@@ -24,7 +24,7 @@ if g_env['libtorch'] != False:
   l_tests += [ 'backend/Tensor.test.torch.cpp',
                'backend/BinaryContractionScalar.test.torch.cpp',
                'backend/EinsumNode.test.torch.cpp',
-               'frontend/EinsumExpression.torch.cpp' ]
+               'frontend/EinsumExpression.test.torch.cpp' ]
 
 if g_env['libxsmm'] != False and g_env['libtorch'] != False:
   l_tests += [ 'backend/BinaryContractionTpp.test.torch.cpp' ]
