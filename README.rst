@@ -8,7 +8,7 @@ Building the Code
    git clone https://github.com/libxsmm/libxsmm.git
    cd libxsmm
    git checkout feature_packed_gemm
-   make -j8
+   make BLAS=0 -j8
    cd ..
 
    wget https://github.com/catchorg/Catch2/releases/download/v2.13.10/catch.hpp
