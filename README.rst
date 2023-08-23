@@ -5,6 +5,9 @@ Building the Code
 -----------------
 .. code-block:: bash
 
+   git clone https://github.com/scalable-analyses/einsum_ir
+   cd einsum_ir
+
    git clone https://github.com/libxsmm/libxsmm.git
    cd libxsmm
    git checkout feature_packed_gemm
