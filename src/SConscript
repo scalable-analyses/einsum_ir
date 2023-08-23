@@ -1,0 +1,43 @@
+Import('g_env')
+
+l_sources = [ 'backend/Tensor.cpp',
+              'backend/ContractionLoops.cpp',
+              'backend/ContractionLoopsSimple.cpp',
+              'backend/BinaryContraction.cpp',
+              'backend/BinaryContractionScalar.cpp',
+              'backend/EinsumNode.cpp',
+              'frontend/EinsumExpression.cpp' ]
+
+if g_env['libxsmm'] != False:
+  l_sources += [ 'backend/ContractionLoopsTpp.cpp',
+                 'backend/BinaryContractionTpp.cpp' ]
+
+l_tests = [ 'tests.cpp',
+            'backend/ContractionLoopsSimple.test.cpp',
+            'backend/BinaryContraction.test.cpp',
+            'frontend/EinsumExpression.test.cpp' ]
+
+if g_env['libxsmm'] != False:
+  l_tests += [ 'backend/BinaryContractionTpp.test.cpp' ]
+
+if g_env['libtorch'] != False:
+  l_tests += [ 'backend/Tensor.test.torch.cpp',
+               'backend/BinaryContractionScalar.test.torch.cpp',
+               'backend/EinsumNode.test.torch.cpp',
+               'frontend/EinsumExpression.torch.cpp' ]
+
+if g_env['libxsmm'] != False and g_env['libtorch'] != False:
+  l_tests += [ 'backend/BinaryContractionTpp.test.torch.cpp' ]
+
+for l_source in l_sources:
+  g_env.sources.append( g_env.Object( l_source ) )
+
+for l_test in l_tests:
+  g_env.tests.append( g_env.Object( l_test ) )
+g_env.tests.append( g_env.sources )
+
+if g_env['libxsmm'] != False and g_env['libtorch'] != False:
+  g_env.exe['bench_binary'] = g_env.Object( 'bench_binary.cpp' )
+  g_env.exe['bench_expression'] = g_env.Object( 'bench_expression.cpp' )
+
+Export('g_env')
