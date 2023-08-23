@@ -2,14 +2,6 @@
 #include "catch.hpp"
 #include "EinsumExpression.h"
 
-#include <iostream>
-
-
-
-
-
-
-
 TEST_CASE( "Single matmul example using an einsum expression through the native interface.", "[einsum_exp]" ) {
   // test case:
   //
