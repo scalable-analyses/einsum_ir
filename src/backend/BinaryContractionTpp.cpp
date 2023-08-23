@@ -237,7 +237,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
 
   l_lda = l_m;
   l_ldb = l_k;
-  l_ldc = m_num_dims_n > 0 ? m_strides_out_n[ m_num_dims_n - m_num_dims_nb ] : 1;
+  l_ldc = m_num_dims_n > 0 ? m_strides_out_n[ m_num_dims_n - m_num_dims_nb ] : l_m*l_r;
 
   // first-touch and last-touch shape
   libxsmm_meltw_unary_shape l_shape_single_touch = libxsmm_create_meltw_unary_shape( l_m*l_r,

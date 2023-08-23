@@ -19,6 +19,7 @@ void split_string( std::string                const & i_input,
 
   while( l_off < l_string.size() ) {
     l_off = l_string.find( i_separation );
+    if( l_off < 0 ) break;
     o_output.push_back( l_string.substr( 0, l_off ) );
     l_string.erase( 0, l_off + i_separation.size() );
   }
