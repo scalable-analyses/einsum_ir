@@ -57,6 +57,15 @@ class einsum_ir::backend::ContractionLoops {
     //! number of bytes for a scalar of the output tensor
     int64_t m_num_bytes_scalar_out = 0;
 
+    //! upper dimension type limit for spawning tasks
+    char m_threading_limit_dim_type = -1;
+
+    //! upper dimension count limit for spawning tasks
+    int64_t m_threading_limit_dim_count = -1;
+
+    //! grain size for the innermost loop
+    int64_t m_threading_grain_size_inner_most = -1;
+
   public:
     /**
      * Kernel applied to the output tensor before the contraction.
@@ -133,6 +142,15 @@ class einsum_ir::backend::ContractionLoops {
                int64_t         i_num_bytes_scalar_left,
                int64_t         i_num_bytes_scalar_right,
                int64_t         i_num_bytes_scalar_out );
+
+    /**
+     * Sets the threading for the contraction loops.
+     * Parallelizes all loops such that the targeted number of tasks is reached or
+     * all parallelizable loop dimensions have been exhausted.
+     *
+     * @param i_num_tasks_target number of targeted tasks. 
+     **/
+    void threading( int64_t i_num_tasks_target );
 
     /**
      * Contracts the two input tensors.

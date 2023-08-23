@@ -1,8 +1,9 @@
 #ifndef EINSUM_IR_BACKEND_BINARY_CONTRACTION_TPP
 #define EINSUM_IR_BACKEND_BINARY_CONTRACTION_TPP
 
-#include "BinaryContraction.h"
 #include <libxsmm.h>
+#include "BinaryContraction.h"
+#include "ContractionLoopsTpp.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -33,6 +34,9 @@ class einsum_ir::backend::BinaryContractionTpp: public BinaryContraction {
     //! number of blocked K dimensions
     int64_t m_num_dims_kb = 0;
 
+    //! contraction loop interface
+    ContractionLoopsTpp m_cont_loops;
+
     /**
      * Converts the given native datatype to a LIBXSMM datatype.
      *
@@ -46,6 +50,13 @@ class einsum_ir::backend::BinaryContractionTpp: public BinaryContraction {
      * Compiles the binary contraction.
      **/
     err_t compile();
+
+    /**
+     * Initializes the threading configuration of the contraction.
+     *
+     * @param i_num_tasks_target number of targeted tasks.
+     **/
+    void threading( int64_t i_num_tasks_target  );
 
     /**
      * Performs a contraction on the given input data.

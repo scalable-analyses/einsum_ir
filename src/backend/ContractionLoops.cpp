@@ -45,6 +45,59 @@ void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
   m_num_bytes_scalar_left = i_num_bytes_scalar_left;
   m_num_bytes_scalar_right = i_num_bytes_scalar_right;
   m_num_bytes_scalar_out = i_num_bytes_scalar_out;
+
+  m_threading_limit_dim_type = -1;
+  m_threading_limit_dim_count = -1;
+}
+
+void einsum_ir::backend::ContractionLoops::threading( int64_t i_num_tasks_target ) {
+  int64_t l_num_tasks = 1;
+
+  // invalid config, disable threading
+  if( l_num_tasks >= i_num_tasks_target ) {
+    m_threading_limit_dim_type = -1;
+    m_threading_limit_dim_count = -1;
+    m_threading_grain_size_inner_most = -1;
+    return;
+  }
+
+  // C loops
+  for( int64_t l_di = 0; l_di < m_num_dims_c; l_di++ ) {
+    l_num_tasks *= m_sizes_c[l_di];
+    if( l_num_tasks >= i_num_tasks_target ) {
+      m_threading_limit_dim_type = 0;
+      m_threading_limit_dim_count = l_di;
+      m_threading_grain_size_inner_most = l_num_tasks / i_num_tasks_target;
+      return;
+    }
+  }
+
+  // N loops
+  for( int64_t l_di = 0; l_di < m_num_dims_n; l_di++ ) {
+    l_num_tasks *= m_sizes_n[l_di];
+    if( l_num_tasks >= i_num_tasks_target ) {
+      m_threading_limit_dim_type = 1;
+      m_threading_limit_dim_count = l_di;
+      m_threading_grain_size_inner_most = l_num_tasks / i_num_tasks_target;
+      return;
+    }
+  }
+
+  // M loops
+  for( int64_t l_di = 0; l_di < m_num_dims_m; l_di++ ) {
+    l_num_tasks *= m_sizes_m[l_di];
+    if( l_num_tasks >= i_num_tasks_target ) {
+      m_threading_limit_dim_type = 2;
+      m_threading_limit_dim_count = l_di;
+      m_threading_grain_size_inner_most = l_num_tasks / i_num_tasks_target;
+      return;
+    }
+  }
+
+  // insufficient outer loops: every loop is a taskloop
+  m_threading_limit_dim_type = 2;
+  m_threading_limit_dim_count = m_num_dims_m-1;
+  m_threading_grain_size_inner_most = 1;
 }
 
 void einsum_ir::backend::ContractionLoops::contract_cnmk( char            i_dim_type,
@@ -95,26 +148,51 @@ void einsum_ir::backend::ContractionLoops::contract_cnmk( char            i_dim_
   //   current dimension type is not exhausted
   //   take care of additional dimension
   if( i_dim_count < l_num_dims ) {
-    char * l_ptr_in_left = (char *) i_ptr_in_left;
-    char * l_ptr_in_right = (char *) i_ptr_in_right;
-    char * l_ptr_out = (char *) i_ptr_out;
+    int64_t l_stride_left_byte  =  m_num_bytes_scalar_left;
+    int64_t l_stride_right_byte =  m_num_bytes_scalar_right;
+    int64_t l_stride_out_byte   =  m_num_bytes_scalar_out;
+    if( i_dim_type != 1 ) {
+      l_stride_left_byte  *= l_strides_in_left[i_dim_count];
+    }
+    if( i_dim_type != 2 ) {
+      l_stride_right_byte *= l_strides_in_right[i_dim_count];
+    }
+    if( i_dim_type != 3 ) {
+      l_stride_out_byte   *= l_strides_out[i_dim_count];
+    }
 
+#ifdef _OPENMP
+      bool l_task_parallel  = i_dim_type < m_threading_limit_dim_type;
+           l_task_parallel |=    i_dim_type == m_threading_limit_dim_type
+                              && i_dim_count <= m_threading_limit_dim_count;
+
+      int64_t l_grain_size = 1;
+      if(    i_dim_type  == m_threading_limit_dim_type
+          && i_dim_count == m_threading_limit_dim_count ) {
+        l_grain_size = m_threading_grain_size_inner_most;
+      }
+#pragma omp taskloop grainsize( l_grain_size ) if( l_task_parallel )
+#endif
     for( int64_t l_it = 0; l_it < l_sizes[i_dim_count]; l_it++ ) {
+      char * l_ptr_in_left  = (char *) i_ptr_in_left;
+      char * l_ptr_in_right = (char *) i_ptr_in_right;
+      char * l_ptr_out      = (char *) i_ptr_out;
+
+      if( i_dim_type != 1 ) {
+        l_ptr_in_left  += l_it * l_stride_left_byte;
+      }
+      if( i_dim_type != 2 ) {
+        l_ptr_in_right += l_it * l_stride_right_byte;
+      }
+      if( i_dim_type != 3 ) {
+        l_ptr_out      += l_it * l_stride_out_byte;
+      }
+
       contract_cnmk( i_dim_type,
                      i_dim_count+1,
                      l_ptr_in_left,
                      l_ptr_in_right,
                      l_ptr_out );
-
-      if( i_dim_type != 1 ) {
-        l_ptr_in_left += l_strides_in_left[i_dim_count] * m_num_bytes_scalar_left;
-      }
-      if( i_dim_type != 2 ) {
-        l_ptr_in_right += l_strides_in_right[i_dim_count] * m_num_bytes_scalar_right;
-      }
-      if( i_dim_type != 3 ) {
-        l_ptr_out += l_strides_out[i_dim_count] * m_num_bytes_scalar_out;
-      }
     }
   }
   // second case:
@@ -148,9 +226,16 @@ void einsum_ir::backend::ContractionLoops::contract_cnmk( char            i_dim_
 void einsum_ir::backend::ContractionLoops::contract( void const * i_tensor_in_left,
                                                      void const * i_tensor_in_right,
                                                      void       * io_tensor_out ) {
+#ifdef _OPENMP
+#pragma omp parallel
+#pragma omp single
+#endif
   contract_cnmk( 0,
                  0,
                  i_tensor_in_left,
                  i_tensor_in_right,
                  io_tensor_out );
+#ifdef _OPENMP
+#pragma omp taskwait
+#endif
 }

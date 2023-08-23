@@ -313,6 +313,13 @@ class einsum_ir::backend::BinaryContraction {
      * Gets the number of operations for a single contraction.
      **/
     int64_t num_ops();
+
+    /**
+     * Initializes the threading configuration of the contraction.
+     *
+     * @param i_num_tasks_target number of targeted tasks.
+     **/
+    virtual void threading( int64_t i_num_tasks_target  ) = 0;
 };
 
 #endif

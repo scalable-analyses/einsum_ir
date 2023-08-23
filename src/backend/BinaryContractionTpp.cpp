@@ -1,5 +1,4 @@
 #include "BinaryContractionTpp.h"
-#include "ContractionLoopsTpp.h"
 
 libxsmm_datatype einsum_ir::backend::BinaryContractionTpp::dtype_to_libxsmm( data_t i_dtype ) {
   if( i_dtype == FP32 ) {
@@ -327,9 +326,38 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     return einsum_ir::COMPILATION_FAILED;
   }
 
+  // contraction loop interface
+  m_cont_loops.init( m_num_dims_c-m_num_dims_cb,
+                     m_num_dims_m-m_num_dims_mb,
+                     m_num_dims_n-m_num_dims_nb,
+                     m_num_dims_k-m_num_dims_kb,
+                     m_sizes_c.data(),
+                     m_sizes_m.data(),
+                     m_sizes_n.data(),
+                     m_sizes_k.data(),
+                     m_strides_in_left_c.data(),
+                     m_strides_in_left_m.data(),
+                     m_strides_in_left_k.data(),
+                     m_strides_in_right_c.data(),
+                     m_strides_in_right_n.data(),
+                     m_strides_in_right_k.data(),
+                     m_strides_out_c.data(),
+                     m_strides_out_m.data(),
+                     m_strides_out_n.data(),
+                     ce_n_bytes( m_dtype_left ),
+                     ce_n_bytes( m_dtype_right ),
+                     ce_n_bytes( m_dtype_out ),
+                     m_xmm_kernel_first_touch,
+                     m_xmm_kernel_inner.gemm,
+                     m_xmm_kernel_last_touch );
+
   m_compiled = true;
 
   return einsum_ir::SUCCESS;
+}
+
+void einsum_ir::backend::BinaryContractionTpp::threading( int64_t i_num_tasks_target  ) {
+  m_cont_loops.threading( i_num_tasks_target );
 }
 
 void einsum_ir::backend::BinaryContractionTpp::contract( void const * i_tensor_in_left,
@@ -342,31 +370,7 @@ void einsum_ir::backend::BinaryContractionTpp::contract( void const * i_tensor_i
     l_tensor_right = i_tensor_in_left;
   }
 
-  ContractionLoopsTpp l_cont_loops( m_num_dims_c-m_num_dims_cb,
-                                    m_num_dims_m-m_num_dims_mb,
-                                    m_num_dims_n-m_num_dims_nb,
-                                    m_num_dims_k-m_num_dims_kb,
-                                    m_sizes_c.data(),
-                                    m_sizes_m.data(),
-                                    m_sizes_n.data(),
-                                    m_sizes_k.data(),
-                                    m_strides_in_left_c.data(),
-                                    m_strides_in_left_m.data(),
-                                    m_strides_in_left_k.data(),
-                                    m_strides_in_right_c.data(),
-                                    m_strides_in_right_n.data(),
-                                    m_strides_in_right_k.data(),
-                                    m_strides_out_c.data(),
-                                    m_strides_out_m.data(),
-                                    m_strides_out_n.data(),
-                                    ce_n_bytes( m_dtype_left ),
-                                    ce_n_bytes( m_dtype_right ),
-                                    ce_n_bytes( m_dtype_out ),
-                                    m_xmm_kernel_first_touch,
-                                    m_xmm_kernel_inner.gemm,
-                                    m_xmm_kernel_last_touch );
-
-  l_cont_loops.contract( l_tensor_left,
+  m_cont_loops.contract( l_tensor_left,
                          l_tensor_right,
                          io_tensor_out );
 }

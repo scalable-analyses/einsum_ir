@@ -70,6 +70,11 @@ class einsum_ir::backend::BinaryContractionScalar: public BinaryContraction {
     err_t compile();
 
     /**
+     * Not implemented.
+     **/
+    void threading( int64_t ){}
+
+    /**
      * Performs a contraction on the given input data.
      *
      * @param i_tensor_in_left left input tensor.

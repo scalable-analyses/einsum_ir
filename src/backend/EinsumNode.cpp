@@ -21,6 +21,9 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
   m_dim_sizes = &i_dim_sizes;
   m_dtype = i_dtype;
   m_data_ptr_ext = i_data_ptr;
+  m_num_ops_node = 0;
+  m_num_ops_children = 0;
+  m_num_tasks_intra_op = 1;
 }
 
 void einsum_ir::backend::EinsumNode::init( int64_t            i_num_dims,
@@ -129,6 +132,28 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
     }
   }
 
+  // derive the number of ops
+  m_num_ops_node = 0;
+  m_num_ops_children = 0;
+
+  if( m_children.size() > 0 ) {
+    m_num_ops_node += m_cont->num_ops();
+  }
+  for( int64_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
+    m_num_ops_children += m_children[l_ch]->m_num_ops_node;
+  }
+
+  return einsum_ir::SUCCESS;
+}
+
+einsum_ir::err_t einsum_ir::backend::EinsumNode::threading_intra_op( int64_t i_num_tasks ) {
+  m_num_tasks_intra_op = i_num_tasks;
+
+#ifdef _OPENMP
+  if( m_num_tasks_intra_op > 1 ) {
+    m_cont->threading( m_num_tasks_intra_op );
+  }
+#endif
   return einsum_ir::SUCCESS;
 }
 
@@ -168,18 +193,10 @@ void einsum_ir::backend::EinsumNode::eval() {
 }
 
 int64_t einsum_ir::backend::EinsumNode::num_ops( bool i_children ) {
-  int64_t l_num_ops = 0;
+  int64_t l_num_ops = m_num_ops_node;
 
-  // add operations of the contraction
-  if( m_children.size() > 0 ) {
-    l_num_ops += m_cont->num_ops();
-  }
-
-  // add operations of children
   if( i_children ) {
-    for( int64_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
-      l_num_ops += m_children[l_ch]->num_ops( true );
-    }
+    l_num_ops += m_num_ops_children;
   }
 
   return l_num_ops;

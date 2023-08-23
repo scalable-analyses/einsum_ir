@@ -2,6 +2,9 @@
 #include <deque>
 #include <set>
 #include <cmath>
+#ifdef _OPENMP
+#include "omp.h"
+#endif
 
 void einsum_ir::frontend::EinsumExpression::histogram( int64_t         i_num_dims,
                                                        int64_t         i_string_size,
@@ -247,6 +250,22 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
                        m_nodes[l_root_id_right] );
 
   err_t l_err = m_nodes.back().compile();
+
+  /*
+   * init intra-op parallelism
+   */
+#ifdef _OPENMP
+  // four times overload
+  int64_t l_num_tasks = omp_get_max_threads() * 4;
+
+  for( int64_t l_no = 0; l_no < m_nodes.size(); l_no++ ) {
+    // magic number: 512^3
+    if( m_nodes[l_no].m_num_ops_node >= 134217728 ) {
+      m_nodes[l_no].threading_intra_op( l_num_tasks );
+    }
+  }
+#endif
+
   return l_err;
 }
 

@@ -11,6 +11,10 @@ l_vars.AddVariables(
                 'release',
                  allowed_values=('release', 'debug', 'release+san', 'debug+san' )
               ),
+  EnumVariable( 'parallel',
+                'used parallelization',
+                'omp',
+                 allowed_values=('none', 'omp') ),
   PackageVariable( 'libxsmm',
                    'Enable libxsmm.',
                    'no' ),
@@ -55,6 +59,12 @@ if 'san' in  g_env['mode']:
 
 # enable c++14
 g_env.Append( CXXFLAGS = [ '-std=c++14' ] )
+
+# enable omp
+if 'omp' in g_env['parallel']:
+  g_env.AppendUnique( CPPFLAGS = ['-fopenmp'] )
+  g_env.AppendUnique( CPPFLAGS = ['-fopenmp-simd'] )
+  g_env.AppendUnique( LINKFLAGS = ['-fopenmp'] )
 
 # discover libraries
 if g_env['libtorch'] != False:
@@ -105,9 +115,9 @@ Import('g_env')
 
 if( g_env['libxsmm'] and g_env['libtorch'] ):
   g_env.Program( g_env['build_dir']+'/bench_binary',
-                 source = g_env.exe['bench_binary'] + g_env.sources )
+                 source = g_env.sources + g_env.exe['bench_binary'] )
   g_env.Program( g_env['build_dir']+'/bench_expression',
-                 source = g_env.exe['bench_expression'] + g_env.sources )
+                 source = g_env.sources + g_env.exe['bench_expression'] )
 
 g_env.Program( g_env['build_dir']+'/tests',
                source = g_env.tests )

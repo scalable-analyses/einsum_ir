@@ -46,6 +46,14 @@ class einsum_ir::backend::EinsumNode {
     //! binary contraction
     BinaryContraction * m_cont = nullptr;
 
+    //! number of operations in the contraction
+    int64_t m_num_ops_node = 0;
+    //! number of operations of the children
+    int64_t m_num_ops_children = 0;
+
+    //! number of intra-op tasks
+    int64_t m_num_tasks_intra_op = 1;
+
     /**
      * Destructor.
      **/
@@ -121,6 +129,13 @@ class einsum_ir::backend::EinsumNode {
      * Compiles the contraction of the node and recursively those of all children.
      **/    
     err_t compile();
+
+    /**
+     * Enables intra-op threading with the given number of tasks.
+     *
+     * @param i_num_tasks number of targeted tasks.
+     **/
+    err_t threading_intra_op( int64_t i_num_tasks );
 
     /**
      * Evaluates the einsum tree described by the node all its children. 
