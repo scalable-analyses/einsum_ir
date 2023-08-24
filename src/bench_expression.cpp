@@ -217,7 +217,7 @@ int main( int     i_argc,
   /*
    * run einsum_ir
    */
-  std::cout << "benchmarking einsum_ir" << std::endl;
+  std::cout <<  "\n*** benchmarking einsum_ir ***" << std::endl;
 
   einsum_ir::frontend::EinsumExpression l_einsum_exp;
   l_einsum_exp.init( l_dim_sizes.size(),
@@ -268,11 +268,27 @@ int main( int     i_argc,
   std::cout << "  time (eval):    " << l_time_eval << std::endl;
   std::cout << "  gflops (eval):  " << l_gflops_eval << std::endl;
   std::cout << "  gflops (total): " << l_gflops_total << std::endl;
+  std::cout << "CSV_DATA: "
+            << "einsum_ir,"
+            << "\"" << l_expression_string << "\","
+            << "\"" << l_dim_sizes_string << "\","
+            << "\"" << l_path_string << "\","
+            << l_num_flops << ","
+            << l_time_compile << ","
+            << l_time_eval << ","
+            << l_gflops_eval << ","
+            << l_gflops_total
+            << std::endl;
 
   /*
-   * run aten
+   * run at::einsum
    */
-  std::cout << "benchmarking aten" << std::endl;
+  std::cout << "\n*** benchmarking at::einsum ***" << std::endl;
+  l_time_compile = 0;
+  l_time_eval = 0;
+  l_time_total = 0;
+  l_gflops_eval = 0;
+  l_gflops_total = 0;
 
   std::vector< at::Tensor > l_data_in( l_data.size()-1 );
   for( int64_t l_te = 0; l_te < l_data.size() - 1; l_te++ ) {
@@ -291,9 +307,92 @@ int main( int     i_argc,
   std::cout << "  #flops:         " << l_num_flops << std::endl;\
   std::cout << "  time (total):   " << l_time_total << std::endl;
   std::cout << "  gflops (total): " << l_gflops_total << std::endl;
+  std::cout << "CSV_DATA: "
+            << "at::einsum,"
+            << "\"" << l_expression_string << "\","
+            << "\"" << l_dim_sizes_string << "\","
+            << "\"" << l_path_string << "\","
+            << l_num_flops << ","
+            << l_time_compile << ","
+            << l_time_eval << ","
+            << l_gflops_eval << ","
+            << l_gflops_total
+            << std::endl;
 
+  /*
+   * run at::matmul
+   */
+  std::cout << "\n*** benchmarking at::matmul ***" << std::endl;
+  l_time_compile = 0;
+  l_time_eval = 0;
+  l_time_total = 0;
+  l_gflops_eval = 0;
+  l_gflops_total = 0;
+  int64_t l_num_flops_matmul = 0;
+
+  // extract binary contractions
+  einsum_ir::backend::EinsumNode * l_bin_conts = l_einsum_exp.m_nodes.data() + l_tensors.size()-1;
+
+  // iterate over binary contractions
+  for( int64_t l_co = 0; l_co < l_tensors.size()-2; l_co++ ) {
+    // extract matrix sizes
+    int64_t l_c = 1;
+    int64_t l_m = 1;
+    int64_t l_n = 1;
+    int64_t l_k = 1;
+
+    for( int64_t l_di = 0; l_di < l_bin_conts[l_co].m_cont->m_num_dims_c; l_di++ ) {
+      l_c *= l_bin_conts[l_co].m_cont->m_sizes_c[l_di];
+    }
+    for( int64_t l_di = 0; l_di < l_bin_conts[l_co].m_cont->m_num_dims_m; l_di++ ) {
+      l_m *= l_bin_conts[l_co].m_cont->m_sizes_m[l_di];
+    }
+    for( int64_t l_di = 0; l_di < l_bin_conts[l_co].m_cont->m_num_dims_n; l_di++ ) {
+      l_n *= l_bin_conts[l_co].m_cont->m_sizes_n[l_di];
+    }
+    for( int64_t l_di = 0; l_di < l_bin_conts[l_co].m_cont->m_num_dims_k; l_di++ ) {
+      l_k *= l_bin_conts[l_co].m_cont->m_sizes_k[l_di];
+    }
+
+    at::Tensor l_mat_a = at::rand( {l_c, l_k, l_m} );
+    at::Tensor l_mat_b = at::rand( {l_c, l_n, l_k} );
+
+    l_tp0 = std::chrono::steady_clock::now();
+    at::Tensor l_mat_c = at::matmul( l_mat_b,
+                                     l_mat_a );
+    l_tp1 = std::chrono::steady_clock::now();
+    l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
+
+    l_time_eval += l_dur.count();
+    l_num_flops_matmul += 2 * l_m * l_n * l_k - l_m * l_n;
+  }
+  if( l_num_flops_matmul != l_num_flops ) {
+    std::cerr << "error: flops performed through batched gemms dont match" << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  l_gflops_eval = 1.0E-9 * l_num_flops / (l_time_eval);
+
+  std::cout << "  #flops:         " << l_num_flops << std::endl;\
+  std::cout << "  time (eval):    " << l_time_eval << std::endl;
+  std::cout << "  gflops (eval):  " << l_gflops_eval << std::endl;
+  std::cout << "CSV_DATA: "
+            << "at::matmul,"
+            << "\"" << l_expression_string << "\","
+            << "\"" << l_dim_sizes_string << "\","
+            << "\"" << l_path_string << "\","
+            << l_num_flops << ","
+            << l_time_compile << ","
+            << l_time_eval << ","
+            << l_gflops_eval << ","
+            << l_gflops_total
+            << std::endl;
+
+  /*
+   * compare solution
+   */
   if( !at::allclose( l_out_aten, l_data.back() ) ) {
-    std::cerr << "error: einsum_ir solution is not close to aten!" << std::endl;
+    std::cerr << "error: einsum_ir solution is not close to at:einsum!" << std::endl;
     return EXIT_FAILURE;
   }
 
