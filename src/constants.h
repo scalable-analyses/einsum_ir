@@ -25,7 +25,11 @@ namespace einsum_ir {
   typedef enum {
     SUCCESS = 0,
     COMPILATION_FAILED = 1,
-    DIMENSION_ORDERING_FAILED = 2
+    DIMENSION_ORDERING_FAILED = 2,
+    NO_DATA_PTR_PROVIDED = 3,
+    CALLED_BEFORE_COMPILATION = 4,
+    INVALID_ID = 5,
+    UNDEFINED_ERROR = 99
   } err_t;
 
   typedef enum {

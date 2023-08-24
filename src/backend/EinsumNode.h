@@ -54,6 +54,12 @@ class einsum_ir::backend::EinsumNode {
     //! number of intra-op tasks
     int64_t m_num_tasks_intra_op = 1;
 
+    //! true if the node has been compiled
+    bool m_compiled = false;
+
+    //! true if the external data was copied and locked
+    bool m_data_locked = false;
+
     /**
      * Destructor.
      **/
@@ -129,6 +135,19 @@ class einsum_ir::backend::EinsumNode {
      * Compiles the contraction of the node and recursively those of all children.
      **/    
     err_t compile();
+
+    /**
+     * Stores the provided data internally and locks it, i.e.,
+     * the provided data pointer is ignored in future evaluations.
+     * Has to be called after compilation.
+     **/
+    err_t store_and_lock_data();
+
+    /**
+     * Unlocks the data, i.e., the provided data pointer is used
+     * in future evaluations.
+     **/
+    err_t unlock_data();
 
     /**
      * Enables intra-op threading with the given number of tasks.

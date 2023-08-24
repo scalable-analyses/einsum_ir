@@ -170,6 +170,130 @@ TEST_CASE( "Two matmul example with external intermediate data.", "[einsum_node]
   REQUIRE( at::allclose( l_data_bd, l_data_bd_ref )  );
 }
 
+TEST_CASE( "Two matmul example with locked data.", "[einsum_node]" ) {
+  // test case:
+  //
+  //         __bd__
+  //        /      \
+  //    ___ba___    da
+  //   /        \
+  // ca          bc
+  //
+  // char   id   size
+  //    a    0      2
+  //    b    1      3
+  //    c    2      4
+  //    d    3      5
+  std::map< int64_t, int64_t > l_dim_sizes;
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 0, 2 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 1, 3 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 2, 4 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 3, 5 ) );
+
+  int64_t l_dim_ids_ca[2] = { 2, 0 };
+  int64_t l_dim_ids_bc[2] = { 1, 2 };
+  int64_t l_dim_ids_da[2] = { 3, 0 };
+  int64_t l_dim_ids_ba[2] = { 1, 0 };
+  int64_t l_dim_ids_bd[2] = { 1, 3 };
+
+  // data
+  at::Tensor l_data_ca     = at::rand(  {4, 2} );
+  at::Tensor l_data_bc     = at::rand(  {3, 4} );
+  at::Tensor l_data_da     = at::rand(  {5, 2} );
+  at::Tensor l_data_bd_ref = at::rand(  {3, 5} );
+  at::Tensor l_data_bd     = l_data_bd_ref.clone();
+
+  // reference
+  l_data_bd_ref = at::einsum( "ca,bc,da->bd",
+                              {l_data_ca, l_data_bc, l_data_da} );
+
+  // einsum_ir
+  einsum_ir::backend::EinsumNode l_node_ca;
+  einsum_ir::backend::EinsumNode l_node_bc;
+  einsum_ir::backend::EinsumNode l_node_da;
+  einsum_ir::backend::EinsumNode l_node_ba;
+  einsum_ir::backend::EinsumNode l_node_bd;
+
+  l_node_ca.init( 2,
+                  l_dim_ids_ca,
+                  l_dim_sizes,
+                  einsum_ir::FP32,
+                  l_data_ca.data_ptr() );
+
+  l_node_bc.init( 2,
+                  l_dim_ids_bc,
+                  l_dim_sizes,
+                  einsum_ir::FP32,
+                  l_data_bc.data_ptr() );
+
+  l_node_da.init( 2,
+                  l_dim_ids_da,
+                  l_dim_sizes,
+                  einsum_ir::FP32,
+                  l_data_da.data_ptr() );
+
+  l_node_ba.init( 2,
+                  l_dim_ids_ba,
+                  einsum_ir::FP32,
+                  einsum_ir::ZERO,
+                  einsum_ir::MADD,
+                  einsum_ir::UNDEFINED_KTYPE,
+                  l_node_ca,
+                  l_node_bc );
+
+  l_node_bd.init( 2,
+                  l_dim_ids_bd,
+                  einsum_ir::FP32,
+                  l_data_bd.data_ptr(),
+                  einsum_ir::ZERO,
+                  einsum_ir::MADD,
+                  einsum_ir::UNDEFINED_KTYPE,
+                  l_node_ba,
+                  l_node_da );
+
+  einsum_ir::err_t l_err = l_node_bd.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  l_err = l_node_ca.store_and_lock_data();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+  l_err = l_node_bc.store_and_lock_data();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+  l_err = l_node_da.store_and_lock_data();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  // check node info
+  REQUIRE( l_node_ca.m_data_ptr_int != nullptr );
+  REQUIRE( l_node_bc.m_data_ptr_int != nullptr );
+  REQUIRE( l_node_da.m_data_ptr_int != nullptr );
+
+  // modify external data
+  l_data_ca += at::rand( {4, 2} );
+  l_data_bc += at::rand( {3, 4} );
+  l_data_da += at::rand( {5, 2} );
+
+  l_node_bd.eval();
+
+  // check results
+  REQUIRE( at::allclose( l_data_bd, l_data_bd_ref )  );
+
+  // unlock data
+  l_err = l_node_ca.unlock_data();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+  l_err = l_node_bc.unlock_data();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+  l_err = l_node_da.unlock_data();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  l_node_bd.eval();
+
+  // reference
+  l_data_bd_ref = at::einsum( "ca,bc,da->bd",
+                              {l_data_ca, l_data_bc, l_data_da} );
+
+  // check results
+  REQUIRE( at::allclose( l_data_bd, l_data_bd_ref )  );
+}
+
 TEST_CASE( "Two matmul example with internal intermediate data.", "[einsum_node]" ) {
   // test case:
   //

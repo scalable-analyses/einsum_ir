@@ -13,29 +13,29 @@ namespace einsum_ir {
 class einsum_ir::frontend::EinsumExpression {
   public:
     //! number of dimensions
-    int64_t m_num_dims;
+    int64_t m_num_dims = 0;
     //! sizes of the dimensions
-    int64_t const * m_dim_sizes;
+    int64_t const * m_dim_sizes = nullptr;
 
     //! number of binary contractions
-    int64_t m_num_conts;
+    int64_t m_num_conts = 0;
 
     //! external dimension ids of the einsum string
     //! example: 01,234->124 (ab,cde->bce) gets 01234124
-    int64_t const * m_string_dim_ids_ext;
+    int64_t const * m_string_dim_ids_ext = nullptr;
 
     //! sizes of the tensors in the external einsum string
     //! example: 01,234->124 has sizes 233
-    int64_t const * m_string_num_dims_ext;
+    int64_t const * m_string_num_dims_ext = nullptr;
 
     //! datatype of all tensors
-    data_t m_dtype;
+    data_t m_dtype = data_t::UNDEFINED_DTYPE;
     //! data points of the tensors 
-    void * const * m_data_ptrs;
+    void * const * m_data_ptrs = nullptr;
 
     //! external contraction path
     //! tensors are assumed to be removed after every contraction
-    int64_t const * m_path_ext;
+    int64_t const * m_path_ext = nullptr;
 
     //! internal contraction path
     //! tensors are not removed after the contraction, i.e., they have unique ids
@@ -54,6 +54,9 @@ class einsum_ir::frontend::EinsumExpression {
 
     //! nodes of the resulting einsum tree
     std::vector< backend::EinsumNode > m_nodes;
+
+    //! true if the expression was compiled
+    bool m_compiled = false;
 
     /**
      * Derives a histogram showing how often the dimensions appear in the einsum string.
@@ -136,6 +139,20 @@ class einsum_ir::frontend::EinsumExpression {
      * Compiles the einsum expression. 
      **/
     err_t compile();
+
+    /**
+     * Stores the data of the given tensor internally and locks it.
+     * In following execution the stored data is used.
+     *
+     * @param i_tensor_id id of the the tensor in the einsum string.
+     **/
+    err_t store_and_lock_data( int64_t i_tensor_id );
+
+    /**
+     * Unlocks the data of the given tensor.
+     * In following executions the provided data pointer is used.
+     **/
+    err_t unlock_data( int64_t i_tensor_id );
 
     /**
      * Evaluates the einsum expression.

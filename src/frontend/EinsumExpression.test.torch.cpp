@@ -248,6 +248,100 @@ TEST_CASE( "Two matmul example using an einsum expression through the native int
   REQUIRE( l_einsum_exp.num_ops() == 2*3*4*2 - 2*3 + 2*3*5*2 - 3*5 );
 }
 
+TEST_CASE( "Two matmul expression with locked data.", "[einsum_exp]" ) {
+  // test case:
+  //
+  //         __bd__
+  //        /      \
+  //    ___ba___    da
+  //   /        \
+  // ca          bc
+  //
+  // char   id   size
+  //    a    0      2
+  //    b    1      3
+  //    c    2      4
+  //    d    3      5
+
+  // data
+  at::Tensor l_data_ca     = at::rand( {4, 2} );
+  at::Tensor l_data_bc     = at::rand( {3, 4} );
+  at::Tensor l_data_da     = at::rand( {5, 2} );
+  at::Tensor l_data_bd_ref = at::rand( {3, 5} );
+  at::Tensor l_data_bd     = l_data_bd_ref.clone();
+
+  int64_t l_dim_sizes[4] = { 2, 3, 4, 5 };
+
+  int64_t l_string_num_dims[4] = { 2, 2, 2, 2 };
+
+  int64_t l_string_dim_ids[8] = { 2, 0,   // ca
+                                  1, 2,   // bc
+                                  3, 0,   // da
+                                  1, 3 }; // bd
+
+  int64_t l_path[4] = { 0, 1,   // ba
+                        0, 1 }; // bd
+
+  void * l_data_ptrs[4] = { l_data_ca.data_ptr(),
+                            l_data_bc.data_ptr(),
+                            l_data_da.data_ptr(),
+                            l_data_bd.data_ptr() };
+
+  einsum_ir::frontend::EinsumExpression l_einsum_exp;
+
+  l_einsum_exp.init( 4,
+                     l_dim_sizes,
+                     2,
+                     l_string_num_dims,
+                     l_string_dim_ids,
+                     l_path,
+                     einsum_ir::FP32,
+                     l_data_ptrs );
+
+  einsum_ir::err_t l_err = l_einsum_exp.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  // reference
+  l_data_bd_ref = at::einsum( "ca,bc,da->bd",
+                              {l_data_ca, l_data_bc, l_data_da} );
+
+  // lock input data
+  l_err = l_einsum_exp.store_and_lock_data( 0 );
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+  l_err = l_einsum_exp.store_and_lock_data( 1 );
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+  l_err = l_einsum_exp.store_and_lock_data( 2 );
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  // modify input data
+  l_data_ca += at::rand( {4, 2} );
+  l_data_bc += at::rand( {3, 4} );
+  l_data_da += at::rand( {5, 2} );
+
+  l_einsum_exp.eval();
+
+  // check results
+  REQUIRE( at::allclose( l_data_bd, l_data_bd_ref )  );
+
+
+  // unlock input data
+  l_err = l_einsum_exp.unlock_data( 0 );
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+  l_err = l_einsum_exp.unlock_data( 1 );
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+  l_err = l_einsum_exp.unlock_data( 2 );
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  l_einsum_exp.eval();
+
+  // reference
+  l_data_bd_ref = at::einsum( "ca,bc,da->bd",
+                              {l_data_ca, l_data_bc, l_data_da} );
+
+  // check result
+  REQUIRE( at::allclose( l_data_bd, l_data_bd_ref )  );
+}
+
 TEST_CASE( "Multi-level einsum expression using the internal interface.", "[einsum_exp]" ) {
   // test case:
   //

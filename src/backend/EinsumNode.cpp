@@ -24,6 +24,8 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
   m_num_ops_node = 0;
   m_num_ops_children = 0;
   m_num_tasks_intra_op = 1;
+  m_compiled = false;
+  m_data_locked = false;
 }
 
 void einsum_ir::backend::EinsumNode::init( int64_t            i_num_dims,
@@ -117,7 +119,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
     }
   }
 
-  // allocate memory for intermediate data is required
+  // allocate memory for intermediate data if required
   if( m_data_ptr_ext == nullptr || l_permute_inputs ) {
     char * l_data = new char[m_size];
     m_data_ptr_int = l_data;
@@ -143,6 +145,8 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
     m_num_ops_children += m_children[l_ch]->m_num_ops_node;
   }
 
+  m_compiled = true;
+
   return einsum_ir::SUCCESS;
 }
 
@@ -162,13 +166,53 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile() {
   return l_err;
 }
 
+einsum_ir::err_t einsum_ir::backend::EinsumNode::store_and_lock_data() {
+  if( m_compiled == false ) {
+    return err_t::CALLED_BEFORE_COMPILATION;
+  }
+  else if( m_data_ptr_ext == nullptr ) {
+    return err_t::NO_DATA_PTR_PROVIDED;
+  }
+
+  // allocate memory for intermediate data if required
+  if( m_data_ptr_int == nullptr ) {
+    char * l_data = new char[m_size];
+    m_data_ptr_int = l_data;
+  }
+
+  // store data internally
+  Tensor::permute( m_num_dims,
+                   *m_dim_sizes,
+                   m_dim_ids_ext,
+                   m_dim_ids_int,
+                   m_dtype,
+                   m_dtype,
+                   m_data_ptr_ext,
+                   m_data_ptr_int );
+
+  m_data_locked = true;
+
+  return err_t::SUCCESS;
+}
+
+einsum_ir::err_t einsum_ir::backend::EinsumNode::unlock_data() {
+  if( m_data_ptr_ext == nullptr ) {
+    return err_t::NO_DATA_PTR_PROVIDED;
+  }
+
+  m_data_locked = false;
+
+  return err_t::SUCCESS;
+}
+
 void einsum_ir::backend::EinsumNode::eval() {
   for( int64_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
     m_children[l_ch]->eval();
   }
 
-  if( m_children.size() == 0 &&
-      m_data_ptr_int != nullptr ) {
+  if(    m_data_locked  == false
+      && m_data_ptr_ext != nullptr
+      && m_data_ptr_int != nullptr ) {
     Tensor::permute( m_num_dims,
                      *m_dim_sizes,
                      m_dim_ids_ext,

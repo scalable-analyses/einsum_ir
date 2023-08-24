@@ -31,8 +31,9 @@ void split_string( std::string                const & i_input,
 int main( int     i_argc,
           char  * i_argv[] ) {
   if( i_argc < 4 ) {
-    std::cerr << "usage: bench_expression einsum_string dimension_sizes contraction_path" << std::endl;
+    std::cerr << "usage: bench_expression einsum_string dimension_sizes contraction_path SL" << std::endl;
     std::cerr << "dimension sizes have to be in ascending order of the dimension ids" << std::endl;
+    std::cerr << "if SL is 1, all einsum_ir input tensors are stored and locked before evaluation" << std::endl;
     std::cerr << "example: ./bench_expression \"iae,bf,dcba,cg,dh->hgfei\" \"32,8,4,2,16,64,8,8,8\" \"(1,2),(2,3),(0,1),(0,1)\"" << std::endl;
     return EXIT_FAILURE;
   }
@@ -136,6 +137,18 @@ int main( int     i_argc,
   }
 
   /*
+   * parse SL
+   */
+  bool l_store_and_lock = false;
+  if( i_argc > 4 ) {
+    int l_arg_sl = std::stoi( i_argv[4] );
+    if( l_arg_sl == 1 ) {
+      l_store_and_lock = true;
+    }
+  }
+  std::cout << "store and lock: " << l_store_and_lock << std::endl;
+
+  /*
    * assemble einsum_ir data structures
    */
   std::vector< int64_t > l_string_num_dims( l_tensors.size() );
@@ -225,6 +238,17 @@ int main( int     i_argc,
   if( l_err != einsum_ir::SUCCESS ) {
     std::cerr << "error: failed to compile einsum_ir expressions" << std::endl;
     return EXIT_FAILURE;
+  }
+
+  // stage input tensors if requested
+  if( l_store_and_lock ) {
+    for( int64_t l_te = 0; l_te < l_data_ptrs.size()-1; l_te++ ) {
+      l_err = l_einsum_exp.store_and_lock_data( l_te );
+      if( l_err != einsum_ir::SUCCESS ) {
+        std::cerr << "error: failed to store and lock tensor with id: " << l_te << std::endl;
+        return EXIT_FAILURE;
+      }
+    }
   }
 
   l_tp0 = std::chrono::steady_clock::now();

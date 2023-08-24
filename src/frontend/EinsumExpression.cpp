@@ -114,6 +114,7 @@ void einsum_ir::frontend::EinsumExpression::init( int64_t                 i_num_
   m_path_ext = i_path;
   m_dtype = i_dtype;
   m_data_ptrs = i_data_ptrs;
+  m_compiled = false;
 }
 
 einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
@@ -265,6 +266,34 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
     }
   }
 #endif
+
+  m_compiled = true;
+
+  return l_err;
+}
+
+einsum_ir::err_t einsum_ir::frontend::EinsumExpression::store_and_lock_data( int64_t i_tensor_id ) {
+  if( m_compiled == false ) {
+    return err_t::CALLED_BEFORE_COMPILATION;
+  }
+  else if( !(i_tensor_id < m_num_conts+1) ) {
+    return err_t::INVALID_ID;
+  }
+
+  err_t l_err = m_nodes[i_tensor_id].store_and_lock_data();
+
+  return l_err;
+}
+
+einsum_ir::err_t einsum_ir::frontend::EinsumExpression::unlock_data( int64_t i_tensor_id ) {
+  if( m_compiled == false ) {
+    return err_t::CALLED_BEFORE_COMPILATION;
+  }
+  else if( !(i_tensor_id < m_num_conts+1) ) {
+    return err_t::INVALID_ID;
+  }
+
+  err_t l_err = m_nodes[i_tensor_id].unlock_data();
 
   return l_err;
 }
