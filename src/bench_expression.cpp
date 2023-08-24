@@ -364,7 +364,7 @@ int main( int     i_argc,
     l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
 
     l_time_eval += l_dur.count();
-    l_num_flops_matmul += 2 * l_m * l_n * l_k - l_m * l_n;
+    l_num_flops_matmul += 2 * l_c * l_m * l_n * l_k - l_c * l_m * l_n;
   }
   if( l_num_flops_matmul != l_num_flops ) {
     std::cerr << "error: flops performed through batched gemms dont match" << std::endl;

@@ -482,7 +482,7 @@ int64_t einsum_ir::backend::BinaryContraction::num_ops() {
   int64_t l_num_ops = l_size_c * l_size_m * l_size_n * l_size_k * 2;
 
   if( m_ktype_first_touch == ZERO ) {
-    l_num_ops -= l_size_m * l_size_n;
+    l_num_ops -= l_size_c * l_size_m * l_size_n;
   }
 
   return l_num_ops;

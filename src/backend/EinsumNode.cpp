@@ -143,6 +143,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
   }
   for( int64_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
     m_num_ops_children += m_children[l_ch]->m_num_ops_node;
+    m_num_ops_children += m_children[l_ch]->m_num_ops_children;
   }
 
   m_compiled = true;
