@@ -31,9 +31,10 @@ void split_string( std::string                const & i_input,
 int main( int     i_argc,
           char  * i_argv[] ) {
   if( i_argc < 4 ) {
-    std::cerr << "usage: bench_expression einsum_string dimension_sizes contraction_path SL" << std::endl;
+    std::cerr << "usage: bench_expression einsum_string dimension_sizes contraction_path dtype store_lock" << std::endl;
     std::cerr << "dimension sizes have to be in ascending order of the dimension ids" << std::endl;
-    std::cerr << "if SL is 1, all einsum_ir input tensors are stored and locked before evaluation" << std::endl;
+    std::cerr << "dtype maybe be either FP32 or FP64, default: FP32" << std::endl;
+    std::cerr << "if store_lock is 1, all einsum_ir input tensors are stored and locked before evaluation, default: 0" << std::endl;
     std::cerr << "example: ./bench_expression \"iae,bf,dcba,cg,dh->hgfei\" \"32,8,4,2,16,64,8,8,8\" \"(1,2),(2,3),(0,1),(0,1)\"" << std::endl;
     return EXIT_FAILURE;
   }
@@ -59,7 +60,7 @@ int main( int     i_argc,
   l_tensors.push_back( l_tensors_tmp[1] );
 
   std::cout << "parsed tensors:" << std::endl;
-  for( int64_t l_te = 0; l_te < l_tensors.size(); l_te++ ) {
+  for( std::size_t l_te = 0; l_te < l_tensors.size(); l_te++ ) {
     std::cout << "  " << l_tensors[l_te] << std::endl;
   }
 
@@ -77,7 +78,7 @@ int main( int     i_argc,
                 std::string(","),
                 l_dim_sizes_tmp );
   std::vector< int64_t > l_dim_sizes( l_dim_sizes_tmp.size() );
-  for( int64_t l_di = 0; l_di < l_dim_sizes_tmp.size(); l_di++ ) {
+  for( std::size_t l_di = 0; l_di < l_dim_sizes_tmp.size(); l_di++ ) {
     l_dim_sizes[l_di] = std::stoi( l_dim_sizes_tmp[l_di] );
   }
 
@@ -102,12 +103,12 @@ int main( int     i_argc,
                 std::string(","),
                 l_path_tmp );
   std::vector< int64_t > l_path( l_path_tmp.size() );
-  for( int64_t l_co = 0; l_co < l_path_tmp.size(); l_co++ ) {
+  for( std::size_t l_co = 0; l_co < l_path_tmp.size(); l_co++ ) {
     l_path[l_co] = std::stoi( l_path_tmp[l_co] );
   }
 
   std::cout << "parsed contraction path: ";
-  for( int64_t l_co = 0; l_co < l_path.size(); l_co++ ) {
+  for( std::size_t l_co = 0; l_co < l_path.size(); l_co++ ) {
     std::cout << l_path[l_co] << " ";
   }
   std::cout << std::endl;
@@ -116,10 +117,10 @@ int main( int     i_argc,
    * create mapping from dimension name to id
    */
   std::set< char > l_dim_names_set;
-  for( int64_t l_te = 0; l_te < l_tensors.size(); l_te++ ) {
+  for( std::size_t l_te = 0; l_te < l_tensors.size(); l_te++ ) {
     std::string l_tensor = l_tensors[l_te];
 
-    for( int64_t l_ch = 0; l_ch < l_tensor.size(); l_ch++ ) {
+    for( std::size_t l_ch = 0; l_ch < l_tensor.size(); l_ch++ ) {
       l_dim_names_set.insert( l_tensor[l_ch] );
     }
   }
@@ -127,21 +128,44 @@ int main( int     i_argc,
                                    l_dim_names_set.end() );
 
   std::cout << "parsed dimension sizes:" << std::endl;
-  for( int64_t l_di = 0; l_di < l_dim_sizes.size(); l_di++ ) {
+  for( std::size_t l_di = 0; l_di < l_dim_sizes.size(); l_di++ ) {
     std::cout << "  " << l_dim_names[l_di] << ": " << l_dim_sizes[l_di] << std::endl;
   }
 
   std::map< char, int64_t > m_map_dim_name_to_id;
-  for( int64_t l_di = 0; l_di < l_dim_names.size(); l_di++ ) {
+  for( std::size_t l_di = 0; l_di < l_dim_names.size(); l_di++ ) {
     m_map_dim_name_to_id.insert( { l_dim_names[l_di], l_di } );
   }
 
   /*
-   * parse SL
+   * parse dtype
+   */
+  at::ScalarType l_dtype_at= at::ScalarType::Float;
+  einsum_ir::data_t l_dtype_einsum_ir = einsum_ir::FP32;
+  if( i_argc > 4 ) {
+    std::string l_arg_dtype = std::string( i_argv[4] );
+    if( l_arg_dtype == "FP64" ) {
+      l_dtype_at = at::ScalarType::Double;
+      l_dtype_einsum_ir = einsum_ir::FP64;
+    }
+  }
+  if( l_dtype_einsum_ir == einsum_ir::FP32 ) {
+    std::cout << "dtype: FP32" << std::endl;
+  }
+  else if( l_dtype_einsum_ir == einsum_ir::FP64 ) {
+    std::cout << "dtype: FP64" << std::endl;
+  }
+  else {
+    std::cerr << "failed to determine dtype" << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  /*
+   * parse store_lock
    */
   bool l_store_and_lock = false;
-  if( i_argc > 4 ) {
-    int l_arg_sl = std::stoi( i_argv[4] );
+  if( i_argc > 5 ) {
+    int l_arg_sl = std::stoi( i_argv[5] );
     if( l_arg_sl == 1 ) {
       l_store_and_lock = true;
     }
@@ -152,15 +176,15 @@ int main( int     i_argc,
    * assemble einsum_ir data structures
    */
   std::vector< int64_t > l_string_num_dims( l_tensors.size() );
-  for( int64_t l_te = 0; l_te < l_tensors.size(); l_te++ ) {
+  for( std::size_t l_te = 0; l_te < l_tensors.size(); l_te++ ) {
     l_string_num_dims[l_te] = l_tensors[l_te].size();
   }
 
   std::vector< int64_t > l_string_dim_ids;
-  for( int64_t l_te = 0; l_te < l_tensors.size(); l_te++ ) {
+  for( std::size_t l_te = 0; l_te < l_tensors.size(); l_te++ ) {
     std::string l_tensor = l_tensors[l_te];
 
-    for( int64_t l_ch = 0; l_ch < l_tensor.size(); l_ch++ ) {
+    for( std::size_t l_ch = 0; l_ch < l_tensor.size(); l_ch++ ) {
       int64_t l_dim_id = m_map_dim_name_to_id[ l_tensor[l_ch] ];
       l_string_dim_ids.push_back( l_dim_id );
     }
@@ -168,13 +192,13 @@ int main( int     i_argc,
 
   std::cout << "assembled einsum_ir data structures" << std::endl;
   std::cout << "  string_num_dims: ";
-  for( int64_t l_te = 0; l_te < l_string_num_dims.size(); l_te++ ) {
+  for( std::size_t l_te = 0; l_te < l_string_num_dims.size(); l_te++ ) {
     std::cout << l_string_num_dims[l_te] << " ";
   }
   std::cout << std::endl;
 
   std::cout << "  string_dim_ids: ";
-  for( int64_t l_ch = 0; l_ch < l_string_dim_ids.size(); l_ch++ ) {
+  for( std::size_t l_ch = 0; l_ch < l_string_dim_ids.size(); l_ch++ ) {
     std::cout << l_string_dim_ids[l_ch] << " ";
   }
   std::cout << std::endl;
@@ -194,11 +218,11 @@ int main( int     i_argc,
     }
     l_off += l_string_num_dims[l_te];
 
-    l_data.push_back( at::rand( l_sizes ) );
+    l_data.push_back( at::rand( l_sizes, l_dtype_at ) );
   }
 
   std::vector< void * > l_data_ptrs;
-  for( int64_t l_te = 0; l_te < l_data.size(); l_te++ ) {
+  for( std::size_t l_te = 0; l_te < l_data.size(); l_te++ ) {
     l_data_ptrs.push_back( l_data[l_te].data_ptr() );
   }
 
@@ -226,7 +250,7 @@ int main( int     i_argc,
                      l_string_num_dims.data(),
                      l_string_dim_ids.data(),
                      l_path.data(),
-                     einsum_ir::FP32,
+                     l_dtype_einsum_ir,
                      l_data_ptrs.data() );
 
   l_tp0 = std::chrono::steady_clock::now();
