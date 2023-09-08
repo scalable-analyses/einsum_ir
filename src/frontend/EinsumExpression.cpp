@@ -63,7 +63,7 @@ void einsum_ir::frontend::EinsumExpression::substring_out( int64_t              
                                             l_substring.end() );
 
   // add output tensor's dimensions to histogram
-  for( int64_t l_en = 0; l_en < o_substring_out.size(); l_en++ ) {
+  for( std::size_t l_en = 0; l_en < o_substring_out.size(); l_en++ ) {
     int64_t l_id = o_substring_out[l_en];
     io_histogram[l_id]++;
   }
@@ -259,7 +259,7 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
   // four times overload
   int64_t l_num_tasks = omp_get_max_threads() * 4;
 
-  for( int64_t l_no = 0; l_no < m_nodes.size(); l_no++ ) {
+  for( std::size_t l_no = 0; l_no < m_nodes.size(); l_no++ ) {
     // magic number: 512^3
     if( m_nodes[l_no].m_num_ops_node >= 134217728 ) {
       m_nodes[l_no].threading_intra_op( l_num_tasks );

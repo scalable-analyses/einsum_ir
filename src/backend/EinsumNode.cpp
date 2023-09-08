@@ -126,7 +126,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
   }
 
   // compile children
-  for( int64_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
+  for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
     int64_t const * l_dim_ids_child = m_cont->dim_ids_in_ordered( l_ch );
     err_t l_err = m_children[l_ch]->compile( l_dim_ids_child );
     if( l_err != einsum_ir::SUCCESS ) {
@@ -141,7 +141,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
   if( m_children.size() > 0 ) {
     m_num_ops_node += m_cont->num_ops();
   }
-  for( int64_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
+  for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
     m_num_ops_children += m_children[l_ch]->m_num_ops_node;
     m_num_ops_children += m_children[l_ch]->m_num_ops_children;
   }
@@ -207,7 +207,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::unlock_data() {
 }
 
 void einsum_ir::backend::EinsumNode::eval() {
-  for( int64_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
+  for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
     m_children[l_ch]->eval();
   }
 

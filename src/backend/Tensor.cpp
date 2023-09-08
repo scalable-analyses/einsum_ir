@@ -74,7 +74,7 @@ void einsum_ir::backend::Tensor::permute( int64_t         i_num_dims,
 
   if(        i_dtype_in  == einsum_ir::FP32
           && i_dtype_out == einsum_ir::FP32 ) {
-    float const * l_tensor_in = (float * const) i_data_ptr_in;
+    float const * l_tensor_in = (float const *) i_data_ptr_in;
     float * l_tensor_out = (float *) o_data_ptr_out;
 
     transpose( i_num_dims,
@@ -86,7 +86,7 @@ void einsum_ir::backend::Tensor::permute( int64_t         i_num_dims,
   }
   else if(    i_dtype_in  == einsum_ir::FP64
            && i_dtype_out == einsum_ir::FP64 ) {
-    double const * l_tensor_in = (double * const) i_data_ptr_in;
+    double const * l_tensor_in = (double const *) i_data_ptr_in;
     double * l_tensor_out = (double *) o_data_ptr_out;
 
     transpose( i_num_dims,

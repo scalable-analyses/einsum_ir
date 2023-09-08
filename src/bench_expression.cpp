@@ -16,8 +16,8 @@ void split_string( std::string                const & i_input,
                    std::vector< std::string >       & o_output ) {
   std::string l_string = i_input;
   int64_t l_off = 0;
-
-  while( l_off < l_string.size() ) {
+  int64_t l_size_string = l_string.size();
+  while( l_off < l_size_string ) {
     l_off = l_string.find( i_separation );
     if( l_off < 0 ) break;
     o_output.push_back( l_string.substr( 0, l_off ) );
@@ -58,9 +58,10 @@ int main( int     i_argc,
                 std::string(","),
                 l_tensors );
   l_tensors.push_back( l_tensors_tmp[1] );
+  int64_t l_num_tensors = l_tensors.size();
 
   std::cout << "parsed tensors:" << std::endl;
-  for( std::size_t l_te = 0; l_te < l_tensors.size(); l_te++ ) {
+  for( int64_t l_te = 0; l_te < l_num_tensors; l_te++ ) {
     std::cout << "  " << l_tensors[l_te] << std::endl;
   }
 
@@ -117,7 +118,7 @@ int main( int     i_argc,
    * create mapping from dimension name to id
    */
   std::set< char > l_dim_names_set;
-  for( std::size_t l_te = 0; l_te < l_tensors.size(); l_te++ ) {
+  for( int64_t l_te = 0; l_te < l_num_tensors; l_te++ ) {
     std::string l_tensor = l_tensors[l_te];
 
     for( std::size_t l_ch = 0; l_ch < l_tensor.size(); l_ch++ ) {
@@ -175,13 +176,13 @@ int main( int     i_argc,
   /*
    * assemble einsum_ir data structures
    */
-  std::vector< int64_t > l_string_num_dims( l_tensors.size() );
-  for( std::size_t l_te = 0; l_te < l_tensors.size(); l_te++ ) {
+  std::vector< int64_t > l_string_num_dims( l_num_tensors );
+  for( int64_t l_te = 0; l_te < l_num_tensors; l_te++ ) {
     l_string_num_dims[l_te] = l_tensors[l_te].size();
   }
 
   std::vector< int64_t > l_string_dim_ids;
-  for( std::size_t l_te = 0; l_te < l_tensors.size(); l_te++ ) {
+  for( int64_t l_te = 0; l_te < l_num_tensors; l_te++ ) {
     std::string l_tensor = l_tensors[l_te];
 
     for( std::size_t l_ch = 0; l_ch < l_tensor.size(); l_ch++ ) {
@@ -208,7 +209,7 @@ int main( int     i_argc,
    */
   std::vector< at::Tensor > l_data;
   int64_t l_off = 0;
-  for( int64_t l_te = 0; l_te < l_tensors.size(); l_te++ ) {
+  for( int64_t l_te = 0; l_te < l_num_tensors; l_te++ ) {
     // assemble size of the tensor
     std::vector< int64_t > l_sizes;
     for( int64_t l_di = 0; l_di < l_string_num_dims[l_te]; l_di++ ) {
@@ -266,7 +267,7 @@ int main( int     i_argc,
 
   // stage input tensors if requested
   if( l_store_and_lock ) {
-    for( int64_t l_te = 0; l_te < l_data_ptrs.size()-1; l_te++ ) {
+    for( int64_t l_te = 0; l_te < l_num_tensors-1; l_te++ ) {
       l_err = l_einsum_exp.store_and_lock_data( l_te );
       if( l_err != einsum_ir::SUCCESS ) {
         std::cerr << "error: failed to store and lock tensor with id: " << l_te << std::endl;
@@ -314,8 +315,8 @@ int main( int     i_argc,
   l_gflops_eval = 0;
   l_gflops_total = 0;
 
-  std::vector< at::Tensor > l_data_in( l_data.size()-1 );
-  for( int64_t l_te = 0; l_te < l_data.size() - 1; l_te++ ) {
+  std::vector< at::Tensor > l_data_in( l_num_tensors-1 );
+  for( int64_t l_te = 0; l_te < l_num_tensors - 1; l_te++ ) {
     l_data_in[l_te] = l_data[l_te];
   }
 
@@ -355,10 +356,10 @@ int main( int     i_argc,
   int64_t l_num_flops_matmul = 0;
 
   // extract binary contractions
-  einsum_ir::backend::EinsumNode * l_bin_conts = l_einsum_exp.m_nodes.data() + l_tensors.size()-1;
+  einsum_ir::backend::EinsumNode * l_bin_conts = l_einsum_exp.m_nodes.data() + l_num_tensors-1;
 
   // iterate over binary contractions
-  for( int64_t l_co = 0; l_co < l_tensors.size()-2; l_co++ ) {
+  for( int64_t l_co = 0; l_co < l_num_tensors-2; l_co++ ) {
     // extract matrix sizes
     int64_t l_c = 1;
     int64_t l_m = 1;
