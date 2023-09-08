@@ -25,6 +25,18 @@ class einsum_ir::backend::BinaryContractionTpp: public BinaryContraction {
     //! used tensor ordering
     tenord_t m_tensor_ordering = UNDEFINED_TENORD;
 
+    //! target blocked M dimension size of the generated standard GEMMs
+    int64_t m_size_mb_gemm_target = 64;
+
+    //! target blocked N dimension size of the generated standard GEMMs
+    int64_t m_size_nb_gemm_target = 96;
+
+    //! target blocked K dimension size of the generated standard GEMMs
+    int64_t m_size_kb_gemm_target = 256;
+
+    //! target block C dimension size of the generated packed GEMMs
+    int64_t m_size_cb_packed_gemm_target = 8;
+
     //! number of blocked C dimensions
     int64_t m_num_dims_cb = 0;
     //! number of blocked M dimensions

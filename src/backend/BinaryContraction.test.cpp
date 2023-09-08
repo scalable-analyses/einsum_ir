@@ -1,7 +1,7 @@
 #include "catch.hpp"
 #include "BinaryContraction.h"
 
-TEST_CASE( "Derives the dimension types given a binary einsum string of int64 values", "[dim_types]" ) {
+TEST_CASE( "Derives the dimension types given a binary einsum string of int64 values", "[bin_cont_dim_types]" ) {
   //         ______________iexfghy________________
   //        /                                     \
   //   ie-a-x-c-g-y                            a-f-x-c-h-y
@@ -126,7 +126,7 @@ TEST_CASE( "Filters the dimension ids based on the given type.", "[filter_dim_id
   REQUIRE( l_ids_c[1] == 16 );
 }
 
-TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_right_bc_bn_bk_out_native)", "[order_dims_in]" ) {
+TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_right_bc_bn_bk_out_native)", "[bin_cont_order_dims_in]" ) {
   int64_t l_ids_c[2] = { 0, 1 };
   int64_t l_ids_m[3] = { 2, 3, 4 };
   int64_t l_ids_n[2] = { 5, 6 };
@@ -169,7 +169,7 @@ TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_right_bc_bn_bk_ou
   REQUIRE( l_dim_ids_right[0] == 0 );
 }
 
-TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_kb_mb_right_bc_bn_bk_nb_kb_out_native).", "[order_dims_in]" ) {
+TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_kb_mb_right_bc_bn_bk_nb_kb_out_native).", "[bin_cont_order_dims_in]" ) {
   int64_t l_ids_c[2] = { 0, 1 };
   int64_t l_ids_m[3] = { 2, 3, 4 };
   int64_t l_ids_n[2] = { 5, 6 };
@@ -245,7 +245,7 @@ TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_kb_mb_right_bc_bn
   REQUIRE( l_dim_ids_right[0] == 0 );
 }
 
-TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_kb_mb_cb_right_bc_bn_bk_nb_kb_cb_out_native).", "[order_dims_in]" ) {
+TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_kb_mb_cb_right_bc_bn_bk_nb_kb_cb_out_native).", "[bin_cont_order_dims_in]" ) {
   int64_t l_ids_c[3] = { 0, 1, 2 };
   int64_t l_ids_m[3] = { 3, 4, 5 };
   int64_t l_ids_n[2] = { 6, 7 };

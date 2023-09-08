@@ -197,9 +197,9 @@ TEST_CASE( "TPP-based Binary contraction involving C, M, N and K dimensions, str
   //      x  7    3   c0
   //      y  8    4   c1
   //
-  //  ieaxcgy: 8 4 3 7 2 1 0
-  //  afxchy:  8 6 3 7 5 2
-  //  iexfghy: 8 6 4 5 7 1 0
+  //  yhgfxei: 8 4 3 7 2 1 0
+  //  yhcxfa:  8 6 3 7 5 2
+  //  ygcxaei: 8 6 4 5 7 1 0
   //
   //   dim types:
   //     c:  yx /  87
@@ -254,8 +254,16 @@ TEST_CASE( "TPP-based Binary contraction involving C, M, N and K dimensions, str
                            {l_in_left, l_in_right} );
 
   l_bin_cont.compile();
-  at::Tensor l_left_ordered  = l_in_left.permute(  { 0, 3, 1, 5, 2, 4, 6 } ).contiguous();
-  at::Tensor l_right_ordered = l_in_right.permute( { 0, 3, 1, 2, 4, 5 } ).contiguous();
+
+  // TPP-kernel will use blocking:
+  //   mb: e, i
+  //   nb: f
+  //   kb: c, a
+  // ordering:
+  //   left  (BC-BM-BK-KB-MB): yx - g - - ca - ei
+  //   right (BC-BN-BK-NB-KB): yx - h - - f  - ca
+  at::Tensor l_left_ordered  = l_in_left.permute(  { 0, 3, 1, 2, 4, 5, 6 } ).contiguous();
+  at::Tensor l_right_ordered = l_in_right.permute( { 0, 3, 1, 4, 2, 5 } ).contiguous();
 
 
   l_bin_cont.contract( l_left_ordered.data_ptr(),
@@ -345,8 +353,15 @@ TEST_CASE( "TPP-based Binary contraction involving C, M, N and K dimensions, str
   einsum_ir::err_t l_err = l_bin_cont.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
-  at::Tensor l_left_ordered  = l_in_left.permute(  { 0, 3, 1, 5, 2, 4, 6 } ).contiguous();
-  at::Tensor l_right_ordered = l_in_right.permute( { 0, 3, 1, 2, 4, 5 } ).contiguous();
+  // TPP-kernel will use blocking:
+  //   mb: e, i
+  //   nb: f
+  //   kb: c, a
+  // ordering:
+  //   left  (BC-BM-BK-KB-MB): yx - g - - ca - ei
+  //   right (BC-BN-BK-NB-KB): yx - h - - f  - ca
+  at::Tensor l_left_ordered  = l_in_left.permute(  { 0, 3, 1, 2, 4, 5, 6 } ).contiguous();
+  at::Tensor l_right_ordered = l_in_right.permute( { 0, 3, 1, 4, 2, 5 } ).contiguous();
 
 
   l_bin_cont.contract( l_left_ordered.data_ptr(),

@@ -41,15 +41,15 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
 
   // swap left and right tensors if required
   if( l_swap_inputs ) {
-    init( m_num_dims_in_right,
-          m_num_dims_in_left,
+    init( m_num_dims_right,
+          m_num_dims_left,
           m_num_dims_out,
           *m_dim_sizes,
-          m_dim_ids_in_right_native,
-          m_dim_ids_in_left_native,
+          m_dim_ids_right_native,
+          m_dim_ids_left_native,
           m_dim_ids_out,
-          m_dtype_left,
           m_dtype_right,
+          m_dtype_left,
           m_dtype_comp,
           m_dtype_out,
           m_ktype_first_touch,
@@ -61,40 +61,99 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     m_tensors_in_swapped = true;
   }
 
-  // derive parameters for reordering of input dimensions
-  int64_t const * l_dim_ids_in_left  = m_dim_ids_in_left_native;
-  int64_t const * l_dim_ids_in_right = m_dim_ids_in_right_native;
-
-  m_dim_ids_left_ordered.resize( 0 );
-  m_dim_ids_right_ordered.resize( 0 );
-
+  m_dim_ids_left_ordered.resize( m_num_dims_left );
   m_dim_ids_left_ordered.insert( m_dim_ids_left_ordered.begin(),
-                                 m_dim_ids_in_left_native,
-                                 m_dim_ids_in_left_native + m_num_dims_in_left );
+                                 m_dim_ids_left_native,
+                                 m_dim_ids_left_native + m_num_dims_left );
 
+  m_dim_ids_right_ordered.resize( m_num_dims_right );
   m_dim_ids_right_ordered.insert( m_dim_ids_right_ordered.begin(),
-                                  m_dim_ids_in_right_native,
-                                  m_dim_ids_in_right_native + m_num_dims_in_right );
+                                  m_dim_ids_right_native,
+                                  m_dim_ids_right_native + m_num_dims_right );
 
-  l_dim_ids_in_left = m_dim_ids_left_ordered.data();
-  l_dim_ids_in_right = m_dim_ids_right_ordered.data();
+  int64_t * l_dim_ids_left  = m_dim_ids_left_ordered.data();
+  int64_t * l_dim_ids_right = m_dim_ids_right_ordered.data();
 
+  // derive parameters for reordering of input dimensions
   if( m_dim_types_out[ m_num_dims_out - 1 ] == M ) {
     m_tensor_ordering = LEFT_BC_BM_BK_KB_MB_RIGHT_BC_BN_BK_NB_KB_OUT_NATIVE;
 
+    // use standard GEMM kernels
     m_num_dims_cb = 0;
-    m_num_dims_mb = (m_num_dims_m > 0) ? 1 : 0;
-    m_num_dims_nb = (m_num_dims_n > 0) ? 1 : 0;
-    m_num_dims_kb = (m_num_dims_k > 0) ? 1 : 0;
+
+    // use consecutive M dimensions in output tensor as mb until target is reached
+    m_num_dims_mb = 0;
+    int64_t l_id_out = m_num_dims_out - 1;
+    int64_t l_block_dim_size = 1;
+    while( l_id_out >= 0 ) {
+      if( m_dim_types_out[ l_id_out ] == M &&
+          l_block_dim_size < m_size_mb_gemm_target ) {
+        int64_t l_dim_id = m_dim_ids_out[l_id_out];
+        l_block_dim_size *= m_dim_sizes->at( l_dim_id );
+
+        m_num_dims_mb++;
+        l_id_out--;
+      }
+      else {
+        break;
+      }
+    }
+
+    // jump over possible C dimensions
+    while( l_id_out >= 0 ) {
+      if( m_dim_types_out[ l_id_out ] == C ) {
+        l_id_out--;
+      }
+      else {
+        break;
+      }
+    }
+
+    // use consecutive N dimensions in output tensor as nb until target is reached
+    m_num_dims_nb = 0;
+    l_block_dim_size = 1;
+    while( l_id_out >= 0 ) {
+      if( m_dim_types_out[ l_id_out ] == N &&
+          l_block_dim_size < m_size_nb_gemm_target ) {
+        int64_t l_dim_id = m_dim_ids_out[l_id_out];
+        l_block_dim_size *= m_dim_sizes->at( l_dim_id );
+
+        m_num_dims_nb++;
+        l_id_out--;
+      }
+      else {
+        break;
+      }
+    }
+
+    // determine number of K dimensions which reach the target (kb)
+    int64_t l_id_k = m_num_dims_k - 1;
+    m_num_dims_kb = 0;
+    l_block_dim_size = 1;
+    while( l_id_k >= 0 ) {
+      l_block_dim_size *= m_dim_sizes->at( m_dim_ids_k[l_id_k] );
+
+      m_num_dims_kb++;
+      l_id_k--;
+
+      if( l_block_dim_size >= m_size_kb_gemm_target ) {
+        break;
+      }
+    }
   }
   else if( m_dim_types_out[ m_num_dims_out - 1 ] == C ) {
     m_tensor_ordering = LEFT_BC_BM_BK_KB_MB_CB_RIGHT_BC_BN_BK_NB_KB_CB_OUT_NATIVE;
 
-    // derive number of consecutive C dimensions in output tensor (used as cb)
+    // use consecutive C dimensions in output tensor as cb until target is reached
     m_num_dims_cb = 0;
     int64_t l_id_out = m_num_dims_out - 1;
+    int64_t l_block_dim_size = 1;
     while( l_id_out >= 0 ) {
-      if( m_dim_types_out[ l_id_out ] == C ) {
+      if( m_dim_types_out[ l_id_out ] == C &&
+          l_block_dim_size < m_size_cb_packed_gemm_target ) {
+        int64_t l_dim_id = m_dim_ids_out[l_id_out];
+        l_block_dim_size *= m_dim_sizes->at( l_dim_id );
+
         m_num_dims_cb++;
         l_id_out--;
       }
@@ -103,6 +162,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
       }
     }
 
+    // remaining dimension types
     m_num_dims_mb = (m_num_dims_m > 0) ? 1 : 0;
     m_num_dims_nb = (m_num_dims_n > 0) ? 1 : 0;
     m_num_dims_kb = (m_num_dims_k > 0) ? 1 : 0;
@@ -125,21 +185,21 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                                m_dim_ids_m.data(),
                                m_dim_ids_n.data(),
                                m_dim_ids_k.data(),
-                               m_dim_ids_left_ordered.data(),
-                               m_dim_ids_right_ordered.data() );
+                               l_dim_ids_left,
+                               l_dim_ids_right );
   if( l_err != SUCCESS ) {
     return l_err;
   }
 
   // check if the reordering changed the data layout of the input tensors
-  for( int64_t l_le = 0; l_le < m_num_dims_in_left; l_le++ ) {
-    if( m_dim_ids_in_left_native[l_le] != m_dim_ids_left_ordered[l_le] ) {
+  for( int64_t l_le = 0; l_le < m_num_dims_left; l_le++ ) {
+    if( m_dim_ids_left_native[l_le] != l_dim_ids_left[l_le] ) {
       m_tensors_in_reordered = true;
       break;
     }
   }
-  for( int64_t l_ri = 0; l_ri < m_num_dims_in_right; l_ri++ ) {
-    if( m_dim_ids_in_right_native[l_ri] != m_dim_ids_right_ordered[l_ri] ) {
+  for( int64_t l_ri = 0; l_ri < m_num_dims_right; l_ri++ ) {
+    if( m_dim_ids_right_native[l_ri] != l_dim_ids_right[l_ri] ) {
       m_tensors_in_reordered = true;
       break;
     }
@@ -150,13 +210,13 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   std::map< int64_t, int64_t > l_map_id_stride_in_right;
   std::map< int64_t, int64_t > l_map_id_stride_out;
 
-  strides( m_num_dims_in_left,
-           l_dim_ids_in_left,
+  strides( m_num_dims_left,
+           l_dim_ids_left,
            *m_dim_sizes,
            l_map_id_stride_in_left );
 
-  strides( m_num_dims_in_right,
-           l_dim_ids_in_right,
+  strides( m_num_dims_right,
+           l_dim_ids_right,
            *m_dim_sizes,
            l_map_id_stride_in_right );
 
@@ -237,7 +297,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
 
   l_lda = l_m;
   l_ldb = l_k;
-  l_ldc = m_num_dims_n > 0 ? m_strides_out_n[ m_num_dims_n - m_num_dims_nb ] : l_m*l_r;
+  l_ldc = m_num_dims_nb > 0 ? m_strides_out_n[ m_num_dims_n - 1 ] : l_m*l_r;
 
   // first-touch and last-touch shape
   libxsmm_meltw_unary_shape l_shape_single_touch = libxsmm_create_meltw_unary_shape( l_m*l_r,

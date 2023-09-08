@@ -31,15 +31,15 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile( tenord_t 
   BinaryContraction::compile_base();
 
   // reorder input dimensions if requested
-  int64_t const * l_dim_ids_in_left  = m_dim_ids_in_left_native;
-  int64_t const * l_dim_ids_in_right = m_dim_ids_in_right_native;
+  int64_t const * l_dim_ids_in_left  = m_dim_ids_left_native;
+  int64_t const * l_dim_ids_in_right = m_dim_ids_right_native;
   m_dim_ids_left_ordered.resize(0);
   m_dim_ids_right_ordered.resize(0);
 
   if( i_tensor_ordering == LEFT_NATIVE_RIGHT_NATIVE_OUT_NATIVE ) {}
   else if( i_tensor_ordering == LEFT_BC_BM_BK_RIGHT_BC_BN_BK_OUT_NATIVE ) {
-    m_dim_ids_left_ordered.resize( m_num_dims_in_left );
-    m_dim_ids_right_ordered.resize( m_num_dims_in_right );
+    m_dim_ids_left_ordered.resize( m_num_dims_left );
+    m_dim_ids_right_ordered.resize( m_num_dims_right );
     l_dim_ids_in_left = m_dim_ids_left_ordered.data();
     l_dim_ids_in_right = m_dim_ids_right_ordered.data();
 
@@ -59,14 +59,14 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile( tenord_t 
                    m_dim_ids_left_ordered.data(),
                    m_dim_ids_right_ordered.data() );
 
-    for( int64_t l_le = 0; l_le < m_num_dims_in_left; l_le++ ) {
-      if( m_dim_ids_in_left_native[l_le] != m_dim_ids_left_ordered[l_le] ) {
+    for( int64_t l_le = 0; l_le < m_num_dims_left; l_le++ ) {
+      if( m_dim_ids_left_native[l_le] != m_dim_ids_left_ordered[l_le] ) {
         m_tensors_in_reordered = true;
         break;
       }
     }
-    for( int64_t l_ri = 0; l_ri < m_num_dims_in_right; l_ri++ ) {
-      if( m_dim_ids_in_right_native[l_ri] != m_dim_ids_right_ordered[l_ri] ) {
+    for( int64_t l_ri = 0; l_ri < m_num_dims_right; l_ri++ ) {
+      if( m_dim_ids_right_native[l_ri] != m_dim_ids_right_ordered[l_ri] ) {
         m_tensors_in_reordered = true;
         break;
       }
@@ -81,12 +81,12 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile( tenord_t 
   std::map< int64_t, int64_t > l_map_id_stride_in_right;
   std::map< int64_t, int64_t > l_map_id_stride_out;
 
-  strides( m_num_dims_in_left,
+  strides( m_num_dims_left,
            l_dim_ids_in_left,
            *m_dim_sizes,
            l_map_id_stride_in_left );
 
-  strides( m_num_dims_in_right,
+  strides( m_num_dims_right,
            l_dim_ids_in_right,
            *m_dim_sizes,
            l_map_id_stride_in_right );

@@ -16,17 +16,17 @@ class einsum_ir::backend::BinaryContraction {
 
   public:
     //! number of dimensions of the left tensor
-    int64_t m_num_dims_in_left = 0;
+    int64_t m_num_dims_left = 0;
     //! number of dimensions of the right tensor
-    int64_t m_num_dims_in_right = 0;
+    int64_t m_num_dims_right = 0;
     //! number of dimensions of the output tensor
     int64_t m_num_dims_out = 0;
     //! mapping from the dimension ids to the dimension sizes
     std::map< int64_t, int64_t > const * m_dim_sizes = nullptr;
     //! left tensor's native dimension ids, i.e., without any imposed ordering
-    int64_t const * m_dim_ids_in_left_native = nullptr;
+    int64_t const * m_dim_ids_left_native = nullptr;
     //! right tensor's native dimension ids, i.e., without any imposed ordering
-    int64_t const * m_dim_ids_in_right_native = nullptr;
+    int64_t const * m_dim_ids_right_native = nullptr;
     //! output tensor's dimension ids
     int64_t const * m_dim_ids_out = nullptr;
 
@@ -160,6 +160,33 @@ class einsum_ir::backend::BinaryContraction {
                                    int64_t       * o_dim_ids_filtered );
 
     /**
+     * Derives the dimension types and ids.
+     *
+     * @param i_num_dims_left number of dimensions of the left tensor.
+     * @param i_num_dims_right number of dimensions of the right tensor.
+     * @param i_num_dims_out number of dimensions of the output tensor.
+     * @param i_dim_ids_left dimension ids of the left tensor.
+     * @param i_dim_ids_right dimension ids of the right tensor.
+     * @param i_dim_ids_out dimensions ids of the output tensor.
+     * @param o_dim_types_out will be set to dimension types of the output tensor.
+     * @param o_dim_ids_c will be set to ids of the C dimensions.
+     * @param o_dim_ids_m will be set to ids of the M dimensions.
+     * @param o_dim_ids_n will be set to ids of the N dimensions.
+     * @param o_dim_ids_k will be set to ids of the K dimensions.
+     **/
+    static void dim_types_ids( int64_t                                 i_num_dims_left,
+                               int64_t                                 i_num_dims_right,
+                               int64_t                                 i_num_dims_out,
+                               int64_t                         const * i_dim_ids_left,
+                               int64_t                         const * i_dim_ids_right,
+                               int64_t                         const * i_dim_ids_out,
+                               std::vector< einsum_ir::dim_t >       & o_dim_types_out,
+                               std::vector< int64_t >                & o_dim_ids_c,
+                               std::vector< int64_t >                & o_dim_ids_m,
+                               std::vector< int64_t >                & o_dim_ids_n,
+                               std::vector< int64_t >                & o_dim_ids_k );
+
+    /**
      * Orders the dimensions of the left and right input tensor according to the given kernel type.
      *
      * @param i_kernel_type ordering of the input tensors.
@@ -248,12 +275,12 @@ class einsum_ir::backend::BinaryContraction {
     /**
      * Initializes the binary contraction.
      *
-     * @param i_num_dims_in_left number of dimensions of the left tensor.
-     * @param i_num_dims_in_right number of dimensions of the right tensor.
+     * @param i_num_dims_left number of dimensions of the left tensor.
+     * @param i_num_dims_right number of dimensions of the right tensor.
      * @param i_num_dims_out number of dimensions of the output tensor.
      * @param i_dim_sizes mapping from the tensor's dimension ids to their sizes.
-     * @param i_dim_ids_in_left dimension ids of the left tensor.
-     * @param i_dim_ids_in_right dimension ids of the right tensor.
+     * @param i_dim_ids_left dimension ids of the left tensor.
+     * @param i_dim_ids_right dimension ids of the right tensor.
      * @param i_dim_ids_out dimensions ids of the output tensor.
      * @param i_dtype_left datatype of the left input.
      * @param i_dtype_right datatype of the right input.
@@ -263,12 +290,12 @@ class einsum_ir::backend::BinaryContraction {
      * @param i_ktype_inner type of the inner kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
      **/
-    void init( int64_t                              i_num_dims_in_left,
-               int64_t                              i_num_dims_in_right,
+    void init( int64_t                              i_num_dims_left,
+               int64_t                              i_num_dims_right,
                int64_t                              i_num_dims_out,
                std::map< int64_t, int64_t > const & i_dim_sizes,
-               int64_t                      const * i_dim_ids_in_left,
-               int64_t                      const * i_dim_ids_in_right,
+               int64_t                      const * i_dim_ids_left,
+               int64_t                      const * i_dim_ids_right,
                int64_t                      const * i_dim_ids_out,
                data_t                               i_dtype_left,
                data_t                               i_dtype_right,

@@ -78,21 +78,106 @@ int64_t einsum_ir::backend::BinaryContraction::filter_dim_ids( int64_t         i
   return l_id_filtered;
 }
 
+
+void einsum_ir::backend::BinaryContraction::dim_types_ids( int64_t                                 i_num_dims_left,
+                                                           int64_t                                 i_num_dims_right,
+                                                           int64_t                                 i_num_dims_out,
+                                                           int64_t                         const * i_dim_ids_left,
+                                                           int64_t                         const * i_dim_ids_right,
+                                                           int64_t                         const * i_dim_ids_out,
+                                                           std::vector< einsum_ir::dim_t >       & o_dim_types_out,
+                                                           std::vector<          int64_t >       & o_dim_ids_c,
+                                                           std::vector<          int64_t >       & o_dim_ids_m,
+                                                           std::vector<          int64_t >       & o_dim_ids_n,
+                                                           std::vector<          int64_t >       & o_dim_ids_k ) {
+  // derive dimension types
+  std::vector< einsum_ir::dim_t > l_dim_types_in_left( i_num_dims_left );
+  o_dim_types_out.resize( i_num_dims_out );
+
+  dim_types( i_num_dims_right,
+             i_num_dims_out,
+             i_num_dims_left,
+             i_dim_ids_right,
+             i_dim_ids_out,
+             i_dim_ids_left,
+             einsum_ir::I,
+             einsum_ir::K,
+             einsum_ir::M,
+             einsum_ir::C,
+             l_dim_types_in_left.data() );
+
+  dim_types( i_num_dims_left,
+             i_num_dims_right,
+             i_num_dims_out,
+             i_dim_ids_left,
+             i_dim_ids_right,
+             i_dim_ids_out,
+             einsum_ir::UNDEFINED_DIM,
+             einsum_ir::M,
+             einsum_ir::N,
+             einsum_ir::C,
+             o_dim_types_out.data() );
+
+  // count dimensions
+  int64_t l_num_dims_c = std::count( o_dim_types_out.begin(),
+                                     o_dim_types_out.end(),
+                                     einsum_ir::C );
+  int64_t l_num_dims_m = std::count( o_dim_types_out.begin(),
+                                     o_dim_types_out.end(),
+                                     einsum_ir::M );
+  int64_t l_num_dims_n = std::count( o_dim_types_out.begin(),
+                                     o_dim_types_out.end(),
+                                     einsum_ir::N );
+  int64_t l_num_dims_k = std::count( l_dim_types_in_left.begin(),
+                                     l_dim_types_in_left.end(),
+                                     einsum_ir::K );
+
+  // filter dim ids
+  o_dim_ids_c.resize( l_num_dims_c );
+  o_dim_ids_m.resize( l_num_dims_m );
+  o_dim_ids_n.resize( l_num_dims_n );
+  o_dim_ids_k.resize( l_num_dims_k );
+
+  filter_dim_ids( i_num_dims_out,
+                  einsum_ir::C,
+                  o_dim_types_out.data(),
+                  i_dim_ids_out,
+                  o_dim_ids_c.data() );
+
+  filter_dim_ids( i_num_dims_out,
+                  einsum_ir::M,
+                  o_dim_types_out.data(),
+                  i_dim_ids_out,
+                  o_dim_ids_m.data() );
+
+  filter_dim_ids( i_num_dims_out,
+                  einsum_ir::N,
+                  o_dim_types_out.data(),
+                  i_dim_ids_out,
+                  o_dim_ids_n.data() );
+
+  filter_dim_ids( i_num_dims_left,
+                  einsum_ir::K,
+                  l_dim_types_in_left.data(),
+                  i_dim_ids_left,
+                  o_dim_ids_k.data() );
+}
+
 einsum_ir::err_t einsum_ir::backend::BinaryContraction::order_dims_in( tenord_t        i_tensor_ordering,
-                                                                        int64_t         i_num_dims_c,
-                                                                        int64_t         i_num_dims_m,
-                                                                        int64_t         i_num_dims_n,
-                                                                        int64_t         i_num_dims_k,
-                                                                        int64_t         i_num_dims_cb,
-                                                                        int64_t         i_num_dims_mb,
-                                                                        int64_t         i_num_dims_nb,
-                                                                        int64_t         i_num_dims_kb,
-                                                                        int64_t const * i_dim_ids_c,
-                                                                        int64_t const * i_dim_ids_m,
-                                                                        int64_t const * i_dim_ids_n,
-                                                                        int64_t const * i_dim_ids_k,
-                                                                        int64_t       * o_dim_ids_left,
-                                                                        int64_t       * o_dim_ids_right ) {
+                                                                       int64_t         i_num_dims_c,
+                                                                       int64_t         i_num_dims_m,
+                                                                       int64_t         i_num_dims_n,
+                                                                       int64_t         i_num_dims_k,
+                                                                       int64_t         i_num_dims_cb,
+                                                                       int64_t         i_num_dims_mb,
+                                                                       int64_t         i_num_dims_nb,
+                                                                       int64_t         i_num_dims_kb,
+                                                                       int64_t const * i_dim_ids_c,
+                                                                       int64_t const * i_dim_ids_m,
+                                                                       int64_t const * i_dim_ids_n,
+                                                                       int64_t const * i_dim_ids_k,
+                                                                       int64_t       * o_dim_ids_left,
+                                                                       int64_t       * o_dim_ids_right ) {
   // check for valid input
   if(    i_num_dims_cb > i_num_dims_c
       || i_num_dims_mb > i_num_dims_m
@@ -299,12 +384,12 @@ void einsum_ir::backend::BinaryContraction::strides( int64_t                    
   }
 }
 
-void einsum_ir::backend::BinaryContraction::init( int64_t                              i_num_dims_in_left,
-                                                  int64_t                              i_num_dims_in_right,
+void einsum_ir::backend::BinaryContraction::init( int64_t                              i_num_dims_left,
+                                                  int64_t                              i_num_dims_right,
                                                   int64_t                              i_num_dims_out,
                                                   std::map< int64_t, int64_t > const & i_dim_sizes,
-                                                  int64_t                      const * i_dim_ids_in_left,
-                                                  int64_t                      const * i_dim_ids_in_right,
+                                                  int64_t                      const * i_dim_ids_left,
+                                                  int64_t                      const * i_dim_ids_right,
                                                   int64_t                      const * i_dim_ids_out,
                                                   data_t                               i_dtype_left,
                                                   data_t                               i_dtype_right,
@@ -313,14 +398,14 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
                                                   kernel_t                             i_ktype_first_touch,
                                                   kernel_t                             i_ktype_inner,
                                                   kernel_t                             i_ktype_last_touch ) {
-  m_num_dims_in_left = i_num_dims_in_left;
-  m_num_dims_in_right = i_num_dims_in_right;
+  m_num_dims_left = i_num_dims_left;
+  m_num_dims_right = i_num_dims_right;
   m_num_dims_out = i_num_dims_out;
 
   m_dim_sizes = &i_dim_sizes;
 
-  m_dim_ids_in_left_native = i_dim_ids_in_left;
-  m_dim_ids_in_right_native = i_dim_ids_in_right;
+  m_dim_ids_left_native = i_dim_ids_left;
+  m_dim_ids_right_native = i_dim_ids_right;
   m_dim_ids_out = i_dim_ids_out;
 
   m_dtype_left = i_dtype_left;
@@ -334,77 +419,22 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
 }
 
 einsum_ir::err_t einsum_ir::backend::BinaryContraction::compile_base() {
-  // derive dimension types
-  std::vector< dim_t > l_dim_types_in_left( m_num_dims_in_left );
-  m_dim_types_out.resize( m_num_dims_out );
+  dim_types_ids( m_num_dims_left,
+                 m_num_dims_right,
+                 m_num_dims_out,
+                 m_dim_ids_left_native,
+                 m_dim_ids_right_native,
+                 m_dim_ids_out,
+                 m_dim_types_out,
+                 m_dim_ids_c,
+                 m_dim_ids_m,
+                 m_dim_ids_n,
+                 m_dim_ids_k );
 
-  dim_types( m_num_dims_in_right,
-             m_num_dims_out,
-             m_num_dims_in_left,
-             m_dim_ids_in_right_native,
-             m_dim_ids_out,
-             m_dim_ids_in_left_native,
-             I,
-             K,
-             M,
-             C,
-             l_dim_types_in_left.data() );
-
-  dim_types( m_num_dims_in_left,
-             m_num_dims_in_right,
-             m_num_dims_out,
-             m_dim_ids_in_left_native,
-             m_dim_ids_in_right_native,
-             m_dim_ids_out,
-             UNDEFINED_DIM,
-             M,
-             N,
-             C,
-             m_dim_types_out.data() );
-
-  // count dimensions
-  m_num_dims_c = std::count( m_dim_types_out.begin(),
-                             m_dim_types_out.end(),
-                             C );
-  m_num_dims_m = std::count( m_dim_types_out.begin(),
-                             m_dim_types_out.end(),
-                             M );
-  m_num_dims_n = std::count( m_dim_types_out.begin(),
-                             m_dim_types_out.end(),
-                             N );
-  m_num_dims_k = std::count( l_dim_types_in_left.begin(),
-                             l_dim_types_in_left.end(),
-                             K );
-
-  // filter dim ids
-  m_dim_ids_c.resize( m_num_dims_c );
-  m_dim_ids_m.resize( m_num_dims_m );
-  m_dim_ids_n.resize( m_num_dims_n );
-  m_dim_ids_k.resize( m_num_dims_k );
-
-  filter_dim_ids( m_num_dims_out,
-                  C,
-                  m_dim_types_out.data(),
-                  m_dim_ids_out,
-                  m_dim_ids_c.data() );
-
-  filter_dim_ids( m_num_dims_out,
-                  M,
-                  m_dim_types_out.data(),
-                  m_dim_ids_out,
-                  m_dim_ids_m.data() );
-
-  filter_dim_ids( m_num_dims_out,
-                  N,
-                  m_dim_types_out.data(),
-                  m_dim_ids_out,
-                  m_dim_ids_n.data() );
-
-  filter_dim_ids( m_num_dims_in_left,
-                  K,
-                  l_dim_types_in_left.data(),
-                  m_dim_ids_in_left_native,
-                  m_dim_ids_k.data() );
+  m_num_dims_c = m_dim_ids_c.size();
+  m_num_dims_m = m_dim_ids_m.size();
+  m_num_dims_n = m_dim_ids_n.size();
+  m_num_dims_k = m_dim_ids_k.size();
 
   // derive sizes
   m_sizes_c.resize( m_num_dims_c );
@@ -445,7 +475,7 @@ int64_t const * einsum_ir::backend::BinaryContraction::dim_ids_in_ordered( int64
       l_dim_ids = m_dim_ids_left_ordered.data();
     }
     else {
-      l_dim_ids = m_dim_ids_in_left_native;
+      l_dim_ids = m_dim_ids_left_native;
     }
   }
   else if( l_side == 1 ) {
@@ -453,7 +483,7 @@ int64_t const * einsum_ir::backend::BinaryContraction::dim_ids_in_ordered( int64
       l_dim_ids = m_dim_ids_right_ordered.data();
     }
     else {
-      l_dim_ids = m_dim_ids_in_right_native;
+      l_dim_ids = m_dim_ids_right_native;
     }
   }
 
