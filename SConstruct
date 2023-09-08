@@ -48,17 +48,44 @@ if 'CXX' in g_env['OS_ENV'].keys():
 
 # set optimization mode
 if 'debug' in g_env['mode']:
-  g_env.Append( CXXFLAGS = ['-g','-O0'] )
+  g_env.AppendUnique( CXXFLAGS = [ '-g',
+                                   '-O0' ] )
+  # set strict warnings
+  g_env.AppendUnique( CXXFLAGS = [ '-Werror',
+                                   '-Wall',
+                                   '-Wextra',
+                                   '-Wcast-align',
+                                   '-pedantic',
+                                   '-Wshadow',
+                                   '-Wdisabled-optimization',
+                                   '-Wduplicated-branches',
+                                   '-Wduplicated-cond',
+                                   '-Wlogical-op',
+                                   '-Wnull-dereference',
+                                   '-Woverloaded-virtual',
+                                   '-Wpointer-arith',
+                                   '-Wshadow' ] )
+  # exceptions for annoying warnings
+  g_env.AppendUnique( CXXFLAGS = [ '-Wno-comment' ] )
 else:
   g_env.Append( CPPDEFINES = ['PP_NDEBUG'] )
   g_env.Append( CXXFLAGS = ['-O2'] )
 # add sanitizers
 if 'san' in  g_env['mode']:
-  g_env.Append( CXXFLAGS =  ['-g', '-fsanitize=float-divide-by-zero', '-fsanitize=bounds', '-fsanitize=address', '-fsanitize=undefined', '-fno-omit-frame-pointer'] )
-  g_env.Append( LINKFLAGS = ['-g', '-fsanitize=address', '-fsanitize=undefined'] )
+  g_env.AppendUnique( CXXFLAGS =  [ '-g',
+                                    '-fsanitize=float-divide-by-zero',
+                                    '-fsanitize=address',
+                                    '-fsanitize=undefined',
+                                    '-fno-omit-frame-pointer',
+                                    '-fsanitize=pointer-compare',
+                                    '-fsanitize=pointer-subtract',
+                                    '-fsanitize=leak'] )
+  g_env.AppendUnique( LINKFLAGS = [ '-g',
+                                    '-fsanitize=address',
+                                    '-fsanitize=undefined'] )
 
 # enable c++14
-g_env.Append( CXXFLAGS = [ '-std=c++14' ] )
+g_env.AppendUnique( CXXFLAGS = [ '-std=c++14' ] )
 
 # enable omp
 if 'omp' in g_env['parallel']:
