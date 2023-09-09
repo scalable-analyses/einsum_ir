@@ -99,9 +99,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
       }
     }
 
-    // jump over possible C dimensions
+    // jump until we reach an N dimension
     while( l_id_out >= 0 ) {
-      if( m_dim_types_out[ l_id_out ] == C ) {
+      if( m_dim_types_out[ l_id_out ] != N ) {
         l_id_out--;
       }
       else {
