@@ -140,7 +140,7 @@ void einsum_ir::backend::ContractionLoops::contract_cnmk( char            i_dim_
   // first time a K dimension is observed:
   // execute first touch kernel
   if(    i_dim_count == 0
-      && i_dim_type == 3 ) {
+      && i_dim_type  == 3 ) {
     kernel_first_touch( i_ptr_out );
   }
 
@@ -217,8 +217,8 @@ void einsum_ir::backend::ContractionLoops::contract_cnmk( char            i_dim_
 
   // last K dimension finished all iterations:
   // execute last touch kernel
-  if(    i_dim_count == l_num_dims-1
-      && i_dim_type == 3 ) {
+  if(    i_dim_count == 0
+      && i_dim_type  == 3 ) {
     kernel_last_touch( i_ptr_out );
   }
 }
