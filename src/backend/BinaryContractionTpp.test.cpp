@@ -39,10 +39,10 @@ TEST_CASE( "Tests the left/right swap of TPP-based binary contractions.", "[bin_
   l_bin_cont.compile();
 
   REQUIRE( l_bin_cont.m_tensors_in_swapped == false );
-  REQUIRE( l_bin_cont.m_strides_in_left_m[0] == 1 );
-  REQUIRE( l_bin_cont.m_strides_in_left_k[0] == 2 );
-  REQUIRE( l_bin_cont.m_strides_in_right_n[0] == 4 );
-  REQUIRE( l_bin_cont.m_strides_in_right_k[0] == 1 );
+  REQUIRE( l_bin_cont.m_strides_left_m[0] == 1 );
+  REQUIRE( l_bin_cont.m_strides_left_k[0] == 2 );
+  REQUIRE( l_bin_cont.m_strides_right_n[0] == 4 );
+  REQUIRE( l_bin_cont.m_strides_right_k[0] == 1 );
   REQUIRE( l_bin_cont.m_strides_out_m[0] == 1 );
   REQUIRE( l_bin_cont.m_strides_out_n[0] == 2 );
 
@@ -75,10 +75,10 @@ TEST_CASE( "Tests the left/right swap of TPP-based binary contractions.", "[bin_
                    einsum_ir::UNDEFINED_KTYPE );
   l_bin_cont.compile();
   REQUIRE( l_bin_cont.m_tensors_in_swapped == true );
-  REQUIRE( l_bin_cont.m_strides_in_left_m[0] == 1 );
-  REQUIRE( l_bin_cont.m_strides_in_left_k[0] == 3 );
-  REQUIRE( l_bin_cont.m_strides_in_right_n[0] == 4 );
-  REQUIRE( l_bin_cont.m_strides_in_right_k[0] == 1 );
+  REQUIRE( l_bin_cont.m_strides_left_m[0] == 1 );
+  REQUIRE( l_bin_cont.m_strides_left_k[0] == 3 );
+  REQUIRE( l_bin_cont.m_strides_right_n[0] == 4 );
+  REQUIRE( l_bin_cont.m_strides_right_k[0] == 1 );
   REQUIRE( l_bin_cont.m_strides_out_m[0] == 1 );
   REQUIRE( l_bin_cont.m_strides_out_n[0] == 3 );
 }

@@ -456,3 +456,450 @@ TEST_CASE( "TPP-based Binary contraction involving C, M, N and K dimensions, str
 
   REQUIRE( at::allclose( l_out_ordered, l_out_ref )  );
 }
+
+TEST_CASE( "TPP-based 1D Convolution with a single input feature.", "[bin_cont_tpp_conv]" ) {
+  // Test Case:
+  //
+  //    ____a____
+  //   /         \
+  //  a           n
+  //
+  // char   id   size
+  //    a    0      5
+  //    b    1      3
+  std::map< int64_t, int64_t > l_dim_sizes;
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 0, 5 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 1, 3 ) );
+
+  std::map< int64_t, int64_t > l_dim_link_s_to_p;
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 1, 0 ) );
+
+  int64_t l_dim_ids_left[1]  = { 0 };
+  int64_t l_dim_ids_right[1] = { 1 };
+  int64_t l_dim_ids_out[1]   = { 0 };
+
+  einsum_ir::backend::BinaryContractionTpp l_bin_cont;
+  l_bin_cont.init( 1,
+                   1,
+                   1,
+                   l_dim_sizes,
+                   l_dim_sizes,
+                   l_dim_sizes,
+                   l_dim_sizes,
+                   l_dim_ids_left,
+                   l_dim_ids_right,
+                   l_dim_ids_out,
+                   l_dim_link_s_to_p,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::ZERO,
+                   einsum_ir::MADD,
+                   einsum_ir::UNDEFINED_KTYPE );
+  // data
+  at::Tensor l_left  = at::rand( {1, 5+2} );
+  at::Tensor l_right = at::rand( {1, 1, 3} );
+  at::Tensor l_out   = at::rand( {5} );
+
+  // reference
+  at::Tensor l_out_ref = at::conv1d( l_left,
+                                     l_right ).squeeze();
+
+  einsum_ir::err_t l_err = l_bin_cont.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  l_bin_cont.contract( l_left.data_ptr(),
+                       l_right.data_ptr(),
+                       l_out.data_ptr() );
+
+  REQUIRE( at::allclose( l_out, l_out_ref )  );
+}
+
+TEST_CASE( "TPP-based 1D Convolution with additional K.", "[bin_cont_tpp_conv]" ) {
+  // Test Case:
+  //
+  //    ____a____
+  //   /         \
+  // ca          cb
+  //
+  // char   id   size
+  //    a    0      5
+  //    b    1      3
+  //    c    2      8
+  std::map< int64_t, int64_t > l_dim_sizes_inner;
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 0, 5 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 1, 3 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 2, 8 ) );
+
+  std::map< int64_t, int64_t > l_dim_sizes_outer;
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 0, 5+2 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 1, 3 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 2, 8 ) );
+
+
+  std::map< int64_t, int64_t > l_dim_link_s_to_p;
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 1, 0 ) );
+
+  int64_t l_dim_ids_left[2]  = { 2, 0 };
+  int64_t l_dim_ids_right[2] = { 2, 1 };
+  int64_t l_dim_ids_out[1]   = { 0 };
+
+  einsum_ir::backend::BinaryContractionTpp l_bin_cont;
+  l_bin_cont.init( 2,
+                   2,
+                   1,
+                   l_dim_sizes_inner,
+                   l_dim_sizes_outer,
+                   l_dim_sizes_outer,
+                   l_dim_sizes_inner,
+                   l_dim_ids_left,
+                   l_dim_ids_right,
+                   l_dim_ids_out,
+                   l_dim_link_s_to_p,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::ZERO,
+                   einsum_ir::MADD,
+                   einsum_ir::UNDEFINED_KTYPE );
+
+  // data
+  at::Tensor l_left  = at::rand( {8, 5+2} );
+  at::Tensor l_right = at::ones( {1, 8, 3} );
+  at::Tensor l_out   = at::ones( {5} );
+
+  // reference
+  at::Tensor l_out_ref = at::conv1d( l_left,
+                                     l_right ).squeeze();
+
+  einsum_ir::err_t l_err = l_bin_cont.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  at::Tensor l_left_perm = l_left;
+  at::Tensor l_right_perm = l_right.permute( {0, 2, 1} ).contiguous();
+
+  l_bin_cont.contract( l_left_perm.data_ptr(),
+                       l_right_perm.data_ptr(),
+                       l_out.data_ptr() );
+
+  REQUIRE( at::allclose( l_out, l_out_ref )  );
+}
+
+TEST_CASE( "TPP-based 2D Convolution with a single input feature.", "[bin_cont_tpp_conv]" ) {
+  // Test Case:
+  //
+  //    ____ab____
+  //   /          \
+  //  ab           cd
+  //
+  // char   id   size
+  //    a    0     16
+  //    b    1     13
+  //    c    2      3
+  //    d    3      3
+  std::map< int64_t, int64_t > l_dim_sizes_inner;
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 0,   16 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 1,   13 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 2,    3 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 3,    3 ) );
+
+  std::map< int64_t, int64_t > l_dim_sizes_outer;
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 0, 16+2 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 1, 13+2 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 2,    3 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 3,    3 ) );
+
+  std::map< int64_t, int64_t > l_dim_link_s_to_p;
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 2, 0 ) );
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 3, 1 ) );
+
+  int64_t l_dim_ids_left[2]  = { 0, 1 };
+  int64_t l_dim_ids_right[2] = { 2, 3 };
+  int64_t l_dim_ids_out[2]   = { 0, 1 };
+
+  einsum_ir::backend::BinaryContractionTpp l_bin_cont;
+  l_bin_cont.init( 2,
+                   2,
+                   2,
+                   l_dim_sizes_inner,
+                   l_dim_sizes_outer,
+                   l_dim_sizes_outer,
+                   l_dim_sizes_inner,
+                   l_dim_ids_left,
+                   l_dim_ids_right,
+                   l_dim_ids_out,
+                   l_dim_link_s_to_p,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::ZERO,
+                   einsum_ir::MADD,
+                   einsum_ir::UNDEFINED_KTYPE );
+  // data
+  at::Tensor l_left  = at::rand( {1, 16+2, 13+2} );
+  at::Tensor l_right = at::rand( {1, 1, 3, 3} );
+  at::Tensor l_out   = at::rand( {16, 13} );
+
+  // reference
+  at::Tensor l_out_ref = at::conv2d( l_left,
+                                     l_right ).squeeze();
+
+  // compile
+  einsum_ir::err_t l_err = l_bin_cont.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  // contract
+  l_bin_cont.contract( l_left.data_ptr(),
+                       l_right.data_ptr(),
+                       l_out.data_ptr() );
+
+  REQUIRE( at::allclose( l_out, l_out_ref )  );
+}
+
+TEST_CASE( "TPP-based 2D Convolution with additional K and ReLU, weights right.", "[bin_cont_tpp_conv]" ) {
+  // Test Case:
+  //
+  //    ____ab____
+  //   /          \
+  //  eab         ecd
+  //
+  // char   id   size
+  //    a    0     11
+  //    b    1     16
+  //    c    2      3
+  //    d    3      3
+  //    e    4      6
+  std::map< int64_t, int64_t > l_dim_sizes_inner;
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 0,  11 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 1,  16 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 2,   3 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 3,   3 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 4,   6 ) );
+
+  std::map< int64_t, int64_t > l_dim_sizes_outer;
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 0, 11+2 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 1, 16+2 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 2,    3 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 3,    3 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 4,    6 ) );
+
+
+  std::map< int64_t, int64_t > l_dim_link_s_to_p;
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 2, 0 ) );
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 3, 1 ) );
+
+  int64_t l_dim_ids_left[3]  = { 4, 0, 1 };
+  int64_t l_dim_ids_right[3] = { 4, 2, 3 };
+  int64_t l_dim_ids_out[2]   = { 0, 1 };
+
+  einsum_ir::backend::BinaryContractionTpp l_bin_cont;
+  l_bin_cont.init( 3,
+                   3,
+                   2,
+                   l_dim_sizes_inner,
+                   l_dim_sizes_outer,
+                   l_dim_sizes_outer,
+                   l_dim_sizes_inner,
+                   l_dim_ids_left,
+                   l_dim_ids_right,
+                   l_dim_ids_out,
+                   l_dim_link_s_to_p,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::ZERO,
+                   einsum_ir::MADD,
+                   einsum_ir::RELU );
+  // data
+  at::Tensor l_left  = at::randn( {1, 6, 11+2, 16+2} );
+  at::Tensor l_right = at::randn( {1, 6, 3, 3} );
+  at::Tensor l_out   = at::rand( {11, 16} );
+
+  // reference
+  at::Tensor l_out_ref = at::conv2d( l_left,
+                                     l_right ).squeeze();
+  l_out_ref = at::relu( l_out_ref );
+
+  // compile
+  einsum_ir::err_t l_err = l_bin_cont.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  at::Tensor l_left_perm  = l_left.permute(  {0, 2, 1, 3} ).contiguous();
+  at::Tensor l_right_perm = l_right.permute( {0, 2, 3, 1} ).contiguous();
+
+  // contract
+  l_bin_cont.contract( l_left_perm.data_ptr(),
+                       l_right_perm.data_ptr(),
+                       l_out.data_ptr() );
+
+  REQUIRE( at::allclose( l_out, l_out_ref, 1E-4, 1E-7 )  );
+}
+
+TEST_CASE( "TPP-based 2D Convolution with additional K and ReLU, weights left.", "[bin_cont_tpp_conv]" ) {
+  // Test Case:
+  //
+  //    ____ab____
+  //   /          \
+  //  eab         ecd
+  //
+  // char   id   size
+  //    a    0     11
+  //    b    1     16
+  //    c    2      3
+  //    d    3      3
+  //    e    4      6
+  std::map< int64_t, int64_t > l_dim_sizes_inner;
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 0,  11 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 1,  16 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 2,   3 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 3,   3 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 4,   6 ) );
+
+  std::map< int64_t, int64_t > l_dim_sizes_outer;
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 0, 11+2 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 1, 16+2 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 2,    3 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 3,    3 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 4,    6 ) );
+
+
+  std::map< int64_t, int64_t > l_dim_link_s_to_p;
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 2, 0 ) );
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 3, 1 ) );
+
+  int64_t l_dim_ids_left[3]  = { 4, 2, 3 };
+  int64_t l_dim_ids_right[3] = { 4, 0, 1 };
+  int64_t l_dim_ids_out[2]   = { 0, 1 };
+
+  einsum_ir::backend::BinaryContractionTpp l_bin_cont;
+  l_bin_cont.init( 3,
+                   3,
+                   2,
+                   l_dim_sizes_inner,
+                   l_dim_sizes_outer,
+                   l_dim_sizes_outer,
+                   l_dim_sizes_inner,
+                   l_dim_ids_left,
+                   l_dim_ids_right,
+                   l_dim_ids_out,
+                   l_dim_link_s_to_p,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::ZERO,
+                   einsum_ir::MADD,
+                   einsum_ir::RELU );
+  // data
+  at::Tensor l_left  = at::randn( {1, 6, 3, 3} );
+  at::Tensor l_right = at::randn( {1, 6, 11+2, 16+2} );
+  at::Tensor l_out   = at::randn( {11, 16} );
+
+  // reference
+  at::Tensor l_out_ref = at::conv2d( l_right,
+                                     l_left ).squeeze();
+  l_out_ref = at::relu( l_out_ref );
+
+  // compile
+  einsum_ir::err_t l_err = l_bin_cont.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  at::Tensor l_left_perm  = l_left.permute(  {0, 2, 3, 1} ).contiguous();
+  at::Tensor l_right_perm = l_right.permute( {0, 2, 1, 3} ).contiguous();
+
+  // contract
+  l_bin_cont.contract( l_left_perm.data_ptr(),
+                       l_right_perm.data_ptr(),
+                       l_out.data_ptr() );
+
+  REQUIRE( at::allclose( l_out, l_out_ref, 1E-4, 1E-7 )  );
+}
+
+TEST_CASE( "TPP-based 2D Convolution with input and output features, weights left.", "[bin_cont_tpp_conv]" ) {
+  // Test Case:
+  //
+  //     ____fab____
+  //    /           \
+  //  fecd         eab
+  //
+  // char   id   size
+  //    a    0     16
+  //    b    1     13
+  //    c    2      3
+  //    d    3      3
+  //    e    4      8
+  //    f    5      7
+  std::map< int64_t, int64_t > l_dim_sizes_inner;
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 0,   16 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 1,   13 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 2,    3 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 3,    3 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 4,    8 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 5,    7 ) );
+
+  std::map< int64_t, int64_t > l_dim_sizes_outer;
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 0, 16+2 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 1, 13+2 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 2,    3 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 3,    3 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 4,    8 ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 5,    7 ) );
+
+  std::map< int64_t, int64_t > l_dim_link_s_to_p;
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 2, 0 ) );
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 3, 1 ) );
+
+  int64_t l_dim_ids_left[4]  = { 5, 4, 2, 3 };
+  int64_t l_dim_ids_right[3] = { 4, 0, 1 };
+  int64_t l_dim_ids_out[3]   = { 5, 0, 1 };
+
+  einsum_ir::backend::BinaryContractionTpp l_bin_cont;
+  l_bin_cont.init( 4,
+                   3,
+                   3,
+                   l_dim_sizes_inner,
+                   l_dim_sizes_outer,
+                   l_dim_sizes_outer,
+                   l_dim_sizes_inner,
+                   l_dim_ids_left,
+                   l_dim_ids_right,
+                   l_dim_ids_out,
+                   l_dim_link_s_to_p,
+                   einsum_ir::FP64,
+                   einsum_ir::FP64,
+                   einsum_ir::FP64,
+                   einsum_ir::FP64,
+                   einsum_ir::ZERO,
+                   einsum_ir::MADD,
+                   einsum_ir::UNDEFINED_KTYPE );
+
+  // data
+  at::Tensor l_left  = at::randn( {7, 8, 3, 3},
+                                  at::ScalarType::Double );
+  at::Tensor l_right = at::randn( {1, 8, 16+2, 13+2},
+                                  at::ScalarType::Double );
+  at::Tensor l_out   = at::randn(  {7, 16, 13},
+                                   at::ScalarType::Double );
+
+  // reference
+  at::Tensor l_out_ref = at::conv2d( l_right,
+                                     l_left ).squeeze();
+
+  // compile
+  einsum_ir::err_t l_err = l_bin_cont.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  at::Tensor l_left_perm  = l_left.permute( {2, 3, 0, 1} ).contiguous();
+  at::Tensor l_right_perm = l_right.permute( {0, 2, 1, 3} ).contiguous();
+
+  // contract
+  l_bin_cont.contract( l_left_perm.data_ptr(),
+                       l_right_perm.data_ptr(),
+                       l_out.data_ptr() );
+
+  REQUIRE( at::allclose( l_out, l_out_ref, 1E-4, 1E-7 )  );
+}

@@ -51,8 +51,7 @@ if 'debug' in g_env['mode']:
   g_env.AppendUnique( CXXFLAGS = [ '-g',
                                    '-O0' ] )
   # set strict warnings
-  g_env.AppendUnique( CXXFLAGS = [ '-Werror',
-                                   '-Wall',
+  g_env.AppendUnique( CXXFLAGS = [ '-Wall',
                                    '-Wextra',
                                    '-Wcast-align',
                                    '-pedantic',
@@ -97,6 +96,7 @@ if 'omp' in g_env['parallel']:
 if g_env['libtorch'] != False:
   if g_env['libtorch'] != True:
     g_env.AppendUnique( CXXFLAGS = [ ('-isystem',  g_env['libtorch'] + '/include') ] )
+    g_env.AppendUnique( CXXFLAGS = [ ('-isystem',  g_env['libtorch'] + '/include/torch/csrc/api/include') ] )
     g_env.AppendUnique( LIBPATH = [ g_env['libtorch'] + '/lib'] )
     g_env.AppendUnique( RPATH = [ g_env['libtorch'] + '/lib'] )
     g_env.AppendUnique( CPPDEFINES='_GLIBCXX_USE_CXX11_ABI=0' )
@@ -106,8 +106,8 @@ if g_env['libtorch'] != False:
           g_conf.CheckLib( 'libtorch_cpu',
                             language='CXX' ) and \
           g_conf.CheckLibWithHeader( 'libtorch',
-                                      'ATen/ATen.h',
-                                      'CXX' ) ):
+                                     ['ATen/ATen.h', 'torch/torch.h'],
+                                     'CXX' ) ):
     print( 'warning: disabling libtorch' )
     g_env['libtorch'] = False
 
@@ -145,6 +145,8 @@ if( g_env['libxsmm'] and g_env['libtorch'] ):
                  source = g_env.sources + g_env.exe['bench_binary'] )
   g_env.Program( g_env['build_dir']+'/bench_expression',
                  source = g_env.sources + g_env.exe['bench_expression'] )
+  g_env.Program( g_env['build_dir']+'/bench_mlp',
+                 source = g_env.sources + g_env.exe['bench_mlp'] )
 
 g_env.Program( g_env['build_dir']+'/tests',
                source = g_env.tests )

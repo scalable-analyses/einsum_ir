@@ -260,8 +260,8 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
   int64_t l_num_tasks = omp_get_max_threads() * 4;
 
   for( std::size_t l_no = 0; l_no < m_nodes.size(); l_no++ ) {
-    // magic number: 512^3
-    if( m_nodes[l_no].m_num_ops_node >= 134217728 ) {
+    // magic number: 64^3
+    if( m_nodes[l_no].m_num_ops_node >= 262144 ) {
       m_nodes[l_no].threading_intra_op( l_num_tasks );
     }
   }

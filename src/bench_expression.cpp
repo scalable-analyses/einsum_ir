@@ -329,7 +329,7 @@ int main( int     i_argc,
   l_time_total = l_dur.count();
   l_gflops_total = 1.0E-9 * l_num_flops / (l_time_total);
 
-  std::cout << "  #flops:         " << l_num_flops << std::endl;\
+  std::cout << "  #flops:         " << l_num_flops << std::endl;
   std::cout << "  time (total):   " << l_time_total << std::endl;
   std::cout << "  gflops (total): " << l_gflops_total << std::endl;
   std::cout << "CSV_DATA: "

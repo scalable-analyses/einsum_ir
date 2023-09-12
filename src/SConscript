@@ -37,7 +37,8 @@ for l_test in l_tests:
 g_env.tests.append( g_env.sources )
 
 if g_env['libxsmm'] != False and g_env['libtorch'] != False:
-  g_env.exe['bench_binary'] = g_env.Object( 'bench_binary.cpp' )
+  g_env.exe['bench_binary']     = g_env.Object( 'bench_binary.cpp' )
   g_env.exe['bench_expression'] = g_env.Object( 'bench_expression.cpp' )
+  g_env.exe['bench_mlp']        = g_env.Object( 'bench_mlp.cpp' )
 
 Export('g_env')

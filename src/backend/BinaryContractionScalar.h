@@ -2,6 +2,7 @@
 #define EINSUM_IR_BACKEND_BINARY_CONTRACTION_SCALAR
 
 #include "BinaryContraction.h"
+#include "ContractionLoopsSimple.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -11,6 +12,9 @@ namespace einsum_ir {
 
 class einsum_ir::backend::BinaryContractionScalar: public BinaryContraction {
   private:
+    //! contraction loop interface
+    ContractionLoopsSimple m_cont_loops;
+
     /**
      * Compiler-based zero kernel.
      *

@@ -29,10 +29,10 @@ class einsum_ir::backend::BinaryContractionTpp: public BinaryContraction {
     int64_t m_size_mb_gemm_target = 64;
 
     //! target blocked N dimension size of the generated standard GEMMs
-    int64_t m_size_nb_gemm_target = 96;
+    int64_t m_size_nb_gemm_target = 48;
 
     //! target blocked K dimension size of the generated standard GEMMs
-    int64_t m_size_kb_gemm_target = 256;
+    int64_t m_size_kb_gemm_target = 64;
 
     //! target block C dimension size of the generated packed GEMMs
     int64_t m_size_cb_packed_gemm_target = 8;

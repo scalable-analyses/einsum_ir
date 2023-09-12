@@ -191,42 +191,37 @@ TEST_CASE( "K dimension of the contraction loops.", "[contraction_loops_k]" ) {
                      kernel_madd_fp32,
                      nullptr );
 
+  einsum_ir::err_t l_err = l_cont_loops.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
   // single recursion (single loop around kernel)
-  l_cont_loops.contract_cnmk( 3,
-                              0,
-                              l_a,
-                              l_b,
-                              l_c );
+  l_cont_loops.contract( l_a,
+                         l_b,
+                         l_c );
   REQUIRE( l_c[0] == l_ref );
 
   // two recursions
   l_c[0] = 0;
 
-  l_cont_loops.contract_cnmk(  2,
-                               0,
-                               l_a,
-                               l_b,
-                               l_c );
+  l_cont_loops.contract( l_a,
+                         l_b,
+                         l_c );
   REQUIRE( l_c[0] == l_ref );
 
   // three recursions
   l_c[0] = 0;
 
-  l_cont_loops.contract_cnmk(  1,
-                               0,
-                               l_a,
-                               l_b,
-                               l_c );
+  l_cont_loops.contract( l_a,
+                         l_b,
+                         l_c );
   REQUIRE( l_c[0] == l_ref );
 
   // four recursions
   l_c[0] = 0;
 
-  l_cont_loops.contract_cnmk(  0,
-                               0,
-                               l_a,
-                               l_b,
-                               l_c );
+  l_cont_loops.contract( l_a,
+                         l_b,
+                         l_c );
   REQUIRE( l_c[0] == l_ref );
 
   // wrapper
@@ -325,6 +320,9 @@ TEST_CASE( "Matmul with first and last touch.", "[contraction_loops]" ) {
                      kernel_zero_fp32,
                      kernel_madd_fp32,
                      kenrel_relu_fp32 );
+
+  einsum_ir::err_t l_err = l_cont_loops.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
 
   l_cont_loops.contract( l_a_mat,
                          l_b_mat,
@@ -526,6 +524,9 @@ TEST_CASE( "Nested loops used in binary contractions using a scalar kernel.", "[
                      nullptr,
                      kernel_madd_fp32,
                      nullptr );
+
+  einsum_ir::err_t l_err = l_cont_loops.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
 
   l_cont_loops.contract( l_a_ten,
                          l_b_ten,
@@ -735,6 +736,9 @@ TEST_CASE( "Nested loops used in binary contractions using a matrix kernel.", "[
                      nullptr,
                      kernel_mat_24_5_2_24_2_72_fp32,
                      nullptr );
+
+  einsum_ir::err_t l_err = l_cont_loops.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
 
   l_cont_loops.contract( l_a_ten,
                          l_b_ten,

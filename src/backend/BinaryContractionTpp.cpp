@@ -44,7 +44,10 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     init( m_num_dims_right,
           m_num_dims_left,
           m_num_dims_out,
-          *m_dim_sizes,
+          *m_dim_sizes_inner,
+          *m_dim_sizes_outer_right,
+          *m_dim_sizes_outer_left,
+          *m_dim_sizes_outer_out,
           m_dim_ids_right_native,
           m_dim_ids_left_native,
           m_dim_ids_out,
@@ -76,7 +79,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
 
   // derive parameters for reordering of input dimensions
   if( m_dim_types_out[ m_num_dims_out - 1 ] == M ) {
-    m_tensor_ordering = LEFT_BC_BM_BK_KB_MB_RIGHT_BC_BN_BK_NB_KB_OUT_NATIVE;
+    m_tensor_ordering = LEFT_BC_BM_BI_BK_IB_KB_MB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_OUT_NATIVE;
 
     // use standard GEMM kernels
     m_num_dims_cb = 0;
@@ -88,11 +91,22 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     while( l_id_out >= 0 ) {
       if( m_dim_types_out[ l_id_out ] == M &&
           l_block_dim_size < m_size_mb_gemm_target ) {
-        int64_t l_dim_id = m_dim_ids_out[l_id_out];
-        l_block_dim_size *= m_dim_sizes->at( l_dim_id );
+        int64_t l_dim_id              = m_dim_ids_out[l_id_out];
+        int64_t l_dim_size_inner      = m_dim_sizes_inner->at(      l_dim_id );
+        int64_t l_dim_size_outer_left = m_dim_sizes_outer_left->at( l_dim_id );
+        int64_t l_dim_size_outer_out  = m_dim_sizes_outer_out->at(  l_dim_id );
+        bool l_cont = l_dim_size_inner == l_dim_size_outer_left  &&
+                      l_dim_size_inner == l_dim_size_outer_out;
 
-        m_num_dims_mb++;
-        l_id_out--;
+        // only merge dim if M is stored contiguously
+        if( m_num_dims_mb == 0 || l_cont ) {
+          l_block_dim_size *= l_dim_size_inner;
+          m_num_dims_mb++;
+          l_id_out--;
+        }
+        else {
+          break;
+        }
       }
       else {
         break;
@@ -115,11 +129,22 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     while( l_id_out >= 0 ) {
       if( m_dim_types_out[ l_id_out ] == N &&
           l_block_dim_size < m_size_nb_gemm_target ) {
-        int64_t l_dim_id = m_dim_ids_out[l_id_out];
-        l_block_dim_size *= m_dim_sizes->at( l_dim_id );
+        int64_t l_dim_id               = m_dim_ids_out[l_id_out];
+        int64_t l_dim_size_inner       = m_dim_sizes_inner->at(       l_dim_id );
+        int64_t l_dim_size_outer_right = m_dim_sizes_outer_right->at( l_dim_id );
+        int64_t l_dim_size_outer_out   = m_dim_sizes_outer_out->at(   l_dim_id );
+        int64_t l_cont = l_dim_size_inner == l_dim_size_outer_right &&
+                         l_dim_size_inner == l_dim_size_outer_out;
 
-        m_num_dims_nb++;
-        l_id_out--;
+        // only merge dim if N is store contiguously
+        if( m_num_dims_nb == 0 || l_cont ) {
+          l_block_dim_size *= l_dim_size_inner;
+          m_num_dims_nb++;
+          l_id_out--;
+        }
+        else {
+          break;
+        }
       }
       else {
         break;
@@ -131,10 +156,22 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     m_num_dims_kb = 0;
     l_block_dim_size = 1;
     while( l_id_k >= 0 ) {
-      l_block_dim_size *= m_dim_sizes->at( m_dim_ids_k[l_id_k] );
+      int64_t l_dim_id               = m_dim_ids_k[l_id_k];
+      int64_t l_dim_size_inner       = m_dim_sizes_inner->at(       l_dim_id );
+      int64_t l_dim_size_outer_left  = m_dim_sizes_outer_left->at(  l_dim_id );
+      int64_t l_dim_size_outer_right = m_dim_sizes_outer_right->at( l_dim_id );
+      bool l_cont = l_dim_size_inner == l_dim_size_outer_left  &&
+                    l_dim_size_inner == l_dim_size_outer_right;
 
-      m_num_dims_kb++;
-      l_id_k--;
+      // only merge dim if K is stored contiguously
+      if( m_num_dims_kb == 0 || l_cont ) {
+        l_block_dim_size *= l_dim_size_inner;
+        m_num_dims_kb++;
+        l_id_k--;
+      }
+      else {
+        break;
+      }
 
       if( l_block_dim_size >= m_size_kb_gemm_target ) {
         break;
@@ -142,7 +179,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     }
   }
   else if( m_dim_types_out[ m_num_dims_out - 1 ] == C ) {
-    m_tensor_ordering = LEFT_BC_BM_BK_KB_MB_CB_RIGHT_BC_BN_BK_NB_KB_CB_OUT_NATIVE;
+    m_tensor_ordering = LEFT_BC_BM_BI_BK_IB_KB_MB_CB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_CB_OUT_NATIVE;
 
     // use consecutive C dimensions in output tensor as cb until target is reached
     m_num_dims_cb = 0;
@@ -151,11 +188,24 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     while( l_id_out >= 0 ) {
       if( m_dim_types_out[ l_id_out ] == C &&
           l_block_dim_size < m_size_cb_packed_gemm_target ) {
-        int64_t l_dim_id = m_dim_ids_out[l_id_out];
-        l_block_dim_size *= m_dim_sizes->at( l_dim_id );
+        int64_t l_dim_id               = m_dim_ids_out[l_id_out];
+        int64_t l_dim_size_inner       = m_dim_sizes_inner->at(       l_dim_id );
+        int64_t l_dim_size_outer_left  = m_dim_sizes_outer_left->at(  l_dim_id );
+        int64_t l_dim_size_outer_right = m_dim_sizes_outer_right->at( l_dim_id );
+        int64_t l_dim_size_outer_out   = m_dim_sizes_outer_out->at(   l_dim_id );
+        bool l_cont = l_dim_size_inner == l_dim_size_outer_left  &&
+                      l_dim_size_inner == l_dim_size_outer_right &&
+                      l_dim_size_inner == l_dim_size_outer_out;
 
-        m_num_dims_cb++;
-        l_id_out--;
+        // only merge dim if C is stored contiguously
+        if( m_num_dims_cb == 0 || l_cont ) {
+          l_block_dim_size *= l_dim_size_inner;
+          m_num_dims_cb++;
+          l_id_out--;
+        }
+        else {
+          break;
+        }
       }
       else {
         break;
@@ -177,14 +227,20 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                                m_num_dims_m,
                                m_num_dims_n,
                                m_num_dims_k,
+                               m_num_dims_i,
+                               m_num_dims_j,
                                m_num_dims_cb,
                                m_num_dims_mb,
                                m_num_dims_nb,
                                m_num_dims_kb,
+                               0,
+                               0,
                                m_dim_ids_c.data(),
                                m_dim_ids_m.data(),
                                m_dim_ids_n.data(),
                                m_dim_ids_k.data(),
+                               m_dim_ids_i.data(),
+                               m_dim_ids_j.data(),
                                l_dim_ids_left,
                                l_dim_ids_right );
   if( l_err != SUCCESS ) {
@@ -206,57 +262,110 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   }
 
   // derive strides
-  std::map< int64_t, int64_t > l_map_id_stride_in_left;
-  std::map< int64_t, int64_t > l_map_id_stride_in_right;
-  std::map< int64_t, int64_t > l_map_id_stride_out;
+  m_strides_left_c.resize( m_num_dims_c );
+  m_strides_left_m.resize( m_num_dims_m );
+  m_strides_left_k.resize( m_num_dims_k );
+  m_strides_left_i.resize( m_num_dims_i );
 
-  strides( m_num_dims_left,
-           l_dim_ids_left,
-           *m_dim_sizes,
-           l_map_id_stride_in_left );
-
-  strides( m_num_dims_right,
-           l_dim_ids_right,
-           *m_dim_sizes,
-           l_map_id_stride_in_right );
-
-  strides( m_num_dims_out,
-           m_dim_ids_out,
-           *m_dim_sizes,
-           l_map_id_stride_out );
-
-  m_strides_in_left_c.resize( m_num_dims_c );
-  m_strides_in_left_m.resize( m_num_dims_m );
-  m_strides_in_left_k.resize( m_num_dims_k );
-
-  m_strides_in_right_c.resize( m_num_dims_c );
-  m_strides_in_right_n.resize( m_num_dims_n );
-  m_strides_in_right_k.resize( m_num_dims_k );
+  m_strides_right_c.resize( m_num_dims_c );
+  m_strides_right_n.resize( m_num_dims_n );
+  m_strides_right_k.resize( m_num_dims_k );
+  m_strides_right_j.resize( m_num_dims_j );
 
   m_strides_out_c.resize( m_num_dims_c );
   m_strides_out_m.resize( m_num_dims_m );
   m_strides_out_n.resize( m_num_dims_n );
 
-  for( int64_t l_c = 0; l_c < m_num_dims_c; l_c++ ) {
-    int64_t l_id = m_dim_ids_c[l_c];
-    m_strides_in_left_c[l_c]  = l_map_id_stride_in_left.at(l_id);
-    m_strides_in_right_c[l_c] = l_map_id_stride_in_right.at(l_id);
-    m_strides_out_c[l_c]      = l_map_id_stride_out.at(l_id);
+  strides( m_num_dims_left,
+           m_num_dims_right,
+           m_num_dims_out,
+           m_num_dims_c,
+           m_num_dims_m,
+           m_num_dims_n,
+           m_num_dims_k,
+           m_num_dims_i,
+           m_num_dims_j,
+           l_dim_ids_left,
+           l_dim_ids_right,
+           m_dim_ids_out,
+           m_dim_ids_c.data(),
+           m_dim_ids_m.data(),
+           m_dim_ids_n.data(),
+           m_dim_ids_k.data(),
+           m_dim_ids_i.data(),
+           m_dim_ids_j.data(),
+           *m_dim_sizes_outer_left,
+           *m_dim_sizes_outer_right,
+           *m_dim_sizes_outer_out,
+           m_strides_left_c.data(),
+           m_strides_left_m.data(),
+           m_strides_left_k.data(),
+           m_strides_left_i.data(),
+           m_strides_right_c.data(),
+           m_strides_right_n.data(),
+           m_strides_right_k.data(),
+           m_strides_right_j.data(),
+           m_strides_out_c.data(),
+           m_strides_out_m.data(),
+           m_strides_out_n.data() );
+
+  // number of K loop dims
+  int64_t l_num_k_loop_dims = m_num_dims_k - m_num_dims_kb;
+
+  // treat secondary I dimensions as K internally
+  for( int64_t l_di_i = 0; l_di_i < m_num_dims_i; l_di_i++ ) {
+    int64_t l_di_n = 0;
+    l_err = link_secondary_to_primary( m_dim_ids_i[l_di_i],
+                                       m_num_dims_n,
+                                       m_dim_ids_n.data(),
+                                       *m_dim_link_s_to_p,
+                                       l_di_n );
+    if( l_err != err_t::SUCCESS ) {
+      return err_t::COMPILATION_FAILED;
+    }
+
+    // corresponding contraction info
+    int64_t l_size_s   = m_sizes_i[l_di_i];
+    int64_t l_stride_p = m_strides_right_n[l_di_n];
+    int64_t l_stride_s = m_strides_left_i[l_di_i];
+
+    // add to K dimensions
+    m_num_dims_k++;
+    m_sizes_k.insert( m_sizes_k.begin() + l_num_k_loop_dims,
+                      l_size_s );
+    m_strides_left_k.insert( m_strides_left_k.begin() + l_num_k_loop_dims,
+                             l_stride_s );
+    m_strides_right_k.insert( m_strides_right_k.begin() + l_num_k_loop_dims,
+                              l_stride_p );
+    l_num_k_loop_dims++;
   }
-  for( int64_t l_m = 0; l_m < m_num_dims_m; l_m++ ) {
-    int64_t l_id = m_dim_ids_m[l_m];
-    m_strides_in_left_m[l_m]  = l_map_id_stride_in_left.at(l_id);
-    m_strides_out_m[l_m]      = l_map_id_stride_out.at(l_id);
-  }
-  for( int64_t l_n = 0; l_n < m_num_dims_n; l_n++ ) {
-    int64_t l_id = m_dim_ids_n[l_n];
-    m_strides_in_right_n[l_n] = l_map_id_stride_in_right.at(l_id);
-    m_strides_out_n[l_n]      = l_map_id_stride_out.at(l_id);
-  }
-  for( int64_t l_k = 0; l_k < m_num_dims_k; l_k++ ) {
-    int64_t l_id = m_dim_ids_k[l_k];
-    m_strides_in_left_k[l_k]  = l_map_id_stride_in_left.at(l_id);
-    m_strides_in_right_k[l_k]  = l_map_id_stride_in_right.at(l_id);
+
+  // treat secondary J dimensions as K internally
+  for( int64_t l_di_j = 0; l_di_j < m_num_dims_j; l_di_j++ ) {
+    int64_t l_di_m = 0;
+    l_err = link_secondary_to_primary( m_dim_ids_j[l_di_j],
+                                       m_num_dims_m,
+                                       m_dim_ids_m.data(),
+                                       *m_dim_link_s_to_p,
+                                       l_di_m );
+    if( l_err != err_t::SUCCESS ) {
+      return err_t::COMPILATION_FAILED;
+    }
+
+    // corresponding contraction info
+    int64_t l_size_s   = m_sizes_j[l_di_j];
+    int64_t l_stride_p = m_strides_left_m[l_di_m];
+    int64_t l_stride_s = m_strides_right_j[l_di_j];
+
+    // add to K dimensions
+    m_num_dims_k++;
+    m_sizes_k.insert( m_sizes_k.begin() + l_num_k_loop_dims,
+                      l_size_s );
+    m_strides_left_k.insert( m_strides_left_k.begin() + l_num_k_loop_dims,
+                             l_stride_p );
+    m_strides_right_k.insert( m_strides_right_k.begin() + l_num_k_loop_dims,
+                              l_stride_s );
+    l_num_k_loop_dims++;
   }
 
   // libxsmm data types
@@ -278,9 +387,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   libxsmm_blasint l_k = 1;
   libxsmm_blasint l_r = 1;
 
-  libxsmm_blasint l_lda = 0;
-  libxsmm_blasint l_ldb = 0;
-  libxsmm_blasint l_ldc = 0;
+  libxsmm_blasint l_lda = 1;
+  libxsmm_blasint l_ldb = 1;
+  libxsmm_blasint l_ldc = 1;
 
   for( int64_t l_cb = 0; l_cb < m_num_dims_cb; l_cb++ ) {
     l_r *= m_sizes_c[ m_num_dims_c - 1 - l_cb ];
@@ -295,9 +404,11 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     l_k *= m_sizes_k[ m_num_dims_k - 1 - l_kb ];
   }
 
-  l_lda = l_m;
-  l_ldb = l_k;
-  l_ldc = m_num_dims_nb > 0 ? m_strides_out_n[ m_num_dims_n - 1 ] : l_m*l_r;
+  // set leading dimensions
+  // alternatives (l_m, l_k, l_m*l_r) have no purpose other than satisfying the jitter
+  l_lda = m_num_dims_kb > 0 ? m_strides_left_k[  m_num_dims_k - 1 ] : l_m;
+  l_ldb = m_num_dims_nb > 0 ? m_strides_right_n[ m_num_dims_n - 1 ] : l_k;
+  l_ldc = m_num_dims_nb > 0 ? m_strides_out_n[   m_num_dims_n - 1 ] : l_m*l_r;
 
   // first-touch and last-touch shape
   libxsmm_meltw_unary_shape l_shape_single_touch = libxsmm_create_meltw_unary_shape( l_m*l_r,
@@ -356,13 +467,13 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   l_brconfig.br_stride_b_hint = 0;
   l_brconfig.br_unroll_hint = 0;
 
-  if( m_tensor_ordering == LEFT_BC_BM_BK_KB_MB_RIGHT_BC_BN_BK_NB_KB_OUT_NATIVE ) {
+  if( m_tensor_ordering == LEFT_BC_BM_BI_BK_IB_KB_MB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_OUT_NATIVE ) {
     m_xmm_kernel_inner.gemm = libxsmm_dispatch_brgemm_v2( l_shape_brgemm,
                                                           l_flags_brgemm,
                                                           l_prefetch_flags_brgemm,
                                                           l_brconfig );
   }
-  else if( m_tensor_ordering == LEFT_BC_BM_BK_KB_MB_CB_RIGHT_BC_BN_BK_NB_KB_CB_OUT_NATIVE ) {
+  else if( m_tensor_ordering == LEFT_BC_BM_BI_BK_IB_KB_MB_CB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_CB_OUT_NATIVE ) {
     m_xmm_kernel_inner.gemm = libxsmm_create_packed_gemm( l_shape_brgemm,
                                                           l_flags_brgemm,
                                                           l_prefetch_flags_brgemm,
@@ -395,12 +506,12 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                      m_sizes_m.data(),
                      m_sizes_n.data(),
                      m_sizes_k.data(),
-                     m_strides_in_left_c.data(),
-                     m_strides_in_left_m.data(),
-                     m_strides_in_left_k.data(),
-                     m_strides_in_right_c.data(),
-                     m_strides_in_right_n.data(),
-                     m_strides_in_right_k.data(),
+                     m_strides_left_c.data(),
+                     m_strides_left_m.data(),
+                     m_strides_left_k.data(),
+                     m_strides_right_c.data(),
+                     m_strides_right_n.data(),
+                     m_strides_right_k.data(),
                      m_strides_out_c.data(),
                      m_strides_out_m.data(),
                      m_strides_out_n.data(),
@@ -410,6 +521,11 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                      m_xmm_kernel_first_touch,
                      m_xmm_kernel_inner.gemm,
                      m_xmm_kernel_last_touch );
+
+  l_err = m_cont_loops.compile();
+  if( l_err != einsum_ir::SUCCESS ) {
+    return einsum_ir::COMPILATION_FAILED;
+  }
 
   m_compiled = true;
 

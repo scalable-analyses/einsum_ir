@@ -135,7 +135,7 @@ TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_right_bc_bn_bk_ou
   int64_t l_dim_ids_left[7] = { 0 };
   int64_t l_dim_ids_right[6] = { 0 };
 
-  einsum_ir::err_t l_err = einsum_ir::backend::BinaryContraction::order_dims_in( einsum_ir::LEFT_BC_BM_BK_RIGHT_BC_BN_BK_OUT_NATIVE,
+  einsum_ir::err_t l_err = einsum_ir::backend::BinaryContraction::order_dims_in( einsum_ir::LEFT_BC_BM_BI_BK_RIGHT_BC_BN_BJ_BK_OUT_NATIVE,
                                                                                  2,
                                                                                  3,
                                                                                  2,
@@ -144,10 +144,16 @@ TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_right_bc_bn_bk_ou
                                                                                  0,
                                                                                  0,
                                                                                  0,
+                                                                                 0,
+                                                                                 0,
+                                                                                 0,
+                                                                                 0,
                                                                                  l_ids_c,
                                                                                  l_ids_m,
                                                                                  l_ids_n,
                                                                                  l_ids_k,
+                                                                                 nullptr,
+                                                                                 nullptr,
                                                                                  l_dim_ids_left,
                                                                                  l_dim_ids_right );
 
@@ -178,19 +184,25 @@ TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_kb_mb_right_bc_bn
   int64_t l_dim_ids_left[7] = { 0 };
   int64_t l_dim_ids_right[6] = { 0 };
 
-  einsum_ir::err_t l_err = einsum_ir::backend::BinaryContraction::order_dims_in( einsum_ir::LEFT_BC_BM_BK_KB_MB_RIGHT_BC_BN_BK_NB_KB_OUT_NATIVE,
+  einsum_ir::err_t l_err = einsum_ir::backend::BinaryContraction::order_dims_in( einsum_ir::LEFT_BC_BM_BI_BK_IB_KB_MB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_OUT_NATIVE,
                                                                                  2,
                                                                                  3,
                                                                                  2,
                                                                                  2,
                                                                                  0,
+                                                                                 0,
+                                                                                 0,
                                                                                  1,
                                                                                  1,
                                                                                  1,
+                                                                                 0,
+                                                                                 0,
                                                                                  l_ids_c,
                                                                                  l_ids_m,
                                                                                  l_ids_n,
                                                                                  l_ids_k,
+                                                                                 nullptr,
+                                                                                 nullptr,
                                                                                  l_dim_ids_left,
                                                                                  l_dim_ids_right );
 
@@ -211,19 +223,25 @@ TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_kb_mb_right_bc_bn
   REQUIRE( l_dim_ids_right[1] == 1 );
   REQUIRE( l_dim_ids_right[0] == 0 );
 
-  l_err = einsum_ir::backend::BinaryContraction::order_dims_in( einsum_ir::LEFT_BC_BM_BK_KB_MB_RIGHT_BC_BN_BK_NB_KB_OUT_NATIVE,
+  l_err = einsum_ir::backend::BinaryContraction::order_dims_in( einsum_ir::LEFT_BC_BM_BI_BK_IB_KB_MB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_OUT_NATIVE,
                                                                 2,
                                                                 3,
                                                                 2,
                                                                 2,
                                                                 0,
+                                                                0,
+                                                                0,
                                                                 2,
                                                                 1,
                                                                 1,
+                                                                0,
+                                                                0,
                                                                 l_ids_c,
                                                                 l_ids_m,
                                                                 l_ids_n,
                                                                 l_ids_k,
+                                                                nullptr,
+                                                                nullptr,
                                                                 l_dim_ids_left,
                                                                 l_dim_ids_right );
 
@@ -254,19 +272,25 @@ TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_kb_mb_cb_right_bc
   int64_t l_dim_ids_left[8] = { 0 };
   int64_t l_dim_ids_right[7] = { 0 };
 
-  einsum_ir::err_t l_err = einsum_ir::backend::BinaryContraction::order_dims_in( einsum_ir::LEFT_BC_BM_BK_KB_MB_CB_RIGHT_BC_BN_BK_NB_KB_CB_OUT_NATIVE,
+  einsum_ir::err_t l_err = einsum_ir::backend::BinaryContraction::order_dims_in( einsum_ir::LEFT_BC_BM_BI_BK_IB_KB_MB_CB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_CB_OUT_NATIVE,
                                                                                   3,
                                                                                   3,
                                                                                   2,
                                                                                   2,
+                                                                                  0,
+                                                                                  0,
                                                                                   2,
                                                                                   1,
                                                                                   2,
                                                                                   1,
+                                                                                  0,
+                                                                                  0,
                                                                                   l_ids_c,
                                                                                   l_ids_m,
                                                                                   l_ids_n,
                                                                                   l_ids_k,
+                                                                                  nullptr,
+                                                                                  nullptr,
                                                                                   l_dim_ids_left,
                                                                                   l_dim_ids_right );
 
@@ -290,150 +314,24 @@ TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_kb_mb_cb_right_bc
   REQUIRE( l_dim_ids_right[0] == 0 );
 }
 
-TEST_CASE( "Derives the strides of tensor's dimensions", "[strides]" ) {
-  int64_t l_num_dims = 4;
-  int64_t l_dim_ids[4] = { 7, 13, 3, 5 };
+TEST_CASE( "Links secondary to primary dimensions w.r.t. to a primary tensor.", "[bin_cont_link]" ) {
+  int64_t l_dim_id_s = 4;
+  int64_t l_num_dims_p = 5;
+  int64_t l_dim_ids_p[5] = { 2, 5, 1, 3, 7 };
 
-  std::map< int64_t, int64_t > l_dim_sizes;
+  std::map< int64_t, int64_t > l_dim_link_s_to_p;
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 10,  2 ) );
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 11, 12 ) );
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >(  4,  3 ) );
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 13, 14 ) );
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 14,  2 ) );
 
-  // not used
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 2, 20 ) );
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 1, 15 ) );
-
-  // used
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  3, 4 ) );
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  5, 8 ) );
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  7, 5 ) );
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 13, 9 ) );
-  
-  std::map< int64_t, int64_t > l_strides;
-
-  einsum_ir::backend::BinaryContraction::strides( l_num_dims,
-                                                   l_dim_ids,
-                                                   l_dim_sizes,
-                                                   l_strides );
-
-  REQUIRE( l_strides.size() ==   4 );
-  REQUIRE( l_strides.at(5)  ==   1 );
-  REQUIRE( l_strides.at(3)  ==   8 );
-  REQUIRE( l_strides.at(13) ==  32 );
-  REQUIRE( l_strides.at(7)  == 288 );
-}
-
-
-TEST_CASE( "Derives the strides of the respective tensor dimension types", "[strides]" ) {
-  int64_t l_dim_ids_left[7] = { 0, 1, 2, 3, 4, 7, 8 };
-  int64_t l_dim_ids_right[6] = {0, 1, 5, 6, 7, 8 };
-  int64_t l_dim_ids_out[7] = { 0, 5, 2, 6, 1, 3, 4 };
-
-
-  std::map< int64_t, int64_t > l_dim_sizes;
-  std::map< int64_t, einsum_ir::dim_t > l_dim_types;
-
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 0, 4 ) );
-  l_dim_types.insert( std::pair< int64_t, einsum_ir::dim_t >( 0, einsum_ir::dim_t::C ) );
-
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 1, 3 ) );
-  l_dim_types.insert( std::pair< int64_t, einsum_ir::dim_t >( 1, einsum_ir::C ) );
-
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 2, 6 ) );
-  l_dim_types.insert( std::pair< int64_t, einsum_ir::dim_t >( 2, einsum_ir::M ) );
-
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 3, 8 ) );
-  l_dim_types.insert( std::pair< int64_t, einsum_ir::dim_t >( 3, einsum_ir::M ) );
-
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 4, 3 ) );
-  l_dim_types.insert( std::pair< int64_t, einsum_ir::dim_t >( 4, einsum_ir::M ) );
-
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 5, 4 ) );
-  l_dim_types.insert( std::pair< int64_t, einsum_ir::dim_t >( 5, einsum_ir::N ) );
-
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 6, 5 ) );
-  l_dim_types.insert( std::pair< int64_t, einsum_ir::dim_t >( 6, einsum_ir::N ) );
-
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 7, 7 ) );
-  l_dim_types.insert( std::pair< int64_t, einsum_ir::dim_t >( 7, einsum_ir::K ) );
-
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 8, 2 ) );
-  l_dim_types.insert( std::pair< int64_t, einsum_ir::dim_t >( 8, einsum_ir::K ) );
-
-  // left tensor
-  int64_t l_strides_left_c[2] = { 0 };
-  int64_t l_strides_left_m[3] = { 0 };
-  int64_t l_strides_left_k[2] = { 0 };
-
-  einsum_ir::backend::BinaryContraction::strides( 7,
-                                                  2,
-                                                  3,
-                                                  0,
-                                                  2,
-                                                  l_dim_ids_left,
-                                                  l_dim_sizes,
-                                                  l_dim_types,
-                                                  l_strides_left_c,
-                                                  l_strides_left_m,
-                                                  nullptr,
-                                                  l_strides_left_k );
-
-  REQUIRE( l_strides_left_k[1] == 1 );
-  REQUIRE( l_strides_left_k[0] == 2 );
-
-  REQUIRE( l_strides_left_m[2] == 14 );
-  REQUIRE( l_strides_left_m[1] == 42 );
-  REQUIRE( l_strides_left_m[0] == 336 );
-
-  REQUIRE( l_strides_left_c[1] == 2016 );
-  REQUIRE( l_strides_left_c[0] == 6048 );
-
-  // right tensor
-  int64_t l_strides_right_c[2] = { 0 };
-  int64_t l_strides_right_n[2] = { 0 };
-  int64_t l_strides_right_k[2] = { 0 };
-
-  einsum_ir::backend::BinaryContraction::strides( 6,
-                                                  2,
-                                                  0,
-                                                  2,
-                                                  2,
-                                                  l_dim_ids_right,
-                                                  l_dim_sizes,
-                                                  l_dim_types,
-                                                  l_strides_right_c,
-                                                  nullptr,
-                                                  l_strides_right_n,
-                                                  l_strides_right_k );
-
-  REQUIRE( l_strides_right_k[1] == 1 );
-  REQUIRE( l_strides_right_k[0] == 2 );
-
-  REQUIRE( l_strides_right_n[1] == 14 );
-  REQUIRE( l_strides_right_n[0] == 70 );
-
-  REQUIRE( l_strides_right_c[1] == 280 );
-  REQUIRE( l_strides_right_c[0] == 840 );
-
-  // output tensor
-  int64_t l_strides_out_c[2] = { 0 };
-  int64_t l_strides_out_m[3] = { 0 };
-  int64_t l_strides_out_n[2] = { 0 };
-
-  einsum_ir::backend::BinaryContraction::strides( 7,
-                                                  2,
-                                                  3,
-                                                  2,
-                                                  0,
-                                                  l_dim_ids_out,
-                                                  l_dim_sizes,
-                                                  l_dim_types,
-                                                  l_strides_out_c,
-                                                  l_strides_out_m,
-                                                  l_strides_out_n,
-                                                  nullptr );
-  REQUIRE( l_strides_out_m[2] == 1 );
-  REQUIRE( l_strides_out_m[1] == 3 );
-  REQUIRE( l_strides_out_c[1] == 24 );
-  REQUIRE( l_strides_out_n[1] == 72 );
-  REQUIRE( l_strides_out_m[0] == 360 );
-  REQUIRE( l_strides_out_n[0] == 2160 );
-  REQUIRE( l_strides_out_c[0] == 8640 );
+  int64_t l_loc = 0;
+  einsum_ir::err_t l_err = einsum_ir::backend::BinaryContraction::link_secondary_to_primary( l_dim_id_s,
+                                                                                             l_num_dims_p,
+                                                                                             l_dim_ids_p,
+                                                                                             l_dim_link_s_to_p,
+                                                                                             l_loc );
+  REQUIRE( l_err == einsum_ir::err_t::SUCCESS );
+  REQUIRE( l_loc == 3 );
 }
