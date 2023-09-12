@@ -342,7 +342,7 @@ void conv2d() {
 int main() {
   std::cout << "running bench_binary!" << std::endl;
 
-  // blocked_matmul();
+  blocked_matmul();
   conv2d();
 
   std::cout << "finished running bench_binary!" << std::endl;
