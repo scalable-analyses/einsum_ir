@@ -28,7 +28,9 @@ class einsum_ir::backend::BinaryContraction {
     std::map< int64_t, int64_t > const * m_dim_sizes_outer_left = nullptr;
     //! mapping from the dimension ids to the outer dimension sizes of the right tensor
     std::map< int64_t, int64_t > const * m_dim_sizes_outer_right = nullptr;
-    //! mapping from the dimension ids to the outer dimension sizes of the out tensor
+    //! mapping from the dimension ids to the outer dimension sizes of the auxiliary output tensor
+    std::map< int64_t, int64_t > const * m_dim_sizes_outer_out_aux = nullptr;
+    //! mapping from the dimension ids to the outer dimension sizes of the output tensor
     std::map< int64_t, int64_t > const * m_dim_sizes_outer_out = nullptr;
 
     //! left tensor's native dimension ids, i.e., without any imposed ordering
@@ -106,6 +108,13 @@ class einsum_ir::backend::BinaryContraction {
     //! J strides of the right tensor
     std::vector< int64_t > m_strides_right_j;
 
+    //! C strides of the auxiliary output tensor
+    std::vector< int64_t > m_strides_out_aux_c;
+    //! M strides of the auxiliary output tensor
+    std::vector< int64_t > m_strides_out_aux_m;
+    //! N strides of the auxiliary output tensor
+    std::vector< int64_t > m_strides_out_aux_n;
+
     //! C strides of the output tensor
     std::vector< int64_t > m_strides_out_c;
     //! M strides of the output tensor
@@ -128,8 +137,8 @@ class einsum_ir::backend::BinaryContraction {
     //! type of the first touch kernel
     kernel_t m_ktype_first_touch = UNDEFINED_KTYPE;
 
-    //! type of the inner kernel
-    kernel_t m_ktype_inner = UNDEFINED_KTYPE;
+    //! type of the main kernel
+    kernel_t m_ktype_main = UNDEFINED_KTYPE;
 
     //! type of the last touch kernel
     kernel_t m_ktype_last_touch = UNDEFINED_KTYPE;
@@ -302,6 +311,7 @@ class einsum_ir::backend::BinaryContraction {
      * @param i_dim_ids_j ids of the J dimensions.
      * @param i_dim_sizes_left outer dimension sizes of the left tensor.
      * @param i_dim_sizes_right outer dimension sizes of the right tensor.
+     * @param i_dim_sizes_out_aux outer dimension sizes of the auxiliary output tensor.
      * @param i_dim_sizes_out outer dimension sizes of the output tensor.
      * @param o_strides_left_c will be set to the strides of the left tensor's C dimensions.
      * @param o_strides_left_m will be set to the strides of the left tensor's M dimensions.
@@ -311,6 +321,9 @@ class einsum_ir::backend::BinaryContraction {
      * @param o_strides_right_n will be set to the strides of the right tensor's N dimensions.
      * @param o_strides_right_k will be set to the strides of the right tensor's K dimensions.
      * @param o_strides_right_j will be set to the strides of the right tensor's J dimensions.
+     * @param o_strides_out_aux_c will be set to the strides of the auxiliary output tensor's C dimensions.
+     * @param o_strides_out_aux_m will be set to the strides of the auxiliary output tensor's M dimensions.
+     * @param o_strides_out_aux_n will be set to the strides of the auxiliary output tensor's N dimensions.
      * @param o_strides_out_c will be set to the strides of the output tensor's C dimensions.
      * @param o_strides_out_m will be set to the strides of the output tensor's M dimensions.
      * @param o_strides_out_n will be set to the strides of the output tensor's N dimensions.
@@ -335,6 +348,7 @@ class einsum_ir::backend::BinaryContraction {
                   int64_t                      const * i_dim_ids_j,
                   std::map< int64_t, int64_t > const & i_dim_sizes_left,
                   std::map< int64_t, int64_t > const & i_dim_sizes_right,
+                  std::map< int64_t, int64_t > const & i_dim_sizes_out_aux,
                   std::map< int64_t, int64_t > const & i_dim_sizes_out,
                   int64_t                            * o_strides_left_c,
                   int64_t                            * o_strides_left_m,
@@ -344,6 +358,9 @@ class einsum_ir::backend::BinaryContraction {
                   int64_t                            * o_strides_right_n,
                   int64_t                            * o_strides_right_k,
                   int64_t                            * o_strides_right_j,
+                  int64_t                            * o_strides_out_aux_c,
+                  int64_t                            * o_strides_out_aux_m,
+                  int64_t                            * o_strides_out_aux_n,
                   int64_t                            * o_strides_out_c,
                   int64_t                            * o_strides_out_m,
                   int64_t                            * o_strides_out_n );
@@ -377,6 +394,7 @@ class einsum_ir::backend::BinaryContraction {
      * @param i_dim_sizes_inner mapping from the dimension ids to the inner sizes.
      * @param i_dim_sizes_outer_left mapping from the dimension ids to the left tensor's outer sizes.
      * @param i_dim_sizes_outer_right mapping from the dimension ids to the right tensor's outer sizes.
+     * @param i_dim_sizes_outer_out_aux mapping from the dimension ids to the auxiliary out tensor's outer sizes.
      * @param i_dim_sizes_outer_out mapping from the dimension ids to the out tensor's outer sizes.
      * @param i_dim_ids_left dimension ids of the left tensor.
      * @param i_dim_ids_right dimension ids of the right tensor.
@@ -386,7 +404,47 @@ class einsum_ir::backend::BinaryContraction {
      * @param i_dtype_comp compute data type.
      * @param i_dtype_out datatype of the output.
      * @param i_ktype_first_touch type of the first-touch kernel.
-     * @param i_ktype_inner type of the inner kernel.
+     * @param i_ktype_main type of the main kernel.
+     * @param i_ktype_last_touch type of the last touch kernel.
+     **/
+    void init( int64_t                              i_num_dims_left,
+               int64_t                              i_num_dims_right,
+               int64_t                              i_num_dims_out,
+               std::map< int64_t, int64_t > const & i_dim_sizes_inner,
+               std::map< int64_t, int64_t > const & i_dim_sizes_outer_left,
+               std::map< int64_t, int64_t > const & i_dim_sizes_outer_right,
+               std::map< int64_t, int64_t > const & i_dim_sizes_outer_out_aux,
+               std::map< int64_t, int64_t > const & i_dim_sizes_outer_out,
+               int64_t                      const * i_dim_ids_left,
+               int64_t                      const * i_dim_ids_right,
+               int64_t                      const * i_dim_ids_out,
+               data_t                               i_dtype_left,
+               data_t                               i_dtype_right,
+               data_t                               i_dtype_comp,
+               data_t                               i_dtype_out,
+               kernel_t                             i_ktype_first_touch,
+               kernel_t                             i_ktype_main,
+               kernel_t                             i_ktype_last_touch );
+
+    /**
+     * Initializes the binary contraction.
+     *
+     * @param i_num_dims_left number of dimensions of the left tensor.
+     * @param i_num_dims_right number of dimensions of the right tensor.
+     * @param i_num_dims_out number of dimensions of the output tensor.
+     * @param i_dim_sizes_inner mapping from the dimension ids to the inner sizes.
+     * @param i_dim_sizes_outer_left mapping from the dimension ids to the left tensor's outer sizes.
+     * @param i_dim_sizes_outer_right mapping from the dimension ids to the right tensor's outer sizes.
+     * @param i_dim_sizes_outer_out mapping from the dimension ids to the out tensor's outer sizes.
+     * @param i_dim_ids_left dimension ids of the left tensor.
+     * @param i_dim_ids_right dimension ids of the right tensor.
+     * @param i_dim_ids_out dimensions ids of the output tensor.
+     * @param i_dtype_left datatype of the left input.
+     * @param i_dtype_right datatype of the right input.
+     * @param i_dtype_comp compute data type.
+     * @param i_dtype_out datatype of the output.
+     * @param i_ktype_first_touch type of the first-touch kernel.
+     * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
      **/
     void init( int64_t                              i_num_dims_left,
@@ -404,7 +462,7 @@ class einsum_ir::backend::BinaryContraction {
                data_t                               i_dtype_comp,
                data_t                               i_dtype_out,
                kernel_t                             i_ktype_first_touch,
-               kernel_t                             i_ktype_inner,
+               kernel_t                             i_ktype_main,
                kernel_t                             i_ktype_last_touch );
 
     /**
@@ -422,7 +480,7 @@ class einsum_ir::backend::BinaryContraction {
      * @param i_dtype_comp compute data type.
      * @param i_dtype_out datatype of the output.
      * @param i_ktype_first_touch type of the first-touch kernel.
-     * @param i_ktype_inner type of the inner kernel.
+     * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
      **/
     void init( int64_t                              i_num_dims_left,
@@ -437,7 +495,50 @@ class einsum_ir::backend::BinaryContraction {
                data_t                               i_dtype_comp,
                data_t                               i_dtype_out,
                kernel_t                             i_ktype_first_touch,
-               kernel_t                             i_ktype_inner,
+               kernel_t                             i_ktype_main,
+               kernel_t                             i_ktype_last_touch );
+
+    /**
+     * Initializes the binary contraction.
+     *
+     * @param i_num_dims_left number of dimensions of the left tensor.
+     * @param i_num_dims_right number of dimensions of the right tensor.
+     * @param i_num_dims_out number of dimensions of the output tensor.
+     * @param i_dim_sizes_inner mapping from the dimension ids to the inner sizes.
+     * @param i_dim_sizes_outer_left mapping from the dimension ids to the left tensor's outer sizes.
+     * @param i_dim_sizes_outer_right mapping from the dimension ids to the right tensor's outer sizes.
+     * @param i_dim_sizes_outer_out_aux mapping from the dimension ids to the auxiliary out tensor's outer sizes.
+     * @param i_dim_sizes_outer_out mapping from the dimension ids to the out tensor's outer sizes.
+     * @param i_dim_ids_left dimension ids of the left tensor.
+     * @param i_dim_ids_right dimension ids of the right tensor.
+     * @param i_dim_ids_out dimensions ids of the output tensor.
+     * @param i_dim_link_s_to_p link from secondary dims to primary ones.
+     * @param i_dtype_left datatype of the left input.
+     * @param i_dtype_right datatype of the right input.
+     * @param i_dtype_comp compute data type.
+     * @param i_dtype_out datatype of the output.
+     * @param i_ktype_first_touch type of the first-touch kernel.
+     * @param i_ktype_main type of the main kernel.
+     * @param i_ktype_last_touch type of the last touch kernel.
+     **/
+    void init( int64_t                              i_num_dims_left,
+               int64_t                              i_num_dims_right,
+               int64_t                              i_num_dims_out,
+               std::map< int64_t, int64_t > const & i_dim_sizes_inner,
+               std::map< int64_t, int64_t > const & i_dim_sizes_outer_left,
+               std::map< int64_t, int64_t > const & i_dim_sizes_outer_right,
+               std::map< int64_t, int64_t > const & i_dim_sizes_outer_out_aux,
+               std::map< int64_t, int64_t > const & i_dim_sizes_outer_out,
+               int64_t                      const * i_dim_ids_left,
+               int64_t                      const * i_dim_ids_right,
+               int64_t                      const * i_dim_ids_out,
+               std::map< int64_t, int64_t > const & i_dim_link_s_to_p,
+               data_t                               i_dtype_left,
+               data_t                               i_dtype_right,
+               data_t                               i_dtype_comp,
+               data_t                               i_dtype_out,
+               kernel_t                             i_ktype_first_touch,
+               kernel_t                             i_ktype_main,
                kernel_t                             i_ktype_last_touch );
 
     /**
@@ -459,7 +560,7 @@ class einsum_ir::backend::BinaryContraction {
      * @param i_dtype_comp compute data type.
      * @param i_dtype_out datatype of the output.
      * @param i_ktype_first_touch type of the first-touch kernel.
-     * @param i_ktype_inner type of the inner kernel.
+     * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
      **/
     void init( int64_t                              i_num_dims_left,
@@ -478,7 +579,7 @@ class einsum_ir::backend::BinaryContraction {
                data_t                               i_dtype_comp,
                data_t                               i_dtype_out,
                kernel_t                             i_ktype_first_touch,
-               kernel_t                             i_ktype_inner,
+               kernel_t                             i_ktype_main,
                kernel_t                             i_ktype_last_touch );
 
     /**
@@ -498,12 +599,25 @@ class einsum_ir::backend::BinaryContraction {
     /**
      * Performs a contraction on the given input data.
      *
-     * @param i_tensor_in_left left input tensor.
-     * @param i_tensor_in_right right input tensor.
+     * @param i_tensor_left left input tensor.
+     * @param i_tensor_right right input tensor.
      * @param io_tensor_out output tensor. 
      **/
-    virtual void contract( void const * i_tensor_in_left,
-                           void const * i_tensor_in_right,
+    virtual void contract( void const * i_tensor_left,
+                           void const * i_tensor_right,
+                           void       * io_tensor_out ) = 0;
+
+    /**
+     * Performs a contraction on the given input data.
+     *
+     * @param i_tensor_left left input tensor.
+     * @param i_tensor_right right input tensor.
+     * @param i_tensor_out_aux auxiliary data w.r.t. output tensor.
+     * @param io_tensor_out output tensor.
+     **/
+    virtual void contract( void const * i_tensor_left,
+                           void const * i_tensor_right,
+                           void const * i_tensor_out_aux,
                            void       * io_tensor_out ) = 0;
 
     /**

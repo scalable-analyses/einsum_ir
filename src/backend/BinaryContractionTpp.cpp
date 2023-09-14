@@ -47,6 +47,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
           *m_dim_sizes_inner,
           *m_dim_sizes_outer_right,
           *m_dim_sizes_outer_left,
+          *m_dim_sizes_outer_out_aux,
           *m_dim_sizes_outer_out,
           m_dim_ids_right_native,
           m_dim_ids_left_native,
@@ -56,7 +57,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
           m_dtype_comp,
           m_dtype_out,
           m_ktype_first_touch,
-          m_ktype_inner,
+          m_ktype_main,
           m_ktype_last_touch );
 
     BinaryContraction::compile_base();
@@ -77,78 +78,99 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   int64_t * l_dim_ids_left  = m_dim_ids_left_ordered.data();
   int64_t * l_dim_ids_right = m_dim_ids_right_ordered.data();
 
+  // check if bcast ops are required to account for the auxiliary output tensor
+  bool l_out_aux_bcast = false;
+  for( int64_t l_di = 0; l_di < m_num_dims_out; l_di++ ) {
+    int64_t l_dim_id = m_dim_ids_out[l_di];
+
+    if(    m_dim_sizes_outer_out_aux->at(l_dim_id) == 1
+        && m_dim_sizes_outer_out->at(l_dim_id)     != 1 ) {
+      l_out_aux_bcast = true;
+      break;
+    }
+  }
+
   // derive parameters for reordering of input dimensions
   if( m_dim_types_out[ m_num_dims_out - 1 ] == M ) {
     m_tensor_ordering = LEFT_BC_BM_BI_BK_IB_KB_MB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_OUT_NATIVE;
 
     // use standard GEMM kernels
     m_num_dims_cb = 0;
+    int64_t l_id_out = 0;
+    int64_t l_block_dim_size = 0;
 
-    // use consecutive M dimensions in output tensor as mb until target is reached
-    m_num_dims_mb = 0;
-    int64_t l_id_out = m_num_dims_out - 1;
-    int64_t l_block_dim_size = 1;
-    while( l_id_out >= 0 ) {
-      if( m_dim_types_out[ l_id_out ] == M &&
-          l_block_dim_size < m_size_mb_gemm_target ) {
-        int64_t l_dim_id              = m_dim_ids_out[l_id_out];
-        int64_t l_dim_size_inner      = m_dim_sizes_inner->at(      l_dim_id );
-        int64_t l_dim_size_outer_left = m_dim_sizes_outer_left->at( l_dim_id );
-        int64_t l_dim_size_outer_out  = m_dim_sizes_outer_out->at(  l_dim_id );
-        bool l_cont = l_dim_size_inner == l_dim_size_outer_left  &&
-                      l_dim_size_inner == l_dim_size_outer_out;
+    // block M and N using consecutive dims for contractions without bcasts
+    if( l_out_aux_bcast == false ) {
+      // use consecutive M dimensions in output tensor as mb until target is reached
+      m_num_dims_mb = 0;
+      l_id_out = m_num_dims_out - 1;
+      l_block_dim_size = 1;
+      while( l_id_out >= 0 ) {
+        if( m_dim_types_out[ l_id_out ] == M &&
+            l_block_dim_size < m_size_mb_gemm_target ) {
+          int64_t l_dim_id              = m_dim_ids_out[l_id_out];
+          int64_t l_dim_size_inner      = m_dim_sizes_inner->at(      l_dim_id );
+          int64_t l_dim_size_outer_left = m_dim_sizes_outer_left->at( l_dim_id );
+          int64_t l_dim_size_outer_out  = m_dim_sizes_outer_out->at(  l_dim_id );
+          bool l_cont = l_dim_size_inner == l_dim_size_outer_left  &&
+                        l_dim_size_inner == l_dim_size_outer_out;
 
-        // only merge dim if M is stored contiguously
-        if( m_num_dims_mb == 0 || l_cont ) {
-          l_block_dim_size *= l_dim_size_inner;
-          m_num_dims_mb++;
+          // only merge dim if M is stored contiguously
+          if( m_num_dims_mb == 0 || l_cont ) {
+            l_block_dim_size *= l_dim_size_inner;
+            m_num_dims_mb++;
+            l_id_out--;
+          }
+          else {
+            break;
+          }
+        }
+        else {
+          break;
+        }
+      }
+
+      // jump until we reach an N dimension
+      while( l_id_out >= 0 ) {
+        if( m_dim_types_out[ l_id_out ] != N ) {
           l_id_out--;
         }
         else {
           break;
         }
       }
-      else {
-        break;
-      }
-    }
 
-    // jump until we reach an N dimension
-    while( l_id_out >= 0 ) {
-      if( m_dim_types_out[ l_id_out ] != N ) {
-        l_id_out--;
-      }
-      else {
-        break;
-      }
-    }
+      // use consecutive N dimensions in output tensor as nb until target is reached
+      m_num_dims_nb = 0;
+      l_block_dim_size = 1;
+      while( l_id_out >= 0 ) {
+        if( m_dim_types_out[ l_id_out ] == N &&
+            l_block_dim_size < m_size_nb_gemm_target ) {
+          int64_t l_dim_id               = m_dim_ids_out[l_id_out];
+          int64_t l_dim_size_inner       = m_dim_sizes_inner->at(       l_dim_id );
+          int64_t l_dim_size_outer_right = m_dim_sizes_outer_right->at( l_dim_id );
+          int64_t l_dim_size_outer_out   = m_dim_sizes_outer_out->at(   l_dim_id );
+          int64_t l_cont = l_dim_size_inner == l_dim_size_outer_right &&
+                           l_dim_size_inner == l_dim_size_outer_out;
 
-    // use consecutive N dimensions in output tensor as nb until target is reached
-    m_num_dims_nb = 0;
-    l_block_dim_size = 1;
-    while( l_id_out >= 0 ) {
-      if( m_dim_types_out[ l_id_out ] == N &&
-          l_block_dim_size < m_size_nb_gemm_target ) {
-        int64_t l_dim_id               = m_dim_ids_out[l_id_out];
-        int64_t l_dim_size_inner       = m_dim_sizes_inner->at(       l_dim_id );
-        int64_t l_dim_size_outer_right = m_dim_sizes_outer_right->at( l_dim_id );
-        int64_t l_dim_size_outer_out   = m_dim_sizes_outer_out->at(   l_dim_id );
-        int64_t l_cont = l_dim_size_inner == l_dim_size_outer_right &&
-                         l_dim_size_inner == l_dim_size_outer_out;
-
-        // only merge dim if N is store contiguously
-        if( m_num_dims_nb == 0 || l_cont ) {
-          l_block_dim_size *= l_dim_size_inner;
-          m_num_dims_nb++;
-          l_id_out--;
+          // only merge dim if N is store contiguously
+          if( m_num_dims_nb == 0 || l_cont ) {
+            l_block_dim_size *= l_dim_size_inner;
+            m_num_dims_nb++;
+            l_id_out--;
+          }
+          else {
+            break;
+          }
         }
         else {
           break;
         }
       }
-      else {
-        break;
-      }
+    }
+    else {
+      m_num_dims_mb = 1;
+      m_num_dims_nb = (m_num_dims_n > 0) ? 1 : 0;
     }
 
     // determine number of K dimensions which reach the target (kb)
@@ -181,35 +203,40 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   else if( m_dim_types_out[ m_num_dims_out - 1 ] == C ) {
     m_tensor_ordering = LEFT_BC_BM_BI_BK_IB_KB_MB_CB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_CB_OUT_NATIVE;
 
-    // use consecutive C dimensions in output tensor as cb until target is reached
-    m_num_dims_cb = 0;
-    int64_t l_id_out = m_num_dims_out - 1;
-    int64_t l_block_dim_size = 1;
-    while( l_id_out >= 0 ) {
-      if( m_dim_types_out[ l_id_out ] == C &&
-          l_block_dim_size < m_size_cb_packed_gemm_target ) {
-        int64_t l_dim_id               = m_dim_ids_out[l_id_out];
-        int64_t l_dim_size_inner       = m_dim_sizes_inner->at(       l_dim_id );
-        int64_t l_dim_size_outer_left  = m_dim_sizes_outer_left->at(  l_dim_id );
-        int64_t l_dim_size_outer_right = m_dim_sizes_outer_right->at( l_dim_id );
-        int64_t l_dim_size_outer_out   = m_dim_sizes_outer_out->at(   l_dim_id );
-        bool l_cont = l_dim_size_inner == l_dim_size_outer_left  &&
-                      l_dim_size_inner == l_dim_size_outer_right &&
-                      l_dim_size_inner == l_dim_size_outer_out;
+    // block C using contiguous dimensions in output tensor for contractions without broadcasts
+    if( l_out_aux_bcast == false ) {
+      m_num_dims_cb = 0;
+      int64_t l_id_out = m_num_dims_out - 1;
+      int64_t l_block_dim_size = 1;
+      while( l_id_out >= 0 ) {
+        if( m_dim_types_out[ l_id_out ] == C &&
+            l_block_dim_size < m_size_cb_packed_gemm_target ) {
+          int64_t l_dim_id               = m_dim_ids_out[l_id_out];
+          int64_t l_dim_size_inner       = m_dim_sizes_inner->at(       l_dim_id );
+          int64_t l_dim_size_outer_left  = m_dim_sizes_outer_left->at(  l_dim_id );
+          int64_t l_dim_size_outer_right = m_dim_sizes_outer_right->at( l_dim_id );
+          int64_t l_dim_size_outer_out   = m_dim_sizes_outer_out->at(   l_dim_id );
+          bool l_cont = l_dim_size_inner == l_dim_size_outer_left  &&
+                        l_dim_size_inner == l_dim_size_outer_right &&
+                        l_dim_size_inner == l_dim_size_outer_out;
 
-        // only merge dim if C is stored contiguously
-        if( m_num_dims_cb == 0 || l_cont ) {
-          l_block_dim_size *= l_dim_size_inner;
-          m_num_dims_cb++;
-          l_id_out--;
+          // only merge dim if C is stored contiguously
+          if( m_num_dims_cb == 0 || l_cont ) {
+            l_block_dim_size *= l_dim_size_inner;
+            m_num_dims_cb++;
+            l_id_out--;
+          }
+          else {
+            break;
+          }
         }
         else {
           break;
         }
       }
-      else {
-        break;
-      }
+    }
+    else {
+      m_num_dims_cb = 1;
     }
 
     // remaining dimension types
@@ -272,6 +299,10 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   m_strides_right_k.resize( m_num_dims_k );
   m_strides_right_j.resize( m_num_dims_j );
 
+  m_strides_out_aux_c.resize( m_num_dims_c );
+  m_strides_out_aux_m.resize( m_num_dims_m );
+  m_strides_out_aux_n.resize( m_num_dims_n );
+
   m_strides_out_c.resize( m_num_dims_c );
   m_strides_out_m.resize( m_num_dims_m );
   m_strides_out_n.resize( m_num_dims_n );
@@ -296,6 +327,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
            m_dim_ids_j.data(),
            *m_dim_sizes_outer_left,
            *m_dim_sizes_outer_right,
+           *m_dim_sizes_outer_out_aux,
            *m_dim_sizes_outer_out,
            m_strides_left_c.data(),
            m_strides_left_m.data(),
@@ -305,6 +337,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
            m_strides_right_n.data(),
            m_strides_right_k.data(),
            m_strides_right_j.data(),
+           m_strides_out_aux_c.data(),
+           m_strides_out_aux_m.data(),
+           m_strides_out_aux_n.data(),
            m_strides_out_c.data(),
            m_strides_out_m.data(),
            m_strides_out_n.data() );
@@ -419,11 +454,66 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                                                                                      l_xmm_dtype_out,
                                                                                      l_xmm_dtype_out );
 
+  // derive the leading dimension of the auxiliary output tensor
+  int64_t l_ld_out_aux = m_num_dims_n > 0 ? m_strides_out_aux_n[ m_num_dims_n - 1 ] : l_m*l_r;
+  libxsmm_bitfield l_flag_out_aux = LIBXSMM_MELTW_FLAG_UNARY_NONE;
+
+  // column to matrix bcast
+  if(         m_num_dims_m > 0
+           && m_num_dims_n > 0
+           && m_strides_out_aux_m[ m_num_dims_m - 1 ] >  0
+           && m_strides_out_aux_n[ m_num_dims_n - 1 ] == 0 ) {
+    l_ld_out_aux   = l_m*l_r;
+    l_flag_out_aux = LIBXSMM_MELTW_FLAG_UNARY_BCAST_COL;
+  }
+  // row to matrix bcast
+  else if(    m_num_dims_m > 0
+           && m_num_dims_n > 0
+           && m_strides_out_aux_m[ m_num_dims_m - 1 ] == 0
+           && m_strides_out_aux_n[ m_num_dims_n - 1 ] >  0 ) {
+    l_flag_out_aux = LIBXSMM_MELTW_FLAG_UNARY_BCAST_ROW;
+  }
+  // scalar to matrix bcast
+  else if(    m_num_dims_m > 0
+           && m_num_dims_n > 0
+           && m_strides_out_aux_m[ m_num_dims_m - 1 ] == 0
+           && m_strides_out_aux_n[ m_num_dims_n - 1 ] == 0 ) {
+    l_flag_out_aux = LIBXSMM_MELTW_FLAG_UNARY_BCAST_SCALAR;
+  }
+
+  libxsmm_meltw_unary_shape l_shape_single_touch_aux_unary = libxsmm_create_meltw_unary_shape( l_m*l_r,
+                                                                                               l_n,
+                                                                                               l_ld_out_aux,
+                                                                                               l_ldc,
+                                                                                               l_xmm_dtype_out,
+                                                                                               l_xmm_dtype_out,
+                                                                                               l_xmm_dtype_out );
+
+  libxsmm_meltw_binary_shape l_shape_single_touch_aux_binary = libxsmm_create_meltw_binary_shape( l_m*l_r,
+                                                                                                  l_n,
+                                                                                                  l_ldc,
+                                                                                                  l_ld_out_aux,
+                                                                                                  l_ldc,
+                                                                                                  l_xmm_dtype_out,
+                                                                                                  l_xmm_dtype_out,
+                                                                                                  l_xmm_dtype_out,
+                                                                                                  l_xmm_dtype_out );
+
   // first touch kernel
   if( m_ktype_first_touch == ZERO ) {
-    m_xmm_kernel_first_touch = libxsmm_dispatch_meltw_unary_v2( LIBXSMM_MELTW_TYPE_UNARY_XOR,
-                                                                l_shape_single_touch,
-                                                                LIBXSMM_MELTW_FLAG_UNARY_NONE );
+    m_xmm_kernel_first_touch_unary = libxsmm_dispatch_meltw_unary_v2( LIBXSMM_MELTW_TYPE_UNARY_XOR,
+                                                                      l_shape_single_touch,
+                                                                      LIBXSMM_MELTW_FLAG_UNARY_NONE );
+  }
+  else if( m_ktype_first_touch == COPY ) {
+    m_xmm_kernel_first_touch_unary = libxsmm_dispatch_meltw_unary_v2( LIBXSMM_MELTW_TYPE_UNARY_IDENTITY,
+                                                                      l_shape_single_touch_aux_unary,
+                                                                      l_flag_out_aux );
+  }
+  else if( m_ktype_first_touch == ADD ) {
+    m_xmm_kernel_first_touch_binary = libxsmm_dispatch_meltw_binary_v2( LIBXSMM_MELTW_TYPE_BINARY_ADD,
+                                                                        l_shape_single_touch_aux_binary,
+                                                                        l_flag_out_aux );
   }
   else if( m_ktype_first_touch != UNDEFINED_KTYPE ) {
     return err_t::COMPILATION_FAILED;
@@ -431,21 +521,26 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
 
   // last touch kernel
   if( m_ktype_last_touch == RELU ) {
-    m_xmm_kernel_last_touch = libxsmm_dispatch_meltw_unary_v2( LIBXSMM_MELTW_TYPE_UNARY_RELU,
-                                                               l_shape_single_touch,
-                                                               LIBXSMM_MELTW_FLAG_UNARY_NONE );
+    m_xmm_kernel_last_touch_unary = libxsmm_dispatch_meltw_unary_v2( LIBXSMM_MELTW_TYPE_UNARY_RELU,
+                                                                     l_shape_single_touch,
+                                                                     LIBXSMM_MELTW_FLAG_UNARY_NONE );
+  }
+  else if( m_ktype_last_touch == ADD ) {
+    m_xmm_kernel_last_touch_binary = libxsmm_dispatch_meltw_binary_v2( LIBXSMM_MELTW_TYPE_BINARY_ADD,
+                                                                       l_shape_single_touch_aux_binary,
+                                                                       l_flag_out_aux );
   }
   else if( m_ktype_last_touch != UNDEFINED_KTYPE ) {
     return err_t::COMPILATION_FAILED;
   }
 
-  // remove blocked C dimension for inner kernel from leading output dimensions which is implicit in LIBXSMM
+  // remove blocked C dimension for main kernel from leading output dimensions which is implicit in LIBXSMM
   if( l_ldc % l_r != 0 ) {
     return einsum_ir::COMPILATION_FAILED;
   }
   l_ldc /= l_r;
 
-  // create inner kernel
+  // create main kernel
   libxsmm_gemm_shape l_shape_brgemm;
   libxsmm_bitfield l_flags_brgemm = LIBXSMM_GEMM_FLAGS('N', 'N');
   libxsmm_bitfield l_prefetch_flags_brgemm = 0;
@@ -468,33 +563,51 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   l_brconfig.br_unroll_hint = 0;
 
   if( m_tensor_ordering == LEFT_BC_BM_BI_BK_IB_KB_MB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_OUT_NATIVE ) {
-    m_xmm_kernel_inner.gemm = libxsmm_dispatch_brgemm_v2( l_shape_brgemm,
-                                                          l_flags_brgemm,
-                                                          l_prefetch_flags_brgemm,
-                                                          l_brconfig );
+    m_xmm_kernel_main.gemm = libxsmm_dispatch_brgemm_v2( l_shape_brgemm,
+                                                         l_flags_brgemm,
+                                                         l_prefetch_flags_brgemm,
+                                                         l_brconfig );
   }
   else if( m_tensor_ordering == LEFT_BC_BM_BI_BK_IB_KB_MB_CB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_CB_OUT_NATIVE ) {
-    m_xmm_kernel_inner.gemm = libxsmm_create_packed_gemm( l_shape_brgemm,
-                                                          l_flags_brgemm,
-                                                          l_prefetch_flags_brgemm,
-                                                          l_r );
+    m_xmm_kernel_main.gemm = libxsmm_create_packed_gemm( l_shape_brgemm,
+                                                         l_flags_brgemm,
+                                                         l_prefetch_flags_brgemm,
+                                                         l_r );
   }
   else {
     return err_t::COMPILATION_FAILED;
   }
 
   // check for existing kernels
-  if(    m_ktype_first_touch      != UNDEFINED_KTYPE
-      && m_xmm_kernel_first_touch == nullptr ) {
+  if( m_xmm_kernel_first_touch_unary == nullptr ) {
+    if(    m_ktype_first_touch != kernel_t::UNDEFINED_KTYPE
+        && m_ktype_first_touch != kernel_t::ADD ) {
+      return einsum_ir::COMPILATION_FAILED;
+    }
+  }
+  if( m_xmm_kernel_first_touch_binary == nullptr ) {
+    if(    m_ktype_first_touch != kernel_t::UNDEFINED_KTYPE
+        && m_ktype_first_touch != kernel_t::ZERO
+        && m_ktype_first_touch != kernel_t::COPY
+        && m_ktype_first_touch != kernel_t::RELU ) {
+      return einsum_ir::COMPILATION_FAILED;
+    }
+  }
+  if(    m_ktype_main             != UNDEFINED_KTYPE
+      && m_xmm_kernel_main.gemm   == nullptr ) {
     return einsum_ir::COMPILATION_FAILED;
   }
-  if(    m_ktype_inner            != UNDEFINED_KTYPE
-      && m_xmm_kernel_inner.gemm == nullptr ) {
-    return einsum_ir::COMPILATION_FAILED;
+  if( m_xmm_kernel_last_touch_unary == nullptr ) {
+    if(    m_ktype_last_touch != kernel_t::UNDEFINED_KTYPE
+        && m_ktype_last_touch != kernel_t::ADD ) {
+      return einsum_ir::COMPILATION_FAILED;
+    }
   }
-  if(    m_ktype_last_touch       != UNDEFINED_KTYPE
-      && m_xmm_kernel_last_touch  == nullptr ) {
-    return einsum_ir::COMPILATION_FAILED;
+  if( m_xmm_kernel_last_touch_binary == nullptr ) {
+    if(    m_ktype_last_touch != kernel_t::UNDEFINED_KTYPE
+        && m_ktype_last_touch != kernel_t::RELU ) {
+      return einsum_ir::COMPILATION_FAILED;
+    }
   }
 
   // contraction loop interface
@@ -512,15 +625,20 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                      m_strides_right_c.data(),
                      m_strides_right_n.data(),
                      m_strides_right_k.data(),
+                     m_strides_out_aux_c.data(),
+                     m_strides_out_aux_m.data(),
+                     m_strides_out_aux_n.data(),
                      m_strides_out_c.data(),
                      m_strides_out_m.data(),
                      m_strides_out_n.data(),
                      ce_n_bytes( m_dtype_left ),
                      ce_n_bytes( m_dtype_right ),
                      ce_n_bytes( m_dtype_out ),
-                     m_xmm_kernel_first_touch,
-                     m_xmm_kernel_inner.gemm,
-                     m_xmm_kernel_last_touch );
+                     m_xmm_kernel_first_touch_unary,
+                     m_xmm_kernel_first_touch_binary,
+                     m_xmm_kernel_main.gemm,
+                     m_xmm_kernel_last_touch_unary,
+                     m_xmm_kernel_last_touch_binary );
 
   l_err = m_cont_loops.compile();
   if( l_err != einsum_ir::SUCCESS ) {
@@ -536,17 +654,28 @@ void einsum_ir::backend::BinaryContractionTpp::threading( int64_t i_num_tasks_ta
   m_cont_loops.threading( i_num_tasks_target );
 }
 
-void einsum_ir::backend::BinaryContractionTpp::contract( void const * i_tensor_in_left,
-                                                         void const * i_tensor_in_right,
+void einsum_ir::backend::BinaryContractionTpp::contract( void const * i_tensor_left,
+                                                         void const * i_tensor_right,
+                                                         void const * i_tensor_out_aux,
                                                          void       * io_tensor_out ) {
-  void const * l_tensor_left = i_tensor_in_left;
-  void const * l_tensor_right = i_tensor_in_right;
+  void const * l_tensor_left = i_tensor_left;
+  void const * l_tensor_right = i_tensor_right;
   if( m_tensors_in_swapped ) {
-    l_tensor_left = i_tensor_in_right;
-    l_tensor_right = i_tensor_in_left;
+    l_tensor_left = i_tensor_right;
+    l_tensor_right = i_tensor_left;
   }
 
   m_cont_loops.contract( l_tensor_left,
                          l_tensor_right,
+                         i_tensor_out_aux,
                          io_tensor_out );
+}
+
+void einsum_ir::backend::BinaryContractionTpp::contract( void const * i_tensor_left,
+                                                         void const * i_tensor_right,
+                                                         void       * io_tensor_out ) {
+  contract( i_tensor_left,
+            i_tensor_right,
+            nullptr,
+            io_tensor_out );
 }

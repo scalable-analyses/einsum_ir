@@ -15,34 +15,36 @@ namespace einsum_ir {
   } dim_t;
 
   typedef enum {
-    LEFT_NATIVE_RIGHT_NATIVE_OUT_NATIVE,
-    LEFT_BC_BM_BI_BK_RIGHT_BC_BN_BJ_BK_OUT_NATIVE,
-    LEFT_BC_BM_BI_BK_IB_KB_MB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_OUT_NATIVE,
-    LEFT_BC_BM_BI_BK_IB_KB_MB_CB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_CB_OUT_NATIVE,
-    UNDEFINED_TENORD = 99
+    LEFT_NATIVE_RIGHT_NATIVE_OUT_NATIVE                                   = 0,
+    LEFT_BC_BM_BI_BK_RIGHT_BC_BN_BJ_BK_OUT_NATIVE                         = 1,
+    LEFT_BC_BM_BI_BK_IB_KB_MB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_OUT_NATIVE       = 2,
+    LEFT_BC_BM_BI_BK_IB_KB_MB_CB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_CB_OUT_NATIVE = 3,
+    UNDEFINED_TENORD                                                      = 99
   } tenord_t;
 
   typedef enum {
-    SUCCESS = 0,
-    COMPILATION_FAILED = 1,
+    SUCCESS                   = 0,
+    COMPILATION_FAILED        = 1,
     DIMENSION_ORDERING_FAILED = 2,
-    NO_DATA_PTR_PROVIDED = 3,
+    NO_DATA_PTR_PROVIDED      = 3,
     CALLED_BEFORE_COMPILATION = 4,
-    INVALID_ID = 5,
-    UNDEFINED_ERROR = 99
+    INVALID_ID                = 5,
+    UNDEFINED_ERROR           = 99
   } err_t;
 
   typedef enum {
-    FP32 = 0,
-    FP64 = 1,
+    FP32            = 0,
+    FP64            = 1,
     UNDEFINED_DTYPE = 99
   } data_t;
 
   typedef enum {
-    ZERO,
-    RELU,
-    MADD,
-    CUSTOM_KTYPE,
+    ZERO            = 0,
+    RELU            = 1,
+    ADD             = 2,
+    MADD            = 3,
+    COPY            = 4,
+    CUSTOM_KTYPE    = 5,
     UNDEFINED_KTYPE = 99
   } kernel_t;
 

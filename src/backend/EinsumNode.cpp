@@ -32,7 +32,7 @@ void einsum_ir::backend::EinsumNode::init( int64_t            i_num_dims,
                                            int64_t    const * i_dim_ids,
                                            data_t             i_dtype,
                                            kernel_t           i_ktype_first_touch,
-                                           kernel_t           i_ktype_inner,
+                                           kernel_t           i_ktype_main,
                                            kernel_t           i_ktype_last_touch,
                                            EinsumNode       & i_left,
                                            EinsumNode       & i_right ) {
@@ -43,7 +43,7 @@ void einsum_ir::backend::EinsumNode::init( int64_t            i_num_dims,
         nullptr );
 
   m_ktype_first_touch = i_ktype_first_touch;
-  m_ktype_inner = i_ktype_inner;
+  m_ktype_main = i_ktype_main;
   m_ktype_last_touch = i_ktype_last_touch;
 
   m_children.resize( 2 );
@@ -56,7 +56,7 @@ void einsum_ir::backend::EinsumNode::init( int64_t            i_num_dims,
                                            data_t             i_dtype,
                                            void             * i_data_ptr,
                                            kernel_t           i_ktype_first_touch,
-                                           kernel_t           i_ktype_inner,
+                                           kernel_t           i_ktype_main,
                                            kernel_t           i_ktype_last_touch,
                                            EinsumNode       & i_left,
                                            EinsumNode       & i_right ) {
@@ -67,7 +67,7 @@ void einsum_ir::backend::EinsumNode::init( int64_t            i_num_dims,
         i_data_ptr );
 
   m_ktype_first_touch = i_ktype_first_touch;
-  m_ktype_inner = i_ktype_inner;
+  m_ktype_main = i_ktype_main;
   m_ktype_last_touch = i_ktype_last_touch;
 
   m_children.resize( 2 );
@@ -98,7 +98,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
                   m_dtype,
                   m_dtype,
                   m_ktype_first_touch,
-                  m_ktype_inner,
+                  m_ktype_main,
                   m_ktype_last_touch );
 
     einsum_ir::err_t l_err = m_cont->compile();

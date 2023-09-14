@@ -55,7 +55,8 @@ void kernel_madd_fp32( void const * i_in_left,
  *
  * @param io_data data which will be zeroed.
  **/
-void kernel_zero_fp32( void * io_data ) {
+void kernel_zero_fp32( void const *,
+                       void * io_data ) {
   float * l_data = (float *) io_data;
   *l_data = 0;
 }
@@ -65,7 +66,8 @@ void kernel_zero_fp32( void * io_data ) {
  *
  * @param io_data data to which the ReLU is applied.
  **/
-void kenrel_relu_fp32( void * io_data ) {
+void kernel_relu_fp32( void const *,
+                       void * io_data ) {
   float * l_data = (float *) io_data;
   *l_data = std::max( *l_data, 0.0f );
 }
@@ -184,6 +186,9 @@ TEST_CASE( "K dimension of the contraction loops.", "[contraction_loops_k]" ) {
                      l_strides_out_c,
                      l_strides_out_m,
                      l_strides_out_n,
+                     l_strides_out_c,
+                     l_strides_out_m,
+                     l_strides_out_n,
                      4,
                      4,
                      4,
@@ -197,6 +202,7 @@ TEST_CASE( "K dimension of the contraction loops.", "[contraction_loops_k]" ) {
   // single recursion (single loop around kernel)
   l_cont_loops.contract( l_a,
                          l_b,
+                         nullptr,
                          l_c );
   REQUIRE( l_c[0] == l_ref );
 
@@ -205,6 +211,7 @@ TEST_CASE( "K dimension of the contraction loops.", "[contraction_loops_k]" ) {
 
   l_cont_loops.contract( l_a,
                          l_b,
+                         nullptr,
                          l_c );
   REQUIRE( l_c[0] == l_ref );
 
@@ -213,6 +220,7 @@ TEST_CASE( "K dimension of the contraction loops.", "[contraction_loops_k]" ) {
 
   l_cont_loops.contract( l_a,
                          l_b,
+                         nullptr,
                          l_c );
   REQUIRE( l_c[0] == l_ref );
 
@@ -221,6 +229,7 @@ TEST_CASE( "K dimension of the contraction loops.", "[contraction_loops_k]" ) {
 
   l_cont_loops.contract( l_a,
                          l_b,
+                         nullptr,
                          l_c );
   REQUIRE( l_c[0] == l_ref );
 
@@ -228,6 +237,7 @@ TEST_CASE( "K dimension of the contraction loops.", "[contraction_loops_k]" ) {
   l_c[0] = 0;
   l_cont_loops.contract( l_a,
                          l_b,
+                         nullptr,
                          l_c );
   REQUIRE( l_c[0] == l_ref );
 }
@@ -314,18 +324,22 @@ TEST_CASE( "Matmul with first and last touch.", "[contraction_loops]" ) {
                      l_strides_out_c,
                      l_strides_out_m,
                      l_strides_out_n,
+                     l_strides_out_c,
+                     l_strides_out_m,
+                     l_strides_out_n,
                      4,
                      4,
                      4,
                      kernel_zero_fp32,
                      kernel_madd_fp32,
-                     kenrel_relu_fp32 );
+                     kernel_relu_fp32 );
 
   einsum_ir::err_t l_err = l_cont_loops.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
   l_cont_loops.contract( l_a_mat,
                          l_b_mat,
+                         nullptr,
                          l_c_mat );
 
   gemm_ref_mnk( l_a_mat,
@@ -510,11 +524,14 @@ TEST_CASE( "Nested loops used in binary contractions using a scalar kernel.", "[
                      l_sizes_n,
                      l_sizes_k,
                      l_strides_in_left_c,
-                      l_strides_in_left_m,
+                     l_strides_in_left_m,
                      l_strides_in_left_k,
                      l_strides_in_right_c,
                      l_strides_in_right_n,
                      l_strides_in_right_k,
+                     l_strides_out_c,
+                     l_strides_out_m,
+                     l_strides_out_n,
                      l_strides_out_c,
                      l_strides_out_m,
                      l_strides_out_n,
@@ -530,6 +547,7 @@ TEST_CASE( "Nested loops used in binary contractions using a scalar kernel.", "[
 
   l_cont_loops.contract( l_a_ten,
                          l_b_ten,
+                         nullptr,
                          l_c_ten );
 
   gemm_ref_mnk( l_a_mat,
@@ -730,6 +748,9 @@ TEST_CASE( "Nested loops used in binary contractions using a matrix kernel.", "[
                      l_strides_out_c,
                      l_strides_out_m,
                      l_strides_out_n,
+                     l_strides_out_c,
+                     l_strides_out_m,
+                     l_strides_out_n,
                      4,
                      4,
                      4,
@@ -742,6 +763,7 @@ TEST_CASE( "Nested loops used in binary contractions using a matrix kernel.", "[
 
   l_cont_loops.contract( l_a_ten,
                          l_b_ten,
+                         nullptr,
                          l_c_ten );
 
   for( int64_t l_ba = 0; l_ba < 4*3; l_ba++ ) {

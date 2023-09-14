@@ -3,15 +3,26 @@
 #include <cmath>
 
 template < typename T >
-void einsum_ir::backend::BinaryContractionScalar::kernel_zero( void * o_data ) {
+void einsum_ir::backend::BinaryContractionScalar::kernel_zero( void const *,
+                                                               void       * o_data ) {
   T * l_data = (T *) o_data;
   *l_data = T(0);
 }
 
 template < typename T >
-void einsum_ir::backend::BinaryContractionScalar::kernel_relu( void * io_data ) {
+void einsum_ir::backend::BinaryContractionScalar::kernel_relu( void const *,
+                                                               void       * io_data ) {
   T * l_data = (T *) io_data;
   *l_data = std::max( *l_data, T(0) );
+}
+
+template < typename T >
+void einsum_ir::backend::BinaryContractionScalar::kernel_copy( void const * i_data_src,
+                                                               void       * io_data_dst ) {
+  T const * l_data_src = (T const *) i_data_src;
+  T * l_data_dst = (T *) io_data_dst;
+
+  *l_data_dst = *l_data_src;
 }
 
 template < typename T_LEFT,
@@ -93,6 +104,10 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile( tenord_t 
   m_strides_right_k.resize( m_num_dims_k );
   m_strides_right_j.resize( m_num_dims_j );
 
+  m_strides_out_aux_c.resize( m_num_dims_c );
+  m_strides_out_aux_m.resize( m_num_dims_m );
+  m_strides_out_aux_n.resize( m_num_dims_n );
+
   m_strides_out_c.resize( m_num_dims_c );
   m_strides_out_m.resize( m_num_dims_m );
   m_strides_out_n.resize( m_num_dims_n );
@@ -117,6 +132,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile( tenord_t 
            m_dim_ids_j.data(),
            *m_dim_sizes_outer_left,
            *m_dim_sizes_outer_right,
+           *m_dim_sizes_outer_out_aux,
            *m_dim_sizes_outer_out,
            m_strides_left_c.data(),
            m_strides_left_m.data(),
@@ -126,6 +142,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile( tenord_t 
            m_strides_right_n.data(),
            m_strides_right_k.data(),
            m_strides_right_j.data(),
+           m_strides_out_aux_c.data(),
+           m_strides_out_aux_m.data(),
+           m_strides_out_aux_n.data(),
            m_strides_out_c.data(),
            m_strides_out_m.data(),
            m_strides_out_n.data() );
@@ -207,17 +226,28 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile( tenord_t 
       return einsum_ir::COMPILATION_FAILED;
     }
   }
+  else if( m_ktype_first_touch == COPY ) {
+    if( l_dtype_all_fp32 ) {
+      m_kernel_first_touch = &kernel_copy< float >;
+    }
+    else if( l_dtype_all_fp64 ) {
+      m_kernel_first_touch = &kernel_copy< double >;
+    }
+    else {
+      return einsum_ir::COMPILATION_FAILED;
+    }
+  }
   else if( m_ktype_first_touch != UNDEFINED_KTYPE ) {
     return einsum_ir::COMPILATION_FAILED;
   }
 
-  // inner kernel
-  if( m_ktype_inner == MADD ) {
+  // main kernel
+  if( m_ktype_main == MADD ) {
     if( l_dtype_all_fp32 ) {
-      m_kernel_inner = &kernel_madd< float, float, float >;
+      m_kernel_main = &kernel_madd< float, float, float >;
     }
     else if( l_dtype_all_fp64 ) {
-      m_kernel_inner = &kernel_madd< double, double, double >;
+      m_kernel_main = &kernel_madd< double, double, double >;
     }
     else {
       return einsum_ir::COMPILATION_FAILED;
@@ -257,6 +287,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile( tenord_t 
                      m_strides_right_c.data(),
                      m_strides_right_n.data(),
                      m_strides_right_k.data(),
+                     m_strides_out_aux_c.data(),
+                     m_strides_out_aux_m.data(),
+                     m_strides_out_aux_n.data(),
                      m_strides_out_c.data(),
                      m_strides_out_m.data(),
                      m_strides_out_n.data(),
@@ -264,7 +297,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile( tenord_t 
                      ce_n_bytes( m_dtype_right ),
                      ce_n_bytes( m_dtype_out ),
                      m_kernel_first_touch,
-                     m_kernel_inner,
+                     m_kernel_main,
                      m_kernel_last_touch );
 
   err_t l_err = m_cont_loops.compile();
@@ -283,10 +316,21 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
   return l_err;
 }
 
-void einsum_ir::backend::BinaryContractionScalar::contract( void const * i_tensor_in_left,
-                                                            void const * i_tensor_in_right,
+void einsum_ir::backend::BinaryContractionScalar::contract( void const * i_tensor_left,
+                                                            void const * i_tensor_right,
+                                                            void const * i_tensor_out_aux,
                                                             void       * io_tensor_out ) {
-  m_cont_loops.contract( i_tensor_in_left,
-                         i_tensor_in_right,
+  m_cont_loops.contract( i_tensor_left,
+                         i_tensor_right,
+                         i_tensor_out_aux,
                          io_tensor_out );
+}
+
+void einsum_ir::backend::BinaryContractionScalar::contract( void const * i_tensor_left,
+                                                            void const * i_tensor_right,
+                                                            void       * io_tensor_out ) {
+  contract( i_tensor_left,
+            i_tensor_right,
+            nullptr,
+            io_tensor_out );
 }

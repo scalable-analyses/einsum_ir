@@ -266,7 +266,7 @@ void conv2d() {
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
-                   einsum_ir::ZERO,
+                   einsum_ir::COPY,
                    einsum_ir::MADD,
                    einsum_ir::RELU );
 
@@ -293,6 +293,9 @@ void conv2d() {
                                     l_features_in,
                                     l_height+2,
                                     l_width+2 } );
+  at::Tensor l_bias  = at::randn( { l_features_out,
+                                    l_height,
+                                    l_width } );
   at::Tensor l_out   = at::randn( { l_features_out,
                                     l_height,
                                     l_width } );
@@ -303,8 +306,8 @@ void conv2d() {
   std::cout << "at::conv2d:" << std::endl;
 
   l_tp0 = std::chrono::steady_clock::now();
-  at::Tensor l_out_ref = at::relu( at::conv2d( l_right,
-                                               l_left ) ).squeeze();
+  at::Tensor l_out_ref = at::relu( l_bias + at::conv2d( l_right,
+                                                        l_left ) ).squeeze();
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time = l_dur.count();
@@ -324,6 +327,7 @@ void conv2d() {
   l_tp0 = std::chrono::steady_clock::now();
   l_bin_cont.contract( l_left_perm.data_ptr(),
                        l_right_perm.data_ptr(),
+                       l_bias.data_ptr(),
                        l_out.data_ptr() );
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );

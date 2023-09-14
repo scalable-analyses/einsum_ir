@@ -18,8 +18,8 @@ class einsum_ir::backend::EinsumNode {
 
     //! type of the first-touch kernel
     kernel_t m_ktype_first_touch = kernel_t::UNDEFINED_KTYPE;
-    //! type of the inner kernel
-    kernel_t m_ktype_inner = kernel_t::UNDEFINED_KTYPE;
+    //! type of the main kernel
+    kernel_t m_ktype_main = kernel_t::UNDEFINED_KTYPE;
     //! type of the last-touch kernel
     kernel_t m_ktype_last_touch = kernel_t::UNDEFINED_KTYPE;
 
@@ -87,7 +87,7 @@ class einsum_ir::backend::EinsumNode {
      * @param i_dim_ids ids of the tensor dimensions.
      * @param i_dtype datatype of the node's internal data.
      * @param i_ktype_first_touch type of the first-touch kernel.
-     * @param i_ktype_inner type of the inner kernel.
+     * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
      * @param i_left left child.
      * @param i_right right child. 
@@ -96,7 +96,7 @@ class einsum_ir::backend::EinsumNode {
                int64_t    const * i_dim_ids,
                data_t             i_dtype,
                kernel_t           i_ktype_first_touch,
-               kernel_t           i_ktype_inner,
+               kernel_t           i_ktype_main,
                kernel_t           i_ktype_last_touch,
                EinsumNode       & i_left,
                EinsumNode       & i_right );
@@ -109,7 +109,7 @@ class einsum_ir::backend::EinsumNode {
      * @param i_dtype datatype of the node's tensor.
      * @param i_data_ptr data pointer of the tensor.
      * @param i_ktype_first_touch type of the first-touch kernel.
-     * @param i_ktype_inner type of the inner kernel.
+     * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
      * @param i_left left child.
      * @param i_right right child. 
@@ -119,7 +119,7 @@ class einsum_ir::backend::EinsumNode {
                data_t             i_dtype,
                void             * i_data_ptr,
                kernel_t           i_ktype_first_touch,
-               kernel_t           i_ktype_inner,
+               kernel_t           i_ktype_main,
                kernel_t           i_ktype_last_touch,
                EinsumNode       & i_left,
                EinsumNode       & i_right );

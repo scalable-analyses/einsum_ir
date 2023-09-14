@@ -45,6 +45,13 @@ class einsum_ir::backend::ContractionLoops {
     //! K strides of the right input tensor
     int64_t const * m_strides_in_right_k = nullptr;
 
+    //! C strides of the auxiliary output tensor
+    int64_t const * m_strides_out_aux_c = nullptr;
+    //! M strides of the auxiliary output tensor
+    int64_t const * m_strides_out_aux_m = nullptr;
+    //! N strides of the auxiliary output tensor
+    int64_t const * m_strides_out_aux_n = nullptr;
+
     //! C strides of the output tensor
     int64_t const * m_strides_out_c = nullptr;
     //! M strides of the output tensor
@@ -87,6 +94,8 @@ class einsum_ir::backend::ContractionLoops {
     std::vector< int64_t > m_loop_strides_left;
     //! per-loop-iteration stride in byte w.r.t. the right tensor
     std::vector< int64_t > m_loop_strides_right;
+    //! per-loop-iteration stride in byte w.r.t. the auxiliary output tensor
+    std::vector< int64_t > m_loop_strides_out_aux;
     //! per-loop-iteration stride in byte w.r.t. the output tensor
     std::vector< int64_t > m_loop_strides_out;
 
@@ -97,16 +106,20 @@ class einsum_ir::backend::ContractionLoops {
     /**
      * Kernel applied to the output tensor before the contraction.
      *
+     * @param i_out_aux pointer to a data section of the auxiliary output tensor.
      * @param io_out pointer to a data section of the output tensor.
      **/
-    virtual void kernel_first_touch( void * io_out ) = 0;
+    virtual void kernel_first_touch( void const * i_out_aux,
+                                     void       * io_out ) = 0;
 
     /**
      * Kernel applied to the output tensor after the contraction.
      *
+     * @param i_out_aux pointer to a data section of the auxiliary output tensor.
      * @param io_out pointer to a data section of the output tensor.
      **/
-    virtual void kernel_last_touch( void * io_out ) = 0;
+    virtual void kernel_last_touch( void const * i_out_aux,
+                                    void       * io_out ) = 0;
 
     /**
      * Kernel called in the innermost loop.
@@ -115,9 +128,9 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_right pointer to a data section of the right tensor.
      * @param io_out pointer to a data section of the output tensor.
      **/
-    virtual void kernel_inner( void const * i_left,
-                               void const * i_right,
-                               void       * io_out ) = 0;
+    virtual void kernel_main( void const * i_left,
+                              void const * i_right,
+                              void       * io_out ) = 0;
 
     /**
      * Initializes the the class.
@@ -142,6 +155,9 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_strides_in_right_c C strides of the right input tensor.
      * @param i_strides_in_right_n N strides of the right input tensor.
      * @param i_strides_in_right_k K strides of the right input tensor.
+     * @param i_strides_out_aux_c C strides of the auxiliary output tensor.
+     * @param i_strides_out_aux_m M strides of the auxiliary output tensor.
+     * @param i_strides_out_aux_n N strides of the auxiliary output tensor.
      * @param i_strides_out_c C strides of the output tensor.
      * @param i_strides_out_m M strides of the output tensor.
      * @param i_strides_out_n N strides of the output tensor.
@@ -163,6 +179,9 @@ class einsum_ir::backend::ContractionLoops {
                int64_t const * i_strides_in_right_c,
                int64_t const * i_strides_in_right_n,
                int64_t const * i_strides_in_right_k,
+               int64_t const * i_strides_out_aux_c,
+               int64_t const * i_strides_out_aux_m,
+               int64_t const * i_strides_out_aux_n,
                int64_t const * i_strides_out_c,
                int64_t const * i_strides_out_m,
                int64_t const * i_strides_out_n,
@@ -193,11 +212,13 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_id_loop dimension id of the loop which is executed.
      * @param i_ptr_left pointer to the left tensor's data.
      * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
      * @param i_ptr_out pointer to the output tensor's data.
      **/
     void contract_iter( int64_t         i_id_loop,
                         void    const * i_ptr_left,
                         void    const * i_ptr_right,
+                        void    const * i_ptr_out_aux,
                         void          * i_ptr_out );
 
     /**
@@ -207,11 +228,13 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_id_loop dimension id of the loop which is executed.
      * @param i_ptr_left pointer to the left tensor's data.
      * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
      * @param i_ptr_out pointer to the output tensor's data.
      **/
     void contract_iter_parallel_touch_1( int64_t         i_id_loop,
                                          void    const * i_ptr_left,
                                          void    const * i_ptr_right,
+                                         void    const * i_ptr_out_aux,
                                          void          * i_ptr_out );
 
     /**
@@ -222,11 +245,13 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_id_loop dimension id of the loop which is executed.
      * @param i_ptr_left pointer to the left tensor's data.
      * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
      * @param i_ptr_out pointer to the output tensor's data.
      **/
     void contract_iter_parallel_touch_2( int64_t         i_id_loop,
                                          void    const * i_ptr_left,
                                          void    const * i_ptr_right,
+                                         void    const * i_ptr_out_aux,
                                          void          * i_ptr_out );
 
     /**
@@ -236,11 +261,13 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_id_loop dimension id of the loop which is executed.
      * @param i_ptr_left pointer to the left tensor's data.
      * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
      * @param i_ptr_out pointer to the output tensor's data.
      **/
     void contract_iter_parallel_1( int64_t         i_id_loop,
                                    void    const * i_ptr_left,
                                    void    const * i_ptr_right,
+                                   void    const * i_ptr_out_aux,
                                    void          * i_ptr_out );
 
     /**
@@ -250,11 +277,13 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_id_loop dimension id of the loop which is executed.
      * @param i_ptr_left pointer to the left tensor's data.
      * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
      * @param i_ptr_out pointer to the output tensor's data.
      **/
     void contract_iter_parallel_2( int64_t         i_id_loop,
                                    void    const * i_ptr_left,
                                    void    const * i_ptr_right,
+                                   void    const * i_ptr_out_aux,
                                    void          * i_ptr_out );
 
     /**
@@ -264,11 +293,13 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_id_loop dimension id of the loop which is executed.
      * @param i_ptr_left pointer to the left tensor's data.
      * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
      * @param i_ptr_out pointer to the output tensor's data.
      **/
     void contract_iter_parallel_3( int64_t         i_id_loop,
                                    void    const * i_ptr_left,
                                    void    const * i_ptr_right,
+                                   void    const * i_ptr_out_aux,
                                    void          * i_ptr_out );
 
     /**
@@ -278,38 +309,26 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_id_loop dimension id of the loop which is executed.
      * @param i_ptr_left pointer to the left tensor's data.
      * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
      * @param i_ptr_out pointer to the output tensor's data.
      **/
     void contract_iter_parallel_4( int64_t         i_id_loop,
                                    void    const * i_ptr_left,
                                    void    const * i_ptr_right,
+                                   void    const * i_ptr_out_aux,
                                    void          * i_ptr_out );
-
-    /**
-     * Contracts the two input tensors.
-     * Uses C-M-N-K (outer-to-inner dimensions) for the ordering.
-     *
-     * @param i_dim_type dimension type of the current recursion level: C (0), M (1), N (2) or K (3).
-     * @param i_dim_count counter for the current dimension type.
-     * @param i_ptr_in_left pointer to the left tensor.
-     * @param i_ptr_in_right pointer to the right tensor.
-     * @param i_ptr_out pointer to the output tensor.
-     **/
-    void contract_cnmk( char            i_dim_type,
-                        int64_t         i_dim_count,
-                        void    const * i_ptr_in_left,
-                        void    const * i_ptr_in_right,
-                        void          * i_ptr_out );
 
     /**
      * Contracts the two tensors.
      *
-     * @param i_tensor_in_left left tensor.
-     * @param i_tensor_in_right right tensor.
+     * @param i_tensor_left left tensor.
+     * @param i_tensor_right right tensor.
+     * @param i_tensor_out_aux auxiliary data w.r.t. output tensor.
      * @param io_tensor_out output tensor.
      **/
-    void contract( void const * i_tensor_in_left,
-                   void const * i_tensor_in_right,
+    void contract( void const * i_tensor_left,
+                   void const * i_tensor_right,
+                   void const * i_tensor_out_aux,
                    void       * io_tensor_out );
 };
 

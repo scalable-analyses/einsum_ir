@@ -22,7 +22,8 @@ class einsum_ir::backend::BinaryContractionScalar: public BinaryContraction {
      * @param o_data data which is zeroed.
      **/
     template < typename T >
-    static void kernel_zero( void * o_data );
+    static void kernel_zero( void const *,
+                             void       * o_data );
 
     /**
      * Compiler-based ReLU kernel.
@@ -31,7 +32,19 @@ class einsum_ir::backend::BinaryContractionScalar: public BinaryContraction {
      * @param io_data data to which the ReLU is applied.
      **/
     template < typename T >
-    static void kernel_relu( void * io_data );
+    static void kernel_relu( void const *,
+                             void       * io_data );
+
+    /**
+     * Compiler-based copy kernel.
+     *
+     * @param_t datatype.
+     * @param i_data_src source of the copy operation.
+     * @param i_data_dst destination of the copy operation.
+     **/
+    template < typename T >
+    static void kernel_copy( void const * i_data_src,
+                             void       * io_data_dst );
 
     /**
      * Compiler-based multiply add kernel.
@@ -48,15 +61,17 @@ class einsum_ir::backend::BinaryContractionScalar: public BinaryContraction {
                              void       * io_out );
 
     //! first-touch kernel
-    void (* m_kernel_first_touch)( void * ) = nullptr;
+    void (* m_kernel_first_touch)( void const *,
+                                   void       * ) = nullptr;
 
-    //! inner kernel
-    void (* m_kernel_inner)( void const *,
-                             void const *,
-                             void       * ) = nullptr;
+    //! main kernel
+    void (* m_kernel_main)( void const *,
+                            void const *,
+                            void       * ) = nullptr;
 
     //! last-touch kernel
-    void (* m_kernel_last_touch)( void * ) = nullptr;
+    void (* m_kernel_last_touch)( void const *,
+                                  void       * ) = nullptr;
 
   public:
     /**
@@ -81,12 +96,25 @@ class einsum_ir::backend::BinaryContractionScalar: public BinaryContraction {
     /**
      * Performs a contraction on the given input data.
      *
-     * @param i_tensor_in_left left input tensor.
-     * @param i_tensor_in_right right input tensor.
+     * @param i_tensor_left left input tensor.
+     * @param i_tensor_right right input tensor.
      * @param io_tensor_out output tensor.
      **/
-    void contract( void const * i_tensor_in_left,
-                   void const * i_tensor_in_right,
+    void contract( void const * i_tensor_left,
+                   void const * i_tensor_right,
+                   void       * io_tensor_out );
+
+    /**
+     * Performs a contraction on the given input data.
+     *
+     * @param i_tensor_left left input tensor.
+     * @param i_tensor_right right input tensor.
+     * @param i_tensor_out_aux auxiliary data w.r.t. output tensor.
+     * @param io_tensor_out output tensor.
+     **/
+    void contract( void const * i_tensor_left,
+                   void const * i_tensor_right,
+                   void const * i_tensor_out_aux,
                    void       * io_tensor_out );
 };
 
