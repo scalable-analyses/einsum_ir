@@ -26,10 +26,18 @@ TEST_CASE( "TPP-based binary contraction executing matmuls.", "[bin_cont_tpp]" )
   l_bin_cont.init( 2,
                    2,
                    2,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   nullptr,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -83,10 +91,18 @@ TEST_CASE( "TPP-based Matrix-matrix multiplication with a full-tensor bias.", "[
   l_bin_cont.init( 2,
                    2,
                    2,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   nullptr,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -145,14 +161,18 @@ TEST_CASE( "TPP-based matrix-matrix multiplication with a bias (scalar to matrix
   l_bin_cont.init( 2,
                    2,
                    2,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes_out_aux,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes_out_aux,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -211,14 +231,18 @@ TEST_CASE( "TPP-based matrix-matrix multiplication with a bias (row to matrix bc
   l_bin_cont.init( 2,
                    2,
                    2,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes_out_aux,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes_out_aux,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -277,14 +301,18 @@ TEST_CASE( "TPP-based matrix-matrix multiplication with a bias (column to matrix
   l_bin_cont.init( 2,
                    2,
                    2,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes_out_aux,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes_out_aux,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -341,10 +369,18 @@ TEST_CASE( "TPP-based binary contraction executing a batched matmul.", "[bin_con
   l_bin_cont.init( 3,
                    3,
                    3,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   nullptr,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -399,10 +435,18 @@ TEST_CASE( "TPP-based binary contraction executing matmuls with FP64 and zero fi
   l_bin_cont.init( 2,
                    2,
                    2,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   nullptr,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP64,
                    einsum_ir::FP64,
                    einsum_ir::FP64,
@@ -482,10 +526,18 @@ TEST_CASE( "TPP-based Binary contraction involving C, M, N and K dimensions, str
   l_bin_cont.init( 7,
                    6,
                    7,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   nullptr,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -576,10 +628,18 @@ TEST_CASE( "TPP-based Binary contraction involving C, M, N and K dimensions, str
   l_bin_cont.init( 7,
                    6,
                    7,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   nullptr,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -674,10 +734,18 @@ TEST_CASE( "TPP-based Binary contraction involving C, M, N and K dimensions, str
   l_bin_cont.init( 7,
                    6,
                    7,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   nullptr,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -738,14 +806,18 @@ TEST_CASE( "TPP-based 1D Convolution with a single input feature.", "[bin_cont_t
   l_bin_cont.init( 1,
                    1,
                    1,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   nullptr,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -805,14 +877,18 @@ TEST_CASE( "TPP-based 1D Convolution with additional K.", "[bin_cont_tpp_conv]" 
   l_bin_cont.init( 2,
                    2,
                    1,
-                   l_dim_sizes_inner,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_inner,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer,
+                   &l_dim_sizes_outer,
+                   nullptr,
+                   &l_dim_sizes_inner,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -822,9 +898,9 @@ TEST_CASE( "TPP-based 1D Convolution with additional K.", "[bin_cont_tpp_conv]" 
                    einsum_ir::UNDEFINED_KTYPE );
 
   // data
-  at::Tensor l_left  = at::rand( {8, 5+2} );
-  at::Tensor l_right = at::ones( {1, 8, 3} );
-  at::Tensor l_out   = at::ones( {5} );
+  at::Tensor l_left  = at::randn( {8, 5+2} );
+  at::Tensor l_right = at::randn( {1, 8, 3} );
+  at::Tensor l_out   = at::randn( {5} );
 
   // reference
   at::Tensor l_out_ref = at::conv1d( l_left,
@@ -879,14 +955,18 @@ TEST_CASE( "TPP-based 2D Convolution with a single input feature.", "[bin_cont_t
   l_bin_cont.init( 2,
                    2,
                    2,
-                   l_dim_sizes_inner,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_inner,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer,
+                   &l_dim_sizes_outer,
+                   nullptr,
+                   &l_dim_sizes_inner,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -955,14 +1035,18 @@ TEST_CASE( "TPP-based 2D Convolution with additional K and ReLU, weights right."
   l_bin_cont.init( 3,
                    3,
                    2,
-                   l_dim_sizes_inner,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_inner,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer,
+                   &l_dim_sizes_outer,
+                   nullptr,
+                   &l_dim_sizes_inner,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -1035,14 +1119,18 @@ TEST_CASE( "TPP-based 2D Convolution with additional K and ReLU, weights left.",
   l_bin_cont.init( 3,
                    3,
                    2,
-                   l_dim_sizes_inner,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_inner,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer,
+                   &l_dim_sizes_outer,
+                   nullptr,
+                   &l_dim_sizes_inner,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -1117,14 +1205,18 @@ TEST_CASE( "TPP-based 2D Convolution with input and output features, weights lef
   l_bin_cont.init( 4,
                    3,
                    3,
-                   l_dim_sizes_inner,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_inner,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer,
+                   &l_dim_sizes_outer,
+                   nullptr,
+                   &l_dim_sizes_inner,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP64,
                    einsum_ir::FP64,
                    einsum_ir::FP64,
@@ -1202,14 +1294,18 @@ TEST_CASE( "TPP-based 2D Convolution with input and output features, full-tensor
   l_bin_cont.init( 4,
                    3,
                    3,
-                   l_dim_sizes_inner,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_inner,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer,
+                   &l_dim_sizes_outer,
+                   nullptr,
+                   &l_dim_sizes_inner,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP64,
                    einsum_ir::FP64,
                    einsum_ir::FP64,
@@ -1295,15 +1391,18 @@ TEST_CASE( "TPP-based 2D Convolution with input and output features, init with f
   l_bin_cont.init( 4,
                    3,
                    3,
-                   l_dim_sizes_inner,
-                   l_dim_sizes_outer_in,
-                   l_dim_sizes_outer_in,
-                   l_dim_sizes_outer_out_aux,
-                   l_dim_sizes_inner,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer_in,
+                   &l_dim_sizes_outer_in,
+                   &l_dim_sizes_outer_out_aux,
+                   &l_dim_sizes_inner,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP64,
                    einsum_ir::FP64,
                    einsum_ir::FP64,
@@ -1389,15 +1488,18 @@ TEST_CASE( "TPP-based 2D Convolution with input and output features, feature-onl
   l_bin_cont.init( 4,
                    3,
                    3,
-                   l_dim_sizes_inner,
-                   l_dim_sizes_outer_in,
-                   l_dim_sizes_outer_in,
-                   l_dim_sizes_outer_out_aux,
-                   l_dim_sizes_inner,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer_in,
+                   &l_dim_sizes_outer_in,
+                   &l_dim_sizes_outer_out_aux,
+                   &l_dim_sizes_inner,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP64,
                    einsum_ir::FP64,
                    einsum_ir::FP64,
@@ -1435,4 +1537,118 @@ TEST_CASE( "TPP-based 2D Convolution with input and output features, feature-onl
                        l_out.data_ptr() );
 
   REQUIRE( at::allclose( l_out, l_out_ref )  );
+}
+
+TEST_CASE( "Strided TPP-based 2D Convolution with input and output features, feature-only bias, results are added to destination tensor, weights left.", "[bin_cont_tpp_conv]" ) {
+  // Test Case:
+  //
+  //     ____abf____
+  //    /           \
+  //  fecd         eab
+  //
+  // char   id   size
+  //    a    0      9
+  //    b    1      6
+  //    c    2      3
+  //    d    3      3
+  //    e    4      8
+  //    f    5      7
+  std::map< int64_t, int64_t > l_dim_sizes_inner;
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 0,   9 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 1,   6 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 2,   3 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 3,   3 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 4,   8 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 5,   7 ) );
+
+  std::map< int64_t, int64_t > l_dim_sizes_outer_in;
+  l_dim_sizes_outer_in.insert( std::pair< int64_t, int64_t >( 0, 18+2 ) );
+  l_dim_sizes_outer_in.insert( std::pair< int64_t, int64_t >( 1, 12+2 ) );
+  l_dim_sizes_outer_in.insert( std::pair< int64_t, int64_t >( 2,    3 ) );
+  l_dim_sizes_outer_in.insert( std::pair< int64_t, int64_t >( 3,    3 ) );
+  l_dim_sizes_outer_in.insert( std::pair< int64_t, int64_t >( 4,    8 ) );
+  l_dim_sizes_outer_in.insert( std::pair< int64_t, int64_t >( 5,    7 ) );
+
+  std::map< int64_t, int64_t > l_dim_sizes_outer_out;
+  l_dim_sizes_outer_out.insert( std::pair< int64_t, int64_t >( 0, 9 ) );
+  l_dim_sizes_outer_out.insert( std::pair< int64_t, int64_t >( 1, 6 ) );
+  l_dim_sizes_outer_out.insert( std::pair< int64_t, int64_t >( 5, 7 ) );
+
+  std::map< int64_t, int64_t > l_dim_sizes_outer_out_aux;
+  l_dim_sizes_outer_out_aux.insert( std::pair< int64_t, int64_t >( 0, 1 ) );
+  l_dim_sizes_outer_out_aux.insert( std::pair< int64_t, int64_t >( 1, 1 ) );
+  l_dim_sizes_outer_out_aux.insert( std::pair< int64_t, int64_t >( 5, 7 ) );
+
+  std::map< int64_t, int64_t > l_dim_link_s_to_p;
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 2, 0 ) );
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 3, 1 ) );
+
+  std::map< int64_t, int64_t > l_stride_multipliers_right;
+  l_stride_multipliers_right.insert( std::pair< int64_t, int64_t >( 0, 2 ) );
+  l_stride_multipliers_right.insert( std::pair< int64_t, int64_t >( 1, 2 ) );
+
+  int64_t l_dim_ids_left[4]  = { 5, 4, 2, 3 };
+  int64_t l_dim_ids_right[3] = { 4, 0, 1 };
+  int64_t l_dim_ids_out[3]   = { 0, 1, 5 };
+
+  einsum_ir::backend::BinaryContractionTpp l_bin_cont;
+  l_bin_cont.init( 4,
+                   3,
+                   3,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer_in,
+                   &l_dim_sizes_outer_in,
+                   &l_dim_sizes_outer_out_aux,
+                   &l_dim_sizes_outer_out,
+                   nullptr,
+                   &l_stride_multipliers_right,
+                   nullptr,
+                   l_dim_ids_left,
+                   l_dim_ids_right,
+                   l_dim_ids_out,
+                   &l_dim_link_s_to_p,
+                   einsum_ir::FP64,
+                   einsum_ir::FP64,
+                   einsum_ir::FP64,
+                   einsum_ir::FP64,
+                   einsum_ir::ADD,
+                   einsum_ir::MADD,
+                   einsum_ir::UNDEFINED_KTYPE );
+
+  // data
+  at::Tensor l_left    = at::randn( {7, 8, 3, 3},
+                                    at::ScalarType::Double );
+  at::Tensor l_right   = at::randn( {1, 8, 18+2, 12+2},
+                                    at::ScalarType::Double );
+  at::Tensor l_bias    = at::randn(  {7, 1, 1},
+                                     at::ScalarType::Double );
+  at::Tensor l_out     = at::randn(  {7, 9, 6},
+                                     at::ScalarType::Double );
+  at::Tensor l_out_ref = l_out.clone();
+
+  // reference
+  l_out_ref += l_bias + at::conv2d( l_right,
+                                    l_left,
+                                    {},
+                                    2 ).squeeze();
+
+  // compile
+  einsum_ir::err_t l_err = l_bin_cont.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  // cdef
+  at::Tensor l_left_perm  = l_left.permute( {2, 3, 1, 0} ).contiguous();
+  // abe
+  at::Tensor l_right_perm = l_right.permute( {0, 2, 3, 1} ).contiguous();
+  // abf
+  at::Tensor l_bias_perm  = l_bias.permute( {1, 2, 0} ).contiguous();
+  at::Tensor l_out_perm   = l_out.permute( {1, 2, 0} ).contiguous();
+
+  // contract
+  l_bin_cont.contract( l_left_perm.data_ptr(),
+                       l_right_perm.data_ptr(),
+                       l_bias_perm.data_ptr(),
+                       l_out_perm.data_ptr() );
+
+  REQUIRE( at::allclose( l_out_perm.permute( {2, 0, 1} ), l_out_ref )  );
 }

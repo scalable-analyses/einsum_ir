@@ -209,7 +209,8 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
 
     m_nodes[l_te].init( l_num_dims,
                         m_string_dim_ids_int.data() + l_string_offsets[l_te],
-                        m_map_dim_sizes,
+                        &m_map_dim_sizes,
+                        nullptr,
                         m_dtype,
                         m_data_ptrs[l_te] );
   }
@@ -225,12 +226,23 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
   
     m_nodes[l_num_tensors_in+l_co].init( l_num_dims,
                                          l_dim_ids_out,
+                                         &m_map_dim_sizes,
+                                         nullptr,
+                                         nullptr,
+                                         nullptr,
+                                         nullptr,
+                                         nullptr,
+                                         nullptr,
+                                         nullptr,
+                                         nullptr,
                                          m_dtype,
+                                         nullptr,
+                                         nullptr,
                                          einsum_ir::ZERO,
                                          einsum_ir::MADD,
                                          einsum_ir::UNDEFINED_KTYPE,
-                                         m_nodes[l_id_left],
-                                         m_nodes[l_id_right] );
+                                         &m_nodes[l_id_left],
+                                         &m_nodes[l_id_right] );
   }
 
   // add root
@@ -242,13 +254,23 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
 
   m_nodes.back().init( l_root_num_dims,
                        l_root_dim_ids_out,
+                       &m_map_dim_sizes,
+                       nullptr,
+                       nullptr,
+                       nullptr,
+                       nullptr,
+                       nullptr,
+                       nullptr,
+                       nullptr,
+                       nullptr,
                        m_dtype,
+                       nullptr,
                        m_data_ptrs[l_num_tensors-1],
                        einsum_ir::ZERO,
                        einsum_ir::MADD,
                        einsum_ir::UNDEFINED_KTYPE,
-                       m_nodes[l_root_id_left],
-                       m_nodes[l_root_id_right] );
+                       &m_nodes[l_root_id_left],
+                       &m_nodes[l_root_id_right] );
 
   err_t l_err = m_nodes.back().compile();
 

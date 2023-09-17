@@ -50,6 +50,19 @@ class einsum_ir::backend::Tensor {
                          std::map< int64_t, int64_t > const & i_dim_sizes );
 
     /**
+     * Derives the permutation to transfer the input ids to the output ones.
+     *
+     * @param i_num_dims number of dimensions.
+     * @param i_dim_ids_in dimension ids of the output tensor.
+     * @param i_dim_ids_out dimension ids of the output tensor.
+     * @param o_permutation will be set to derived permutation.
+     **/
+    static void permutation( int64_t         i_num_dims,
+                             int64_t const * i_dim_ids_in,
+                             int64_t const * i_dim_ids_out,
+                             int64_t       * o_permutation );
+
+    /**
      * Permutes the dimensions of the given tensor.
      *
      * @param i_num_dims number of dimensions.

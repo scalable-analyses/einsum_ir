@@ -402,9 +402,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContraction::order_dims_in( tenord_t 
 
 void einsum_ir::backend::BinaryContraction::strides( int64_t                              i_num_dims,
                                                      int64_t const *                      i_dim_ids,
-                                                     std::map< int64_t, int64_t > const & i_dim_sizes,
-                                                     std::map< int64_t, int64_t >       & o_strides ) {
-  o_strides.clear();
+                                                     std::map< int64_t, int64_t > const * i_dim_sizes,
+                                                     std::map< int64_t, int64_t >       * o_strides ) {
+  o_strides->clear();
 
   int64_t l_id_tensor = i_num_dims - 1;
 
@@ -412,7 +412,7 @@ void einsum_ir::backend::BinaryContraction::strides( int64_t                    
 
   while( l_id_tensor >= 0 ) {
     int64_t l_dim_id = i_dim_ids[l_id_tensor];
-    int64_t l_dim_size = i_dim_sizes.at( l_dim_id );
+    int64_t l_dim_size = i_dim_sizes->at( l_dim_id );
 
     std::pair< int64_t, int64_t > l_pair( l_dim_id,
                                           l_stride_tmp );
@@ -420,7 +420,7 @@ void einsum_ir::backend::BinaryContraction::strides( int64_t                    
       l_pair.second = 0;
     }
 
-    o_strides.insert( l_pair );
+    o_strides->insert( l_pair );
 
     l_stride_tmp *= l_dim_size;
 
@@ -446,10 +446,10 @@ void einsum_ir::backend::BinaryContraction::strides( int64_t                    
                                                      int64_t                      const * i_dim_ids_k,
                                                      int64_t                      const * i_dim_ids_i,
                                                      int64_t                      const * i_dim_ids_j,
-                                                     std::map< int64_t, int64_t > const & i_dim_sizes_left,
-                                                     std::map< int64_t, int64_t > const & i_dim_sizes_right,
-                                                     std::map< int64_t, int64_t > const & i_dim_sizes_out_aux,
-                                                     std::map< int64_t, int64_t > const & i_dim_sizes_out,
+                                                     std::map< int64_t, int64_t > const * i_dim_sizes_left,
+                                                     std::map< int64_t, int64_t > const * i_dim_sizes_right,
+                                                     std::map< int64_t, int64_t > const * i_dim_sizes_out_aux,
+                                                     std::map< int64_t, int64_t > const * i_dim_sizes_out,
                                                      int64_t                            * o_strides_left_c,
                                                      int64_t                            * o_strides_left_m,
                                                      int64_t                            * o_strides_left_k,
@@ -472,22 +472,27 @@ void einsum_ir::backend::BinaryContraction::strides( int64_t                    
   strides( i_num_dims_left,
            i_dim_ids_left,
            i_dim_sizes_left,
-           l_map_id_stride_left );
+           &l_map_id_stride_left );
 
   strides( i_num_dims_right,
            i_dim_ids_right,
            i_dim_sizes_right,
-           l_map_id_stride_right );
-
-  strides( i_num_dims_out,
-           i_dim_ids_out,
-           i_dim_sizes_out_aux,
-           l_map_id_stride_out_aux );
+           &l_map_id_stride_right );
 
   strides( i_num_dims_out,
            i_dim_ids_out,
            i_dim_sizes_out,
-           l_map_id_stride_out );
+           &l_map_id_stride_out );
+
+  if( i_dim_sizes_out_aux != nullptr ) {
+    strides( i_num_dims_out,
+            i_dim_ids_out,
+            i_dim_sizes_out_aux,
+            &l_map_id_stride_out_aux );
+  }
+  else {
+    l_map_id_stride_out_aux = l_map_id_stride_out;
+  }
 
   for( int64_t l_c = 0; l_c < i_num_dims_c; l_c++ ) {
     int64_t l_id = i_dim_ids_c[l_c];
@@ -525,6 +530,107 @@ void einsum_ir::backend::BinaryContraction::strides( int64_t                    
   for( int64_t l_j = 0; l_j < i_num_dims_j; l_j++ ) {
     int64_t l_id = i_dim_ids_j[l_j];
     o_strides_right_j[l_j] = l_map_id_stride_right.at(l_id);
+  }
+}
+
+void einsum_ir::backend::BinaryContraction::apply_stride_multiplier( int64_t         i_num_dims,
+                                                                     int64_t const * i_dim_ids,
+                                                                     int64_t         i_mult_dim_id,
+                                                                     int64_t         i_mult_value,
+                                                                     int64_t       * io_strides ) {
+  for( int64_t l_di = 0; l_di < i_num_dims; l_di++ ) {
+    if( i_dim_ids[l_di] == i_mult_dim_id ) {
+      io_strides[l_di] *= i_mult_value;
+      break;
+    }
+  }
+}
+
+void einsum_ir::backend::BinaryContraction::apply_stride_multipliers( int64_t                              i_num_dims_c,
+                                                                      int64_t                              i_num_dims_m,
+                                                                      int64_t                              i_num_dims_n,
+                                                                      int64_t                              i_num_dims_k,
+                                                                      std::map< int64_t, int64_t > const * i_stride_multipliers_left,
+                                                                      std::map< int64_t, int64_t > const * i_stride_multipliers_right,
+                                                                      std::map< int64_t, int64_t > const * i_stride_multipliers_out,
+                                                                      int64_t                      const * i_dim_ids_c,
+                                                                      int64_t                      const * i_dim_ids_m,
+                                                                      int64_t                      const * i_dim_ids_n,
+                                                                      int64_t                      const * i_dim_ids_k,
+                                                                      int64_t                            * io_strides_left_c,
+                                                                      int64_t                            * io_strides_left_m,
+                                                                      int64_t                            * io_strides_left_k,
+                                                                      int64_t                            * io_strides_right_c,
+                                                                      int64_t                            * io_strides_right_n,
+                                                                      int64_t                            * io_strides_right_k,
+                                                                      int64_t                            * io_strides_out_c,
+                                                                      int64_t                            * io_strides_out_m,
+                                                                      int64_t                            * io_strides_out_n ) {
+  if( i_stride_multipliers_left != nullptr ) {
+    for( std::pair< int64_t, int64_t > const l_pa : *i_stride_multipliers_left ) {
+      // apply to C
+      apply_stride_multiplier( i_num_dims_c,
+                               i_dim_ids_c,
+                               l_pa.first,
+                               l_pa.second,
+                               io_strides_left_c  );
+      // apply to M
+      apply_stride_multiplier( i_num_dims_m,
+                               i_dim_ids_m,
+                               l_pa.first,
+                               l_pa.second,
+                               io_strides_left_m  );
+      // apply to K
+      apply_stride_multiplier( i_num_dims_k,
+                               i_dim_ids_k,
+                               l_pa.first,
+                               l_pa.second,
+                               io_strides_left_k  );
+    }
+  }
+  if( i_stride_multipliers_right != nullptr ) {
+    for( std::pair< int64_t, int64_t > const l_pa : *i_stride_multipliers_right ) {
+      // apply to C
+      apply_stride_multiplier( i_num_dims_c,
+                               i_dim_ids_c,
+                               l_pa.first,
+                               l_pa.second,
+                               io_strides_right_c  );
+      // apply to N
+      apply_stride_multiplier( i_num_dims_n,
+                               i_dim_ids_n,
+                               l_pa.first,
+                               l_pa.second,
+                               io_strides_right_n  );
+      // apply to K
+      apply_stride_multiplier( i_num_dims_k,
+                               i_dim_ids_k,
+                               l_pa.first,
+                               l_pa.second,
+                               io_strides_right_k  );
+    }
+  }
+  if( i_stride_multipliers_out != nullptr ) {
+    for( std::pair< int64_t, int64_t > const l_pa : *i_stride_multipliers_out ) {
+      // apply to C
+      apply_stride_multiplier( i_num_dims_c,
+                               i_dim_ids_c,
+                               l_pa.first,
+                               l_pa.second,
+                               io_strides_out_c  );
+      // apply to M
+      apply_stride_multiplier( i_num_dims_m,
+                               i_dim_ids_m,
+                               l_pa.first,
+                               l_pa.second,
+                               io_strides_out_m  );
+      // apply to N
+      apply_stride_multiplier( i_num_dims_n,
+                               i_dim_ids_n,
+                               l_pa.first,
+                               l_pa.second,
+                               io_strides_out_n  );
+    }
   }
 }
 
@@ -567,14 +673,18 @@ einsum_ir::err_t einsum_ir::backend::BinaryContraction::link_secondary_to_primar
 void einsum_ir::backend::BinaryContraction::init( int64_t                              i_num_dims_left,
                                                   int64_t                              i_num_dims_right,
                                                   int64_t                              i_num_dims_out,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_inner,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_outer_left,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_outer_right,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_outer_out_aux,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_outer_out,
+                                                  std::map< int64_t, int64_t > const * i_dim_sizes_inner,
+                                                  std::map< int64_t, int64_t > const * i_dim_sizes_outer_left,
+                                                  std::map< int64_t, int64_t > const * i_dim_sizes_outer_right,
+                                                  std::map< int64_t, int64_t > const * i_dim_sizes_outer_out_aux,
+                                                  std::map< int64_t, int64_t > const * i_dim_sizes_outer_out,
+                                                  std::map< int64_t, int64_t > const * i_stride_multipliers_left,
+                                                  std::map< int64_t, int64_t > const * i_stride_multipliers_right,
+                                                  std::map< int64_t, int64_t > const * i_stride_multipliers_out,
                                                   int64_t                      const * i_dim_ids_left,
                                                   int64_t                      const * i_dim_ids_right,
                                                   int64_t                      const * i_dim_ids_out,
+                                                  std::map< int64_t, int64_t > const * i_dim_link_s_to_p,
                                                   data_t                               i_dtype_left,
                                                   data_t                               i_dtype_right,
                                                   data_t                               i_dtype_comp,
@@ -582,179 +692,34 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
                                                   kernel_t                             i_ktype_first_touch,
                                                   kernel_t                             i_ktype_main,
                                                   kernel_t                             i_ktype_last_touch ) {
-  m_num_dims_left = i_num_dims_left;
+  m_num_dims_left   = i_num_dims_left;
   m_num_dims_right = i_num_dims_right;
-  m_num_dims_out = i_num_dims_out;
+  m_num_dims_out   = i_num_dims_out;
 
-  m_dim_sizes_inner         = &i_dim_sizes_inner;
-  m_dim_sizes_outer_left    = &i_dim_sizes_outer_left;
-  m_dim_sizes_outer_right   = &i_dim_sizes_outer_right;
-  m_dim_sizes_outer_out_aux = &i_dim_sizes_outer_out_aux;
-  m_dim_sizes_outer_out     = &i_dim_sizes_outer_out;
+  m_dim_sizes_inner         = i_dim_sizes_inner;
+  m_dim_sizes_outer_left    = i_dim_sizes_outer_left;
+  m_dim_sizes_outer_right   = i_dim_sizes_outer_right;
+  m_dim_sizes_outer_out_aux = i_dim_sizes_outer_out_aux;
+  m_dim_sizes_outer_out     = i_dim_sizes_outer_out;
 
-  m_dim_ids_left_native = i_dim_ids_left;
+  m_stride_multipliers_left  = i_stride_multipliers_left;
+  m_stride_multipliers_right = i_stride_multipliers_right;
+  m_stride_multipliers_out   = i_stride_multipliers_out;
+
+  m_dim_ids_left_native  = i_dim_ids_left;
   m_dim_ids_right_native = i_dim_ids_right;
-  m_dim_ids_out = i_dim_ids_out;
+  m_dim_ids_out          = i_dim_ids_out;
 
-  m_dtype_left = i_dtype_left;
+  m_dim_link_s_to_p = i_dim_link_s_to_p;
+
+  m_dtype_left  = i_dtype_left;
   m_dtype_right = i_dtype_right;
-  m_dtype_comp = i_dtype_comp;
-  m_dtype_out = i_dtype_out;
+  m_dtype_comp  = i_dtype_comp;
+  m_dtype_out   = i_dtype_out;
 
   m_ktype_first_touch = i_ktype_first_touch;
-  m_ktype_main = i_ktype_main;
-  m_ktype_last_touch = i_ktype_last_touch;
-}
-
-void einsum_ir::backend::BinaryContraction::init( int64_t                              i_num_dims_left,
-                                                  int64_t                              i_num_dims_right,
-                                                  int64_t                              i_num_dims_out,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_inner,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_outer_left,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_outer_right,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_outer_out,
-                                                  int64_t                      const * i_dim_ids_left,
-                                                  int64_t                      const * i_dim_ids_right,
-                                                  int64_t                      const * i_dim_ids_out,
-                                                  data_t                               i_dtype_left,
-                                                  data_t                               i_dtype_right,
-                                                  data_t                               i_dtype_comp,
-                                                  data_t                               i_dtype_out,
-                                                  kernel_t                             i_ktype_first_touch,
-                                                  kernel_t                             i_ktype_main,
-                                                  kernel_t                             i_ktype_last_touch ) {
-  init( i_num_dims_left,
-        i_num_dims_right,
-        i_num_dims_out,
-        i_dim_sizes_inner,
-        i_dim_sizes_outer_left,
-        i_dim_sizes_outer_right,
-        i_dim_sizes_outer_out,
-        i_dim_sizes_outer_out,
-        i_dim_ids_left,
-        i_dim_ids_right,
-        i_dim_ids_out,
-        i_dtype_left,
-        i_dtype_right,
-        i_dtype_comp,
-        i_dtype_out,
-        i_ktype_first_touch,
-        i_ktype_main,
-        i_ktype_last_touch );
-}
-
-void einsum_ir::backend::BinaryContraction::init( int64_t                              i_num_dims_left,
-                                                  int64_t                              i_num_dims_right,
-                                                  int64_t                              i_num_dims_out,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes,
-                                                  int64_t                      const * i_dim_ids_left,
-                                                  int64_t                      const * i_dim_ids_right,
-                                                  int64_t                      const * i_dim_ids_out,
-                                                  data_t                               i_dtype_left,
-                                                  data_t                               i_dtype_right,
-                                                  data_t                               i_dtype_comp,
-                                                  data_t                               i_dtype_out,
-                                                  kernel_t                             i_ktype_first_touch,
-                                                  kernel_t                             i_ktype_main,
-                                                  kernel_t                             i_ktype_last_touch ) {
-  init( i_num_dims_left,
-        i_num_dims_right,
-        i_num_dims_out,
-        i_dim_sizes,
-        i_dim_sizes,
-        i_dim_sizes,
-        i_dim_sizes,
-        i_dim_sizes,
-        i_dim_ids_left,
-        i_dim_ids_right,
-        i_dim_ids_out,
-        i_dtype_left,
-        i_dtype_right,
-        i_dtype_comp,
-        i_dtype_out,
-        i_ktype_first_touch,
-        i_ktype_main,
-        i_ktype_last_touch );
-}
-
-void einsum_ir::backend::BinaryContraction::init( int64_t                              i_num_dims_left,
-                                                  int64_t                              i_num_dims_right,
-                                                  int64_t                              i_num_dims_out,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_inner,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_outer_left,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_outer_right,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_outer_out_aux,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_outer_out,
-                                                  int64_t                      const * i_dim_ids_left,
-                                                  int64_t                      const * i_dim_ids_right,
-                                                  int64_t                      const * i_dim_ids_out,
-                                                  std::map< int64_t, int64_t > const & i_dim_link_s_to_p,
-                                                  data_t                               i_dtype_left,
-                                                  data_t                               i_dtype_right,
-                                                  data_t                               i_dtype_comp,
-                                                  data_t                               i_dtype_out,
-                                                  kernel_t                             i_ktype_first_touch,
-                                                  kernel_t                             i_ktype_main,
-                                                  kernel_t                             i_ktype_last_touch ) {
-  init( i_num_dims_left,
-        i_num_dims_right,
-        i_num_dims_out,
-        i_dim_sizes_inner,
-        i_dim_sizes_outer_left,
-        i_dim_sizes_outer_right,
-        i_dim_sizes_outer_out_aux,
-        i_dim_sizes_outer_out,
-        i_dim_ids_left,
-        i_dim_ids_right,
-        i_dim_ids_out,
-        i_dtype_left,
-        i_dtype_right,
-        i_dtype_comp,
-        i_dtype_out,
-        i_ktype_first_touch,
-        i_ktype_main,
-        i_ktype_last_touch );
-
-  m_dim_link_s_to_p = &i_dim_link_s_to_p;
-}
-
-void einsum_ir::backend::BinaryContraction::init( int64_t                              i_num_dims_left,
-                                                  int64_t                              i_num_dims_right,
-                                                  int64_t                              i_num_dims_out,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_inner,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_outer_left,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_outer_right,
-                                                  std::map< int64_t, int64_t > const & i_dim_sizes_outer_out,
-                                                  int64_t                      const * i_dim_ids_left,
-                                                  int64_t                      const * i_dim_ids_right,
-                                                  int64_t                      const * i_dim_ids_out,
-                                                  std::map< int64_t, int64_t > const & i_dim_link_s_to_p,
-                                                  data_t                               i_dtype_left,
-                                                  data_t                               i_dtype_right,
-                                                  data_t                               i_dtype_comp,
-                                                  data_t                               i_dtype_out,
-                                                  kernel_t                             i_ktype_first_touch,
-                                                  kernel_t                             i_ktype_main,
-                                                  kernel_t                             i_ktype_last_touch ) {
-  init( i_num_dims_left,
-        i_num_dims_right,
-        i_num_dims_out,
-        i_dim_sizes_inner,
-        i_dim_sizes_outer_left,
-        i_dim_sizes_outer_right,
-        i_dim_sizes_outer_out,
-        i_dim_sizes_outer_out,
-        i_dim_ids_left,
-        i_dim_ids_right,
-        i_dim_ids_out,
-        i_dim_link_s_to_p,
-        i_dtype_left,
-        i_dtype_right,
-        i_dtype_comp,
-        i_dtype_out,
-        i_ktype_first_touch,
-        i_ktype_main,
-        i_ktype_last_touch );
+  m_ktype_main        = i_ktype_main;
+  m_ktype_last_touch  = i_ktype_last_touch;
 }
 
 einsum_ir::err_t einsum_ir::backend::BinaryContraction::compile_base() {

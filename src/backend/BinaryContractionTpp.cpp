@@ -44,14 +44,18 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     init( m_num_dims_right,
           m_num_dims_left,
           m_num_dims_out,
-          *m_dim_sizes_inner,
-          *m_dim_sizes_outer_right,
-          *m_dim_sizes_outer_left,
-          *m_dim_sizes_outer_out_aux,
-          *m_dim_sizes_outer_out,
+          m_dim_sizes_inner,
+          m_dim_sizes_outer_right,
+          m_dim_sizes_outer_left,
+          m_dim_sizes_outer_out_aux,
+          m_dim_sizes_outer_out,
+          m_stride_multipliers_right,
+          m_stride_multipliers_left,
+          m_stride_multipliers_out,
           m_dim_ids_right_native,
           m_dim_ids_left_native,
           m_dim_ids_out,
+          m_dim_link_s_to_p,
           m_dtype_right,
           m_dtype_left,
           m_dtype_comp,
@@ -80,13 +84,15 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
 
   // check if bcast ops are required to account for the auxiliary output tensor
   bool l_out_aux_bcast = false;
-  for( int64_t l_di = 0; l_di < m_num_dims_out; l_di++ ) {
-    int64_t l_dim_id = m_dim_ids_out[l_di];
+  if( m_dim_sizes_outer_out_aux != nullptr ) {
+    for( int64_t l_di = 0; l_di < m_num_dims_out; l_di++ ) {
+      int64_t l_dim_id = m_dim_ids_out[l_di];
 
-    if(    m_dim_sizes_outer_out_aux->at(l_dim_id) == 1
-        && m_dim_sizes_outer_out->at(l_dim_id)     != 1 ) {
-      l_out_aux_bcast = true;
-      break;
+      if(    m_dim_sizes_outer_out_aux->at(l_dim_id) == 1
+          && m_dim_sizes_outer_out->at(l_dim_id)     != 1 ) {
+        l_out_aux_bcast = true;
+        break;
+      }
     }
   }
 
@@ -325,10 +331,10 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
            m_dim_ids_k.data(),
            m_dim_ids_i.data(),
            m_dim_ids_j.data(),
-           *m_dim_sizes_outer_left,
-           *m_dim_sizes_outer_right,
-           *m_dim_sizes_outer_out_aux,
-           *m_dim_sizes_outer_out,
+           m_dim_sizes_outer_left,
+           m_dim_sizes_outer_right,
+           m_dim_sizes_outer_out_aux,
+           m_dim_sizes_outer_out,
            m_strides_left_c.data(),
            m_strides_left_m.data(),
            m_strides_left_k.data(),
@@ -403,6 +409,82 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     l_num_k_loop_dims++;
   }
 
+  // check that stride multipliers only apply to loop dimensions
+  for( int64_t l_di = m_num_dims_c-m_num_dims_cb; l_di < m_num_dims_c; l_di++ ) {
+    int64_t l_id = m_dim_ids_c[l_di];
+
+    if(    m_stride_multipliers_left != nullptr
+        && m_stride_multipliers_left->find( l_id ) != m_stride_multipliers_left->end() ) {
+      return einsum_ir::COMPILATION_FAILED;
+    }
+    if(    m_stride_multipliers_right != nullptr
+        && m_stride_multipliers_right->find( l_id ) != m_stride_multipliers_right->end() ) {
+      return einsum_ir::COMPILATION_FAILED;
+    }
+    if(    m_stride_multipliers_out != nullptr
+        && m_stride_multipliers_out->find( l_id ) != m_stride_multipliers_out->end() ) {
+      return einsum_ir::COMPILATION_FAILED;
+    }
+  }
+  for( int64_t l_di = m_num_dims_m-m_num_dims_mb; l_di < m_num_dims_m; l_di++ ) {
+    int64_t l_id = m_dim_ids_m[l_di];
+
+    if(    m_stride_multipliers_left != nullptr
+        && m_stride_multipliers_left->find( l_id ) != m_stride_multipliers_left->end() ) {
+      return einsum_ir::COMPILATION_FAILED;
+    }
+    if(    m_stride_multipliers_out != nullptr
+        && m_stride_multipliers_out->find( l_id ) != m_stride_multipliers_out->end() ) {
+      return einsum_ir::COMPILATION_FAILED;
+    }
+  }
+  for( int64_t l_di = m_num_dims_n-m_num_dims_nb+1; l_di < m_num_dims_n; l_di++ ) { // note: we support a single N multiplier
+    int64_t l_id = m_dim_ids_n[l_di];
+
+    if(    m_stride_multipliers_right != nullptr
+        && m_stride_multipliers_right->find( l_id ) != m_stride_multipliers_right->end() ) {
+      return einsum_ir::COMPILATION_FAILED;
+    }
+    if(    m_stride_multipliers_out != nullptr
+        && m_stride_multipliers_out->find( l_id ) != m_stride_multipliers_out->end() ) {
+      return einsum_ir::COMPILATION_FAILED;
+    }
+  }
+  for( int64_t l_di = m_num_dims_k-(m_num_dims_kb-m_num_dims_i-m_num_dims_j); l_di < m_num_dims_k-m_num_dims_i-m_num_dims_j; l_di++ ) {
+    int64_t l_id = m_dim_ids_k[l_di];
+
+    if(    m_stride_multipliers_left != nullptr
+        && m_stride_multipliers_left->find( l_id ) != m_stride_multipliers_left->end() ) {
+      return einsum_ir::COMPILATION_FAILED;
+    }
+    if(    m_stride_multipliers_right != nullptr
+        && m_stride_multipliers_right->find( l_id ) != m_stride_multipliers_right->end() ) {
+      return einsum_ir::COMPILATION_FAILED;
+    }
+  }
+
+  // apply stride multipliers (excludes K obtained from secondary)
+  apply_stride_multipliers( m_num_dims_c,
+                            m_num_dims_m,
+                            m_num_dims_n,
+                            m_num_dims_k-m_num_dims_i-m_num_dims_j,
+                            m_stride_multipliers_left,
+                            m_stride_multipliers_right,
+                            m_stride_multipliers_out,
+                            m_dim_ids_c.data(),
+                            m_dim_ids_m.data(),
+                            m_dim_ids_n.data(),
+                            m_dim_ids_k.data(),
+                            m_strides_left_c.data(),
+                            m_strides_left_m.data(),
+                            m_strides_left_k.data(),
+                            m_strides_right_c.data(),
+                            m_strides_right_n.data(),
+                            m_strides_right_k.data(),
+                            m_strides_out_c.data(),
+                            m_strides_out_m.data(),
+                            m_strides_out_n.data() );
+
   // libxsmm data types
   libxsmm_datatype l_xmm_dtype_left  = dtype_to_libxsmm( m_dtype_left );
   libxsmm_datatype l_xmm_dtype_right = dtype_to_libxsmm( m_dtype_right );
@@ -413,7 +495,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
       || l_xmm_dtype_right == libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED
       || l_xmm_dtype_comp  == libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED
       || l_xmm_dtype_out   == libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED ) {
-   return einsum_ir::COMPILATION_FAILED;
+    return einsum_ir::COMPILATION_FAILED;
   }
 
   // libxsmm parameters
@@ -456,29 +538,33 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
 
   // derive the leading dimension of the auxiliary output tensor
   int64_t l_ld_out_aux = m_num_dims_n > 0 ? m_strides_out_aux_n[ m_num_dims_n - 1 ] : l_m*l_r;
-  libxsmm_bitfield l_flag_out_aux = LIBXSMM_MELTW_FLAG_UNARY_NONE;
+  libxsmm_bitfield l_flag_out_aux_unary  = LIBXSMM_MELTW_FLAG_UNARY_NONE;
+  libxsmm_bitfield l_flag_out_aux_binary = LIBXSMM_MELTW_FLAG_BINARY_NONE;
 
   // column to matrix bcast
   if(         m_num_dims_m > 0
            && m_num_dims_n > 0
            && m_strides_out_aux_m[ m_num_dims_m - 1 ] >  0
            && m_strides_out_aux_n[ m_num_dims_n - 1 ] == 0 ) {
-    l_ld_out_aux   = l_m*l_r;
-    l_flag_out_aux = LIBXSMM_MELTW_FLAG_UNARY_BCAST_COL;
+    l_ld_out_aux = l_m*l_r;
+    l_flag_out_aux_unary  = LIBXSMM_MELTW_FLAG_UNARY_BCAST_COL;
+    l_flag_out_aux_binary = LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_1;
   }
   // row to matrix bcast
   else if(    m_num_dims_m > 0
            && m_num_dims_n > 0
            && m_strides_out_aux_m[ m_num_dims_m - 1 ] == 0
            && m_strides_out_aux_n[ m_num_dims_n - 1 ] >  0 ) {
-    l_flag_out_aux = LIBXSMM_MELTW_FLAG_UNARY_BCAST_ROW;
+    l_flag_out_aux_unary  = LIBXSMM_MELTW_FLAG_UNARY_BCAST_ROW;
+    l_flag_out_aux_binary = LIBXSMM_MELTW_FLAG_BINARY_BCAST_ROW_IN_1;
   }
   // scalar to matrix bcast
   else if(    m_num_dims_m > 0
            && m_num_dims_n > 0
            && m_strides_out_aux_m[ m_num_dims_m - 1 ] == 0
            && m_strides_out_aux_n[ m_num_dims_n - 1 ] == 0 ) {
-    l_flag_out_aux = LIBXSMM_MELTW_FLAG_UNARY_BCAST_SCALAR;
+    l_flag_out_aux_unary  = LIBXSMM_MELTW_FLAG_UNARY_BCAST_SCALAR;
+    l_flag_out_aux_binary = LIBXSMM_MELTW_FLAG_BINARY_BCAST_SCALAR_IN_1;
   }
 
   libxsmm_meltw_unary_shape l_shape_single_touch_aux_unary = libxsmm_create_meltw_unary_shape( l_m*l_r,
@@ -508,12 +594,12 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   else if( m_ktype_first_touch == COPY ) {
     m_xmm_kernel_first_touch_unary = libxsmm_dispatch_meltw_unary_v2( LIBXSMM_MELTW_TYPE_UNARY_IDENTITY,
                                                                       l_shape_single_touch_aux_unary,
-                                                                      l_flag_out_aux );
+                                                                      l_flag_out_aux_unary );
   }
   else if( m_ktype_first_touch == ADD ) {
     m_xmm_kernel_first_touch_binary = libxsmm_dispatch_meltw_binary_v2( LIBXSMM_MELTW_TYPE_BINARY_ADD,
                                                                         l_shape_single_touch_aux_binary,
-                                                                        l_flag_out_aux );
+                                                                        l_flag_out_aux_binary );
   }
   else if( m_ktype_first_touch != UNDEFINED_KTYPE ) {
     return err_t::COMPILATION_FAILED;
@@ -528,7 +614,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   else if( m_ktype_last_touch == ADD ) {
     m_xmm_kernel_last_touch_binary = libxsmm_dispatch_meltw_binary_v2( LIBXSMM_MELTW_TYPE_BINARY_ADD,
                                                                        l_shape_single_touch_aux_binary,
-                                                                       l_flag_out_aux );
+                                                                       l_flag_out_aux_binary );
   }
   else if( m_ktype_last_touch != UNDEFINED_KTYPE ) {
     return err_t::COMPILATION_FAILED;

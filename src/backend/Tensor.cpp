@@ -101,6 +101,19 @@ void einsum_ir::backend::Tensor::permute( int64_t         i_num_dims,
   }
 }
 
+void einsum_ir::backend::Tensor::permutation( int64_t         i_num_dims,
+                                              int64_t const * i_dim_ids_in,
+                                              int64_t const * i_dim_ids_out,
+                                              int64_t       * o_permutation ) {
+  for( int64_t l_di_in = 0; l_di_in < i_num_dims; l_di_in++ ) {
+    for( int64_t l_di_out = 0; l_di_out < i_num_dims; l_di_out++ ) {
+      if( i_dim_ids_in[l_di_in] == i_dim_ids_out[l_di_out] ) {
+        o_permutation[l_di_out] = l_di_in;
+      }
+    }
+  }
+}
+
 void einsum_ir::backend::Tensor::permute( int64_t                              i_num_dims,
                                           std::map< int64_t, int64_t > const & i_dim_sizes,
                                           int64_t                      const * i_dim_ids_in,
@@ -112,18 +125,19 @@ void einsum_ir::backend::Tensor::permute( int64_t                              i
   std::vector< int64_t > l_sizes( i_num_dims );
   std::vector< int64_t > l_permutation( i_num_dims );
 
+  // derive sizes
   for( int64_t l_di_in = 0; l_di_in < i_num_dims; l_di_in++ ) {
     int64_t l_dim_id = i_dim_ids_in[l_di_in];
-
     l_sizes[l_di_in] = i_dim_sizes.at( l_dim_id );
-
-    for( int64_t l_di_out = 0; l_di_out < i_num_dims; l_di_out++ ) {
-      if( i_dim_ids_in[l_di_in] == i_dim_ids_out[l_di_out] ) {
-        l_permutation[l_di_out] = l_di_in;
-      }
-    }
   }
 
+  // derive permutation
+  permutation( i_num_dims,
+               i_dim_ids_in,
+               i_dim_ids_out,
+               l_permutation.data() );
+
+  // perform permutation
   permute( i_num_dims,
            l_sizes.data(),
            l_permutation.data(),

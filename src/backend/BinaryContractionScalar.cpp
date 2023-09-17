@@ -130,10 +130,10 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile( tenord_t 
            m_dim_ids_k.data(),
            m_dim_ids_i.data(),
            m_dim_ids_j.data(),
-           *m_dim_sizes_outer_left,
-           *m_dim_sizes_outer_right,
-           *m_dim_sizes_outer_out_aux,
-           *m_dim_sizes_outer_out,
+           m_dim_sizes_outer_left,
+           m_dim_sizes_outer_right,
+           m_dim_sizes_outer_out_aux,
+           m_dim_sizes_outer_out,
            m_strides_left_c.data(),
            m_strides_left_m.data(),
            m_strides_left_k.data(),
@@ -196,6 +196,28 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile( tenord_t 
     m_strides_left_k.push_back( l_stride_p );
     m_strides_right_k.push_back( l_stride_s );
   }
+
+  // apply stride multipliers (excludes K obtained from secondary)
+  apply_stride_multipliers( m_num_dims_c,
+                            m_num_dims_m,
+                            m_num_dims_n,
+                            m_num_dims_k-m_num_dims_i-m_num_dims_j,
+                            m_stride_multipliers_left,
+                            m_stride_multipliers_right,
+                            m_stride_multipliers_out,
+                            m_dim_ids_c.data(),
+                            m_dim_ids_m.data(),
+                            m_dim_ids_n.data(),
+                            m_dim_ids_k.data(),
+                            m_strides_left_c.data(),
+                            m_strides_left_m.data(),
+                            m_strides_left_k.data(),
+                            m_strides_right_c.data(),
+                            m_strides_right_n.data(),
+                            m_strides_right_k.data(),
+                            m_strides_out_c.data(),
+                            m_strides_out_m.data(),
+                            m_strides_out_n.data() );
 
   // determine if all dtypes are FP32 or FP64
   bool l_dtype_all_fp32 = false;

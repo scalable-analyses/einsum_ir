@@ -33,8 +33,23 @@ class einsum_ir::backend::EinsumNode {
     //! internal dimension ids of the node's tensor
     int64_t const * m_dim_ids_int = nullptr;
 
-    //! id to size mapping for the dimensions
-    std::map< int64_t, int64_t > const * m_dim_sizes;
+    //! id to size mapping for the inner dimensions
+    std::map< int64_t, int64_t > const * m_dim_sizes_inner = nullptr;
+
+    //! id to size mapping for the auxiliary tensor's (if any) outer dimensions
+    std::map< int64_t, int64_t > const * m_dim_sizes_aux_outer = nullptr;
+
+    //! id to size mapping for the tensor's (if any) outer dimensions
+    std::map< int64_t, int64_t > const * m_dim_sizes_outer = nullptr;
+
+    //! strides (if any) of the tensor's children if other than one
+    std::vector< std::map< int64_t, int64_t > const * > m_strides_children;
+    //! strides of the tensor itself
+    std::map< int64_t, int64_t > const * m_strides = nullptr;
+
+    //! link between secondary dimensions and primary dimensions
+    std::map< int64_t, int64_t > const * m_dim_link_s_to_p = nullptr;
+
 
     //! children of the node
     std::vector< EinsumNode * > m_children;
@@ -42,6 +57,21 @@ class einsum_ir::backend::EinsumNode {
     void * m_data_ptr_int = nullptr;
     //! external data
     void * m_data_ptr_ext = nullptr;
+
+    //! internal auxiliary data
+    void * m_data_ptr_aux_int = nullptr;
+    //! external auxiliary data
+    void * m_data_ptr_aux_ext = nullptr;
+
+    //! external local auxiliary tensor offset in bytes
+    std::map< int64_t, int64_t > const * m_offsets_aux_ext = nullptr;
+    //! external local tensor offset in bytes
+    std::map< int64_t, int64_t > const * m_offsets_ext = nullptr;
+
+    //! effective auxiliary offset in bytes
+    int64_t m_offset_aux_bytes = 0;
+    //! effective offset in bytes
+    int64_t m_offset_bytes = 0;
 
     //! binary contraction
     BinaryContraction * m_cont = nullptr;
@@ -66,63 +96,63 @@ class einsum_ir::backend::EinsumNode {
     ~EinsumNode();
 
     /**
-     * Initializes the node without any children and with a data pointer.
+     * Initializes the node.
      *
      * @param i_num_dims number of tensor dimensions.
      * @param i_dim_ids ids of the tensor dimensions.
-     * @param i_dim_sizes dimension id to size mapping.
+     * @param i_dim_sizes_inner dimension id to inner size mapping.
+     * @param i_dim_sizes_outer dimension id to outer size mapping. optional: use nullptr if not needed.
      * @param i_dtype datatype of the tensor.
      * @param i_data_ptr data pointer of the tensor.
      **/
     void init( int64_t                              i_num_dims,
                int64_t                      const * i_dim_ids,
-               std::map< int64_t, int64_t > const & i_dim_sizes,
+               std::map< int64_t, int64_t > const * i_dim_sizes_inner,
+               std::map< int64_t, int64_t > const * i_dim_sizes_outer,
                data_t                               i_dtype,
                void                               * i_data_ptr );
 
     /**
-     * Initializes the node with two children and without a data pointer.
+     * Initializes the node with two children.
      *
      * @param i_num_dims number of tensor dimensions.
      * @param i_dim_ids ids of the tensor dimensions.
-     * @param i_dtype datatype of the node's internal data.
-     * @param i_ktype_first_touch type of the first-touch kernel.
-     * @param i_ktype_main type of the main kernel.
-     * @param i_ktype_last_touch type of the last touch kernel.
-     * @param i_left left child.
-     * @param i_right right child. 
-     **/
-    void init( int64_t            i_num_dims,
-               int64_t    const * i_dim_ids,
-               data_t             i_dtype,
-               kernel_t           i_ktype_first_touch,
-               kernel_t           i_ktype_main,
-               kernel_t           i_ktype_last_touch,
-               EinsumNode       & i_left,
-               EinsumNode       & i_right );
-
-    /**
-     * Initializes the node with two children and a data pointer.
-     *
-     * @param i_num_dims number of tensor dimensions.
-     * @param i_dim_ids ids of the tensor dimensions.
+     * @param i_dim_sizes_aux_outer dimension id to outer size mapping for the auxiliary data. optional: use nullptr if not needed.
+     * @param i_dim_sizes_outer dimension id to outer size mapping for the data. optional: use nullptr if not needed.
+     * @param i_offsets_aux offsets applied to the auxiliary data pointer in the node-local binary contraction. optional: use nullptr if not needed.
+     * @param i_offsets offsets applied to the data pointer in the node-local binary contraction. optional: use nullptr if not needed.
+     * @param i_strides_left left strides of the dimensions, default: stride is assumed to be 1. optional: use nullptr if not needed.
+     * @param i_strides_right right strides of the dimensions, default: stride is assumed to be 1. optional: use nullptr if not needed.
+     * @param i_strides strides of the tensor itself dimensions, default: stride is assumed to be 1. optional: use nullptr if not needed.
+     * @param i_dim_link_s_to_p link from secondary dims to primary ones. optional: use nullptr if not needed.
      * @param i_dtype datatype of the node's tensor.
+     * @param i_data_ptr_aux data pointer of the auxiliary tensor. optional: use nullptr if not needed.
      * @param i_data_ptr data pointer of the tensor.
-     * @param i_ktype_first_touch type of the first-touch kernel.
+     * @param i_ktype_first_touch type of the first-touch kernel. optional: use 0 if not needed.
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
      * @param i_left left child.
      * @param i_right right child. 
      **/
-    void init( int64_t            i_num_dims,
-               int64_t    const * i_dim_ids,
-               data_t             i_dtype,
-               void             * i_data_ptr,
-               kernel_t           i_ktype_first_touch,
-               kernel_t           i_ktype_main,
-               kernel_t           i_ktype_last_touch,
-               EinsumNode       & i_left,
-               EinsumNode       & i_right );
+    void init( int64_t                              i_num_dims,
+               int64_t                      const * i_dim_ids,
+               std::map< int64_t, int64_t > const * i_dim_sizes_inner,
+               std::map< int64_t, int64_t > const * i_dim_sizes_aux_outer,
+               std::map< int64_t, int64_t > const * i_dim_sizes_outer,
+               std::map< int64_t, int64_t > const * i_offsets_aux,
+               std::map< int64_t, int64_t > const * i_offsets,
+               std::map< int64_t, int64_t > const * i_strides_left,
+               std::map< int64_t, int64_t > const * i_strides_right,
+               std::map< int64_t, int64_t > const * i_strides,
+               std::map< int64_t, int64_t > const * i_dim_link_s_to_p,
+               data_t                               i_dtype,
+               void                               * i_data_ptr_aux,
+               void                               * i_data_ptr,
+               kernel_t                             i_ktype_first_touch,
+               kernel_t                             i_ktype_main,
+               kernel_t                             i_ktype_last_touch,
+               EinsumNode                         * i_left,
+               EinsumNode                         * i_right );
 
     /**
      * Compiles the contraction of the node and recursively those of all children.

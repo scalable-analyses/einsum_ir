@@ -26,10 +26,18 @@ TEST_CASE( "Matrix-matrix multiplication.", "[binary_contraction_scalar]" ) {
   l_bin_cont.init( 2,
                    2,
                    2,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   nullptr,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -90,10 +98,18 @@ TEST_CASE( "Matrix-matrix multiplication with a full-tensor bias.", "[binary_con
   l_bin_cont.init( 2,
                    2,
                    2,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   nullptr,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -152,14 +168,18 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (scalar to matrix bcast).",
   l_bin_cont.init( 2,
                    2,
                    2,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes_out_aux,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes_out_aux,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -218,14 +238,18 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (row to matrix bcast).", "[
   l_bin_cont.init( 2,
                    2,
                    2,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes_out_aux,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes_out_aux,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -284,14 +308,18 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (column to matrix bcast).",
   l_bin_cont.init( 2,
                    2,
                    2,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes_out_aux,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes_out_aux,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -369,10 +397,18 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions.", "[binary_co
   l_bin_cont.init( 7,
                    6,
                    7,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   nullptr,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -465,10 +501,18 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions using FP64, ze
   l_bin_cont.init( 7,
                    6,
                    7,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   nullptr,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP64,
                    einsum_ir::FP64,
                    einsum_ir::FP64,
@@ -544,14 +588,18 @@ TEST_CASE( "1D convolution with single input and output feature.", "[binary_cont
   l_bin_cont.init( 1,
                    1,
                    1,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   nullptr,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -614,14 +662,18 @@ TEST_CASE( "2D convolution with a single input and output feature.", "[binary_co
   l_bin_cont.init( 2,
                    2,
                    2,
-                   l_dim_sizes_inner,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_inner,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer,
+                   &l_dim_sizes_outer,
+                   nullptr,
+                   &l_dim_sizes_inner,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -692,14 +744,18 @@ TEST_CASE( "2D convolution with multiple input and output features.", "[binary_c
   l_bin_cont.init( 3,
                    4,
                    3,
-                   l_dim_sizes_inner,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_inner,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer,
+                   &l_dim_sizes_outer,
+                   nullptr,
+                   &l_dim_sizes_inner,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -770,14 +826,18 @@ TEST_CASE( "2D Convolution with multiple input and output features, weights left
   l_bin_cont.init( 4,
                    3,
                    3,
-                   l_dim_sizes_inner,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_inner,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer,
+                   &l_dim_sizes_outer,
+                   nullptr,
+                   &l_dim_sizes_inner,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -849,14 +909,18 @@ TEST_CASE( "3D Convolution with single input and output feature.", "[binary_cont
   l_bin_cont.init( 3,
                    3,
                    3,
-                   l_dim_sizes_inner,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_inner,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer,
+                   &l_dim_sizes_outer,
+                   nullptr,
+                   &l_dim_sizes_inner,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -883,4 +947,97 @@ TEST_CASE( "3D Convolution with single input and output feature.", "[binary_cont
                        l_out.data_ptr() );
 
   REQUIRE( at::allclose( l_out, l_out_ref )  );
+}
+
+TEST_CASE( "Strided 2D convolution with multiple input and output features, weights left.", "[binary_contraction_scalar_conv2d]" ) {
+  // Test Case:
+  //
+  //     ____fab____
+  //    /           \
+  //  fecd         eab
+  //
+  // char   id   size
+  //    a    0     16
+  //    b    1     12
+  //    c    2      3
+  //    d    3      3
+  //    e    4      8
+  //    f    5      7
+  std::map< int64_t, int64_t > l_dim_sizes_inner;
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 0,    8 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 1,    6 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 2,    3 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 3,    3 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 4,    8 ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 5,    7 ) );
+
+  std::map< int64_t, int64_t > l_dim_sizes_outer_in;
+  l_dim_sizes_outer_in.insert( std::pair< int64_t, int64_t >( 0, 16+2 ) );
+  l_dim_sizes_outer_in.insert( std::pair< int64_t, int64_t >( 1, 12+2 ) );
+  l_dim_sizes_outer_in.insert( std::pair< int64_t, int64_t >( 2,    3 ) );
+  l_dim_sizes_outer_in.insert( std::pair< int64_t, int64_t >( 3,    3 ) );
+  l_dim_sizes_outer_in.insert( std::pair< int64_t, int64_t >( 4,    8 ) );
+  l_dim_sizes_outer_in.insert( std::pair< int64_t, int64_t >( 5,    7 ) );
+
+  std::map< int64_t, int64_t > l_dim_sizes_outer_out;
+  l_dim_sizes_outer_out.insert( std::pair< int64_t, int64_t >( 0, 8 ) );
+  l_dim_sizes_outer_out.insert( std::pair< int64_t, int64_t >( 1, 6 ) );
+  l_dim_sizes_outer_out.insert( std::pair< int64_t, int64_t >( 5, 7 ) );
+
+  std::map< int64_t, int64_t > l_dim_link_s_to_p;
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 2, 0 ) );
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 3, 1 ) );
+
+  std::map< int64_t, int64_t > l_stride_multipliers_right;
+  l_stride_multipliers_right.insert( std::pair< int64_t, int64_t >( 0, 2 ) );
+  l_stride_multipliers_right.insert( std::pair< int64_t, int64_t >( 1, 2 ) );
+
+  int64_t l_dim_ids_left[4]  = { 5, 4, 2, 3 };
+  int64_t l_dim_ids_right[3] = { 4, 0, 1 };
+  int64_t l_dim_ids_out[5]   = { 5, 0, 1 };
+
+  einsum_ir::backend::BinaryContractionScalar l_bin_cont;
+  l_bin_cont.init( 4,
+                   3,
+                   3,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer_in,
+                   &l_dim_sizes_outer_in,
+                   nullptr,
+                   &l_dim_sizes_outer_out,
+                   nullptr,
+                   &l_stride_multipliers_right,
+                   nullptr,
+                   l_dim_ids_left,
+                   l_dim_ids_right,
+                   l_dim_ids_out,
+                   &l_dim_link_s_to_p,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::FP32,
+                   einsum_ir::ZERO,
+                   einsum_ir::MADD,
+                   einsum_ir::UNDEFINED_KTYPE );
+  // data
+  at::Tensor l_left  = at::randn( {7, 8, 3, 3} );
+  at::Tensor l_right = at::randn( {1, 8, 16+2, 12+2} );
+  at::Tensor l_out   = at::randn( {7, 8, 6} );
+
+  // reference
+  at::Tensor l_out_ref = at::conv2d( l_right,
+                                     l_left,
+                                     {},
+                                     2 ).squeeze();
+
+  // compile
+  einsum_ir::err_t l_err = l_bin_cont.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  // contract
+  l_bin_cont.contract( l_left.data_ptr(),
+                       l_right.data_ptr(),
+                       l_out.data_ptr() );
+
+  REQUIRE( at::allclose( l_out, l_out_ref, 1E-3, 1E-6 )  );
 }

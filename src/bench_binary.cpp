@@ -153,10 +153,18 @@ void blocked_matmul() {
   l_bin_cont.init( 8,
                    8,
                    7,
-                   l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   &l_dim_sizes,
+                   nullptr,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_in_left,
                    l_dim_ids_in_right,
                    l_dim_ids_out,
+                   nullptr,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -254,14 +262,18 @@ void conv2d() {
   l_bin_cont.init( 4,
                    3,
                    3,
-                   l_dim_sizes_inner,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_outer,
-                   l_dim_sizes_inner,
+                   &l_dim_sizes_inner,
+                   &l_dim_sizes_outer,
+                   &l_dim_sizes_outer,
+                   nullptr,
+                   &l_dim_sizes_inner,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,
-                   l_dim_link_s_to_p,
+                   &l_dim_link_s_to_p,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -305,9 +317,12 @@ void conv2d() {
    */
   std::cout << "at::conv2d:" << std::endl;
 
-  l_tp0 = std::chrono::steady_clock::now();
   at::Tensor l_out_ref = at::relu( l_bias + at::conv2d( l_right,
                                                         l_left ) ).squeeze();
+
+  l_tp0 = std::chrono::steady_clock::now();
+  l_out_ref = at::relu( l_bias + at::conv2d( l_right,
+                                             l_left ) ).squeeze();
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time = l_dur.count();

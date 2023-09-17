@@ -93,55 +93,91 @@ int main() {
 
   l_node_input.init( 2,
                      l_dim_ids_input,
-                     l_dim_sizes,
+                     &l_dim_sizes,
+                     nullptr,
                      einsum_ir::FP32,
                      l_data.data_ptr() );
 
   l_node_weight_0.init( 2,
                         l_dim_ids_weight_0,
-                        l_dim_sizes,
+                        &l_dim_sizes,
+                        nullptr,
                         einsum_ir::FP32,
                         l_fc_weights[0].data_ptr() );
 
   l_node_weight_1.init( 2,
                         l_dim_ids_weight_1,
-                        l_dim_sizes,
+                        &l_dim_sizes,
+                        nullptr,
                         einsum_ir::FP32,
                         l_fc_weights[1].data_ptr() );
 
   l_node_weight_2.init( 2,
                         l_dim_ids_weight_2,
-                        l_dim_sizes,
+                        &l_dim_sizes,
+                        nullptr,
                         einsum_ir::FP32,
                         l_fc_weights[2].data_ptr() );
 
   l_node_hidden_0.init( 2,
                         l_dim_ids_hidden_0,
+                        &l_dim_sizes,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
                         einsum_ir::FP32,
+                        nullptr,
+                        nullptr,
                         einsum_ir::kernel_t::ZERO,
                         einsum_ir::kernel_t::MADD,
                         einsum_ir::kernel_t::RELU,
-                        l_node_input,
-                        l_node_weight_0 );
+                        &l_node_input,
+                        &l_node_weight_0 );
 
   l_node_hidden_1.init( 2,
                         l_dim_ids_hidden_1,
+                        &l_dim_sizes,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
                         einsum_ir::FP32,
+                        nullptr,
+                        nullptr,
                         einsum_ir::kernel_t::ZERO,
                         einsum_ir::kernel_t::MADD,
                         einsum_ir::kernel_t::RELU,
-                        l_node_hidden_0,
-                        l_node_weight_1 );
+                        &l_node_hidden_0,
+                        &l_node_weight_1 );
 
   l_node_out.init( 2,
                    l_dim_ids_out,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
                    einsum_ir::FP32,
+                   nullptr,
                    l_out.data_ptr(),
                    einsum_ir::kernel_t::ZERO,
                    einsum_ir::kernel_t::MADD,
                    einsum_ir::kernel_t::UNDEFINED_KTYPE,
-                   l_node_hidden_1,
-                   l_node_weight_2 );
+                   &l_node_hidden_1,
+                   &l_node_weight_2 );
 
   // compile and stage weights
   l_tp0 = std::chrono::steady_clock::now();
@@ -225,55 +261,91 @@ int main() {
 
   l_node_input_blocked.init( 5,
                              l_dim_ids_input_blocked,
-                             l_dim_sizes_blocked,
+                             &l_dim_sizes_blocked,
+                             nullptr,
                              einsum_ir::FP32,
                              l_data.data_ptr() );
 
   l_node_weight_0_blocked.init( 8,
                                 l_dim_ids_weight_0_blocked,
-                                l_dim_sizes_blocked,
+                                &l_dim_sizes_blocked,
+                                nullptr,
                                 einsum_ir::FP32,
                                 l_fc_weights[0].data_ptr() );
 
   l_node_weight_1_blocked.init( 8,
                                 l_dim_ids_weight_1_blocked,
-                                l_dim_sizes_blocked,
+                                &l_dim_sizes_blocked,
+                                nullptr,
                                 einsum_ir::FP32,
                                 l_fc_weights[1].data_ptr() );
 
   l_node_weight_2_blocked.init( 5,
                                 l_dim_ids_weight_2_blocked,
-                                l_dim_sizes_blocked,
+                                &l_dim_sizes_blocked,
+                                nullptr,
                                 einsum_ir::FP32,
                                 l_fc_weights[2].data_ptr() );
 
   l_node_hidden_0_blocked.init( 5,
                                 l_dim_ids_hidden_0_blocked,
+                                &l_dim_sizes_blocked,
+                                nullptr,
+                                nullptr,
+                                nullptr,
+                                nullptr,
+                                nullptr,
+                                nullptr,
+                                nullptr,
+                                nullptr,
                                 einsum_ir::FP32,
+                                nullptr,
+                                nullptr,
                                 einsum_ir::kernel_t::ZERO,
                                 einsum_ir::kernel_t::MADD,
                                 einsum_ir::kernel_t::RELU,
-                                l_node_input_blocked,
-                                l_node_weight_0_blocked );
+                                &l_node_input_blocked,
+                                &l_node_weight_0_blocked );
 
   l_node_hidden_1_blocked.init( 5,
                                 l_dim_ids_hidden_1_blocked,
+                                &l_dim_sizes_blocked,
+                                nullptr,
+                                nullptr,
+                                nullptr,
+                                nullptr,
+                                nullptr,
+                                nullptr,
+                                nullptr,
+                                nullptr,
                                 einsum_ir::FP32,
+                                nullptr,
+                                nullptr,
                                 einsum_ir::kernel_t::ZERO,
                                 einsum_ir::kernel_t::MADD,
                                 einsum_ir::kernel_t::RELU,
-                                l_node_hidden_0_blocked,
-                                l_node_weight_1_blocked );
+                                &l_node_hidden_0_blocked,
+                                &l_node_weight_1_blocked );
 
   l_node_out_blocked.init( 2,
                            l_dim_ids_out_blocked,
+                           &l_dim_sizes_blocked,
+                           nullptr,
+                           nullptr,
+                           nullptr,
+                           nullptr,
+                           nullptr,
+                           nullptr,
+                           nullptr,
+                           nullptr,
                            einsum_ir::FP32,
+                           nullptr,
                            l_out_blocked.data_ptr(),
                            einsum_ir::kernel_t::ZERO,
                            einsum_ir::kernel_t::MADD,
                            einsum_ir::kernel_t::UNDEFINED_KTYPE,
-                           l_node_hidden_1_blocked,
-                           l_node_weight_2_blocked );
+                           &l_node_hidden_1_blocked,
+                           &l_node_weight_2_blocked );
 
   // compile and stage weights
   l_tp0 = std::chrono::steady_clock::now();
