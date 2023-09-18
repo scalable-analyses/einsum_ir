@@ -82,6 +82,7 @@ TEST_CASE( "Tests the generation of a residual block with downsampling.", "[resi
                          {},
                          l_stride );
   l_act_2 += l_data_bias_down_sample;
+  l_act_2 = at::relu( l_act_2 );
 
   at::Tensor l_data_activation_2_perm_no_pad = l_data_activation_2_perm.narrow( 0, 1, l_height/l_stride );
   l_data_activation_2_perm_no_pad = l_data_activation_2_perm_no_pad.narrow( 1, 1, l_width/l_stride );

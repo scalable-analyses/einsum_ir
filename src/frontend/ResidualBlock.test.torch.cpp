@@ -62,6 +62,7 @@ TEST_CASE( "Tests the generation of a residual block.", "[residual_block]" ) {
                                             1,
                                             1 ); 
   l_data_activation_0_no_pad += l_data_bias_1;
+  l_data_activation_0_no_pad = at::relu( l_data_activation_0_no_pad );
 
   at::Tensor l_data_activation_0_perm_no_pad = l_data_activation_0_perm.narrow( 0, 1, l_height );
   l_data_activation_0_perm_no_pad = l_data_activation_0_perm_no_pad.narrow( 1, 1, l_width );
@@ -143,6 +144,7 @@ TEST_CASE( "Tests the generation of a residual blocks with strided convolutions 
                                             1,
                                             1 ); 
   l_data_activation_2_no_pad += l_data_bias_1;
+  l_data_activation_2_no_pad = at::relu( l_data_activation_2_no_pad );
 
   at::Tensor l_data_activation_2_perm_no_pad = l_data_activation_2_perm.narrow( 0, 1, l_height/l_stride );
   l_data_activation_2_perm_no_pad = l_data_activation_2_perm_no_pad.narrow( 1, 1, l_width/l_stride );

@@ -155,6 +155,13 @@ class einsum_ir::frontend::ResidualBlock {
    * Evaluates the block.
    **/
   void eval();
+
+  /**
+   * Derives the number of operations in the residual block.
+   *
+   * @return number of operations.
+   **/
+  int64_t num_ops();
 };
 
 #endif

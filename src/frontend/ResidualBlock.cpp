@@ -1,5 +1,9 @@
 #include "ResidualBlock.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 void einsum_ir::frontend::ResidualBlock::init( int64_t   i_width,
                                                int64_t   i_height,
                                                int64_t   i_kernel_width,
@@ -275,7 +279,7 @@ einsum_ir::err_t einsum_ir::frontend::ResidualBlock::compile() {
                    m_data_abz,
                    einsum_ir::kernel_t::ADD,
                    einsum_ir::kernel_t::MADD,
-                   einsum_ir::kernel_t::UNDEFINED_KTYPE,
+                   einsum_ir::kernel_t::RELU,
                    &m_node_aby,
                    &m_node_zyef );
 
@@ -289,9 +293,22 @@ einsum_ir::err_t einsum_ir::frontend::ResidualBlock::compile() {
   m_node_yxcd.store_and_lock_data();
   m_node_zyef.store_and_lock_data();
 
+  // enable threading
+#ifdef _OPENMP
+  // four times overload
+  int64_t l_num_tasks = omp_get_max_threads() * 4;
+
+  m_node_aby.threading_intra_op( l_num_tasks );
+  m_node_abz.threading_intra_op( l_num_tasks );
+#endif
+
   return err_t::SUCCESS;
 }
 
 void einsum_ir::frontend::ResidualBlock::eval() {
   m_node_abz.eval();
+}
+
+int64_t einsum_ir::frontend::ResidualBlock::num_ops() {
+  return m_node_abz.num_ops();
 }
