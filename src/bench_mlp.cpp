@@ -200,6 +200,9 @@ int main() {
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time_compile = l_dur.count();
 
+  // dry run
+  l_node_out.eval();
+
   // run network
   l_tp0 = std::chrono::steady_clock::now();
   l_node_out.eval();
@@ -360,13 +363,16 @@ int main() {
   l_node_weight_2_blocked.store_and_lock_data();
 
   // enable threading
-  l_node_hidden_0_blocked.threading_intra_op( 256 );
-  l_node_hidden_1_blocked.threading_intra_op( 256 );
-  l_node_out_blocked.threading_intra_op( 256 );
+  l_node_hidden_0_blocked.threading_intra_op( 64 );
+  l_node_hidden_1_blocked.threading_intra_op( 64 );
+  l_node_out_blocked.threading_intra_op( 64 );
 
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time_compile = l_dur.count();
+
+  // dry run
+  l_node_out_blocked.eval();
 
   // run network
   l_tp0 = std::chrono::steady_clock::now();
@@ -396,7 +402,7 @@ int main() {
   at::Tensor l_out_torch = l_model.forward( { l_data } ).toTensor();
 
   l_tp0 = std::chrono::steady_clock::now();
-  l_model.forward( { l_data } );
+  l_out_torch = l_model.forward( { l_data } ).toTensor();
   l_tp1 = std::chrono::steady_clock::now();
 
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );

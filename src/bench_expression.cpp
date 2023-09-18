@@ -219,7 +219,7 @@ int main( int     i_argc,
     }
     l_off += l_string_num_dims[l_te];
 
-    l_data.push_back( at::rand( l_sizes, l_dtype_at ) );
+    l_data.push_back( at::randn( l_sizes, l_dtype_at ) );
   }
 
   std::vector< void * > l_data_ptrs;
@@ -276,6 +276,9 @@ int main( int     i_argc,
     }
   }
 
+  // dry run
+  l_einsum_exp.eval();
+
   l_tp0 = std::chrono::steady_clock::now();
   l_einsum_exp.eval();
   l_tp1 = std::chrono::steady_clock::now();
@@ -320,10 +323,15 @@ int main( int     i_argc,
     l_data_in[l_te] = l_data[l_te];
   }
 
-  l_tp0 = std::chrono::steady_clock::now();
+  // dry run
   at::Tensor l_out_aten = at::einsum( l_expression_string,
                                       l_data_in,
                                       l_path );
+
+  l_tp0 = std::chrono::steady_clock::now();
+  l_out_aten = at::einsum( l_expression_string,
+                           l_data_in,
+                           l_path );
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time_total = l_dur.count();
@@ -382,9 +390,13 @@ int main( int     i_argc,
     at::Tensor l_mat_a = at::rand( {l_c, l_k, l_m} );
     at::Tensor l_mat_b = at::rand( {l_c, l_n, l_k} );
 
-    l_tp0 = std::chrono::steady_clock::now();
+    // dry run
     at::Tensor l_mat_c = at::matmul( l_mat_b,
                                      l_mat_a );
+
+    l_tp0 = std::chrono::steady_clock::now();
+    l_mat_c = at::matmul( l_mat_b,
+                          l_mat_a );
     l_tp1 = std::chrono::steady_clock::now();
     l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
 
@@ -417,7 +429,7 @@ int main( int     i_argc,
    * compare solution
    */
   if( !at::allclose( l_out_aten, l_data.back() ) ) {
-    std::cerr << "error: einsum_ir solution is not close to at:einsum!" << std::endl;
+    std::cerr << "warning: einsum_ir solution is not close to at:einsum!" << std::endl;
     return EXIT_FAILURE;
   }
 

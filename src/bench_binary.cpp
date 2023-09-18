@@ -52,7 +52,8 @@ void blocked_matmul() {
 
   std::cout << "matmul:" << std::endl;
 
-  at::Tensor l_out_matmul = l_mat_c.clone();
+  // dry run
+  at::Tensor l_out_matmul = at::matmul( l_mat_b, l_mat_a );
 
   l_tp0 = std::chrono::steady_clock::now();
   l_out_matmul = at::matmul( l_mat_b, l_mat_a );
@@ -101,7 +102,6 @@ void blocked_matmul() {
                                 l_size_n1 } ); // 6
   //                              c0 c1 c2 n0 m0 n1 m1
   l_ten_out = l_ten_out.permute( { 0, 1, 2, 5, 3, 6, 4} ).contiguous();
-  at::Tensor l_ten_out_torch = l_ten_out.clone();
 
   /*
    * at::einsum
@@ -111,6 +111,12 @@ void blocked_matmul() {
   // m: de
   // n: fg
   // k: hij
+
+  // dry run
+  at::Tensor l_ten_out_torch = at::einsum( "abcdhije,abcfhigj->abcfdge",
+                                            {l_ten_left, l_ten_right},
+                                            { {0,1} } );
+
   l_tp0 = std::chrono::steady_clock::now();
   l_ten_out_torch = at::einsum( "abcdhije,abcfhigj->abcfdge",
                                 {l_ten_left, l_ten_right},
@@ -179,10 +185,15 @@ void blocked_matmul() {
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time_compile = l_dur.count();
 
-  l_bin_cont.threading( 256 );
+  l_bin_cont.threading( 64 );
 
   at::Tensor l_ten_left_perm = l_ten_left;
   at::Tensor l_ten_right_perm = l_ten_right.permute( {0, 1, 2, 3, 4, 6, 5, 7} ).contiguous();
+
+  // dry run
+  l_bin_cont.contract( l_ten_left_perm.data_ptr(),
+                       l_ten_right_perm.data_ptr(),
+                       l_ten_out.data_ptr() );
 
   l_tp0 = std::chrono::steady_clock::now();
   l_bin_cont.contract( l_ten_left_perm.data_ptr(),
@@ -289,7 +300,7 @@ void conv2d() {
     std::cerr << "error: failed to compile the convolution!" << std::endl;
     return;
   }
-  l_bin_cont.threading( 8 );
+  l_bin_cont.threading( 64 );
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time_compile = l_dur.count();
@@ -317,6 +328,7 @@ void conv2d() {
    */
   std::cout << "at::conv2d:" << std::endl;
 
+  // dry run
   at::Tensor l_out_ref = at::relu( l_bias + at::conv2d( l_right,
                                                         l_left ) ).squeeze();
 
@@ -338,6 +350,12 @@ void conv2d() {
    * einsum_ir
    */
   std::cout << "einsum_ir" << std::endl;
+
+  // dry run
+  l_bin_cont.contract( l_left_perm.data_ptr(),
+                       l_right_perm.data_ptr(),
+                       l_bias.data_ptr(),
+                       l_out.data_ptr() );
 
   l_tp0 = std::chrono::steady_clock::now();
   l_bin_cont.contract( l_left_perm.data_ptr(),
