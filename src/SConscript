@@ -7,7 +7,8 @@ l_sources = [ 'backend/Tensor.cpp',
               'backend/BinaryContractionScalar.cpp',
               'backend/EinsumNode.cpp',
               'frontend/EinsumExpression.cpp',
-              'frontend/ResidualBlock.cpp' ]
+              'frontend/ResidualBlock.cpp',
+              'frontend/ResidualBlockDownSample.cpp' ]
 
 if g_env['libxsmm'] != False:
   l_sources += [ 'backend/ContractionLoopsTpp.cpp',
@@ -26,7 +27,8 @@ if g_env['libtorch'] != False:
                'backend/BinaryContractionScalar.test.torch.cpp',
                'backend/EinsumNode.test.torch.cpp',
                'frontend/EinsumExpression.test.torch.cpp',
-               'frontend/ResidualBlock.test.torch.cpp' ]
+               'frontend/ResidualBlock.test.torch.cpp',
+               'frontend/ResidualBlockDownSample.test.torch.cpp' ]
 
 if g_env['libxsmm'] != False and g_env['libtorch'] != False:
   l_tests += [ 'backend/BinaryContractionTpp.test.torch.cpp' ]

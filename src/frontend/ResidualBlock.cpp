@@ -1,16 +1,11 @@
 #include "ResidualBlock.h"
 
-
-#include <iostream>
-
-
-
-
 void einsum_ir::frontend::ResidualBlock::init( int64_t   i_width,
                                                int64_t   i_height,
                                                int64_t   i_kernel_width,
                                                int64_t   i_kernel_height,
-                                               int64_t   i_num_features,
+                                               int64_t   i_num_features_in,
+                                               int64_t   i_num_features_out,
                                                int64_t   i_stride,
                                                void    * i_activations_0,
                                                void    * i_weights_0,
@@ -19,39 +14,46 @@ void einsum_ir::frontend::ResidualBlock::init( int64_t   i_width,
                                                void    * i_weights_1,
                                                void    * i_bias_1,
                                                void    * io_activations_2 ) {
-  m_width         = i_width;
-  m_height        = i_height;
-  m_kernel_width  = i_kernel_width;
-  m_kernel_height = i_kernel_height;
-  m_num_features  = i_num_features;
-  m_stride        = i_stride;
-  m_data_abx      = i_activations_0;
-  m_data_yxcd     = i_weights_0;
-  m_data_aby_aux  = i_bias_0;
-  m_data_aby      = io_activations_1;
-  m_data_zyef     = i_weights_1;
-  m_data_abz_aux  = i_bias_1;
-  m_data_abz      = io_activations_2;
+  m_width            = i_width;
+  m_height           = i_height;
+  m_kernel_width     = i_kernel_width;
+  m_kernel_height    = i_kernel_height;
+  m_num_features_in  = i_num_features_in;
+  m_num_features_out = i_num_features_out;
+  m_stride           = i_stride;
+  m_data_abx         = i_activations_0;
+  m_data_yxcd        = i_weights_0;
+  m_data_aby_aux     = i_bias_0;
+  m_data_aby         = io_activations_1;
+  m_data_zyef        = i_weights_1;
+  m_data_abz_aux     = i_bias_1;
+  m_data_abz         = io_activations_2;
 }
 
 einsum_ir::err_t einsum_ir::frontend::ResidualBlock::compile() {
-  // split feature dimension until target is reached
-  int64_t l_num_features = m_num_features;
-  while( l_num_features > m_num_target_features ) {
-    if( l_num_features % 2 != 0 ) {
+  // split input feature dimension until target is reached
+  int64_t l_num_features_in = m_num_features_in;
+  while( l_num_features_in > m_num_target_features ) {
+    if( l_num_features_in % 2 != 0 ) {
       return err_t::COMPILATION_FAILED;
     }
-    m_num_features_split.push_back( 2 );
-    l_num_features /= 2;
+    m_num_features_split_in.push_back( 2 );
+    l_num_features_in /= 2;
   }
-  m_num_features_split.push_back( l_num_features );
-  int64_t l_num_split = m_num_features_split.size();
+  m_num_features_split_in.push_back( l_num_features_in );
+  int64_t l_num_split_in = m_num_features_split_in.size();
 
-std::cout << "feature split: ";
-for( std::size_t l_fe = 0; l_fe < m_num_features_split.size(); l_fe++ ) {
-  std::cout << m_num_features_split[l_fe] << " ";
-}
-std::cout << std::endl;
+  // split output feature dimension until target is reached
+  int64_t l_num_features_out = m_num_features_out;
+  while( l_num_features_out > m_num_target_features ) {
+    if( l_num_features_out % 2 != 0 ) {
+      return err_t::COMPILATION_FAILED;
+    }
+    m_num_features_split_out.push_back( 2 );
+    l_num_features_out /= 2;
+  }
+  m_num_features_split_out.push_back( l_num_features_out );
+  int64_t l_num_split_out = m_num_features_split_out.size();
 
   // derive padding sizes
   if( (m_kernel_height - 1) % 2 != 0 ) {
@@ -81,9 +83,13 @@ std::cout << std::endl;
   
   // set inner dimension sizes related to the features
   int64_t l_dim_id = 6;
-  for( int64_t l_char = 0; l_char < 3; l_char++ ) { // xyz
-    for( int64_t l_sp = 0; l_sp < l_num_split; l_sp++ ) {
-      m_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( l_dim_id, m_num_features_split[l_sp] ) );
+  for( int64_t l_sp = 0; l_sp < l_num_split_in; l_sp++ ) {
+    m_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( l_dim_id, m_num_features_split_in[l_sp] ) );
+    l_dim_id++;
+  }
+  for( int64_t l_char = 0; l_char < 2; l_char++ ) { // yz
+    for( int64_t l_sp = 0; l_sp < l_num_split_out; l_sp++ ) {
+      m_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( l_dim_id, m_num_features_split_out[l_sp] ) );
       l_dim_id++;
     }
   }
@@ -98,9 +104,13 @@ std::cout << std::endl;
   
   // set outer input dimension sizes related to the features
   l_dim_id = 6;
-  for( int64_t l_char = 0; l_char < 3; l_char++ ) { // xyz
-    for( int64_t l_sp = 0; l_sp < l_num_split; l_sp++ ) {
-      m_dim_sizes_outer_input.insert( std::pair< int64_t, int64_t >( l_dim_id, m_num_features_split[l_sp] ) );
+  for( int64_t l_sp = 0; l_sp < l_num_split_in; l_sp++ ) {
+    m_dim_sizes_outer_input.insert( std::pair< int64_t, int64_t >( l_dim_id, m_num_features_split_in[l_sp] ) );
+    l_dim_id++;
+  }
+  for( int64_t l_char = 0; l_char < 2; l_char++ ) { // yz
+    for( int64_t l_sp = 0; l_sp < l_num_split_out; l_sp++ ) {
+      m_dim_sizes_outer_input.insert( std::pair< int64_t, int64_t >( l_dim_id, m_num_features_split_out[l_sp] ) );
       l_dim_id++;
     }
   }
@@ -115,21 +125,24 @@ std::cout << std::endl;
   
   // set outer dimension sizes related to the intermediate and output features
   l_dim_id = 6;
-  for( int64_t l_char = 0; l_char < 3; l_char++ ) { // xyz
-    for( int64_t l_sp = 0; l_sp < l_num_split; l_sp++ ) {
-      m_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( l_dim_id, m_num_features_split[l_sp] ) );
+  for( int64_t l_sp = 0; l_sp < l_num_split_in; l_sp++ ) {
+    m_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( l_dim_id, m_num_features_split_in[l_sp] ) );
+    l_dim_id++;
+  }
+  for( int64_t l_char = 0; l_char < 2; l_char++ ) { // yz
+    for( int64_t l_sp = 0; l_sp < l_num_split_out; l_sp++ ) {
+      m_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( l_dim_id, m_num_features_split_out[l_sp] ) );
       l_dim_id++;
     }
   }
 
-
   // set aux dimension sizes
   m_dim_sizes_aux_outer.insert( std::pair< int64_t, int64_t >( 0, 1 ) );
   m_dim_sizes_aux_outer.insert( std::pair< int64_t, int64_t >( 1, 1 ) );
-  l_dim_id = 6 + l_num_split;
-  for( int64_t l_char = 0; l_char < 2; l_char++ ) { // xy
-    for( int64_t l_sp = 0; l_sp < l_num_split; l_sp++ ) {
-      m_dim_sizes_aux_outer.insert( std::pair< int64_t, int64_t >( l_dim_id, m_num_features_split[l_sp] ) );
+  l_dim_id = 6 + l_num_split_in;
+  for( int64_t l_char = 0; l_char < 2; l_char++ ) { // yz
+    for( int64_t l_sp = 0; l_sp < l_num_split_out; l_sp++ ) {
+      m_dim_sizes_aux_outer.insert( std::pair< int64_t, int64_t >( l_dim_id, m_num_features_split_out[l_sp] ) );
       l_dim_id++;
     }
   }
@@ -144,19 +157,19 @@ std::cout << std::endl;
   m_dim_ids_abx.push_back( 0 );
   m_dim_ids_abx.push_back( 1 );
   l_dim_id = 6;
-  for( int64_t l_sp = 0; l_sp < l_num_split; l_sp++ ) {
+  for( int64_t l_sp = 0; l_sp < l_num_split_in; l_sp++ ) {
     m_dim_ids_abx.push_back( l_dim_id );
     l_dim_id++;
   }
 
   // set yxcd dimension ids
-  l_dim_id = 6 + l_num_split;
-  for( int64_t l_sp = 0; l_sp < l_num_split; l_sp++ ) {
+  l_dim_id = 6 + l_num_split_in;
+  for( int64_t l_sp = 0; l_sp < l_num_split_out; l_sp++ ) {
     m_dim_ids_yxcd.push_back( l_dim_id );
     l_dim_id++;
   }
   l_dim_id = 6;
-  for( int64_t l_sp = 0; l_sp < l_num_split; l_sp++ ) {
+  for( int64_t l_sp = 0; l_sp < l_num_split_in; l_sp++ ) {
     m_dim_ids_yxcd.push_back( l_dim_id );
     l_dim_id++;
   }
@@ -166,20 +179,20 @@ std::cout << std::endl;
   // set aby dimension ids
   m_dim_ids_aby.push_back( 0 );
   m_dim_ids_aby.push_back( 1 );
-  l_dim_id = 6 + l_num_split;
-  for( int64_t l_sp = 0; l_sp < l_num_split; l_sp++ ) {
+  l_dim_id = 6 + l_num_split_in;
+  for( int64_t l_sp = 0; l_sp < l_num_split_out; l_sp++ ) {
     m_dim_ids_aby.push_back( l_dim_id );
     l_dim_id++;
   }
 
   // set zyef dimension ids
-  l_dim_id = 6 + 2*l_num_split;
-  for( int64_t l_sp = 0; l_sp < l_num_split; l_sp++ ) {
+  l_dim_id = 6 + l_num_split_in + l_num_split_out;
+  for( int64_t l_sp = 0; l_sp < l_num_split_out; l_sp++ ) {
     m_dim_ids_zyef.push_back( l_dim_id );
     l_dim_id++;
   }
-  l_dim_id = 6 + l_num_split;
-  for( int64_t l_sp = 0; l_sp < l_num_split; l_sp++ ) {
+  l_dim_id = 6 + l_num_split_in;
+  for( int64_t l_sp = 0; l_sp < l_num_split_out; l_sp++ ) {
     m_dim_ids_zyef.push_back( l_dim_id );
     l_dim_id++;
   }
@@ -189,41 +202,11 @@ std::cout << std::endl;
   // set abz dimension ids
   m_dim_ids_abz.push_back( 0 );
   m_dim_ids_abz.push_back( 1 );
-  l_dim_id = 6 + 2*l_num_split;
-  for( int64_t l_sp = 0; l_sp < l_num_split; l_sp++ ) {
+  l_dim_id = 6 + l_num_split_in + l_num_split_out;
+  for( int64_t l_sp = 0; l_sp < l_num_split_out; l_sp++ ) {
     m_dim_ids_abz.push_back( l_dim_id );
     l_dim_id++;
   }
-
-std::cout << "abx: ";
-for( std::size_t l_di = 0; l_di < m_dim_ids_abx.size(); l_di++ ) {
-  std::cout << m_dim_ids_abx[l_di] << " ";
-}
-std::cout << std::endl;
-
-std::cout << "yxcd: ";
-for( std::size_t l_di = 0; l_di < m_dim_ids_yxcd.size(); l_di++ ) {
-  std::cout << m_dim_ids_yxcd[l_di] << " ";
-}
-std::cout << std::endl;
-
-std::cout << "aby: ";
-for( std::size_t l_di = 0; l_di < m_dim_ids_aby.size(); l_di++ ) {
-  std::cout << m_dim_ids_aby[l_di] << " ";
-}
-std::cout << std::endl;
-
-std::cout << "zyef: ";
-for( std::size_t l_di = 0; l_di < m_dim_ids_zyef.size(); l_di++ ) {
-  std::cout << m_dim_ids_zyef[l_di] << " ";
-}
-std::cout << std::endl;
-
-std::cout << "abz: ";
-for( std::size_t l_di = 0; l_di < m_dim_ids_abz.size(); l_di++ ) {
-  std::cout << m_dim_ids_abz[l_di] << " ";
-}
-std::cout << std::endl;
 
   // set offsets
   m_offsets.insert( std::pair< int64_t, int64_t >( 0, 1 ) );
@@ -234,21 +217,21 @@ std::cout << std::endl;
   m_strides.insert( std::pair< int64_t, int64_t >( 1, m_stride ) );
 
   // init leaf nodes
-  m_node_abx.init( 2 + l_num_split,
+  m_node_abx.init( 2 + l_num_split_in,
                    m_dim_ids_abx.data(),
                    &m_dim_sizes_inner,
                    &m_dim_sizes_outer_input,
                    einsum_ir::FP32,
                    m_data_abx );
 
-  m_node_yxcd.init( 2 + 2*l_num_split,
+  m_node_yxcd.init( 2 + l_num_split_in+l_num_split_out,
                     m_dim_ids_yxcd.data(),
                     &m_dim_sizes_inner,
                     &m_dim_sizes_outer,
                     einsum_ir::FP32,
                     m_data_yxcd );
 
-  m_node_zyef.init( 2 + 2*l_num_split,
+  m_node_zyef.init( 2 + 2*l_num_split_out,
                     m_dim_ids_zyef.data(),
                     &m_dim_sizes_inner,
                     &m_dim_sizes_outer,
@@ -256,7 +239,7 @@ std::cout << std::endl;
                     m_data_zyef );
 
   // dependent nodes
-  m_node_aby.init( 2 + l_num_split,
+  m_node_aby.init( 2 + l_num_split_out,
                    m_dim_ids_aby.data(),
                    &m_dim_sizes_inner,
                    &m_dim_sizes_aux_outer,
@@ -276,7 +259,7 @@ std::cout << std::endl;
                    &m_node_abx,
                    &m_node_yxcd );
 
-  m_node_abz.init( 2 + l_num_split,
+  m_node_abz.init( 2 + l_num_split_out,
                    m_dim_ids_abz.data(),
                    &m_dim_sizes_inner,
                    &m_dim_sizes_aux_outer,
