@@ -12,10 +12,10 @@ TEST_CASE( "Tests the generation of a residual block with downsampling.", "[resi
   
   at::Tensor l_data_activation_0        = at::zeros( { l_num_features_in, l_height+2, l_width+2 } );
 
-  at::Tensor l_data_weights_down_sample = at::randn( { l_num_features_out, l_num_features_in, 3, 3 } ) / l_num_features_out;
+  at::Tensor l_data_weights_down_sample = at::randn( { l_num_features_out, l_num_features_in, 1, 1 } ) / l_num_features_out;
   at::Tensor l_data_bias_down_sample    = at::randn( { l_num_features_out, 1, 1 } ) / l_num_features_out;
 
-  at::Tensor l_data_weights_0           = at::randn( { l_num_features_out, l_num_features_in, 3, 3 } ) / l_num_features_out;
+  at::Tensor l_data_weights_0           = at::randn( { l_num_features_out, l_num_features_in, 3, 3 } ) / l_num_features_in;
   at::Tensor l_data_bias_0              = at::randn( { l_num_features_out, 1, 1 } ) / l_num_features_out;
 
   at::Tensor l_data_activation_1        = at::zeros( { l_num_features_out, l_height/l_stride+2, l_width/l_stride+2 } );
@@ -43,6 +43,8 @@ TEST_CASE( "Tests the generation of a residual block with downsampling.", "[resi
                     l_height,
                     3,
                     3,
+                    1,
+                    1,
                     l_num_features_in,
                     l_num_features_out,
                     l_stride,
@@ -77,7 +79,7 @@ TEST_CASE( "Tests the generation of a residual block with downsampling.", "[resi
                                    1 ); 
   l_act_2 += l_data_bias_1;
 
-  l_act_2 += at::conv2d( l_data_activation_0,
+  l_act_2 += at::conv2d( l_data_activation_0_no_pad,
                          l_data_weights_down_sample,
                          {},
                          l_stride );

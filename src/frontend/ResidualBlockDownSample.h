@@ -60,19 +60,23 @@ class einsum_ir::frontend::ResidualBlockDownSample {
     einsum_ir::backend::EinsumNode m_node_abu;
 
     //! input and output width (excludes padding)
-    int64_t m_width            = 0;
+    int64_t m_width                     = 0;
     //! input and output height (excludes padding)
-    int64_t m_height           = 0;
+    int64_t m_height                    = 0;
     //! width of the used kernels
-    int64_t m_kernel_width     = 0;
+    int64_t m_kernel_width              = 0;
     //! height of the used kernels
-    int64_t m_kernel_height    = 0;
+    int64_t m_kernel_height             = 0;
+    //! width of the used kernels in the downsampling part
+    int64_t m_kernel_width_down_sample  = 0;
+    //! height of the used kernels in the downsampling part
+    int64_t m_kernel_height_down_sample = 0;
     //! number of features occurring in the input tensors
-    int64_t m_num_features_in  = 0;
+    int64_t m_num_features_in           = 0;
     //! number of features occurring in the intermediate and output tensors
-    int64_t m_num_features_out = 0;
+    int64_t m_num_features_out          = 0;
     //! stride used in the first convolution
-    int64_t m_stride           = 0;
+    int64_t m_stride                    = 0;
 
     //! data pointer to fist activation tensor
     void  * m_data_abx     = nullptr;
@@ -96,6 +100,8 @@ class einsum_ir::frontend::ResidualBlockDownSample {
      * @param i_height height excluding padding.
      * @param i_kernel_width width of the used kernels.
      * @param i_kernel_height height of the used kernels.
+     * @param i_kernel_width_down_sample width of the used kernels in the downsampling part.
+     * @param i_kernel_height_down_sample height of the used kernels in the downsampling part.
      * @param i_num_features_in number of input features.
      * @param i_num_features_out number of output features.
      * @param i_stride strides used in the first convolution.
@@ -113,6 +119,8 @@ class einsum_ir::frontend::ResidualBlockDownSample {
                int64_t   i_height,
                int64_t   i_kernel_width,
                int64_t   i_kernel_height,
+               int64_t   i_kernel_width_down_sample,
+               int64_t   i_kernel_height_down_sample,
                int64_t   i_num_features_in,
                int64_t   i_num_features_out,
                int64_t   i_stride,
@@ -137,6 +145,13 @@ class einsum_ir::frontend::ResidualBlockDownSample {
    * Evaluates the block.
    **/
   void eval();
+
+  /**
+   * Derives the number of operations in the residual block.
+   *
+   * @return number of operations.
+   **/
+  int64_t num_ops();
 };
 
 #endif
