@@ -75,9 +75,9 @@ TEST_CASE( "Binary contraction representing a sum of small GEMMs.", "[einsum_exp
   //    d    3     96
 
   // data
-  at::Tensor l_left    = at::rand( {4096, 96, 96} );
-  at::Tensor l_right   = at::rand( {4096, 24, 96} );
-  at::Tensor l_out_ref = at::rand( {24, 96} );
+  at::Tensor l_left    = at::randn( {4096, 96, 96} ) / 4096;
+  at::Tensor l_right   = at::randn( {4096, 24, 96} ) / 4096;
+  at::Tensor l_out_ref = at::randn( {24, 96} );
   at::Tensor l_out     = l_out_ref.clone();
 
   int64_t l_dim_sizes[5] = { 96, 24, 4096, 96 };
@@ -116,9 +116,67 @@ TEST_CASE( "Binary contraction representing a sum of small GEMMs.", "[einsum_exp
 
   // check results
   REQUIRE( at::allclose( l_out,
-                         l_out_ref,
+                         l_out_ref )  );
+}
+
+TEST_CASE( "Binary contraction representing packed GEMM.", "[einsum_exp_tmp]" ) {
+  // test case:
+  //
+  //       __bdc__
+  //      /       \
+  //    adc       bac
+  //
+  // char   id   size
+  //    a    0     32
+  //    b    1     24
+  //    c    2     48
+  //    d    3     16
+
+  // data
+  at::Tensor l_data_adc     = at::rand( {32, 16, 48 } );
+  at::Tensor l_data_bac     = at::rand( {24, 32, 48 } );
+  at::Tensor l_data_bdc_ref = at::rand( {24, 16, 48 } );
+  at::Tensor l_data_bdc     = l_data_bdc_ref.clone();
+
+  int64_t l_dim_sizes[4] = { 32, 24, 48, 16 };
+
+  int64_t l_string_dim_ids[9] = { 0, 3, 2,   // adc
+                                  1, 0, 2,    // bac
+                                  1, 3, 2 };  // bdc
+
+  int64_t l_string_num_dims[3] = { 3, 3, 3 };
+
+  void * l_data_ptrs[3] = { l_data_adc.data_ptr(),
+                            l_data_bac.data_ptr(),
+                            l_data_bdc.data_ptr() };
+
+  int64_t l_path[2] = { 0, 1 };
+
+  einsum_ir::frontend::EinsumExpression l_einsum_exp;
+
+  l_einsum_exp.init( 4,
+                     l_dim_sizes,
+                     1,
+                     l_string_num_dims,
+                     l_string_dim_ids,
+                     l_path,
+                     einsum_ir::FP32,
+                     l_data_ptrs );
+
+  einsum_ir::err_t l_err = l_einsum_exp.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  l_einsum_exp.eval();
+
+  // reference
+  l_data_bdc_ref = at::einsum( "adc,bac->bdc",
+                               {l_data_adc, l_data_bac} );
+
+  // check results
+  REQUIRE( at::allclose( l_data_bdc_ref,
+                         l_data_bdc,
                          1e-5,
-                         7e0 )  );
+                         7e-5 )  );
 }
 
 TEST_CASE( "Binary contraction using an einsum expression through the native interface.", "[einsum_exp]" ) {
