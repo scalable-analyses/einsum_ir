@@ -623,8 +623,8 @@ int main( int     i_argc,
   std::cout << "  stride:                    " << l_stride << std::endl;
 
   // set image properties
-  int64_t l_width  = 224;
-  int64_t l_height = 224;
+  int64_t l_width  = 56;
+  int64_t l_height = 56;
 
   // set up input data
   at::Tensor l_data_activation_0 = at::zeros( { l_num_features_in,
