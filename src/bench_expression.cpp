@@ -366,6 +366,8 @@ int main( int     i_argc,
   // extract binary contractions
   einsum_ir::backend::EinsumNode * l_bin_conts = l_einsum_exp.m_nodes.data() + l_num_tensors-1;
 
+
+  std::cout << "  C M N K for the binary contractions:" << std::endl;
   // iterate over binary contractions
   for( int64_t l_co = 0; l_co < l_num_tensors-2; l_co++ ) {
     // extract matrix sizes
@@ -402,6 +404,10 @@ int main( int     i_argc,
 
     l_time_eval += l_dur.count();
     l_num_flops_matmul += 2 * l_c * l_m * l_n * l_k - l_c * l_m * l_n;
+
+    std::cout << "    #" << l_co << ": "
+              <<  l_c << " " << l_m << " " << l_n << " " << l_k
+              << std::endl;
   }
   if( l_num_flops_matmul != l_num_flops ) {
     std::cerr << "error: flops performed through batched gemms dont match" << std::endl;
@@ -410,7 +416,7 @@ int main( int     i_argc,
 
   l_gflops_eval = 1.0E-9 * l_num_flops / (l_time_eval);
 
-  std::cout << "  #flops:         " << l_num_flops << std::endl;\
+  std::cout << "  #flops:         " << l_num_flops << std::endl;
   std::cout << "  time (eval):    " << l_time_eval << std::endl;
   std::cout << "  gflops (eval):  " << l_gflops_eval << std::endl;
   std::cout << "CSV_DATA: "
