@@ -1,5 +1,9 @@
 #include "ResidualBlockDownSample.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 void einsum_ir::frontend::ResidualBlockDownSample::init( int64_t   i_width,
                                                          int64_t   i_height,
                                                          int64_t   i_kernel_width,
@@ -242,6 +246,14 @@ einsum_ir::err_t einsum_ir::frontend::ResidualBlockDownSample::compile() {
   }
 
   m_node_uxcd.store_and_lock_data();
+
+  // enable threading
+#ifdef _OPENMP
+  // four times overload
+  int64_t l_num_tasks = omp_get_max_threads() * 4;
+
+  m_node_abu.threading_intra_op( l_num_tasks );
+#endif
 
   return einsum_ir::SUCCESS;
 }
