@@ -1,8 +1,13 @@
 #include <cstdlib>
 #include <iostream>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #include <ATen/ATen.h>
 #include "backend/BinaryContractionTpp.h"
+#include "backend/EinsumNode.h"
 
 void blocked_matmul() {
   std::cout << "*******************************" << std::endl;
@@ -185,7 +190,13 @@ void blocked_matmul() {
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time_compile = l_dur.count();
 
-  l_bin_cont.threading( 64 );
+  // enable threading
+#ifdef _OPENMP
+  // four times overload
+  int64_t l_num_tasks = omp_get_max_threads() * 4;
+
+  l_bin_cont.threading( l_num_tasks );
+#endif
 
   at::Tensor l_ten_left_perm = l_ten_left;
   at::Tensor l_ten_right_perm = l_ten_right.permute( {0, 1, 2, 3, 4, 6, 5, 7} ).contiguous();
@@ -214,9 +225,9 @@ void blocked_matmul() {
 }
 
 void conv2d() {
-  std::cout << "***********************" << std::endl;
-  std::cout << "*** conv2d testcase ***" << std::endl;
-  std::cout << "***********************" << std::endl;
+  std::cout << "**************************************************************" << std::endl;
+  std::cout << "*** conv2d testcase using the binary contraction interface ***" << std::endl;
+  std::cout << "**************************************************************" << std::endl;
 
   std::chrono::steady_clock::time_point l_tp0, l_tp1;
   std::chrono::duration< double > l_dur;
@@ -232,18 +243,18 @@ void conv2d() {
   //  eab          fecd
   //
   // char   id   size
-  //    a    0     28 // height
-  //    b    1     28 // width
+  //    a    0     56 // height
+  //    b    1     56 // width
   //    c    2      3 // 2nd conv dim
   //    d    3      3 // 1st conv dim
-  //    e    4    128 // in features
-  //    f    5    128 // out features
-  int64_t l_width         = 28;
-  int64_t l_height        = 28;
-  int64_t l_kernel_size_0 = 3;
-  int64_t l_kernel_size_1 = 3;
-  int64_t l_features_in   = 128;
-  int64_t l_features_out  = 128;
+  //    e    4     64 // in features
+  //    f    5     64 // out features
+  int64_t l_width          = 56;
+  int64_t l_height         = 56;
+  int64_t l_kernel_size_0  = 3;
+  int64_t l_kernel_size_1  = 3;
+  int64_t l_features_in    = 64;
+  int64_t l_features_out   = 64;
 
   std::map< int64_t, int64_t > l_dim_sizes_inner;
   l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 0, l_height        ) );
@@ -265,9 +276,9 @@ void conv2d() {
   l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 2, 0 ) );
   l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 3, 1 ) );
 
-  int64_t l_dim_ids_left[4]  = { 5, 4, 2, 3 };
-  int64_t l_dim_ids_right[3] = { 4, 0, 1 };
-  int64_t l_dim_ids_out[3]   = { 5, 0, 1 };
+  int64_t l_dim_ids_left[4]  = { 2, 3, 5, 4 };
+  int64_t l_dim_ids_right[3] = { 0, 1, 4 };
+  int64_t l_dim_ids_out[3]   = { 0, 1, 5 };
 
   einsum_ir::backend::BinaryContractionTpp l_bin_cont;
   l_bin_cont.init( 4,
@@ -289,7 +300,7 @@ void conv2d() {
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
-                   einsum_ir::COPY,
+                   einsum_ir::ZERO,
                    einsum_ir::MADD,
                    einsum_ir::RELU );
 
@@ -300,7 +311,16 @@ void conv2d() {
     std::cerr << "error: failed to compile the convolution!" << std::endl;
     return;
   }
-  l_bin_cont.threading( 64 );
+
+
+  // enable threading
+#ifdef _OPENMP
+  // four times overload
+  int64_t l_num_tasks = omp_get_max_threads() * 4;
+
+  l_bin_cont.threading( l_num_tasks );
+#endif
+
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time_compile = l_dur.count();
@@ -311,14 +331,11 @@ void conv2d() {
   at::Tensor l_left  = at::randn( { l_features_out,
                                     l_features_in,
                                     l_kernel_size_1,
-                                    l_kernel_size_0 } );
+                                    l_kernel_size_0 } ) / l_features_in;
   at::Tensor l_right = at::randn( { 1,
                                     l_features_in,
                                     l_height+2,
                                     l_width+2 } );
-  at::Tensor l_bias  = at::randn( { l_features_out,
-                                    l_height,
-                                    l_width } );
   at::Tensor l_out   = at::randn( { l_features_out,
                                     l_height,
                                     l_width } );
@@ -326,15 +343,15 @@ void conv2d() {
   /*
    * at::conv2d
    */
-  std::cout << "at::conv2d:" << std::endl;
+  std::cout << "benchmarking ATen:" << std::endl;
 
-  // dry run
-  at::Tensor l_out_ref = at::relu( l_bias + at::conv2d( l_right,
-                                                        l_left ) ).squeeze();
+  // warm up
+  at::Tensor l_out_ref = at::relu( at::conv2d( l_right,
+                                               l_left ) );
 
   l_tp0 = std::chrono::steady_clock::now();
-  l_out_ref = at::relu( l_bias + at::conv2d( l_right,
-                                             l_left ) ).squeeze();
+  at::relu( at::conv2d( l_right,
+                        l_left ) );
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time = l_dur.count();
@@ -343,25 +360,26 @@ void conv2d() {
   std::cout << "  time:   " << l_time << std::endl;
   std::cout << "  gflops: " << l_gflops << std::endl;
 
-  at::Tensor l_left_perm  = l_left.permute( {2, 3, 0, 1} ).contiguous();
-  at::Tensor l_right_perm = l_right.permute( {0, 2, 1, 3} ).contiguous();
-
   /*
    * einsum_ir
    */
-  std::cout << "einsum_ir" << std::endl;
+  std::cout << "benchmarking einsum_ir" << std::endl;
+
+  at::Tensor l_left_perm  = l_left.permute( {2, 3, 1, 0} ).contiguous();
+  at::Tensor l_right_perm = l_right.permute( {0, 2, 3, 1} ).contiguous();
+  at::Tensor l_out_perm   = l_out.permute( {1, 2, 0} ).contiguous();
 
   // dry run
   l_bin_cont.contract( l_left_perm.data_ptr(),
                        l_right_perm.data_ptr(),
-                       l_bias.data_ptr(),
-                       l_out.data_ptr() );
+                       nullptr,
+                       l_out_perm.data_ptr() );
 
   l_tp0 = std::chrono::steady_clock::now();
   l_bin_cont.contract( l_left_perm.data_ptr(),
                        l_right_perm.data_ptr(),
-                       l_bias.data_ptr(),
-                       l_out.data_ptr() );
+                       nullptr,
+                       l_out_perm.data_ptr() );
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time = l_dur.count();
@@ -371,16 +389,287 @@ void conv2d() {
   std::cout << "  time (eval):    " << l_time << std::endl;
   std::cout << "  gflops:         " << l_gflops << std::endl;
 
-  if( !at::allclose( l_out, l_out_ref, 1E-4, 1E-4 ) ) {
-    std::cerr << "error: solution is not close!" << std::endl;
+  if( !at::allclose( l_out_perm.permute( {2, 0, 1} ),
+                     l_out_ref,
+                     1E-4,
+                     1E-4 ) ) {
+    std::cerr << "*******************************************" << std::endl;
+    std::cerr << "* warning: einsum_ir is not close to ATen *" << std::endl;
+    std::cerr << "*******************************************" << std::endl;
   }
 }
 
-int main() {
+void conv2d_node( bool    i_bias,
+                  bool    i_relu,
+                  int64_t i_size_mini_batch,
+                  int64_t i_width,
+                  int64_t i_height,
+                  int64_t i_kernel_width,
+                  int64_t i_kernel_height,
+                  int64_t i_num_features_in,
+                  int64_t i_num_features_out ) {
+  std::cout << "********************************************" << std::endl;
+  std::cout << "*** conv2d testcase using an einsum node ***" << std::endl;
+  std::cout << "********************************************" << std::endl;
+
+  std::cout << "i_bias:           " << i_bias             << std::endl;
+  std::cout << "relu:             " << i_relu             << std::endl;
+  std::cout << "size_mini_batch:  " << i_size_mini_batch  << std::endl;
+  std::cout << "width:            " << i_width            << std::endl;
+  std::cout << "height:           " << i_height           << std::endl;
+  std::cout << "kernel_width:     " << i_kernel_width     << std::endl;
+  std::cout << "kernel_height:    " << i_kernel_height    << std::endl;
+  std::cout << "num_features_in:  " << i_num_features_in  << std::endl;
+  std::cout << "num_features_out: " << i_num_features_out << std::endl;
+
+
+  // test case:
+  //
+  //    ___zaby____
+  //   /           \
+  // zabx         yxcd
+  //
+  std::map< int64_t, int64_t > l_dim_sizes_inner;
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 'a', i_height           ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 'b', i_width            ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 'c', i_kernel_height    ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 'd', i_kernel_width     ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 'x', i_num_features_in  ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 'y', i_num_features_out ) );
+  l_dim_sizes_inner.insert( std::pair< int64_t, int64_t >( 'z', i_size_mini_batch  ) );
+
+
+  std::map< int64_t, int64_t > l_dim_sizes_outer;
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 'a', i_height+2         ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 'b', i_width+2          ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 'c', i_kernel_height    ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 'd', i_kernel_width     ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 'x', i_num_features_in  ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 'y', i_num_features_out ) );
+  l_dim_sizes_outer.insert( std::pair< int64_t, int64_t >( 'z', i_size_mini_batch  ) );
+
+  std::map< int64_t, int64_t > l_dim_sizes_aux;
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >( 'a', 1                  ) ); // height
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >( 'b', 1                  ) ); // width
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >( 'y', i_num_features_out ) );
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >( 'z', 1                  ) ); // mini batch
+
+  std::map< int64_t, int64_t > l_dim_link_s_to_p;
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 'c', 'a' ) );
+  l_dim_link_s_to_p.insert( std::pair< int64_t, int64_t >( 'd', 'b' ) );
+
+  int64_t l_dim_ids_zabx[4] = { 'z', 'a', 'b', 'x' };
+  int64_t l_dim_ids_yxcd[4] = { 'y', 'x', 'c', 'd' };
+  int64_t l_dim_ids_zaby[4] = { 'z', 'a', 'b', 'y' };
+
+  std::vector< int64_t > l_sizes_zabx;
+  for( int64_t l_di = 0; l_di < 4; l_di++ ) {
+    l_sizes_zabx.push_back( l_dim_sizes_outer.at( l_dim_ids_zabx[l_di] ) );
+  }
+
+  std::vector< int64_t > l_sizes_yxcd;
+  for( int64_t l_di = 0; l_di < 4; l_di++ ) {
+    l_sizes_yxcd.push_back( l_dim_sizes_outer.at( l_dim_ids_yxcd[l_di] ) );
+  }
+
+  std::vector< int64_t > l_sizes_zaby;
+  for( int64_t l_di = 0; l_di < 4; l_di++ ) {
+    l_sizes_zaby.push_back( l_dim_sizes_inner.at( l_dim_ids_zaby[l_di] ) );
+  }
+
+  std::vector< int64_t > l_sizes_zaby_aux;
+  for( int64_t l_di = 0; l_di < 4; l_di++ ) {
+    l_sizes_zaby_aux.push_back( l_dim_sizes_aux.at( l_dim_ids_zaby[l_di] ) );
+  }
+
+  at::Tensor l_data_zabx     = at::randn( l_sizes_zabx     );
+  at::Tensor l_data_yxcd     = at::randn( l_sizes_yxcd     ) / i_num_features_in;
+  at::Tensor l_data_zaby_aux = at::randn( l_sizes_zaby_aux );
+  at::Tensor l_data_zaby     = at::randn( l_sizes_zaby     );
+
+  einsum_ir::backend::EinsumNode l_node_zabx;
+  einsum_ir::backend::EinsumNode l_node_yxcd;
+  einsum_ir::backend::EinsumNode l_node_zaby;
+
+  // leaf nodes
+  l_node_zabx.init( 4,
+                    l_dim_ids_zabx,
+                    &l_dim_sizes_inner,
+                    &l_dim_sizes_outer,
+                    einsum_ir::FP32,
+                    l_data_zabx.data_ptr() );
+
+  l_node_yxcd.init( 4,
+                    l_dim_ids_yxcd,
+                    &l_dim_sizes_inner,
+                    &l_dim_sizes_outer,
+                    einsum_ir::FP32,
+                    l_data_yxcd.data_ptr() );
+
+  // dependent node
+  l_node_zaby.init( 4,
+                    l_dim_ids_zaby,
+                    &l_dim_sizes_inner,
+                    &l_dim_sizes_aux,
+                    &l_dim_sizes_inner,
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    &l_dim_link_s_to_p,
+                    einsum_ir::FP32,
+                    l_data_zaby_aux.data_ptr(),
+                    l_data_zaby.data_ptr(),
+                    i_bias ? einsum_ir::kernel_t::COPY : einsum_ir::kernel_t::UNDEFINED_KTYPE,
+                    einsum_ir::kernel_t::MADD,
+                    i_relu ? einsum_ir::kernel_t::RELU : einsum_ir::kernel_t::UNDEFINED_KTYPE,
+                    &l_node_zabx,
+                    &l_node_yxcd );
+
+  // compile
+  einsum_ir::err_t l_err = l_node_zaby.compile();
+  if( l_err != einsum_ir::SUCCESS ) {
+    std::cerr << "error: compilation failed" << std::endl;
+    return;
+  }
+
+  /*
+   * store and lock data
+   */
+  l_node_zabx.store_and_lock_data();
+  l_node_yxcd.store_and_lock_data();
+
+  // enable threading
+#ifdef _OPENMP
+  // four times overload
+  int64_t l_num_tasks = omp_get_max_threads() * 4;
+
+  l_node_zaby.threading_intra_op( l_num_tasks );
+#endif
+
+  /*
+   * verify einsum_ir
+   */
+  l_node_zaby.eval();
+
+  // reference
+  at::Tensor l_data_zaby_ref = at::conv2d( l_data_zabx.permute( {0, 3, 1, 2} ),
+                                           l_data_yxcd );
+  if( i_bias ) {
+    l_data_zaby_ref += l_data_zaby_aux.permute( {0, 3, 1, 2} );
+  }
+  if( i_relu ) {
+    l_data_zaby_ref = at::relu( l_data_zaby_ref );
+  }
+
+  if( !at::allclose( l_data_zaby.permute( {0, 3, 1, 2} ),
+                     l_data_zaby_ref,
+                     1E-5,
+                     1E-5 ) )  {
+    std::cerr << "*******************************************" << std::endl;
+    std::cerr << "* warning: einsum_ir is not close to ATen *" << std::endl;
+    std::cerr << "*******************************************" << std::endl;
+  }
+
+  /*
+   * benchmark data
+   */
+  std::chrono::steady_clock::time_point l_tp0, l_tp1;
+  std::chrono::duration< double > l_dur;
+  double l_time_eval;
+  int64_t l_num_ops = l_node_zaby.num_ops();
+  double l_gops_eval = 0;
+
+  /*
+   * benchmark aten
+   */
+  std::cout << "benchmarking ATen" << std::endl;
+
+  at::Tensor l_data_zabx_perm = l_data_zabx.permute( {0, 3, 1, 2} ).contiguous();
+
+  // warm up
+  at::conv2d( l_data_zabx_perm,
+              l_data_yxcd );
+
+  l_tp0 = std::chrono::steady_clock::now();
+  at::conv2d( l_data_zabx_perm,
+              l_data_yxcd );
+  l_tp1 = std::chrono::steady_clock::now();
+
+  l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
+  l_time_eval = l_dur.count();
+  l_gops_eval = 1.0E-9 * l_num_ops / l_time_eval;
+
+  std::cout << "  #ops:        " << l_num_ops   << std::endl;
+  std::cout << "  time (eval): " << l_time_eval << std::endl;
+  std::cout << "  gops (eval): " << l_gops_eval << std::endl;
+
+  /*
+   * benchmark einsum_ir
+   */
+  std::cout << "benchmarking einsum_ir" << std::endl;
+
+  // warmup
+  l_node_zaby.eval();
+
+  l_tp0 = std::chrono::steady_clock::now();
+  l_node_zaby.eval();
+  l_tp1 = std::chrono::steady_clock::now();
+
+  l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
+  l_time_eval = l_dur.count();
+  l_gops_eval = 1.0E-9 * l_num_ops / l_time_eval;
+
+  std::cout << "  #ops:        " << l_num_ops   << std::endl;
+  std::cout << "  time (eval): " << l_time_eval << std::endl;
+  std::cout << "  gops (eval): " << l_gops_eval << std::endl;
+}
+
+int main( int     i_argc,
+          char  * i_argv[] ) {
   std::cout << "running bench_binary!" << std::endl;
+
+  bool l_bias = true;
+  bool l_relu = true;
+
+  int64_t l_size_mini_batch  = 1;
+  int64_t l_height           = 56;
+  int64_t l_width            = 56;
+  int64_t l_kernel_height    = 3;
+  int64_t l_kernel_width     = 3;
+  int64_t l_num_features_in  = 64;
+  int64_t l_num_features_out = 64;
+
+  if( i_argc == 1 ) {}
+  else if( i_argc == 10 ) {
+    l_bias             = std::stoi( i_argv[1] );
+    l_relu             = std::stoi( i_argv[2] );
+    l_size_mini_batch  = std::stoi( i_argv[3] );
+    l_width            = std::stoi( i_argv[4] );
+    l_height           = std::stoi( i_argv[5] );
+    l_kernel_width     = std::stoi( i_argv[6] );
+    l_kernel_height    = std::stoi( i_argv[7] );
+    l_num_features_in  = std::stoi( i_argv[8] );
+    l_num_features_out = std::stoi( i_argv[9] );
+  }
+  else {
+    std::cerr << "usage: ./bench_binary relu bias size_mini_batch width height kernel_width kernel_height num_features_in num_features_out" << std::endl;
+    std::cerr << "example ./bench_binary 1 1 1 56 56 3 3 64 64" << std::endl;
+    return EXIT_FAILURE;
+  }
 
   blocked_matmul();
   conv2d();
+  conv2d_node( l_bias,
+               l_relu,
+               l_size_mini_batch,
+               l_width,
+               l_height,
+               l_kernel_width,
+               l_kernel_height,
+               l_num_features_in,
+               l_num_features_out );
 
   std::cout << "finished running bench_binary!" << std::endl;
   return EXIT_SUCCESS;
