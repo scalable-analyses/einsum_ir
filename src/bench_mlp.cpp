@@ -6,7 +6,6 @@
 
 int main() {
   std::string l_model_path = "model_mlp.pt";
-  int l_num_batch = 64;
 
   // read model
   torch::jit::script::Module l_model;
@@ -29,10 +28,10 @@ int main() {
 
   auto l_named_params= l_model.named_parameters( true );
   for( const auto & l_par: l_named_params ) {
-    std::cout << "  name: "  << l_par.name << std::endl;
+    std::cout << "  name:        "  << l_par.name << std::endl;
     std::cout << "  n_dimension: " << l_par.value.ndimension() << std::endl;
-    std::cout << "  sizes: " << l_par.value.sizes() << std::endl;
-    std::cout << "  type: "  << l_par.value.dtype() << std::endl;
+    std::cout << "  sizes:       " << l_par.value.sizes() << std::endl;
+    std::cout << "  type:        "  << l_par.value.dtype() << std::endl;
     std::cout << std::endl;
 
     if( l_par.name.find( "weight" ) != std::string::npos ) {
@@ -46,7 +45,7 @@ int main() {
   /*
    * performance data structures
    */
-  at::Tensor l_data = at::rand( { l_num_batch, 784 } );
+  at::Tensor l_data = at::randn( { 1344, 784 } );
 
   std::chrono::steady_clock::time_point l_tp0, l_tp1;
   std::chrono::duration< double > l_dur;
@@ -64,65 +63,119 @@ int main() {
   einsum_ir::err_t l_err = einsum_ir::err_t::UNDEFINED_ERROR;
 
   // init einsum ir
-  at::Tensor l_out = at::rand( { l_num_batch, 10 } );
+  at::Tensor l_out = at::rand( { 1344, 10 } );
 
   std::map< int64_t, int64_t > l_dim_sizes;
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 0, l_num_batch ) );
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 1, 784 ) );
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 2, 512 ) );
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 3, 512 ) );
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 4,  10 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  0, 21 ) ); // batch 0
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  1, 64 ) ); // batch 1
 
-  int64_t l_dim_ids_input[2]    = { 0, 1 };
-  int64_t l_dim_ids_hidden_0[2] = { 0, 2 };
-  int64_t l_dim_ids_hidden_1[2] = { 0, 3 };
-  int64_t l_dim_ids_out[2]      = { 0, 4 };
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  2,  8 ) ); // features 00
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  3, 98 ) ); // features 01
 
-  int64_t l_dim_ids_weight_0[2] = { 2, 1 };
-  int64_t l_dim_ids_weight_1[2] = { 3, 2 };
-  int64_t l_dim_ids_weight_2[2] = { 4, 3 };
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  4,  8 ) ); // features 10
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  5, 64 ) ); // features 11
+
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  6,  8 ) ); // features 20
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  7, 64 ) ); // features 21
+
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  8,  8 ) ); // features 30
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  9, 64 ) ); // features 31
+
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 10,  8 ) ); // features 40
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 11, 64 ) ); // features 41
+
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 12, 10 ) ); // features 50
+
+  std::map< int64_t, int64_t > l_dim_sizes_aux;
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >(  0,  1 ) ); // batch 0
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >(  1,  1 ) ); // batch 1
+
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >(  4,  8 ) ); // features 10
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >(  5, 64 ) ); // features 11
+
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >(  6,  8 ) ); // features 20
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >(  7, 64 ) ); // features 21
+
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >(  8,  8 ) ); // features 30
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >(  9, 64 ) ); // features 31
+
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >( 10,  8 ) ); // features 40
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >( 11, 64 ) ); // features 41
+
+  l_dim_sizes_aux.insert( std::pair< int64_t, int64_t >( 12, 10 ) ); // features 50
+
+  int64_t l_dim_ids_input[4]    = {  0,  1,  2,  3 };
+  int64_t l_dim_ids_hidden_0[4] = {  0,  1,  4,  5 };
+  int64_t l_dim_ids_hidden_1[4] = {  0,  1,  6,  7 };
+  int64_t l_dim_ids_hidden_2[4] = {  0,  1,  8,  9 };
+  int64_t l_dim_ids_hidden_3[4] = {  0,  1, 10, 11 };
+  int64_t l_dim_ids_out[3]      = {  0,  1, 12 };
+
+  int64_t l_dim_ids_weight_0[4] = {  4,  5,  2,  3 };
+  int64_t l_dim_ids_weight_1[4] = {  6,  7,  4,  5 };
+  int64_t l_dim_ids_weight_2[4] = {  8,  9,  6,  7 };
+  int64_t l_dim_ids_weight_3[4] = { 10, 11,  8,  9 };
+  int64_t l_dim_ids_weight_4[4] = {     12, 10, 11 };
 
   einsum_ir::backend::EinsumNode l_node_input;
   einsum_ir::backend::EinsumNode l_node_hidden_0;
   einsum_ir::backend::EinsumNode l_node_hidden_1;
+  einsum_ir::backend::EinsumNode l_node_hidden_2;
+  einsum_ir::backend::EinsumNode l_node_hidden_3;
   einsum_ir::backend::EinsumNode l_node_out;
 
   einsum_ir::backend::EinsumNode l_node_weight_0;
   einsum_ir::backend::EinsumNode l_node_weight_1;
   einsum_ir::backend::EinsumNode l_node_weight_2;
+  einsum_ir::backend::EinsumNode l_node_weight_3;
+  einsum_ir::backend::EinsumNode l_node_weight_4;
 
-  l_node_input.init( 2,
+  l_node_input.init( 4,
                      l_dim_ids_input,
                      &l_dim_sizes,
                      nullptr,
                      einsum_ir::FP32,
                      l_data.data_ptr() );
 
-  l_node_weight_0.init( 2,
+  l_node_weight_0.init( 4,
                         l_dim_ids_weight_0,
                         &l_dim_sizes,
                         nullptr,
                         einsum_ir::FP32,
                         l_fc_weights[0].data_ptr() );
 
-  l_node_weight_1.init( 2,
+  l_node_weight_1.init( 4,
                         l_dim_ids_weight_1,
                         &l_dim_sizes,
                         nullptr,
                         einsum_ir::FP32,
                         l_fc_weights[1].data_ptr() );
 
-  l_node_weight_2.init( 2,
+  l_node_weight_2.init( 4,
                         l_dim_ids_weight_2,
                         &l_dim_sizes,
                         nullptr,
                         einsum_ir::FP32,
                         l_fc_weights[2].data_ptr() );
 
-  l_node_hidden_0.init( 2,
-                        l_dim_ids_hidden_0,
+  l_node_weight_3.init( 4,
+                        l_dim_ids_weight_3,
                         &l_dim_sizes,
                         nullptr,
+                        einsum_ir::FP32,
+                        l_fc_weights[3].data_ptr() );
+
+  l_node_weight_4.init( 3,
+                        l_dim_ids_weight_4,
+                        &l_dim_sizes,
+                        nullptr,
+                        einsum_ir::FP32,
+                        l_fc_weights[4].data_ptr() );
+
+  l_node_hidden_0.init( 4,
+                        l_dim_ids_hidden_0,
+                        &l_dim_sizes,
+                        &l_dim_sizes_aux,
                         nullptr,
                         nullptr,
                         nullptr,
@@ -131,18 +184,18 @@ int main() {
                         nullptr,
                         nullptr,
                         einsum_ir::FP32,
+                        l_fc_biases[0].data_ptr(),
                         nullptr,
-                        nullptr,
-                        einsum_ir::kernel_t::ZERO,
+                        einsum_ir::kernel_t::COPY,
                         einsum_ir::kernel_t::MADD,
                         einsum_ir::kernel_t::RELU,
                         &l_node_input,
                         &l_node_weight_0 );
 
-  l_node_hidden_1.init( 2,
+  l_node_hidden_1.init( 4,
                         l_dim_ids_hidden_1,
                         &l_dim_sizes,
-                        nullptr,
+                        &l_dim_sizes_aux,
                         nullptr,
                         nullptr,
                         nullptr,
@@ -151,18 +204,58 @@ int main() {
                         nullptr,
                         nullptr,
                         einsum_ir::FP32,
+                        l_fc_biases[1].data_ptr(),
                         nullptr,
-                        nullptr,
-                        einsum_ir::kernel_t::ZERO,
+                        einsum_ir::kernel_t::COPY,
                         einsum_ir::kernel_t::MADD,
                         einsum_ir::kernel_t::RELU,
                         &l_node_hidden_0,
                         &l_node_weight_1 );
 
-  l_node_out.init( 2,
+  l_node_hidden_2.init( 4,
+                        l_dim_ids_hidden_2,
+                        &l_dim_sizes,
+                        &l_dim_sizes_aux,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        einsum_ir::FP32,
+                        l_fc_biases[2].data_ptr(),
+                        nullptr,
+                        einsum_ir::kernel_t::COPY,
+                        einsum_ir::kernel_t::MADD,
+                        einsum_ir::kernel_t::RELU,
+                        &l_node_hidden_1,
+                        &l_node_weight_2 );
+
+  l_node_hidden_3.init( 4,
+                        l_dim_ids_hidden_3,
+                        &l_dim_sizes,
+                        &l_dim_sizes_aux,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        einsum_ir::FP32,
+                        l_fc_biases[3].data_ptr(),
+                        nullptr,
+                        einsum_ir::kernel_t::COPY,
+                        einsum_ir::kernel_t::MADD,
+                        einsum_ir::kernel_t::RELU,
+                        &l_node_hidden_2,
+                        &l_node_weight_3 );
+
+  l_node_out.init( 3,
                    l_dim_ids_out,
                    &l_dim_sizes,
-                   nullptr,
+                   &l_dim_sizes_aux,
                    nullptr,
                    nullptr,
                    nullptr,
@@ -171,13 +264,13 @@ int main() {
                    nullptr,
                    nullptr,
                    einsum_ir::FP32,
-                   nullptr,
+                   l_fc_biases[4].data_ptr(),
                    l_out.data_ptr(),
-                   einsum_ir::kernel_t::ZERO,
+                   einsum_ir::kernel_t::COPY,
                    einsum_ir::kernel_t::MADD,
                    einsum_ir::kernel_t::UNDEFINED_KTYPE,
-                   &l_node_hidden_1,
-                   &l_node_weight_2 );
+                   &l_node_hidden_3,
+                   &l_node_weight_4 );
 
   // compile and stage weights
   l_tp0 = std::chrono::steady_clock::now();
@@ -190,17 +283,27 @@ int main() {
   l_node_weight_0.store_and_lock_data();
   l_node_weight_1.store_and_lock_data();
   l_node_weight_2.store_and_lock_data();
+  l_node_weight_3.store_and_lock_data();
+  l_node_weight_4.store_and_lock_data();
 
   // enable threading
-  l_node_hidden_0.threading_intra_op( 256 );
-  l_node_hidden_1.threading_intra_op( 256 );
-  l_node_out.threading_intra_op( 256 );
+#ifdef _OPENMP
+  // four times overload
+  int64_t l_num_tasks = omp_get_max_threads() * 4;
+
+  l_node_hidden_0.threading_intra_op( l_num_tasks );
+  l_node_hidden_1.threading_intra_op( l_num_tasks );
+  l_node_hidden_2.threading_intra_op( l_num_tasks );
+  l_node_hidden_3.threading_intra_op( l_num_tasks );
+  l_node_out.threading_intra_op( l_num_tasks );
+#endif
+
   l_tp1 = std::chrono::steady_clock::now();
 
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time_compile = l_dur.count();
 
-  // dry run
+  // warm up
   l_node_out.eval();
 
   // run network
@@ -223,186 +326,21 @@ int main() {
   std::cout << "  gflops (total): " << l_gflops_total << std::endl;
 
   /*
-   * einsum_ir blocked
-   */
-  std::cout << "running blocked einsum_ir model" << std::endl;
-  at::Tensor l_out_blocked = at::rand( { l_num_batch, 10 } );
-
-  std::map< int64_t, int64_t > l_dim_sizes_blocked;
-  l_dim_sizes_blocked.insert( std::pair< int64_t, int64_t >(  0, l_num_batch ) ); // 0
-  l_dim_sizes_blocked.insert( std::pair< int64_t, int64_t >(  1,           2 ) ); // 1-0
-  l_dim_sizes_blocked.insert( std::pair< int64_t, int64_t >(  2,           2 ) ); // 1-1
-  l_dim_sizes_blocked.insert( std::pair< int64_t, int64_t >(  3,           2 ) ); // 1-2
-  l_dim_sizes_blocked.insert( std::pair< int64_t, int64_t >(  4,          98 ) ); // 1-3
-  l_dim_sizes_blocked.insert( std::pair< int64_t, int64_t >(  5,           2 ) ); // 2-0
-  l_dim_sizes_blocked.insert( std::pair< int64_t, int64_t >(  6,           2 ) ); // 2-1
-  l_dim_sizes_blocked.insert( std::pair< int64_t, int64_t >(  7,           2 ) ); // 2-2
-  l_dim_sizes_blocked.insert( std::pair< int64_t, int64_t >(  8,          64 ) ); // 2-3
-  l_dim_sizes_blocked.insert( std::pair< int64_t, int64_t >(  9,           2 ) ); // 3-0
-  l_dim_sizes_blocked.insert( std::pair< int64_t, int64_t >( 10,           2 ) ); // 3-1
-  l_dim_sizes_blocked.insert( std::pair< int64_t, int64_t >( 11,           2 ) ); // 3-2
-  l_dim_sizes_blocked.insert( std::pair< int64_t, int64_t >( 12,          64 ) ); // 3-3
-  l_dim_sizes_blocked.insert( std::pair< int64_t, int64_t >( 13,          10 ) ); // 4
-
-  int64_t l_dim_ids_input_blocked[5]    = {  0,  1,  2,  3,  4 };
-  int64_t l_dim_ids_hidden_0_blocked[5] = {  0,  5,  6,  7,  8 };
-  int64_t l_dim_ids_hidden_1_blocked[5] = {  0,  9, 10, 11, 12 };
-  int64_t l_dim_ids_out_blocked[2]      = {  0, 13 };
-
-  int64_t l_dim_ids_weight_0_blocked[8] = {  5,  6,  7,  8,  1, 2, 3, 4 };
-  int64_t l_dim_ids_weight_1_blocked[8] = {  9, 10, 11, 12,  5, 6, 7, 8 };
-  int64_t l_dim_ids_weight_2_blocked[5] = { 13,  9, 10, 11, 12 };
-
-  einsum_ir::backend::EinsumNode l_node_input_blocked;
-  einsum_ir::backend::EinsumNode l_node_hidden_0_blocked;
-  einsum_ir::backend::EinsumNode l_node_hidden_1_blocked;
-  einsum_ir::backend::EinsumNode l_node_out_blocked;
-
-  einsum_ir::backend::EinsumNode l_node_weight_0_blocked;
-  einsum_ir::backend::EinsumNode l_node_weight_1_blocked;
-  einsum_ir::backend::EinsumNode l_node_weight_2_blocked;
-
-  l_node_input_blocked.init( 5,
-                             l_dim_ids_input_blocked,
-                             &l_dim_sizes_blocked,
-                             nullptr,
-                             einsum_ir::FP32,
-                             l_data.data_ptr() );
-
-  l_node_weight_0_blocked.init( 8,
-                                l_dim_ids_weight_0_blocked,
-                                &l_dim_sizes_blocked,
-                                nullptr,
-                                einsum_ir::FP32,
-                                l_fc_weights[0].data_ptr() );
-
-  l_node_weight_1_blocked.init( 8,
-                                l_dim_ids_weight_1_blocked,
-                                &l_dim_sizes_blocked,
-                                nullptr,
-                                einsum_ir::FP32,
-                                l_fc_weights[1].data_ptr() );
-
-  l_node_weight_2_blocked.init( 5,
-                                l_dim_ids_weight_2_blocked,
-                                &l_dim_sizes_blocked,
-                                nullptr,
-                                einsum_ir::FP32,
-                                l_fc_weights[2].data_ptr() );
-
-  l_node_hidden_0_blocked.init( 5,
-                                l_dim_ids_hidden_0_blocked,
-                                &l_dim_sizes_blocked,
-                                nullptr,
-                                nullptr,
-                                nullptr,
-                                nullptr,
-                                nullptr,
-                                nullptr,
-                                nullptr,
-                                nullptr,
-                                einsum_ir::FP32,
-                                nullptr,
-                                nullptr,
-                                einsum_ir::kernel_t::ZERO,
-                                einsum_ir::kernel_t::MADD,
-                                einsum_ir::kernel_t::RELU,
-                                &l_node_input_blocked,
-                                &l_node_weight_0_blocked );
-
-  l_node_hidden_1_blocked.init( 5,
-                                l_dim_ids_hidden_1_blocked,
-                                &l_dim_sizes_blocked,
-                                nullptr,
-                                nullptr,
-                                nullptr,
-                                nullptr,
-                                nullptr,
-                                nullptr,
-                                nullptr,
-                                nullptr,
-                                einsum_ir::FP32,
-                                nullptr,
-                                nullptr,
-                                einsum_ir::kernel_t::ZERO,
-                                einsum_ir::kernel_t::MADD,
-                                einsum_ir::kernel_t::RELU,
-                                &l_node_hidden_0_blocked,
-                                &l_node_weight_1_blocked );
-
-  l_node_out_blocked.init( 2,
-                           l_dim_ids_out_blocked,
-                           &l_dim_sizes_blocked,
-                           nullptr,
-                           nullptr,
-                           nullptr,
-                           nullptr,
-                           nullptr,
-                           nullptr,
-                           nullptr,
-                           nullptr,
-                           einsum_ir::FP32,
-                           nullptr,
-                           l_out_blocked.data_ptr(),
-                           einsum_ir::kernel_t::ZERO,
-                           einsum_ir::kernel_t::MADD,
-                           einsum_ir::kernel_t::UNDEFINED_KTYPE,
-                           &l_node_hidden_1_blocked,
-                           &l_node_weight_2_blocked );
-
-  // compile and stage weights
-  l_tp0 = std::chrono::steady_clock::now();
-
-  l_err = l_node_out_blocked.compile();
-  if( l_err != einsum_ir::SUCCESS ) {
-    std::cerr << "error: failed to compile MLP" << std::endl;
-    return EXIT_FAILURE;
-  }
-  l_node_weight_0_blocked.store_and_lock_data();
-  l_node_weight_1_blocked.store_and_lock_data();
-  l_node_weight_2_blocked.store_and_lock_data();
-
-  // enable threading
-  l_node_hidden_0_blocked.threading_intra_op( 64 );
-  l_node_hidden_1_blocked.threading_intra_op( 64 );
-  l_node_out_blocked.threading_intra_op( 64 );
-
-  l_tp1 = std::chrono::steady_clock::now();
-  l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
-  l_time_compile = l_dur.count();
-
-  // dry run
-  l_node_out_blocked.eval();
-
-  // run network
-  l_tp0 = std::chrono::steady_clock::now();
-  l_node_out_blocked.eval();
-  l_tp1 = std::chrono::steady_clock::now();
-
-  l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
-  l_time_eval = l_dur.count();
-
-  l_num_flops = l_node_out_blocked.num_ops();
-  l_gflops_eval = 1.0E-9 * l_num_flops / l_time_eval;
-  l_time_total = l_time_compile + l_time_eval;
-  l_gflops_total = 1.0E-9 * l_num_flops / (l_time_total);
-
-  std::cout << "  #flops:         " << l_num_flops    << std::endl;
-  std::cout << "  time (compile): " << l_time_compile << std::endl;
-  std::cout << "  time (eval):    " << l_time_eval    << std::endl;
-  std::cout << "  gflops (eval):  " << l_gflops_eval  << std::endl;
-  std::cout << "  gflops (total): " << l_gflops_total << std::endl;
-
-  /*
    * torchscript model
    */
   std::cout << "running torchscript model" << std::endl;
 
-  // dry run
+  l_tp0 = std::chrono::steady_clock::now();
+  l_model = torch::jit::optimize_for_inference( l_model );
+  l_tp1 = std::chrono::steady_clock::now();
+  l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
+  l_time_compile = l_dur.count();
+
+  // warm up
   at::Tensor l_out_torch = l_model.forward( { l_data } ).toTensor();
 
   l_tp0 = std::chrono::steady_clock::now();
-  l_out_torch = l_model.forward( { l_data } ).toTensor();
+  l_model.forward( { l_data } );
   l_tp1 = std::chrono::steady_clock::now();
 
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
@@ -412,8 +350,10 @@ int main() {
   l_time_total = l_time_compile + l_time_eval;
   l_gflops_total = 1.0E-9 * l_num_flops / (l_time_total);
 
-  std::cout << "  #flops:         " << l_num_flops << std::endl;
-  std::cout << "  time (total):   " << l_time_total << std::endl;
+  std::cout << "  #flops:         " << l_num_flops   << std::endl;
+  std::cout << "  time (compile): " << l_time_compile << std::endl;
+  std::cout << "  time (eval):    " << l_time_eval    << std::endl;
+  std::cout << "  gflops (eval):  " << l_gflops_eval  << std::endl;
   std::cout << "  gflops (total): " << l_gflops_total << std::endl;
 
   /*
@@ -421,11 +361,6 @@ int main() {
    */
   if( !at::allclose( l_out_torch, l_out, 1E-3, 1E-4 ) ) {
     std::cerr << "error: einsum_ir solution is not close to torch!" << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  if( !at::allclose( l_out_torch, l_out_blocked, 1E-3, 1E-4 ) ) {
-    std::cerr << "error: blocked einsum_ir solution is not close to torch!" << std::endl;
     return EXIT_FAILURE;
   }
 
