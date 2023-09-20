@@ -620,10 +620,18 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     return err_t::COMPILATION_FAILED;
   }
 
-  // remove blocked C dimension for main kernel from leading output dimensions which is implicit in LIBXSMM
+  // remove packed size form leading dimension (implicit in LIBXSMM)
+  if( l_lda % l_r != 0 ) {
+    return einsum_ir::COMPILATION_FAILED;
+  }
+  if( l_ldb % l_r != 0 ) {
+    return einsum_ir::COMPILATION_FAILED;
+  }
   if( l_ldc % l_r != 0 ) {
     return einsum_ir::COMPILATION_FAILED;
   }
+  l_lda /= l_r;
+  l_ldb /= l_r;
   l_ldc /= l_r;
 
   // create main kernel
