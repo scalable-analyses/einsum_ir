@@ -99,7 +99,13 @@ if g_env['libtorch'] != False:
     g_env.AppendUnique( CXXFLAGS = [ ('-isystem',  g_env['libtorch'] + '/include/torch/csrc/api/include') ] )
     g_env.AppendUnique( LIBPATH = [ g_env['libtorch'] + '/lib'] )
     g_env.AppendUnique( RPATH = [ g_env['libtorch'] + '/lib'] )
-    g_env.AppendUnique( CPPDEFINES='_GLIBCXX_USE_CXX11_ABI=0' )
+    try:
+      with open( g_env['libtorch'] + '/share/cmake/Torch/TorchConfig.cmake' ) as l_file:
+        l_contents = l_file.read()
+        if( '-D_GLIBCXX_USE_CXX11_ABI=0' in l_contents ):
+          g_env.AppendUnique( CPPDEFINES='_GLIBCXX_USE_CXX11_ABI=0' )
+    except:
+      pass
 
   if not( g_conf.CheckLib( 'libc10',
                            language='CXX' ) and \
