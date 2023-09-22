@@ -276,7 +276,7 @@ int main( int     i_argc,
     }
   }
 
-  // dry run
+  // warmup run
   l_einsum_exp.eval();
 
   l_tp0 = std::chrono::steady_clock::now();
@@ -323,7 +323,7 @@ int main( int     i_argc,
     l_data_in[l_te] = l_data[l_te];
   }
 
-  // dry run
+  // warmup run
   at::Tensor l_out_aten = at::einsum( l_expression_string,
                                       l_data_in,
                                       l_path );
@@ -389,10 +389,12 @@ int main( int     i_argc,
       l_k *= l_bin_conts[l_co].m_cont->m_sizes_k[l_di];
     }
 
-    at::Tensor l_mat_a = at::rand( {l_c, l_k, l_m} );
-    at::Tensor l_mat_b = at::rand( {l_c, l_n, l_k} );
+    at::Tensor l_mat_a = at::randn( {l_c, l_k, l_m},
+                                    l_dtype_at );
+    at::Tensor l_mat_b = at::randn( {l_c, l_n, l_k},
+                                    l_dtype_at );
 
-    // dry run
+    // warmup run
     at::Tensor l_mat_c = at::matmul( l_mat_b,
                                      l_mat_a );
 
