@@ -4,8 +4,29 @@
 #include <memory>
 #include "src/backend/EinsumNode.h"
 
-int main() {
-  std::string l_model_path = "model_mlp.pt";
+int main( int     i_argc,
+          char  * i_argv[] ) {
+  if( i_argc < 2 ) {
+    std::cerr << "usage: ./bench_mlp path_to_model.pt store_and_lock" << std::endl;
+    std::cerr << "store_and_lock is optional (defaults to 0) "
+              << "and will exclude the initial transpose from the time measurements if 1"
+              << std::endl;
+    return EXIT_FAILURE;
+  }
+  std::string l_model_path( i_argv[1] );
+
+  bool l_store_and_lock = false;
+  if( i_argc > 2 ) {
+    int l_arg_sl = std::stoi( i_argv[2] );
+
+    if( l_arg_sl == 1 ) {
+      l_store_and_lock = true;
+    }
+  }
+
+  std::cout << "running MLP using" << std::endl;
+  std::cout << "  model path: " << l_model_path << std::endl;
+  std::cout << "  store and lock: " << l_store_and_lock << std::endl;
 
   // read model
   torch::jit::script::Module l_model;
@@ -285,6 +306,9 @@ int main() {
   l_node_weight_2.store_and_lock_data();
   l_node_weight_3.store_and_lock_data();
   l_node_weight_4.store_and_lock_data();
+  if( l_store_and_lock ) {
+    l_node_input.store_and_lock_data();
+  }
 
   // enable threading
 #ifdef _OPENMP
