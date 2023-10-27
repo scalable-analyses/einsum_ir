@@ -22,7 +22,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-          export LIBTORCH_PATH=$(python -c "import torch as _; print(_.__path__[0])")
+          echo LIBTORCH_PATH=$(python -c "import torch as _; print(_.__path__[0])") >> $GITHUB_ENV
 
       - name: Install LIBXSMM
         run: |
@@ -31,7 +31,7 @@ jobs:
           git checkout feature_packed_gemm
           make BLAS=0 -j
           cd ..
-          export LIBXSMM_PATH=$(pwd)/libxsmm
+          echo LIBXSMM_PATH=$(pwd)/libxsmm >> $GITHUB_ENV
 
       - name: Install einsum_ir
         run: |
