@@ -83,8 +83,8 @@ if 'san' in  g_env['mode']:
                                     '-fsanitize=address',
                                     '-fsanitize=undefined'] )
 
-# enable c++14
-g_env.AppendUnique( CXXFLAGS = [ '-std=c++14' ] )
+# enable c++17
+g_env.AppendUnique( CXXFLAGS = [ '-std=c++17' ] )
 
 # enable omp
 if 'omp' in g_env['parallel']:
