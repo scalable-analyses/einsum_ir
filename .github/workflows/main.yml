@@ -7,18 +7,34 @@ on:
     branches: [ main ]
 
 jobs:
-  UT:
+  tests:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Python
+      - name: Install Python
         uses: actions/setup-python@v2
         with:
           python-version: 3.8
 
-      - name: PyTorch
+      - name: Install PyTorch
         run: |
           python -m pip install --upgrade pip
           pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+          LIBTORCH_PATH=$(python -c "import torch as _; print(_.__path__[0])")
+
+      - name: Install LIBXSMM
+        run: |
+          git clone https://github.com/libxsmm/libxsmm.git
+          cd libxsmm
+          git checkout feature_packed_gemm
+          make BLAS=0 -j
+          cd ..
+
+      - name: Install einsum_ir
+          sudo apt-get install scons
+          git clone https://github.com/scalable-analyses/einsum_ir.git
+          cd einsum_ir
+          wget https://github.com/catchorg/Catch2/releases/download/v2.13.10/catch.hpp
+          scons mode=debug+san libtorch=${LIBTORCH_PATH} libxsmm=$(pwd)/../libxsmm
