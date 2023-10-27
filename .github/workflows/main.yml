@@ -33,6 +33,7 @@ jobs:
           cd ..
 
       - name: Install einsum_ir
+         run: |
           sudo apt-get install scons
           git clone https://github.com/scalable-analyses/einsum_ir.git
           cd einsum_ir
