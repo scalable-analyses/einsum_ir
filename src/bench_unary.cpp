@@ -57,12 +57,11 @@ void split_string( std::string                const & i_input,
 
 int main( int     i_argc,
           char  * i_argv[] ) {
-  if( i_argc < 4 ) {
-    std::cerr << "usage: bench_unary einsum_string dimension_sizes dtype operator"      << std::endl;
+  if( i_argc < 3 ) {
+    std::cerr << "usage: bench_unary einsum_string dimension_sizes dtype"               << std::endl;
     std::cerr << "  dimension sizes have to be in ascending order of the dimension ids" << std::endl;
     std::cerr << "  dtype maybe be either FP32 or FP64, default: FP32"                  << std::endl;
-    std::cerr << "  operator may only be copy"                                          << std::endl;
-    std::cerr << "example: ./bench_unary \"abcd->dbac\" \"32,32,32,32\" \"FP64\""  << std::endl;
+    std::cerr << "example: ./bench_unary \"abcd->dbac\" \"32,32,32,32\" \"FP64\""       << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -131,8 +130,8 @@ int main( int     i_argc,
    */
   at::ScalarType l_dtype_at= at::ScalarType::Float;
   einsum_ir::data_t l_dtype_einsum_ir = einsum_ir::FP32;
-  if( i_argc > 4 ) {
-    std::string l_arg_dtype = std::string( i_argv[4] );
+  if( i_argc > 3 ) {
+    std::string l_arg_dtype = std::string( i_argv[3] );
     if( l_arg_dtype == "FP64" ) {
       l_dtype_at = at::ScalarType::Double;
       l_dtype_einsum_ir = einsum_ir::FP64;
@@ -145,8 +144,7 @@ int main( int     i_argc,
     std::cout << "dtype: FP64" << std::endl;
   }
   else {
-    std::cerr << "failed to determine dtype" << std::endl;
-    return EXIT_FAILURE;
+    l_dtype_einsum_ir = einsum_ir::FP32;
   }
 
   if( l_tensors[0].size() != l_tensors[1].size() ) {
