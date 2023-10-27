@@ -1,8 +1,12 @@
 #include "EinsumNode.h"
+#include "UnaryTpp.h"
 #include "BinaryContractionTpp.h"
 #include "Tensor.h"
 
 einsum_ir::backend::EinsumNode::~EinsumNode() {
+  if( m_unary != nullptr ) {
+    delete m_unary;
+  }
   if( m_cont != nullptr ) {
     delete m_cont;
   }
@@ -106,6 +110,8 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
 }
 
 einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_ids_req ) {
+  err_t l_err = err_t::UNDEFINED_ERROR;
+
   m_dim_ids_int = i_dim_ids_req;
 
   m_size = Tensor::size( ce_n_bytes( m_dtype ),
@@ -139,7 +145,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
                   m_ktype_main,
                   m_ktype_last_touch );
 
-    einsum_ir::err_t l_err = m_cont->compile();
+    l_err = m_cont->compile();
     if( l_err != einsum_ir::SUCCESS ) {
       return l_err;
     }
@@ -155,6 +161,22 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
         break;
       }
     }
+  }
+
+  // compile unary copy operation
+  m_unary = new UnaryTpp;
+  m_unary->init( m_num_dims,
+                 m_dim_sizes_outer,
+                 m_dim_ids_ext,
+                 m_dim_ids_int,
+                 m_dtype,
+                 m_dtype,
+                 m_dtype,
+                 kernel_t::COPY );
+
+  l_err = m_unary->compile();
+  if( l_err != einsum_ir::SUCCESS ) {
+    return l_err;
   }
 
   // allocate memory for intermediate data if required
@@ -201,7 +223,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
   // compile children
   for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
     int64_t const * l_dim_ids_child = m_cont->dim_ids_in_ordered( l_ch );
-    err_t l_err = m_children[l_ch]->compile( l_dim_ids_child );
+    l_err = m_children[l_ch]->compile( l_dim_ids_child );
     if( l_err != einsum_ir::SUCCESS ) {
       return l_err;
     }
@@ -255,14 +277,8 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::store_and_lock_data() {
   }
 
   // store data internally
-  Tensor::permute( m_num_dims,
-                   *m_dim_sizes_outer,
-                   m_dim_ids_ext,
-                   m_dim_ids_int,
-                   m_dtype,
-                   m_dtype,
-                   m_data_ptr_ext,
-                   m_data_ptr_int );
+  m_unary->eval( m_data_ptr_ext,
+                 m_data_ptr_int );
 
   m_data_locked = true;
 
@@ -287,14 +303,8 @@ void einsum_ir::backend::EinsumNode::eval() {
   if(    m_data_locked  == false
       && m_data_ptr_ext != nullptr
       && m_data_ptr_int != nullptr ) {
-    Tensor::permute( m_num_dims,
-                     *m_dim_sizes_outer,
-                     m_dim_ids_ext,
-                     m_dim_ids_int,
-                     m_dtype,
-                     m_dtype,
-                     m_data_ptr_ext,
-                     m_data_ptr_int );
+    m_unary->eval( m_data_ptr_ext,
+                   m_data_ptr_int );
   }
 
   if( m_children.size() == 2 ) {

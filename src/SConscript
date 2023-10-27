@@ -1,6 +1,10 @@
 Import('g_env')
 
 l_sources = [ 'backend/Tensor.cpp',
+              'backend/UnaryLoops.cpp',
+              'backend/UnaryLoopsSimple.cpp',
+              'backend/Unary.cpp',
+              'backend/UnaryScalar.cpp',
               'backend/ContractionLoops.cpp',
               'backend/ContractionLoopsSimple.cpp',
               'backend/BinaryContraction.cpp',
@@ -11,10 +15,13 @@ l_sources = [ 'backend/Tensor.cpp',
               'frontend/ResidualBlockDownSample.cpp' ]
 
 if g_env['libxsmm'] != False:
-  l_sources += [ 'backend/ContractionLoopsTpp.cpp',
+  l_sources += [ 'backend/UnaryLoopsTpp.cpp',
+                 'backend/UnaryTpp.cpp',
+                 'backend/ContractionLoopsTpp.cpp',
                  'backend/BinaryContractionTpp.cpp' ]
 
 l_tests = [ 'tests.cpp',
+            'backend/Unary.test.cpp',
             'backend/ContractionLoopsSimple.test.cpp',
             'backend/BinaryContraction.test.cpp',
             'frontend/EinsumExpression.test.cpp' ]
@@ -23,7 +30,8 @@ if g_env['libxsmm'] != False:
   l_tests += [ 'backend/BinaryContractionTpp.test.cpp' ]
 
 if g_env['libtorch'] != False:
-  l_tests += [ 'backend/Tensor.test.torch.cpp',
+  l_tests += [ 'backend/UnaryLoopsSimple.test.torch.cpp',
+               'backend/UnaryScalar.test.torch.cpp',
                'backend/BinaryContractionScalar.test.torch.cpp',
                'backend/EinsumNode.test.torch.cpp',
                'frontend/EinsumExpression.test.torch.cpp',
@@ -31,7 +39,8 @@ if g_env['libtorch'] != False:
                'frontend/ResidualBlockDownSample.test.torch.cpp' ]
 
 if g_env['libxsmm'] != False and g_env['libtorch'] != False:
-  l_tests += [ 'backend/BinaryContractionTpp.test.torch.cpp' ]
+  l_tests += [ 'backend/UnaryTpp.test.torch.cpp',
+               'backend/BinaryContractionTpp.test.torch.cpp' ]
 
 for l_source in l_sources:
   g_env.sources.append( g_env.Object( l_source ) )
@@ -41,6 +50,7 @@ for l_test in l_tests:
 g_env.tests.append( g_env.sources )
 
 if g_env['libxsmm'] != False and g_env['libtorch'] != False:
+  g_env.exe['bench_unary']      = g_env.Object( 'bench_unary.cpp' )
   g_env.exe['bench_binary']     = g_env.Object( 'bench_binary.cpp' )
   g_env.exe['bench_expression'] = g_env.Object( 'bench_expression.cpp' )
   g_env.exe['bench_mlp']        = g_env.Object( 'bench_mlp.cpp' )

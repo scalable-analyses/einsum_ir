@@ -147,6 +147,8 @@ SConscript( g_env['build_dir']+'/src/SConscript' )
 Import('g_env')
 
 if( g_env['libxsmm'] and g_env['libtorch'] ):
+  g_env.Program( g_env['build_dir']+'/bench_unary',
+                 source = g_env.sources + g_env.exe['bench_unary'] )
   g_env.Program( g_env['build_dir']+'/bench_binary',
                  source = g_env.sources + g_env.exe['bench_binary'] )
   g_env.Program( g_env['build_dir']+'/bench_expression',

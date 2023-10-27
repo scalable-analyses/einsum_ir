@@ -2,6 +2,7 @@
 #define EINSUM_IR_BACKEND_EINSUM_NODE
 
 #include <vector>
+#include "Unary.h"
 #include "BinaryContraction.h"
 #include "../constants.h"
 
@@ -72,6 +73,9 @@ class einsum_ir::backend::EinsumNode {
     int64_t m_offset_aux_bytes = 0;
     //! effective offset in bytes
     int64_t m_offset_bytes = 0;
+
+    //! unary operation
+    Unary * m_unary = nullptr;
 
     //! binary contraction
     BinaryContraction * m_cont = nullptr;
