@@ -31,6 +31,7 @@ jobs:
           git checkout feature_packed_gemm
           make BLAS=0 -j
           cd ..
+          export LIBXSMM_PATH=$(pwd)/libxsmm
 
       - name: Install einsum_ir
         run: |
@@ -38,4 +39,6 @@ jobs:
           git clone https://github.com/scalable-analyses/einsum_ir.git
           cd einsum_ir
           wget https://github.com/catchorg/Catch2/releases/download/v2.13.10/catch.hpp
-          scons mode=debug+san libtorch=${LIBTORCH_PATH} libxsmm=$(pwd)/../libxsmm
+          echo "using libxsmm path: ${LIBXSMM_PATH}"
+          echo "using libtorch path: ${LIBTORCH_PATH}"
+          scons mode=debug+san libtorch=${LIBTORCH_PATH} libxsmm=${LIBXSMM_PATH}
