@@ -53,7 +53,7 @@ void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
   m_num_bytes_scalar_right = i_num_bytes_scalar_right;
   m_num_bytes_scalar_out = i_num_bytes_scalar_out;
 
-  m_threading_num_loops = -1;
+  m_num_tasks_targeted = 1;
 
   m_threading_first_last_touch = false;
 
@@ -145,6 +145,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
 
   // add dummy data for non-existing loops such that the inner kernel is executed
   if( m_num_loops == 0 ) {
+    m_num_loops = 1;
     m_loop_dim_type.push_back(         dim_t::UNDEFINED_DIM );
     m_loop_first_last_touch.push_back( EVERY_ITER           );
     m_loop_sizes.push_back(            1                    );
@@ -162,48 +163,46 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
     m_loop_strides_out[l_lo]     *= m_num_bytes_scalar_out;
   }
 
+  // compile iteration spaces
+  err_t l_err = threading( m_num_tasks_targeted );
+  if( l_err != err_t::SUCCESS ) {
+    return err_t::COMPILATION_FAILED;
+  }
+
   m_compiled = true;
 
-  return einsum_ir::SUCCESS;
+  return err_t::SUCCESS;
 }
 
-void einsum_ir::backend::ContractionLoops::threading( int64_t i_num_tasks_target ) {
-  if( i_num_tasks_target < 2 ) {
-    m_threading_num_loops = -1;
-    return;
+einsum_ir::err_t einsum_ir::backend::ContractionLoops::threading( int64_t i_num_tasks ) {
+  m_num_tasks = i_num_tasks;
+
+  int64_t l_num_parallel = m_num_dims_c + m_num_dims_m + m_num_dims_n;
+  m_iter_spaces.init( m_num_loops,
+                      l_num_parallel,
+                      nullptr,
+                      m_loop_sizes.data(),
+                      m_num_tasks );
+  err_t l_err = m_iter_spaces.compile();
+  if( l_err != err_t::SUCCESS ) {
+    return err_t::COMPILATION_FAILED;
   }
 
-  m_threading_first_last_touch = false;
-  int64_t l_num_tasks = 1;
+  m_num_tasks = m_iter_spaces.num_tasks();
 
-  for( int64_t l_lo = 0; l_lo < m_num_loops; l_lo++ ) {
-    if(    m_threading_first_last_touch  == false
-        && m_loop_dim_type[l_lo]         != K
-        && m_loop_first_last_touch[l_lo] == NONE ) {
-      l_num_tasks *= m_loop_sizes[l_lo];
-      m_threading_num_loops = l_lo+1;
-    }
-    else if(    m_loop_dim_type[l_lo] != K
-             && l_lo                  <  2 ) {
-      m_threading_first_last_touch = true;
-      l_num_tasks *= m_loop_sizes[l_lo];
-      m_threading_num_loops = l_lo+1;
-    }
-    else {
-      break;
-    }
-
-    if( l_num_tasks >= i_num_tasks_target ) {
-      break;
-    }
-  }
+  return err_t::SUCCESS;
 }
 
-void einsum_ir::backend::ContractionLoops::contract_iter( int64_t         i_id_loop,
+void einsum_ir::backend::ContractionLoops::contract_iter( int64_t         i_id_task,
+                                                          int64_t         i_id_loop,
                                                           void    const * i_ptr_left,
                                                           void    const * i_ptr_right,
                                                           void    const * i_ptr_out_aux,
                                                           void          * i_ptr_out ) {
+  // derive first element and number of iterations
+  int64_t l_first = m_iter_spaces.firsts(i_id_task)[ i_id_loop ];
+  int64_t l_size  = m_iter_spaces.sizes(i_id_task)[  i_id_loop ];
+
   // execute first touch kernel
   if( m_loop_first_last_touch[i_id_loop] == BEFORE_AFTER_ITER ) {
     kernel_first_touch( i_ptr_out_aux,
@@ -211,7 +210,7 @@ void einsum_ir::backend::ContractionLoops::contract_iter( int64_t         i_id_l
   }
 
   // issue loop iterations
-  for( int64_t l_it = 0; l_it < m_loop_sizes[i_id_loop]; l_it++ ) {
+  for( int64_t l_it = l_first; l_it < l_first+l_size; l_it++ ) {
     char * l_ptr_left    = (char *) i_ptr_left;
     char * l_ptr_right   = (char *) i_ptr_right;
     char * l_ptr_out_aux = (char *) i_ptr_out_aux;
@@ -228,7 +227,8 @@ void einsum_ir::backend::ContractionLoops::contract_iter( int64_t         i_id_l
     }
 
     if( i_id_loop + 1 < m_num_loops ) {
-      contract_iter( i_id_loop+1,
+      contract_iter( i_id_task,
+                     i_id_loop+1,
                      l_ptr_left,
                      l_ptr_right,
                      l_ptr_out_aux,
@@ -251,325 +251,6 @@ void einsum_ir::backend::ContractionLoops::contract_iter( int64_t         i_id_l
   if( m_loop_first_last_touch[i_id_loop] == BEFORE_AFTER_ITER ) {
     kernel_last_touch( i_ptr_out_aux,
                        i_ptr_out );
-  }
-}
-
-void einsum_ir::backend::ContractionLoops::contract_iter_parallel_touch_1( int64_t         i_id_loop,
-                                                                           void    const * i_ptr_left,
-                                                                           void    const * i_ptr_right,
-                                                                           void    const * i_ptr_out_aux,
-                                                                           void          * i_ptr_out ) {
-  // execute first touch kernel
-  if( m_loop_first_last_touch[i_id_loop] == BEFORE_AFTER_ITER ) {
-    kernel_first_touch( i_ptr_out_aux,
-                        i_ptr_out );
-  }
-
-  // issue loop iterations
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for( int64_t l_it = 0; l_it < m_loop_sizes[i_id_loop]; l_it++ ) {
-    char * l_ptr_left    = (char *) i_ptr_left;
-    char * l_ptr_right   = (char *) i_ptr_right;
-    char * l_ptr_out_aux = (char *) i_ptr_out_aux;
-    char * l_ptr_out     = (char *) i_ptr_out;
-
-    l_ptr_left    += l_it * m_loop_strides_left[    i_id_loop ];
-    l_ptr_right   += l_it * m_loop_strides_right[   i_id_loop ];
-    l_ptr_out_aux += l_it * m_loop_strides_out_aux[ i_id_loop ];
-    l_ptr_out     += l_it * m_loop_strides_out[     i_id_loop ];
-
-    if( m_loop_first_last_touch[i_id_loop] == EVERY_ITER ) {
-      kernel_first_touch( l_ptr_out_aux,
-                          l_ptr_out );
-    }
-
-    if( i_id_loop + 1 < m_num_loops ) {
-      contract_iter( i_id_loop+1,
-                     l_ptr_left,
-                     l_ptr_right,
-                     l_ptr_out_aux,
-                     l_ptr_out );
-    }
-    else {
-      // execute main kernel
-      kernel_main( l_ptr_left,
-                   l_ptr_right,
-                   l_ptr_out );
-    }
-
-    if( m_loop_first_last_touch[i_id_loop] == EVERY_ITER ) {
-      kernel_last_touch( l_ptr_out_aux,
-                         l_ptr_out );
-    }
-  }
-
-  // execute last touch kernel
-  if( m_loop_first_last_touch[i_id_loop] == BEFORE_AFTER_ITER ) {
-    kernel_last_touch( i_ptr_out_aux,
-                       i_ptr_out );
-  }
-}
-
-void einsum_ir::backend::ContractionLoops::contract_iter_parallel_touch_2( int64_t         i_id_loop,
-                                                                           void    const * i_ptr_left,
-                                                                           void    const * i_ptr_right,
-                                                                           void    const * i_ptr_out_aux,
-                                                                           void          * i_ptr_out ) {
-  // execute first touch kernel
-  if( m_loop_first_last_touch[i_id_loop] == BEFORE_AFTER_ITER ) {
-    kernel_first_touch( i_ptr_out_aux,
-                        i_ptr_out );
-  }
-
-#ifdef _OPENMP
-#pragma omp parallel for collapse(2)
-#endif
-  // issue loop iterations
-  for( int64_t l_it_0 = 0; l_it_0 < m_loop_sizes[i_id_loop]; l_it_0++ ) {
-    for( int64_t l_it_1 = 0; l_it_1 < m_loop_sizes[i_id_loop+1]; l_it_1++ ) {
-      char * l_ptr_left_0    = (char *) i_ptr_left;
-      char * l_ptr_right_0   = (char *) i_ptr_right;
-      char * l_ptr_out_aux_0 = (char *) i_ptr_out_aux;
-      char * l_ptr_out_0     = (char *) i_ptr_out;
-
-      l_ptr_left_0    += l_it_0 * m_loop_strides_left[    i_id_loop ];
-      l_ptr_right_0   += l_it_0 * m_loop_strides_right[   i_id_loop ];
-      l_ptr_out_aux_0 += l_it_0 * m_loop_strides_out_aux[ i_id_loop ];
-      l_ptr_out_0     += l_it_0 * m_loop_strides_out[     i_id_loop ];
-
-      if( m_loop_first_last_touch[i_id_loop] == EVERY_ITER ) {
-        kernel_first_touch( l_ptr_out_aux_0,
-                            l_ptr_out_0 );
-      }
-
-      char * l_ptr_left_1    = l_ptr_left_0    + l_it_1 * m_loop_strides_left[    i_id_loop+1 ];
-      char * l_ptr_right_1   = l_ptr_right_0   + l_it_1 * m_loop_strides_right[   i_id_loop+1 ];
-      char * l_ptr_out_aux_1 = l_ptr_out_aux_0 + l_it_1 * m_loop_strides_out_aux[ i_id_loop+1 ];
-      char * l_ptr_out_1     = l_ptr_out_0     + l_it_1 * m_loop_strides_out[     i_id_loop+1 ];
-
-      if( m_loop_first_last_touch[i_id_loop+1] == EVERY_ITER ) {
-        kernel_first_touch( l_ptr_out_aux_1,
-                            l_ptr_out_1 );
-      }
-
-      if( i_id_loop + 2 < m_num_loops ) {
-        contract_iter( i_id_loop+2,
-                       l_ptr_left_1,
-                       l_ptr_right_1,
-                       l_ptr_out_aux_1,
-                       l_ptr_out_1 );
-      }
-      else {
-        // execute main kernel
-        kernel_main( l_ptr_left_1,
-                     l_ptr_right_1,
-                     l_ptr_out_1 );
-      }
-
-      if( m_loop_first_last_touch[i_id_loop] == EVERY_ITER ) {
-        kernel_last_touch( l_ptr_out_aux_0,
-                           l_ptr_out_0 );
-      }
-
-      if( m_loop_first_last_touch[i_id_loop+1] == EVERY_ITER ) {
-        kernel_last_touch( l_ptr_out_aux_1,
-                           l_ptr_out_1 );
-      }
-    }
-  }
-
-  // execute last touch kernel
-  if( m_loop_first_last_touch[i_id_loop] == BEFORE_AFTER_ITER ) {
-    kernel_last_touch( i_ptr_out_aux,
-                       i_ptr_out );
-  }
-}
-
-void einsum_ir::backend::ContractionLoops::contract_iter_parallel_1( int64_t         i_id_loop,
-                                                                     void    const * i_ptr_left,
-                                                                     void    const * i_ptr_right,
-                                                                     void    const * i_ptr_out_aux,
-                                                                     void          * i_ptr_out ) {
-  // issue loop iterations
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for( int64_t l_it = 0; l_it < m_loop_sizes[i_id_loop]; l_it++ ) {
-    char * l_ptr_left    = (char *) i_ptr_left;
-    char * l_ptr_right   = (char *) i_ptr_right;
-    char * l_ptr_out_aux = (char *) i_ptr_out_aux;
-    char * l_ptr_out     = (char *) i_ptr_out;
-
-    l_ptr_left    += l_it * m_loop_strides_left[    i_id_loop ];
-    l_ptr_right   += l_it * m_loop_strides_right[   i_id_loop ];
-    l_ptr_out_aux += l_it * m_loop_strides_out_aux[ i_id_loop ];
-    l_ptr_out     += l_it * m_loop_strides_out[     i_id_loop ];
-
-    if( i_id_loop + 1 < m_num_loops ) {
-      contract_iter( i_id_loop+1,
-                     l_ptr_left,
-                     l_ptr_right,
-                     l_ptr_out_aux,
-                     l_ptr_out );
-    }
-    else {
-      // execute main kernel
-      kernel_main( l_ptr_left,
-                   l_ptr_right,
-                   l_ptr_out );
-    }
-  }
-}
-
-void einsum_ir::backend::ContractionLoops::contract_iter_parallel_2( int64_t         i_id_loop,
-                                                                     void    const * i_ptr_left,
-                                                                     void    const * i_ptr_right,
-                                                                     void    const * i_ptr_out_aux,
-                                                                     void          * i_ptr_out ) {
-#ifdef _OPENMP
-#pragma omp parallel for collapse(2)
-#endif
-  // issue loop iterations
-  for( int64_t l_it_0 = 0; l_it_0 < m_loop_sizes[i_id_loop]; l_it_0++ ) {
-    for( int64_t l_it_1 = 0; l_it_1 < m_loop_sizes[i_id_loop+1]; l_it_1++ ) {
-      char * l_ptr_left    = (char *) i_ptr_left;
-      char * l_ptr_right   = (char *) i_ptr_right;
-      char * l_ptr_out_aux = (char *) i_ptr_out_aux;
-      char * l_ptr_out     = (char *) i_ptr_out;
-
-      l_ptr_left    += l_it_0 * m_loop_strides_left[    i_id_loop   ];
-      l_ptr_right   += l_it_0 * m_loop_strides_right[   i_id_loop   ];
-      l_ptr_out_aux += l_it_0 * m_loop_strides_out_aux[ i_id_loop   ];
-      l_ptr_out     += l_it_0 * m_loop_strides_out[     i_id_loop   ];
-
-      l_ptr_left    += l_it_1 * m_loop_strides_left[    i_id_loop+1 ];
-      l_ptr_right   += l_it_1 * m_loop_strides_right[   i_id_loop+1 ];
-      l_ptr_out_aux += l_it_1 * m_loop_strides_out_aux[ i_id_loop+1 ];
-      l_ptr_out     += l_it_1 * m_loop_strides_out[     i_id_loop+1 ];
-
-      if( i_id_loop + 2 < m_num_loops ) {
-        contract_iter( i_id_loop+2,
-                       l_ptr_left,
-                       l_ptr_right,
-                       l_ptr_out_aux,
-                       l_ptr_out );
-      }
-      else {
-        // execute main kernel
-        kernel_main( l_ptr_left,
-                     l_ptr_right,
-                     l_ptr_out );
-      }
-    }
-  }
-}
-
-void einsum_ir::backend::ContractionLoops::contract_iter_parallel_3( int64_t         i_id_loop,
-                                                                     void    const * i_ptr_left,
-                                                                     void    const * i_ptr_right,
-                                                                     void    const * i_ptr_out_aux,
-                                                                     void          * i_ptr_out ) {
-#ifdef _OPENMP
-#pragma omp parallel for collapse(3)
-#endif
-  // issue loop iterations
-  for( int64_t l_it_0 = 0; l_it_0 < m_loop_sizes[i_id_loop]; l_it_0++ ) {
-    for( int64_t l_it_1 = 0; l_it_1 < m_loop_sizes[i_id_loop+1]; l_it_1++ ) {
-      for( int64_t l_it_2 = 0; l_it_2 < m_loop_sizes[i_id_loop+2]; l_it_2++ ) {
-        char * l_ptr_left    = (char *) i_ptr_left;
-        char * l_ptr_right   = (char *) i_ptr_right;
-        char * l_ptr_out_aux = (char *) i_ptr_out_aux;
-        char * l_ptr_out     = (char *) i_ptr_out;
-
-        l_ptr_left    += l_it_0 * m_loop_strides_left[    i_id_loop   ];
-        l_ptr_right   += l_it_0 * m_loop_strides_right[   i_id_loop   ];
-        l_ptr_out_aux += l_it_0 * m_loop_strides_out_aux[ i_id_loop   ];
-        l_ptr_out     += l_it_0 * m_loop_strides_out[     i_id_loop   ];
-
-        l_ptr_left    += l_it_1 * m_loop_strides_left[    i_id_loop+1 ];
-        l_ptr_right   += l_it_1 * m_loop_strides_right[   i_id_loop+1 ];
-        l_ptr_out_aux += l_it_1 * m_loop_strides_out_aux[ i_id_loop+1 ];
-        l_ptr_out     += l_it_1 * m_loop_strides_out[     i_id_loop+1 ];
-
-        l_ptr_left    += l_it_2 * m_loop_strides_left[    i_id_loop+2 ];
-        l_ptr_right   += l_it_2 * m_loop_strides_right[   i_id_loop+2 ];
-        l_ptr_out_aux += l_it_2 * m_loop_strides_out_aux[ i_id_loop+2 ];
-        l_ptr_out     += l_it_2 * m_loop_strides_out[     i_id_loop+2 ];
-
-        if( i_id_loop + 3 < m_num_loops ) {
-          contract_iter( i_id_loop+3,
-                        l_ptr_left,
-                        l_ptr_right,
-                        l_ptr_out_aux,
-                        l_ptr_out );
-        }
-        else {
-          // execute main kernel
-          kernel_main( l_ptr_left,
-                       l_ptr_right,
-                       l_ptr_out );
-        }
-      }
-    }
-  }
-}
-
-void einsum_ir::backend::ContractionLoops::contract_iter_parallel_4( int64_t         i_id_loop,
-                                                                     void    const * i_ptr_left,
-                                                                     void    const * i_ptr_right,
-                                                                     void    const * i_ptr_out_aux,
-                                                                     void          * i_ptr_out ) {
-#ifdef _OPENMP
-#pragma omp parallel for collapse(4)
-#endif
-  // issue loop iterations
-  for( int64_t l_it_0 = 0; l_it_0 < m_loop_sizes[i_id_loop]; l_it_0++ ) {
-    for( int64_t l_it_1 = 0; l_it_1 < m_loop_sizes[i_id_loop+1]; l_it_1++ ) {
-      for( int64_t l_it_2 = 0; l_it_2 < m_loop_sizes[i_id_loop+2]; l_it_2++ ) {
-        for( int64_t l_it_3 = 0; l_it_3 < m_loop_sizes[i_id_loop+3]; l_it_3++ ) {
-          char * l_ptr_left    = (char *) i_ptr_left;
-          char * l_ptr_right   = (char *) i_ptr_right;
-          char * l_ptr_out_aux = (char *) i_ptr_out_aux;
-          char * l_ptr_out     = (char *) i_ptr_out;
-
-          l_ptr_left    += l_it_0 * m_loop_strides_left[    i_id_loop   ];
-          l_ptr_right   += l_it_0 * m_loop_strides_right[   i_id_loop   ];
-          l_ptr_out_aux += l_it_0 * m_loop_strides_out_aux[ i_id_loop   ];
-          l_ptr_out     += l_it_0 * m_loop_strides_out[     i_id_loop   ];
-
-          l_ptr_left    += l_it_1 * m_loop_strides_left[    i_id_loop+1 ];
-          l_ptr_right   += l_it_1 * m_loop_strides_right[   i_id_loop+1 ];
-          l_ptr_out_aux += l_it_1 * m_loop_strides_out_aux[ i_id_loop+1 ];
-          l_ptr_out     += l_it_1 * m_loop_strides_out[     i_id_loop+1 ];
-
-          l_ptr_left    += l_it_2 * m_loop_strides_left[    i_id_loop+2 ];
-          l_ptr_right   += l_it_2 * m_loop_strides_right[   i_id_loop+2 ];
-          l_ptr_out_aux += l_it_2 * m_loop_strides_out_aux[ i_id_loop+2 ];
-          l_ptr_out     += l_it_2 * m_loop_strides_out[     i_id_loop+2 ];
-
-          l_ptr_left    += l_it_3 * m_loop_strides_left[    i_id_loop+3 ];
-          l_ptr_right   += l_it_3 * m_loop_strides_right[   i_id_loop+3 ];
-          l_ptr_out_aux += l_it_3 * m_loop_strides_out_aux[ i_id_loop+3 ];
-          l_ptr_out     += l_it_3 * m_loop_strides_out[     i_id_loop+3 ];
-
-          if( i_id_loop + 4 < m_num_loops ) {
-            contract_iter( i_id_loop+4,
-                          l_ptr_left,
-                          l_ptr_right,
-                          l_ptr_out_aux,
-                          l_ptr_out );
-          }
-          else {
-            // execute main kernel
-            kernel_main( l_ptr_left,
-                         l_ptr_right,
-                         l_ptr_out );
-          }
-        }
-      }
-    }
   }
 }
 
@@ -577,59 +258,15 @@ void einsum_ir::backend::ContractionLoops::contract( void const * i_tensor_left,
                                                      void const * i_tensor_right,
                                                      void const * i_tensor_out_aux,
                                                      void       * io_tensor_out ) {
-  if( m_threading_num_loops < 1 ) {
-    contract_iter( 0,
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for( int64_t l_ta = 0; l_ta < m_num_tasks; l_ta++ ) {
+    contract_iter( l_ta,
+                   0,
                    i_tensor_left,
                    i_tensor_right,
                    i_tensor_out_aux,
                    io_tensor_out );
-  }
-  else {
-    if( m_threading_num_loops == 1 ) {
-      if( m_threading_first_last_touch ) {
-        contract_iter_parallel_touch_1( 0,
-                                        i_tensor_left,
-                                        i_tensor_right,
-                                        i_tensor_out_aux,
-                                        io_tensor_out );
-      }
-      else {
-        contract_iter_parallel_1( 0,
-                                  i_tensor_left,
-                                  i_tensor_right,
-                                  i_tensor_out_aux,
-                                  io_tensor_out );
-      }
-    }
-    else if( m_threading_num_loops == 2 ) {
-      if( m_threading_first_last_touch ) {
-        contract_iter_parallel_touch_2( 0,
-                                        i_tensor_left,
-                                        i_tensor_right,
-                                        i_tensor_out_aux,
-                                        io_tensor_out );
-      }
-      else {
-        contract_iter_parallel_2( 0,
-                                  i_tensor_left,
-                                  i_tensor_right,
-                                  i_tensor_out_aux,
-                                  io_tensor_out );
-      }
-    }
-    else if( m_threading_num_loops == 3 ) {
-      contract_iter_parallel_3( 0,
-                                i_tensor_left,
-                                i_tensor_right,
-                                i_tensor_out_aux,
-                                io_tensor_out );
-    }
-    else {
-      contract_iter_parallel_4( 0,
-                                i_tensor_left,
-                                i_tensor_right,
-                                i_tensor_out_aux,
-                                io_tensor_out );
-    }
   }
 }

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 #include "../constants.h"
+#include "IterationSpaces.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -66,6 +67,15 @@ class einsum_ir::backend::ContractionLoops {
     //! number of bytes for a scalar of the output tensor
     int64_t m_num_bytes_scalar_out = 0;
 
+    //! number of targeted tasks
+    int64_t m_num_tasks_targeted = 0;
+
+    //! number of tasks
+    int64_t m_num_tasks = 0;
+
+    //! iteration spaces
+    IterationSpaces m_iter_spaces;
+
     //! number of loops used for threading
     int64_t m_threading_num_loops = -1;
     //! true if the threading loops have to take care of fist/last touch ops
@@ -82,7 +92,7 @@ class einsum_ir::backend::ContractionLoops {
       EVERY_ITER = 2
     } touch_t;
 
-    //! number of loos
+    //! number of loops
     int64_t m_num_loops = -1;
     //! first/last touch type of the loops
     std::vector< touch_t > m_loop_first_last_touch;
@@ -201,122 +211,27 @@ class einsum_ir::backend::ContractionLoops {
      * Parallelizes all loops such that the targeted number of tasks is reached or
      * all parallelizable loop dimensions have been exhausted.
      *
-     * @param i_num_tasks_target number of targeted tasks. 
+     * @param i_num_tasks number of tasks.
      **/
-    void threading( int64_t i_num_tasks_target );
+    err_t threading( int64_t i_num_tasks );
 
     /**
      * General purpose loop implementation featuring first and last touch operations.
      * No threading is applied.
      *
+     * @param i_id_task task id which is executing the loop.
      * @param i_id_loop dimension id of the loop which is executed.
      * @param i_ptr_left pointer to the left tensor's data.
      * @param i_ptr_right pointer to the right tensor's data.
      * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
      * @param i_ptr_out pointer to the output tensor's data.
      **/
-    void contract_iter( int64_t         i_id_loop,
+    void contract_iter( int64_t         i_id_task,
+                        int64_t         i_id_loop,
                         void    const * i_ptr_left,
                         void    const * i_ptr_right,
                         void    const * i_ptr_out_aux,
                         void          * i_ptr_out );
-
-    /**
-     * Threaded loop implementation featuring first and last touch operation.
-     * The outermost loop is parallelized, then contact_iter is called.
-     *
-     * @param i_id_loop dimension id of the loop which is executed.
-     * @param i_ptr_left pointer to the left tensor's data.
-     * @param i_ptr_right pointer to the right tensor's data.
-     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
-     * @param i_ptr_out pointer to the output tensor's data.
-     **/
-    void contract_iter_parallel_touch_1( int64_t         i_id_loop,
-                                         void    const * i_ptr_left,
-                                         void    const * i_ptr_right,
-                                         void    const * i_ptr_out_aux,
-                                         void          * i_ptr_out );
-
-    /**
-     * Threaded loop implementation featuring first and last touch operation.
-     * The 2x outermost loops are parallelized (collapsed), then contact_iter is called.
-     * BEFORE_AFTER_ITER fist/last touch is only support w.r.t. the outermost loop.
-     *
-     * @param i_id_loop dimension id of the loop which is executed.
-     * @param i_ptr_left pointer to the left tensor's data.
-     * @param i_ptr_right pointer to the right tensor's data.
-     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
-     * @param i_ptr_out pointer to the output tensor's data.
-     **/
-    void contract_iter_parallel_touch_2( int64_t         i_id_loop,
-                                         void    const * i_ptr_left,
-                                         void    const * i_ptr_right,
-                                         void    const * i_ptr_out_aux,
-                                         void          * i_ptr_out );
-
-    /**
-     * Threaded loop implementation without first/last touch support.
-     * The outermost loop is parallelized, then contact_iter is called.
-     *
-     * @param i_id_loop dimension id of the loop which is executed.
-     * @param i_ptr_left pointer to the left tensor's data.
-     * @param i_ptr_right pointer to the right tensor's data.
-     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
-     * @param i_ptr_out pointer to the output tensor's data.
-     **/
-    void contract_iter_parallel_1( int64_t         i_id_loop,
-                                   void    const * i_ptr_left,
-                                   void    const * i_ptr_right,
-                                   void    const * i_ptr_out_aux,
-                                   void          * i_ptr_out );
-
-    /**
-     * Threaded loop implementation without first/last touch support.
-     * The 2x outermost loops are parallelized, then contact_iter is called.
-     *
-     * @param i_id_loop dimension id of the loop which is executed.
-     * @param i_ptr_left pointer to the left tensor's data.
-     * @param i_ptr_right pointer to the right tensor's data.
-     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
-     * @param i_ptr_out pointer to the output tensor's data.
-     **/
-    void contract_iter_parallel_2( int64_t         i_id_loop,
-                                   void    const * i_ptr_left,
-                                   void    const * i_ptr_right,
-                                   void    const * i_ptr_out_aux,
-                                   void          * i_ptr_out );
-
-    /**
-     * Threaded loop implementation without first/last touch support.
-     * The 3x outermost loops are parallelized, then contact_iter is called.
-     *
-     * @param i_id_loop dimension id of the loop which is executed.
-     * @param i_ptr_left pointer to the left tensor's data.
-     * @param i_ptr_right pointer to the right tensor's data.
-     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
-     * @param i_ptr_out pointer to the output tensor's data.
-     **/
-    void contract_iter_parallel_3( int64_t         i_id_loop,
-                                   void    const * i_ptr_left,
-                                   void    const * i_ptr_right,
-                                   void    const * i_ptr_out_aux,
-                                   void          * i_ptr_out );
-
-    /**
-     * Threaded loop implementation without first/last touch support.
-     * The 4x outermost loops are parallelized, then contact_iter is called.
-     *
-     * @param i_id_loop dimension id of the loop which is executed.
-     * @param i_ptr_left pointer to the left tensor's data.
-     * @param i_ptr_right pointer to the right tensor's data.
-     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
-     * @param i_ptr_out pointer to the output tensor's data.
-     **/
-    void contract_iter_parallel_4( int64_t         i_id_loop,
-                                   void    const * i_ptr_left,
-                                   void    const * i_ptr_right,
-                                   void    const * i_ptr_out_aux,
-                                   void          * i_ptr_out );
 
     /**
      * Contracts the two tensors.

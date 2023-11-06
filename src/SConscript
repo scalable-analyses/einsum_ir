@@ -1,6 +1,7 @@
 Import('g_env')
 
 l_sources = [ 'backend/Tensor.cpp',
+              'backend/IterationSpaces.cpp',
               'backend/UnaryLoops.cpp',
               'backend/UnaryLoopsSimple.cpp',
               'backend/Unary.cpp',
@@ -21,6 +22,7 @@ if g_env['libxsmm'] != False:
                  'backend/BinaryContractionTpp.cpp' ]
 
 l_tests = [ 'tests.cpp',
+            'backend/IterationSpaces.test.cpp',
             'backend/Unary.test.cpp',
             'backend/ContractionLoopsSimple.test.cpp',
             'backend/BinaryContraction.test.cpp',
