@@ -76,8 +76,6 @@ class einsum_ir::backend::ContractionLoops {
     //! iteration spaces
     IterationSpaces m_iter_spaces;
 
-    //! number of loops used for threading
-    int64_t m_threading_num_loops = -1;
     //! true if the threading loops have to take care of fist/last touch ops
     bool m_threading_first_last_touch = false;
 
