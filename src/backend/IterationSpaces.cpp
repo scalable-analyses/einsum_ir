@@ -45,12 +45,6 @@ einsum_ir::err_t einsum_ir::backend::IterationSpaces::compile() {
     }
   }
 
-  m_hooks.resize( m_num_loops );
-  for( int64_t l_lo = 0; l_lo < m_num_loops; l_lo++ ) {
-    m_hooks[l_lo].secondary = -1;
-    m_hooks[l_lo].func = nullptr;
-  }
-
   // increase innermost chunk size if possible
   int64_t l_chunk_size = 1;
   int64_t l_prime[5] = { 2, 3, 5, 7, 11 }; // limited prime factorization
@@ -146,49 +140,6 @@ einsum_ir::err_t einsum_ir::backend::IterationSpaces::compile() {
 
   m_compiled = true;
   return err_t::SUCCESS;
-}
-
-einsum_ir::err_t einsum_ir::backend::IterationSpaces::init_dim_hook( int64_t i_primary_loop,
-                                                                     int64_t i_secondary_loop,
-                                                                     void (* i_func)( int64_t const   i_primary_first_global,
-                                                                                      int64_t const   i_primary_size_global,
-                                                                                      int64_t const   i_primary_iter,
-                                                                                      int64_t const   i_secondary_first_global,
-                                                                                      int64_t const   i_secondary_size_global,
-                                                                                      int64_t       * o_secondary_first,
-                                                                                      int64_t       * o_secondary_size ) ) {
-  // hook only allowed to determine iters in thread-local sequential part
-  if( i_secondary_loop < m_num_parallel ) {
-    return err_t::COMPILATION_FAILED;
-  }
-
-  m_hooks[i_primary_loop].secondary = i_secondary_loop;
-  m_hooks[i_primary_loop].func      = i_func;
-
-  return err_t::SUCCESS;
-}
-
-void einsum_ir::backend::IterationSpaces::eval_dim_hook( int64_t i_task,
-                                                         int64_t i_primary_loop,
-                                                         int64_t i_primary_iter ) {
-  int64_t l_primary_first_global   = m_global_space.firsts[ i_primary_loop ];
-  int64_t l_primary_size_global    = m_global_space.sizes[  i_primary_loop ];
-
-  int64_t l_secondary_loop         = m_hooks[ i_primary_loop ].secondary;
-
-  int64_t l_secondary_first_global = m_global_space.firsts[ l_secondary_loop ];
-  int64_t l_secondary_sizes_global = m_global_space.sizes[  l_secondary_loop ];
-
-  int64_t * l_secondary_first_ptr  = &m_thread_local_spaces[ i_task ].firsts[ l_secondary_loop ];
-  int64_t * l_secondary_size_ptr   = &m_thread_local_spaces[ i_task ].sizes[  l_secondary_loop ];
-
-  m_hooks[ i_primary_loop ].func( l_primary_first_global,
-                                  l_primary_size_global,
-                                  i_primary_iter,
-                                  l_secondary_first_global,
-                                  l_secondary_sizes_global,
-                                  l_secondary_first_ptr,
-                                  l_secondary_size_ptr );
 }
 
 int64_t einsum_ir::backend::IterationSpaces::num_collapsed() {

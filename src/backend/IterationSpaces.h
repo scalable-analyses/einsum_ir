@@ -43,25 +43,6 @@ class einsum_ir::backend::IterationSpaces {
     //! thread-local iteration spaces
     std::vector< IterSpace > m_thread_local_spaces;
 
-    /**
-     * Dimension hook. 
-     **/
-    typedef struct {
-      //! secondary loop dimension
-      int64_t secondary;
-      //! hook function
-      void (* func)( int64_t const   i_primary_first,
-                     int64_t const   i_primary_size,
-                     int64_t const   i_primary_iter,
-                     int64_t const   i_secondary_first,
-                     int64_t const   i_secondary_size,
-                     int64_t       * o_secondary_first,
-                     int64_t       * o_secondary_size );
-    } Hook;
-
-    //! dimension hooks
-    std::vector< Hook > m_hooks;
-
     //! true if the iteration spaces interface was compiled
     bool m_compiled = false;
 
@@ -87,34 +68,6 @@ class einsum_ir::backend::IterationSpaces {
      * @return SUCCESS if the compilation was successful, otherwise an appropiate error code.
      **/
     err_t compile();
-
-    /**
-     * Initializes a dimension hook.
-     *
-     * @param i_primary_loop primary loop dimension.
-     * @param i_secondary_loop secondary loop dimension.
-     * @param i_hook hook which derives the secondary loop's first element and size based on the primary dimension.
-     **/
-    err_t init_dim_hook( int64_t i_primary_loop,
-                         int64_t i_secondary_loop,
-                         void (* i_func)( int64_t const   i_primary_first_global,
-                                          int64_t const   i_primary_size_global,
-                                          int64_t const   i_primary_iter,
-                                          int64_t const   i_secondary_first_global,
-                                          int64_t const   i_secondary_size_global,
-                                          int64_t       * o_secondary_first,
-                                          int64_t       * o_secondary_size  ) );
-
-    /**
-     * Evaluates a dimension hook.
-     *
-     * @param i_task task which executes the hook.
-     * @param i_primary_loop id of the primary loop.
-     * @param i_primary_iter current iteration id of the primary loop.
-     **/
-    void eval_dim_hook( int64_t i_task,
-                        int64_t i_primary_loop,
-                        int64_t i_primary_iter );
 
     /**
      * Gets the number of collapsed loops.
