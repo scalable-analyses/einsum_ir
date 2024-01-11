@@ -30,7 +30,6 @@ jobs:
         run: |
           git clone https://github.com/libxsmm/libxsmm.git
           cd libxsmm
-          git checkout feature_packed_gemm
           make BLAS=0 -j
           cd ..
           echo LIBXSMM_PATH=$(pwd)/libxsmm >> $GITHUB_ENV
