@@ -563,7 +563,7 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions using FP64, ze
   REQUIRE( at::allclose( l_out_ordered, l_out_ref )  );
 }
 
-TEST_CASE( "1D convolution with single input and output feature.", "[binary_contraction_scalar_conv1d]" ) {
+TEST_CASE( "1D convolution with single input and output feature.", "[binary_contraction_scalar]" ) {
   // Test Case:
   //
   //    ____a____
@@ -626,7 +626,7 @@ TEST_CASE( "1D convolution with single input and output feature.", "[binary_cont
   REQUIRE( at::allclose( l_out, l_out_ref )  );
 }
 
-TEST_CASE( "2D convolution with a single input and output feature.", "[binary_contraction_scalar_conv2d]" ) {
+TEST_CASE( "2D convolution with a single input and output feature.", "[binary_contraction_scalar]" ) {
   // Test Case:
   //
   //    ____ab____
@@ -702,7 +702,7 @@ TEST_CASE( "2D convolution with a single input and output feature.", "[binary_co
   REQUIRE( at::allclose( l_out, l_out_ref )  );
 }
 
-TEST_CASE( "2D convolution with multiple input and output features.", "[binary_contraction_scalar_conv2d]" ) {
+TEST_CASE( "2D convolution with multiple input and output features.", "[binary_contraction_scalar]" ) {
   // Test Case:
   //
   //    ____fab____
@@ -784,7 +784,7 @@ TEST_CASE( "2D convolution with multiple input and output features.", "[binary_c
   REQUIRE( at::allclose( l_out, l_out_ref )  );
 }
 
-TEST_CASE( "2D Convolution with multiple input and output features, weights left.", "[binary_contraction_scalar_conv2d]" ) {
+TEST_CASE( "2D Convolution with multiple input and output features, weights left.", "[binary_contraction_scalar]" ) {
   // Test Case:
   //
   //     ____fab____
@@ -866,7 +866,7 @@ TEST_CASE( "2D Convolution with multiple input and output features, weights left
   REQUIRE( at::allclose( l_out, l_out_ref )  );
 }
 
-TEST_CASE( "3D Convolution with single input and output feature.", "[binary_contraction_scalar_conv3d]" ) {
+TEST_CASE( "3D Convolution with single input and output feature.", "[binary_contraction_scalar]" ) {
   // Test Case:
   //
   //    ____abc____
@@ -949,7 +949,7 @@ TEST_CASE( "3D Convolution with single input and output feature.", "[binary_cont
   REQUIRE( at::allclose( l_out, l_out_ref )  );
 }
 
-TEST_CASE( "Strided 2D convolution with multiple input and output features, weights left.", "[binary_contraction_scalar_conv2d]" ) {
+TEST_CASE( "Strided 2D convolution with multiple input and output features, weights left.", "[binary_contraction_scalar]" ) {
   // Test Case:
   //
   //     ____fab____
