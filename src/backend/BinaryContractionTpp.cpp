@@ -372,6 +372,8 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
 
     // add to K dimensions
     m_num_dims_k++;
+    m_dim_ids_k.insert( m_dim_ids_k.begin() + l_num_k_loop_dims,
+                        m_dim_ids_i[l_di_i]) ;
     m_sizes_k.insert( m_sizes_k.begin() + l_num_k_loop_dims,
                       l_size_s );
     m_strides_left_k.insert( m_strides_left_k.begin() + l_num_k_loop_dims,
@@ -400,6 +402,8 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
 
     // add to K dimensions
     m_num_dims_k++;
+    m_dim_ids_k.insert( m_dim_ids_k.begin() + l_num_k_loop_dims,
+                        m_dim_ids_j[l_di_j]) ;
     m_sizes_k.insert( m_sizes_k.begin() + l_num_k_loop_dims,
                       l_size_s );
     m_strides_left_k.insert( m_strides_left_k.begin() + l_num_k_loop_dims,
