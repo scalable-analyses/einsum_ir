@@ -81,7 +81,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
 
   // add data of C dimensions
   for( int64_t l_di = 0; l_di < m_num_dims_c; l_di++ ) {
-    if( m_num_dims_k == 0 && m_num_dims_m == 0 && m_num_dims_n == 0 ) {
+    if( l_di == m_num_dims_c-1 && m_num_dims_k == 0 && m_num_dims_m == 0 && m_num_dims_n == 0 ) {
       m_loop_first_last_touch.push_back( EVERY_ITER );
     }
     else {
@@ -97,7 +97,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
 
   // add data of N dimensions
   for( int64_t l_di = 0; l_di < m_num_dims_n; l_di++ ) {
-    if( m_num_dims_k == 0 && m_num_dims_m == 0 ) {
+    if( l_di == m_num_dims_n-1 && m_num_dims_k == 0 && m_num_dims_m == 0 ) {
       m_loop_first_last_touch.push_back( EVERY_ITER );
     }
     else {
@@ -113,7 +113,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
 
   // add data of M dimensions
   for( int64_t l_di = 0; l_di < m_num_dims_m; l_di++ ) {
-    if( m_num_dims_k == 0 ) {
+    if( l_di == m_num_dims_m-1 && m_num_dims_k == 0 ) {
       m_loop_first_last_touch.push_back( EVERY_ITER );
     }
     else {
