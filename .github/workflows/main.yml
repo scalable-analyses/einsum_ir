@@ -15,6 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install OpenBLAS
+        run: |
+          sudo apt-get install libopenblas-dev
+
       - name: Install Python
         uses: actions/setup-python@v2
         with:
@@ -42,7 +46,7 @@ jobs:
           wget https://github.com/catchorg/Catch2/releases/download/v2.13.10/catch.hpp
           echo "using libxsmm path: ${LIBXSMM_PATH}"
           echo "using libtorch path: ${LIBTORCH_PATH}"
-          scons mode=debug+san libtorch=${LIBTORCH_PATH} libxsmm=${LIBXSMM_PATH}
+          scons mode=debug+san libtorch=${LIBTORCH_PATH} libxsmm=${LIBXSMM_PATH} blas=yes
           cd ..
 
       - name: Run unit tests
