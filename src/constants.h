@@ -36,6 +36,8 @@ namespace einsum_ir {
   typedef enum {
     FP32            = 0,
     FP64            = 1,
+    CFP32           = 2,
+    CFP64           = 3,
     UNDEFINED_DTYPE = 99
   } data_t;
 
@@ -50,9 +52,11 @@ namespace einsum_ir {
   } kernel_t;
 
   constexpr int64_t ce_n_bytes( data_t i_dtype ) {
-    if( i_dtype == FP32 ) return 4;
-    else if( i_dtype == FP64 ) return 8;
-    return -1;
+    if(      i_dtype == FP32 )  return 4;
+    else if( i_dtype == FP64 )  return 8;
+    else if( i_dtype == CFP32 ) return 8;
+    else if( i_dtype == CFP64 ) return 16;
+    else                        return -1;
   }
 }
 

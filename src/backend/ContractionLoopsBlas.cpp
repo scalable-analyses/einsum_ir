@@ -33,6 +33,22 @@ void einsum_ir::backend::ContractionLoopsBlas::kernel_zero_64( int64_t   i_m,
   }
 }
 
+void einsum_ir::backend::ContractionLoopsBlas::kernel_zero_128( int64_t   i_m,
+                                                                int64_t   i_n,
+                                                                int64_t   i_ld,
+                                                                void    * io_out ) {
+  double * l_out = (double *) io_out;
+
+  for( int64_t l_n = 0; l_n < i_n; l_n++ ) {
+#ifdef _OPENMP
+#pragma omp simd
+#endif
+    for( int64_t l_m = 0; l_m < i_m*2; l_m++ ) {
+      l_out[ l_n * i_ld * 2 + l_m ] = 0;
+    }
+  }
+}
+
 void einsum_ir::backend::ContractionLoopsBlas::kernel_trans_32( int64_t   i_m,
                                                                 int64_t   i_n,
                                                                 int64_t   i_ld_a,
@@ -66,6 +82,108 @@ void einsum_ir::backend::ContractionLoopsBlas::kernel_trans_64( int64_t   i_m,
                    i_ld_a,
                    i_ld_b );
 }
+
+void einsum_ir::backend::ContractionLoopsBlas::kernel_trans_128( int64_t   i_m,
+                                                                 int64_t   i_n,
+                                                                 int64_t   i_ld_a,
+                                                                 int64_t   i_ld_b,
+                                                                 void    * io_out ) {
+  double * l_out = (double *) io_out;
+  double l_alpha[2] = { 1.0, 0.0 };
+
+  cblas_zimatcopy( CblasColMajor,
+                   CblasTrans,
+                   i_m,
+                   i_n,
+                   l_alpha,
+                   l_out,
+                   i_ld_a,
+                   i_ld_b );
+}
+
+void einsum_ir::backend::ContractionLoopsBlas::kernel_gemm_fp32( void const * i_a,
+                                                                 void const * i_b,
+                                                                 void       * io_c ) {
+  cblas_sgemm( m_blas_row_major ? CblasRowMajor : CblasColMajor,
+               m_blas_trans_a ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
+               m_blas_trans_b ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
+               m_blas_size_m,
+               m_blas_size_n,
+               m_blas_size_k,
+               m_blas_alpha,
+               (const float *) i_a,
+               m_blas_ld_a,
+               (const float *) i_b,
+               m_blas_ld_b,
+               m_blas_beta,
+               (float *) io_c,
+               m_blas_ld_c );
+}
+
+void einsum_ir::backend::ContractionLoopsBlas::kernel_gemm_fp64( void const * i_a,
+                                                                 void const * i_b,
+                                                                 void       * io_c ) {
+  cblas_dgemm( m_blas_row_major ? CblasRowMajor : CblasColMajor,
+               m_blas_trans_a ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
+               m_blas_trans_b ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
+               m_blas_size_m,
+               m_blas_size_n,
+               m_blas_size_k,
+               m_blas_alpha,
+               (const double *) i_a,
+               m_blas_ld_a,
+               (const double *) i_b,
+               m_blas_ld_b,
+               m_blas_beta,
+               (double *) io_c,
+               m_blas_ld_c );
+}
+
+void einsum_ir::backend::ContractionLoopsBlas::kernel_gemm_cfp32( void const * i_a,
+                                                                  void const * i_b,
+                                                                  void       * io_c ) {
+  float l_blas_alpha[2] = { 0 };
+  l_blas_alpha[0] = m_blas_alpha;
+  float l_blas_beta[2]  = { 0 };
+  l_blas_beta[0] = m_blas_beta;
+
+  cblas_cgemm( m_blas_row_major ? CblasRowMajor : CblasColMajor,
+               m_blas_trans_a ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
+               m_blas_trans_b ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
+               m_blas_size_m,
+               m_blas_size_n,
+               m_blas_size_k,
+               l_blas_alpha,
+               (const float *) i_a,
+               m_blas_ld_a,
+               (const float *) i_b,
+               m_blas_ld_b,
+               l_blas_beta,
+               (float *) io_c,
+               m_blas_ld_c );
+}
+
+void einsum_ir::backend::ContractionLoopsBlas::kernel_gemm_cfp64( void const * i_a,
+                                                                  void const * i_b,
+                                                                  void       * io_c ) {
+  double l_blas_alpha[2] = { m_blas_alpha, 0.0 };
+  double l_blas_beta[2]  = { m_blas_beta,  0.0  };
+  cblas_zgemm( m_blas_row_major ? CblasRowMajor : CblasColMajor,
+               m_blas_trans_a ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
+               m_blas_trans_b ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
+               m_blas_size_m,
+               m_blas_size_n,
+               m_blas_size_k,
+               l_blas_alpha,
+               (const double *) i_a,
+               m_blas_ld_a,
+               (const double *) i_b,
+               m_blas_ld_b,
+               l_blas_beta,
+               (double *) io_c,
+               m_blas_ld_c );
+}
+
 void einsum_ir::backend::ContractionLoopsBlas::init( int64_t                              i_num_dims_c,
                                                      int64_t                              i_num_dims_m,
                                                      int64_t                              i_num_dims_n,
@@ -101,12 +219,8 @@ void einsum_ir::backend::ContractionLoopsBlas::init( int64_t                    
                                                      double                               i_blas_beta,
                                                      kernel_t                             i_ktype_first_touch,
                                                      kernel_t                             i_ktype_last_touch ) {
-  if( i_blas_dtype == FP32 ) {
-    m_num_bytes_scalar = 4;
-  }
-  else if( i_blas_dtype == FP64) {
-    m_num_bytes_scalar = 8;
-  }
+
+  m_num_bytes_scalar = ce_n_bytes( i_blas_dtype );
 
   ContractionLoops::init( i_num_dims_c,
                           i_num_dims_m,
@@ -153,17 +267,24 @@ void einsum_ir::backend::ContractionLoopsBlas::init( int64_t                    
 void einsum_ir::backend::ContractionLoopsBlas::kernel_first_touch( void const *,
                                                                    void       * io_out ) {
   if( m_ktype_first_touch == kernel_t::ZERO ) {
-    if( m_blas_dtype == FP32 ) {
+    if( m_blas_dtype == data_t::FP32 ) {
       kernel_zero_32( m_blas_size_m * m_blas_size_c,
                       m_blas_size_n,
                       m_blas_ld_c,
                       io_out );
     }
-    else {
+    else if(    m_blas_dtype == data_t::FP64
+             || m_blas_dtype == data_t::CFP32 ) {
       kernel_zero_64( m_blas_size_m * m_blas_size_c,
                       m_blas_size_n,
                       m_blas_ld_c,
                       io_out );
+    }
+    else {
+      kernel_zero_128( m_blas_size_m * m_blas_size_c,
+                       m_blas_size_n,
+                       m_blas_ld_c,
+                       io_out );
     }
   }
   // packed GEMM primitive without zeroing: n[...]mc -> n[...]cm
@@ -172,19 +293,27 @@ void einsum_ir::backend::ContractionLoopsBlas::kernel_first_touch( void const *,
     for( int64_t l_n = 0; l_n < m_blas_size_n; l_n++ ) {
       void * l_out = (char *) io_out + l_n * m_blas_ld_c * m_num_bytes_scalar;
 
-      if( m_blas_dtype == FP32 ) {
+      if( m_blas_dtype == data_t::FP32 ) {
         kernel_trans_32( m_blas_size_c,
                          m_blas_size_m,
                          m_blas_size_c,
                          m_blas_size_m,
                          l_out );
       }
-      else {
+      else if(    m_blas_dtype == data_t::FP64
+               || m_blas_dtype == data_t::CFP32 ) {
         kernel_trans_64( m_blas_size_c,
                          m_blas_size_m,
                          m_blas_size_c,
                          m_blas_size_m,
                          l_out );
+      }
+      else {
+        kernel_trans_128( m_blas_size_c,
+                          m_blas_size_m,
+                          m_blas_size_c,
+                          m_blas_size_m,
+                          l_out );
       }
     }
   }
@@ -210,36 +339,24 @@ void einsum_ir::backend::ContractionLoopsBlas::kernel_main( void const * i_left,
   // GEMM primitive
   if( m_blas_size_c == 1 ) {
     if( m_blas_dtype == data_t::FP32 ) {
-      cblas_sgemm( m_blas_row_major ? CblasRowMajor : CblasColMajor,
-                   m_blas_trans_a ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
-                   m_blas_trans_b ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
-                   m_blas_size_m,
-                   m_blas_size_n,
-                   m_blas_size_k,
-                   m_blas_alpha,
-                   (const float *) i_left,
-                   m_blas_ld_a,
-                   (const float *) i_right,
-                   m_blas_ld_b,
-                   m_blas_beta,
-                   (float *) io_out,
-                   m_blas_ld_c );
+      kernel_gemm_fp32( i_left,
+                        i_right,
+                        io_out );
+    }
+    else if( m_blas_dtype == data_t::FP64  ) {
+      kernel_gemm_fp64( i_left,
+                        i_right,
+                        io_out );
+    }
+    else if( m_blas_dtype == data_t::CFP32  ) {
+      kernel_gemm_cfp32( i_left,
+                         i_right,
+                         io_out );
     }
     else {
-      cblas_dgemm( m_blas_row_major ? CblasRowMajor : CblasColMajor,
-                   m_blas_trans_a ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
-                   m_blas_trans_b ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
-                   m_blas_size_m,
-                   m_blas_size_n,
-                   m_blas_size_k,
-                   m_blas_alpha,
-                   (const double *) i_left,
-                   m_blas_ld_a,
-                   (const double *) i_right,
-                   m_blas_ld_b,
-                   m_blas_beta,
-                   (double *) io_out,
-                   m_blas_ld_c );
+      kernel_gemm_cfp64( i_left,
+                         i_right,
+                         io_out );
     }
   }
   // packed GEMM primitive: ckm, cnk -> n[...]cm
@@ -252,36 +369,24 @@ void einsum_ir::backend::ContractionLoopsBlas::kernel_main( void const * i_left,
 
       // execute GEMM
       if( m_blas_dtype == data_t::FP32 ) {
-        cblas_sgemm( m_blas_row_major ? CblasRowMajor : CblasColMajor,
-                     m_blas_trans_a ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
-                     m_blas_trans_b ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
-                     m_blas_size_m,
-                     m_blas_size_n,
-                     m_blas_size_k,
-                     m_blas_alpha,
-                     (const float *) l_left,
-                     m_blas_ld_a,
-                     (const float *) l_right,
-                     m_blas_ld_b,
-                     m_blas_beta,
-                     (float *) l_out,
-                     m_blas_ld_c );
+      kernel_gemm_fp32( l_left,
+                        l_right,
+                        l_out );
+      }
+      else if( m_blas_dtype == data_t::FP64  ) {
+      kernel_gemm_fp64( l_left,
+                        l_right,
+                        l_out );
+      }
+      else if( m_blas_dtype == data_t::CFP32 ) {
+      kernel_gemm_cfp32( l_left,
+                         l_right,
+                         l_out );
       }
       else {
-        cblas_dgemm( m_blas_row_major ? CblasRowMajor : CblasColMajor,
-                     m_blas_trans_a ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
-                     m_blas_trans_b ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
-                     m_blas_size_m,
-                     m_blas_size_n,
-                     m_blas_size_k,
-                     m_blas_alpha,
-                     (const double *) l_left,
-                     m_blas_ld_a,
-                     (const double *) l_right,
-                     m_blas_ld_b,
-                     m_blas_beta,
-                     (double *) l_out,
-                     m_blas_ld_c );
+      kernel_gemm_cfp64( l_left,
+                         l_right,
+                         l_out );
       }
     }
   }
@@ -301,12 +406,20 @@ void einsum_ir::backend::ContractionLoopsBlas::kernel_last_touch( void const *,
                          m_blas_size_c,
                          l_out );
       }
-      else {
+      else if(    m_blas_dtype == data_t::FP64
+               || m_blas_dtype == data_t::CFP32 ) {
         kernel_trans_64( m_blas_size_m,
                          m_blas_size_c,
                          m_blas_size_m,
                          m_blas_size_c,
                          l_out );
+      }
+      else {
+        kernel_trans_128( m_blas_size_m,
+                          m_blas_size_c,
+                          m_blas_size_m,
+                          m_blas_size_c,
+                          l_out );
       }
     }
   }

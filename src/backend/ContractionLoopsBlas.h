@@ -77,6 +77,19 @@ class einsum_ir::backend::ContractionLoopsBlas: public ContractionLoops {
                                 void    * io_out );
 
     /**
+     * 128-bit kernel zeroing a column-major matrix.
+     *
+     * @param i_m number of rows.
+     * @param i_n number of columns.
+     * @param i_ld leading dimension.
+     * @param io_out pointer to the matrix.
+     */
+    static void kernel_zero_128( int64_t   i_m,
+                                 int64_t   i_n,
+                                 int64_t   i_ld,
+                                 void    * io_out );
+
+    /**
      * 32-bit kernel transposing a column-major matrix.
      * The matrix is transposed in-place.
      *
@@ -107,6 +120,65 @@ class einsum_ir::backend::ContractionLoopsBlas: public ContractionLoops {
                                  int64_t   i_ld_b,
                                  void    * io_out );
 
+    /**
+     * 128-bit kernel transposing a column-major matrix.
+     * The matrix is transposed in-place.
+     *
+     * @param i_m number of rows.
+     * @param i_n number of columns.
+     * @param i_ld_a leading dimension of the input matrix.
+     * @param i_ld_b leading dimension of the output matrix.
+     * @param io_out pointer to the matrix. 
+     **/
+    static void kernel_trans_128( int64_t   i_m,
+                                  int64_t   i_n,
+                                  int64_t   i_ld_a,
+                                  int64_t   i_ld_b,
+                                  void    * io_out );
+
+    /**
+     * FP32 GEMM kernel.
+     *
+     * @param i_a pointer to matrix A.
+     * @param i_b pointer to matrix B.
+     * @param io_c pointer to matrix C.
+     **/
+    void kernel_gemm_fp32( void const * i_a,
+                           void const * i_b,
+                           void       * io_c );
+
+    /**
+     * FP64 GEMM kernel.
+     *
+     * @param i_a pointer to matrix A.
+     * @param i_b pointer to matrix B.
+     * @param io_c pointer to matrix C.
+     **/
+    void kernel_gemm_fp64( void const * i_a,
+                           void const * i_b,
+                           void       * io_c );
+
+    /**
+     * Complex FP32 GEMM kernel.
+     *
+     * @param i_a pointer to matrix A.
+     * @param i_b pointer to matrix B.
+     * @param io_c pointer to matrix C.
+     **/
+    void kernel_gemm_cfp32( void const * i_a,
+                            void const * i_b,
+                            void       * io_c );
+
+    /**
+     * Complex FP64 GEMM kernel.
+     *
+     * @param i_a pointer to matrix A.
+     * @param i_b pointer to matrix B.
+     * @param io_c pointer to matrix C.
+     **/
+    void kernel_gemm_cfp64( void const * i_a,
+                            void const * i_b,
+                            void       * io_c );
 
   public:
     /**
