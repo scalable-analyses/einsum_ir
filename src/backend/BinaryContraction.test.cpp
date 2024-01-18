@@ -314,6 +314,57 @@ TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bk_kb_mb_cb_right_bc
   REQUIRE( l_dim_ids_right[0] == 0 );
 }
 
+TEST_CASE( "Orders the dimensions of the inputs (left_bc_bm_bi_bk_cb_kb_mb_right_bc_bn_bj_bk_cb_nb_kb_out_native).", "[bin_cont_order_dims_in]" ) {
+  int64_t l_ids_c[3] = { 0, 1, 2 };
+  int64_t l_ids_m[3] = { 3, 4, 5 };
+  int64_t l_ids_n[2] = { 6, 7 };
+  int64_t l_ids_k[2] = { 8, 9 };
+
+  int64_t l_dim_ids_left[8] = { 0 };
+  int64_t l_dim_ids_right[7] = { 0 };
+
+  einsum_ir::err_t l_err = einsum_ir::backend::BinaryContraction::order_dims_in( einsum_ir::LEFT_BC_BM_BI_BK_CB_KB_MB_RIGHT_BC_BN_BJ_BK_CB_NB_KB_OUT_NATIVE,
+                                                                                 3,
+                                                                                 3,
+                                                                                 2,
+                                                                                 2,
+                                                                                 0,
+                                                                                 0,
+                                                                                 2, // cb
+                                                                                 1, // mb
+                                                                                 2, // nb
+                                                                                 1, // kb
+                                                                                 0, // ib
+                                                                                 0, // jb
+                                                                                 l_ids_c,
+                                                                                 l_ids_m,
+                                                                                 l_ids_n,
+                                                                                 l_ids_k,
+                                                                                 nullptr,
+                                                                                 nullptr,
+                                                                                 l_dim_ids_left,
+                                                                                 l_dim_ids_right );
+
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  REQUIRE( l_dim_ids_left[7] == 5 );
+  REQUIRE( l_dim_ids_left[6] == 9 );
+  REQUIRE( l_dim_ids_left[5] == 2 );
+  REQUIRE( l_dim_ids_left[4] == 1 );
+  REQUIRE( l_dim_ids_left[3] == 8 );
+  REQUIRE( l_dim_ids_left[2] == 4 );
+  REQUIRE( l_dim_ids_left[1] == 3 );
+  REQUIRE( l_dim_ids_left[0] == 0 );
+
+  REQUIRE( l_dim_ids_right[6] == 9 );
+  REQUIRE( l_dim_ids_right[5] == 7 );
+  REQUIRE( l_dim_ids_right[4] == 6 );
+  REQUIRE( l_dim_ids_right[3] == 2 );
+  REQUIRE( l_dim_ids_right[2] == 1 );
+  REQUIRE( l_dim_ids_right[1] == 8 );
+  REQUIRE( l_dim_ids_right[0] == 0 );
+}
+
 TEST_CASE( "Links secondary to primary dimensions w.r.t. to a primary tensor.", "[bin_cont_link]" ) {
   int64_t l_dim_id_s = 4;
   int64_t l_num_dims_p = 5;

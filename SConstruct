@@ -18,6 +18,9 @@ l_vars.AddVariables(
   PackageVariable( 'libxsmm',
                    'Enable libxsmm.',
                    'no' ),
+  PackageVariable( 'blas',
+                   'Enable BLAS.',
+                   'no' ),
   PackageVariable( 'libtorch',
                    'Enable libtorch.',
                    'no' )
@@ -128,6 +131,30 @@ if g_env['libxsmm'] != False:
                                       'CXX' ):
      print( 'warning: disabling libxsmm' )
      g_env['libxsmm'] = False
+
+if g_env['blas'] != False:
+  if g_env['blas'] != True:
+    g_env.AppendUnique( CXXFLAGS = [ ('-isystem',  g_env['blas'] + '/include') ] )
+    g_env.AppendUnique( LIBPATH = [ g_env['blas'] + '/lib'] )
+    g_env.AppendUnique( RPATH = [ g_env['blas'] + '/lib'] )
+
+  # try to discover accelerate
+  if( g_env['blas'] == True and g_env['HOST_OS'] == "darwin" ):
+    g_env.AppendUnique( CXXFLAGS  = [ '-I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/Headers/' ] )
+    g_env.AppendUnique( LINKFLAGS = [ '-framework',  'Accelerate' ] )
+  # try to discover openblas
+  else:
+    g_conf.CheckLibWithHeader( 'openblas',
+                               'cblas.h',
+                               'CXX' )
+
+  # check if the required BLAS routines (sgemm, dgemm) and extensiosn (simatcopy, dimatcopy) are available
+  if    not g_conf.CheckFunc('cblas_sgemm',     language='CXX') \
+     or not g_conf.CheckFunc('cblas_dgemm',     language='CXX') \
+     or not g_conf.CheckFunc('cblas_simatcopy', language='CXX') \
+     or not g_conf.CheckFunc('cblas_dimatcopy', language='CXX'):
+    print( 'warning: disabling blas' )
+    g_env['blas'] = False
 
 # build
 g_env['build_dir'] = 'build'

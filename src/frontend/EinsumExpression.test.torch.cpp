@@ -400,6 +400,171 @@ TEST_CASE( "Two matmul expression with locked data.", "[einsum_exp]" ) {
   REQUIRE( at::allclose( l_data_bd, l_data_bd_ref )  );
 }
 
+TEST_CASE( "Single-level einsum expression using the internal interface, stride-1 N.", "[einsum_exp]" ) {
+  // test case:
+  //
+  // string: fcahy,gcexaiy->xhgfeiy
+  // contraction path: [(0, 1)]
+  //
+  //       _____________yxhgfei______
+  //      /                          \
+  //   fcahy                       gcexaiy
+  //
+  // char   id   size
+  //    a    0      4
+  //    c    1      5
+  //    e    2      7
+  //    f    3      2
+  //    g    4      3
+  //    h    5      6
+  //    i    6      9
+  //    x    7      2
+  //    y    8      3
+  int64_t l_dim_sizes[9] = { 4, 5, 7, 2, 3, 6, 9, 2, 3 };
+
+  int64_t l_string_num_dims[3] = { 5, 7, 7 };
+
+  int64_t l_string_dim_ids[19] = { 3, 1, 0, 5, 8,         // fcahy
+                                   4, 1, 2, 7, 0, 6, 8,   // gcexaiy
+                                   8, 7, 5, 4, 3, 2, 6 }; // xhgfeiy
+
+  int64_t l_path[2] = { 0, 1 };
+
+  // data
+  at::Tensor l_data_fcahy   = at::randn( { l_dim_sizes[3],
+                                           l_dim_sizes[1],
+                                           l_dim_sizes[0],
+                                           l_dim_sizes[5],
+                                           l_dim_sizes[8] },
+                                           at::ScalarType::Double );
+
+  at::Tensor l_data_gcexaiy = at::randn( { l_dim_sizes[4],
+                                           l_dim_sizes[1],
+                                           l_dim_sizes[2],
+                                           l_dim_sizes[7],
+                                           l_dim_sizes[0],
+                                           l_dim_sizes[6],
+                                           l_dim_sizes[8] },
+                                           at::ScalarType::Double );
+
+  at::Tensor l_data_xhgfeiy = at::randn( { l_dim_sizes[8],
+                                           l_dim_sizes[7],
+                                           l_dim_sizes[5],
+                                           l_dim_sizes[4],
+                                           l_dim_sizes[3],
+                                           l_dim_sizes[2],
+                                           l_dim_sizes[6] },
+                                           at::ScalarType::Double );
+
+
+  void * l_data_ptrs[3] = { l_data_fcahy.data_ptr(),
+                            l_data_gcexaiy.data_ptr(),
+                            l_data_xhgfeiy.data_ptr() };
+
+  einsum_ir::frontend::EinsumExpression l_einsum_exp;
+  l_einsum_exp.init( 9,
+                     l_dim_sizes,
+                     1,
+                     l_string_num_dims,
+                     l_string_dim_ids,
+                     l_path,
+                     einsum_ir::FP64,
+                     l_data_ptrs );
+
+  einsum_ir::err_t l_err = l_einsum_exp.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  l_einsum_exp.eval();
+
+  // reference
+  at::Tensor l_data_xhgfeiy_ref = at::einsum( "fcahy,gcexaiy->yxhgfei",
+                                              { l_data_fcahy,
+                                                l_data_gcexaiy } );
+
+  REQUIRE( at::allclose( l_data_xhgfeiy_ref, l_data_xhgfeiy ) );
+}
+
+TEST_CASE( "Single-level einsum expression using the internal interface, stride-1 C.", "[einsum_exp]" ) {
+  // test case:
+  //
+  // string: fcahy,gcexaiy->xhgfeiy
+  // contraction path: [(0, 1)] 
+  //
+  //       _____________xhgfeiy______
+  //      /                          \
+  //   fcahy                       gcexaiy
+  //
+  // char   id   size  type (internal)
+  //    a    0      4  K
+  //    c    1      5  K
+  //    e    2      7  M
+  //    f    3      2  N
+  //    g    4      3  M
+  //    h    5      6  N
+  //    i    6      9  M
+  //    x    7      2  M
+  //    y    8      3  C
+  int64_t l_dim_sizes[9] = { 4, 5, 7, 2, 3, 6, 9, 2, 3 };
+
+  int64_t l_string_num_dims[3] = { 5, 7, 7 };
+
+  int64_t l_string_dim_ids[19] = { 3, 1, 0, 5, 8,         // fcahy
+                                   4, 1, 2, 7, 0, 6, 8,   // gcexaiy
+                                   7, 5, 4, 3, 2, 6, 8 }; // xhgfeiy
+
+  int64_t l_path[2] = { 0, 1 };
+
+  // data
+  at::Tensor l_data_fcahy   = at::randn( { l_dim_sizes[3],
+                                           l_dim_sizes[1],
+                                           l_dim_sizes[0],
+                                           l_dim_sizes[5],
+                                           l_dim_sizes[8] } );
+
+  at::Tensor l_data_gcexaiy = at::randn( { l_dim_sizes[4],
+                                           l_dim_sizes[1],
+                                           l_dim_sizes[2],
+                                           l_dim_sizes[7],
+                                           l_dim_sizes[0],
+                                           l_dim_sizes[6],
+                                           l_dim_sizes[8] } );
+
+  at::Tensor l_data_xhgfeiy = at::randn( { l_dim_sizes[7],
+                                           l_dim_sizes[5],
+                                           l_dim_sizes[4],
+                                           l_dim_sizes[3],
+                                           l_dim_sizes[2],
+                                           l_dim_sizes[6],
+                                           l_dim_sizes[8] } );
+
+
+  void * l_data_ptrs[3] = { l_data_fcahy.data_ptr(),
+                            l_data_gcexaiy.data_ptr(),
+                            l_data_xhgfeiy.data_ptr() };
+
+  einsum_ir::frontend::EinsumExpression l_einsum_exp;
+  l_einsum_exp.init( 9,
+                     l_dim_sizes,
+                     1,
+                     l_string_num_dims,
+                     l_string_dim_ids,
+                     l_path,
+                     einsum_ir::FP32,
+                     l_data_ptrs );
+
+  einsum_ir::err_t l_err = l_einsum_exp.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  l_einsum_exp.eval();
+
+  // reference
+  at::Tensor l_data_xhgfeiy_ref = at::einsum( "fcahy,gcexaiy->xhgfeiy",
+                                              { l_data_fcahy,
+                                                l_data_gcexaiy } );
+
+  REQUIRE( at::allclose( l_data_xhgfeiy_ref, l_data_xhgfeiy, 1E-3, 1E-7) );
+}
+
 TEST_CASE( "Multi-level einsum expression using the internal interface.", "[einsum_exp]" ) {
   // test case:
   //

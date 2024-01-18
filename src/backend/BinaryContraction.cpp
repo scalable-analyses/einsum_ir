@@ -346,6 +346,39 @@ einsum_ir::err_t einsum_ir::backend::BinaryContraction::order_dims_in( tenord_t 
       l_num_dims_jb--;
     }
   }
+  else if( i_tensor_ordering == LEFT_BC_BM_BI_BK_CB_KB_MB_RIGHT_BC_BN_BJ_BK_CB_NB_KB_OUT_NATIVE ) {
+    while( l_num_dims_mb > 0 ) {
+      o_dim_ids_left[l_id_left] = i_dim_ids_m[l_id_m];
+      l_id_left--;
+      l_id_m--;
+      l_num_dims_mb--;
+    }
+
+    while( l_num_dims_kb > 0 ) {
+      o_dim_ids_left[l_id_left] = i_dim_ids_k[l_id_k];
+      o_dim_ids_right[l_id_right] = i_dim_ids_k[l_id_k];
+      l_id_left--;
+      l_id_right--;
+      l_id_k--;
+      l_num_dims_kb--;
+    }
+
+    while( l_num_dims_nb > 0 ) {
+      o_dim_ids_right[l_id_right] = i_dim_ids_n[l_id_n];
+      l_id_right--;
+      l_id_n--;
+      l_num_dims_nb--;
+    }
+
+    while( l_num_dims_cb > 0 ) {
+      o_dim_ids_left[l_id_left] = i_dim_ids_c[l_id_c];
+      o_dim_ids_right[l_id_right] = i_dim_ids_c[l_id_c];
+      l_id_left--;
+      l_id_right--;
+      l_id_c--;
+      l_num_dims_cb--;
+    }
+  }
   else {
     return einsum_ir::DIMENSION_ORDERING_FAILED;
   }

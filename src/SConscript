@@ -21,6 +21,10 @@ if g_env['libxsmm'] != False:
                  'backend/ContractionLoopsTpp.cpp',
                  'backend/BinaryContractionTpp.cpp' ]
 
+if g_env['blas'] != False:
+  l_sources += [ 'backend/ContractionLoopsBlas.cpp',
+                 'backend/BinaryContractionBlas.cpp' ]
+
 l_tests = [ 'tests.cpp',
             'backend/IterationSpaces.test.cpp',
             'backend/Unary.test.cpp',
@@ -43,6 +47,10 @@ if g_env['libtorch'] != False:
 if g_env['libxsmm'] != False and g_env['libtorch'] != False:
   l_tests += [ 'backend/UnaryTpp.test.torch.cpp',
                'backend/BinaryContractionTpp.test.torch.cpp' ]
+
+if g_env['blas'] != False and g_env['libtorch'] != False:
+  l_tests += [ 'backend/ContractionLoopsBlas.test.torch.cpp',
+               'backend/BinaryContractionBlas.test.torch.cpp' ]
 
 for l_source in l_sources:
   g_env.sources.append( g_env.Object( l_source ) )
