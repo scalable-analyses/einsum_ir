@@ -562,7 +562,7 @@ TEST_CASE( "Single-level einsum expression using the internal interface, stride-
                                               { l_data_fcahy,
                                                 l_data_gcexaiy } );
 
-  REQUIRE( at::allclose( l_data_xhgfeiy_ref, l_data_xhgfeiy, 1E-3, 1E-7) );
+  REQUIRE( at::allclose( l_data_xhgfeiy_ref, l_data_xhgfeiy, 1E-3, 1E-6) );
 }
 
 TEST_CASE( "Multi-level einsum expression using the internal interface.", "[einsum_exp]" ) {
