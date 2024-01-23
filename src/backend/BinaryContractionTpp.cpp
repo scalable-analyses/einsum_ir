@@ -526,9 +526,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   }
 
   // set leading dimensions
-  // alternatives (l_m, l_k, l_m*l_r) have no purpose other than satisfying the jitter
-  l_lda = m_num_dims_kb > 0 ? m_strides_left_k[  m_num_dims_k - 1 ] : l_m;
-  l_ldb = m_num_dims_nb > 0 ? m_strides_right_n[ m_num_dims_n - 1 ] : l_k;
+  // alternatives (l_m*l_r, l_k*l_r, l_m*l_r) have no purpose other than satisfying the jitter
+  l_lda = m_num_dims_kb > 0 ? m_strides_left_k[  m_num_dims_k - 1 ] : l_m*l_r;
+  l_ldb = m_num_dims_nb > 0 ? m_strides_right_n[ m_num_dims_n - 1 ] : l_k*l_r;
   l_ldc = m_num_dims_nb > 0 ? m_strides_out_n[   m_num_dims_n - 1 ] : l_m*l_r;
 
   // first-touch and last-touch shape
