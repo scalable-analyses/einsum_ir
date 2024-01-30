@@ -16,8 +16,6 @@ class einsum_ir::backend::ContractionLoopsBlas: public ContractionLoops {
 
     //! BLAS data type
     data_t m_blas_dtype = UNDEFINED_DTYPE;
-    //! row-major ordering if true, column-major ordering otherwise
-    bool m_blas_row_major = false;
     //! A is transposed if true, not transposed otherwise
     bool m_blas_trans_a = false;
     //! B is transposed if true, not transposed otherwise
