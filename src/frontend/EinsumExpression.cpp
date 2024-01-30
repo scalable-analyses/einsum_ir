@@ -104,6 +104,7 @@ void einsum_ir::frontend::EinsumExpression::init( int64_t                 i_num_
                                                   int64_t const         * i_string_num_dims,
                                                   int64_t const         * i_string_dim_ids,
                                                   int64_t const         * i_path,
+                                                  complex_t               i_ctype_ext,
                                                   data_t                  i_dtype,
                                                   void          * const * i_data_ptrs ) {
   m_num_dims = i_num_dims;
@@ -112,9 +113,29 @@ void einsum_ir::frontend::EinsumExpression::init( int64_t                 i_num_
   m_string_num_dims_ext = i_string_num_dims;
   m_string_dim_ids_ext = i_string_dim_ids;
   m_path_ext = i_path;
+  m_ctype_ext = i_ctype_ext;
   m_dtype = i_dtype;
   m_data_ptrs = i_data_ptrs;
   m_compiled = false;
+}
+
+void einsum_ir::frontend::EinsumExpression::init( int64_t                 i_num_dims,
+                                                  int64_t const         * i_dim_sizes,
+                                                  int64_t                 i_num_conts,
+                                                  int64_t const         * i_string_num_dims,
+                                                  int64_t const         * i_string_dim_ids,
+                                                  int64_t const         * i_path,
+                                                  data_t                  i_dtype,
+                                                  void          * const * i_data_ptrs ) {
+  init( i_num_dims,
+        i_dim_sizes,
+        i_num_conts,
+        i_string_num_dims,
+        i_string_dim_ids,
+        i_path,
+        complex_t::REAL_ONLY,
+        i_dtype,
+        i_data_ptrs );
 }
 
 einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
@@ -146,7 +167,7 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
                                                  m_string_dim_ids_ext + l_string_size_in );
 
   m_string_num_dims_int = std::vector< int64_t >( m_string_num_dims_ext,
-                                               m_string_num_dims_ext + l_num_tensors_in );
+                                                  m_string_num_dims_ext + l_num_tensors_in );
 
   // derive offsets w.r.t. input tensors
   std::vector< int64_t > l_string_offsets( l_num_tensors );
@@ -189,18 +210,33 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
     l_string_offsets.push_back( m_string_dim_ids_int.size() );
   }
 
-  // append the root string
+  // append data for batch-outer contraction if required
   int64_t const * l_dim_ids_ext_root = m_string_dim_ids_ext + l_string_offsets[l_num_tensors-1];
+
+  if( m_ctype_ext == complex_t::BATCH_INNER ) {
+    m_string_dim_ids_int.push_back( l_dim_ids_ext_root[ m_string_num_dims_int.back()-1 ] ); // complex batch inner -> outermost dimension
+    for( int64_t l_di = 0; l_di < m_string_num_dims_int.back()-1; l_di++ ) {
+      m_string_dim_ids_int.push_back( l_dim_ids_ext_root[l_di] );
+    }
+    m_string_num_dims_int.push_back( m_string_num_dims_int.back() );
+    l_string_offsets.push_back( m_string_dim_ids_int.size() );
+  }
+
+  // add root data
   m_string_num_dims_int.push_back( m_string_num_dims_ext[l_num_tensors-1] );
-  l_string_offsets.push_back( m_string_dim_ids_int.size() );
   m_string_dim_ids_int.insert( m_string_dim_ids_int.end(),
                                l_dim_ids_ext_root,
                                l_dim_ids_ext_root + m_string_num_dims_int.back() );
+  l_string_offsets.push_back( m_string_dim_ids_int.size() );
 
   /*
    * add nodes
    */
   int64_t l_num_nodes = l_num_tensors_in + m_num_conts;
+  // batch-outer to batch-inner conversion
+  if( m_ctype_ext == complex_t::BATCH_INNER ) {
+    l_num_nodes++;
+  }
   m_nodes.resize( l_num_nodes );
 
   // add input nodes
@@ -214,6 +250,10 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
                         m_dtype,
                         m_data_ptrs[l_te] );
   }
+
+  // derive kernel types
+  kernel_t l_ktype_first_touch = (m_ctype_ext == complex_t::REAL_ONLY) ? einsum_ir::ZERO : einsum_ir::CPX_ZERO;
+  kernel_t l_ktype_main        = (m_ctype_ext == complex_t::REAL_ONLY) ? einsum_ir::MADD : einsum_ir::CPX_MADD;
 
   // add internal nodes
   for( int64_t l_co = 0; l_co < m_num_conts-1; l_co++ ) {
@@ -238,39 +278,54 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
                                          m_dtype,
                                          nullptr,
                                          nullptr,
-                                         einsum_ir::ZERO,
-                                         einsum_ir::MADD,
-                                         einsum_ir::UNDEFINED_KTYPE,
+                                         l_ktype_first_touch,
+                                         l_ktype_main,
+                                         kernel_t::UNDEFINED_KTYPE,
                                          &m_nodes[l_id_left],
                                          &m_nodes[l_id_right] );
   }
 
-  // add root
+  // add root contraction
   int64_t   l_root_id_left  = m_path_int[ (m_num_conts-1)*2 + 0];
   int64_t   l_root_id_right = m_path_int[ (m_num_conts-1)*2 + 1];
 
-  int64_t   l_root_num_dims = m_string_num_dims_int.back();
-  int64_t * l_root_dim_ids_out = m_string_dim_ids_int.data() + l_string_offsets.back();
+  int64_t   l_root_num_dims = m_string_num_dims_int[l_num_tensors_in + m_num_conts - 1];
+  int64_t * l_root_dim_ids_out = m_string_dim_ids_int.data() + l_string_offsets[l_num_tensors_in + m_num_conts - 1];
 
-  m_nodes.back().init( l_root_num_dims,
-                       l_root_dim_ids_out,
-                       &m_map_dim_sizes,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       nullptr,
-                       m_dtype,
-                       nullptr,
-                       m_data_ptrs[l_num_tensors-1],
-                       einsum_ir::ZERO,
-                       einsum_ir::MADD,
-                       einsum_ir::UNDEFINED_KTYPE,
-                       &m_nodes[l_root_id_left],
-                       &m_nodes[l_root_id_right] );
+  m_nodes[l_num_tensors_in + m_num_conts - 1].init( l_root_num_dims,
+                                                    l_root_dim_ids_out,
+                                                    &m_map_dim_sizes,
+                                                    nullptr,
+                                                    nullptr,
+                                                    nullptr,
+                                                    nullptr,
+                                                    nullptr,
+                                                    nullptr,
+                                                    nullptr,
+                                                    nullptr,
+                                                    m_dtype,
+                                                    nullptr,
+                                                    (m_ctype_ext != complex_t::BATCH_INNER) ? m_data_ptrs[l_num_tensors-1] : nullptr,
+                                                    l_ktype_first_touch,
+                                                    l_ktype_main,
+                                                    kernel_t::UNDEFINED_KTYPE,
+                                                    &m_nodes[l_root_id_left],
+                                                    &m_nodes[l_root_id_right] );
+
+  // add batch-outer to batch-inner conversion
+  if( m_ctype_ext == complex_t::BATCH_INNER ) {
+    int64_t   l_cpx_conv_child    = l_num_tensors_in + m_num_conts - 1;
+    int64_t   l_cpx_conv_num_dims = m_string_num_dims_int[l_num_tensors_in + m_num_conts];
+    int64_t * l_cpx_conv_dim_ids  = m_string_dim_ids_int.data() + l_string_offsets[l_num_tensors_in + m_num_conts];
+
+    m_nodes.back().init( l_cpx_conv_num_dims,
+                         l_cpx_conv_dim_ids,
+                         &m_map_dim_sizes,
+                         nullptr,
+                         m_dtype,
+                         m_data_ptrs[l_num_tensors-1],
+                         &m_nodes[l_cpx_conv_child] );
+  }
 
   err_t l_err = m_nodes.back().compile();
 

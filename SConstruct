@@ -151,11 +151,8 @@ if g_env['blas'] != False:
   # check if the required BLAS routines (sgemm, dgemm) and extensiosn (simatcopy, dimatcopy) are available
   if    not g_conf.CheckFunc('cblas_sgemm',     language='CXX') \
      or not g_conf.CheckFunc('cblas_dgemm',     language='CXX') \
-     or not g_conf.CheckFunc('cblas_cgemm',     language='CXX') \
-     or not g_conf.CheckFunc('cblas_zgemm',     language='CXX') \
      or not g_conf.CheckFunc('cblas_simatcopy', language='CXX') \
-     or not g_conf.CheckFunc('cblas_dimatcopy', language='CXX') \
-     or not g_conf.CheckFunc('cblas_zimatcopy', language='CXX'):
+     or not g_conf.CheckFunc('cblas_dimatcopy', language='CXX'):
     print( 'warning: disabling blas' )
     g_env['blas'] = False
 

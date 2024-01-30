@@ -1,6 +1,8 @@
 #include "EinsumNode.h"
 #include "UnaryTpp.h"
+#include "BinaryContractionScalar.h"
 #include "BinaryContractionTpp.h"
+#include "BinaryContractionBlas.h"
 #include "Tensor.h"
 
 einsum_ir::backend::EinsumNode::~EinsumNode() {
@@ -53,6 +55,10 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
   m_data_ptr_int        = nullptr;
   m_data_ptr_ext        = i_data_ptr;
 
+  m_btype_unary         = backend_t::AUTO;
+  m_btype_binary        = backend_t::AUTO;
+
+  m_unary               = nullptr;
   m_cont                = nullptr;
 
   m_num_ops_node        = 0;
@@ -62,6 +68,24 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
 
   m_compiled            = false;
   m_data_locked         = false;
+}
+
+void einsum_ir::backend::EinsumNode::init( int64_t                              i_num_dims,
+                                           int64_t                      const * i_dim_ids,
+                                           std::map< int64_t, int64_t > const * i_dim_sizes_inner,
+                                           std::map< int64_t, int64_t > const * i_dim_sizes_outer,
+                                           data_t                               i_dtype,
+                                           void                               * i_data_ptr,
+                                           EinsumNode                         * i_child ) {
+  init( i_num_dims,
+        i_dim_ids,
+        i_dim_sizes_inner,
+        i_dim_sizes_outer,
+        i_dtype,
+        i_data_ptr );
+
+  m_children.resize(1);
+  m_children[0] = i_child;
 }
 
 void einsum_ir::backend::EinsumNode::init( int64_t                              i_num_dims,
@@ -100,6 +124,12 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
   m_ktype_main          = i_ktype_main;
   m_ktype_last_touch    = i_ktype_last_touch;
 
+  if(    ce_cpx_op(m_ktype_first_touch)
+      || ce_cpx_op(m_ktype_main)
+      || ce_cpx_op(m_ktype_last_touch) ) {
+    m_btype_binary = backend_t::BLAS;
+  }
+
   m_strides_children.resize( 2 );
   m_strides_children[0] = i_strides_left;
   m_strides_children[1] = i_strides_right;
@@ -121,7 +151,23 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
 
   // compile contraction
   if( m_children.size() == 2 ) {
-    m_cont = new BinaryContractionTpp;
+    // determine backend for binary contraction
+    if( m_btype_binary == backend_t::AUTO ) {
+      m_cont = new BinaryContractionTpp;
+    }
+    else if( m_btype_binary == backend_t::SCALAR ) {
+      m_cont = new BinaryContractionScalar;
+    }
+    else if( m_btype_binary == backend_t::TPP ) {
+      m_cont = new BinaryContractionTpp;
+    }
+    else if( m_btype_binary == backend_t::BLAS ) {
+      m_cont = new BinaryContractionBlas;
+    }
+    else {
+      return err_t::INVALID_BACKEND;
+    }
+
     m_cont->init( m_children[0]->m_num_dims,
                   m_children[1]->m_num_dims,
                   m_num_dims,
@@ -165,14 +211,27 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
 
   // compile unary copy operation
   m_unary = new UnaryTpp;
-  m_unary->init( m_num_dims,
-                 m_dim_sizes_outer,
-                 m_dim_ids_ext,
-                 m_dim_ids_int,
-                 m_dtype,
-                 m_dtype,
-                 m_dtype,
-                 kernel_t::COPY );
+
+  if( m_children.size() != 1 ) {
+    m_unary->init( m_num_dims,
+                   m_dim_sizes_outer,
+                   m_dim_ids_ext,
+                   m_dim_ids_int,
+                   m_dtype,
+                   m_dtype,
+                   m_dtype,
+                   kernel_t::COPY );
+  }
+  else {
+    m_unary->init( m_num_dims,
+                   m_dim_sizes_outer,
+                   m_children[0]->m_dim_ids_ext,
+                   m_dim_ids_ext,
+                   m_dtype,
+                   m_dtype,
+                   m_dtype,
+                   kernel_t::COPY );
+  }
 
   l_err = m_unary->compile();
   if( l_err != einsum_ir::SUCCESS ) {
@@ -221,9 +280,17 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
   }
 
   // compile children
-  for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
-    int64_t const * l_dim_ids_child = m_cont->dim_ids_in_ordered( l_ch );
-    l_err = m_children[l_ch]->compile( l_dim_ids_child );
+  if( m_children.size() > 1 ) {
+    for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
+      int64_t const * l_dim_ids_child = m_cont->dim_ids_in_ordered( l_ch );
+      l_err = m_children[l_ch]->compile( l_dim_ids_child );
+      if( l_err != einsum_ir::SUCCESS ) {
+        return l_err;
+      }
+    }
+  }
+  else if( m_children.size() == 1 ) {
+    l_err = m_children[0]->compile();
     if( l_err != einsum_ir::SUCCESS ) {
       return l_err;
     }
@@ -233,7 +300,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
   m_num_ops_node = 0;
   m_num_ops_children = 0;
 
-  if( m_children.size() > 0 ) {
+  if( m_children.size() > 1 ) {
     m_num_ops_node += m_cont->num_ops();
   }
   for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
@@ -300,11 +367,23 @@ void einsum_ir::backend::EinsumNode::eval() {
     m_children[l_ch]->eval();
   }
 
-  if(    m_data_locked  == false
-      && m_data_ptr_ext != nullptr
-      && m_data_ptr_int != nullptr ) {
-    m_unary->eval( m_data_ptr_ext,
-                   m_data_ptr_int );
+  if( m_children.size() != 1 ) {
+    if(    m_data_locked  == false
+        && m_data_ptr_ext != nullptr
+        && m_data_ptr_int != nullptr ) {
+      m_unary->eval( m_data_ptr_ext,
+                     m_data_ptr_int );
+    }
+  }
+  else {
+    if( m_children[0]->m_data_ptr_int != nullptr ) {
+      m_unary->eval( m_children[0]->m_data_ptr_int,
+                     m_data_ptr_ext );
+    }
+    else {
+      m_unary->eval( m_children[0]->m_data_ptr_ext,
+                     m_data_ptr_ext );
+    }
   }
 
   if( m_children.size() == 2 ) {

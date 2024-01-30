@@ -60,6 +60,9 @@ class einsum_ir::backend::ContractionLoopsTpp: public ContractionLoops {
      * @param i_num_bytes_scalar_left number of bytes per scalar in the left tensor.
      * @param i_num_bytes_scalar_right number of bytes per scalar in the right tensor.
      * @param i_num_bytes_scalar_out number of bytes per scalar in the output tensor.
+     * @param i_ktype_first_touch first-touch kernel type.
+     * @param i_ktype_main main kernel type.
+     * @param i_ktype_last_touch last-touch kernel type.
      * @param i_xmm_kernel_first_touch_unary unary first-touch tpp.
      * @param i_xmm_kernel_first_touch_binary binary first-touch tpp.
      * @param i_xmm_kernel_main tpp which is applied in the innermost loop.
@@ -89,6 +92,9 @@ class einsum_ir::backend::ContractionLoopsTpp: public ContractionLoops {
                int64_t                             i_num_bytes_scalar_left,
                int64_t                             i_num_bytes_scalar_right,
                int64_t                             i_num_bytes_scalar_out,
+               kernel_t                            i_ktype_first_touch,
+               kernel_t                            i_ktype_main,
+               kernel_t                            i_ktype_last_touch,
                libxsmm_meltwfunction_unary  const  i_xmm_kernel_first_touch_unary,
                libxsmm_meltwfunction_binary const  i_xmm_kernel_first_touch_binary,
                libxsmm_gemmfunction         const  i_xmm_kernel_main,

@@ -110,6 +110,26 @@ class einsum_ir::backend::ContractionLoops {
     //! true if the contraction loop interface was compiled
     bool m_compiled = false;
 
+  protected:
+    //! type of the first touch kernel
+    kernel_t m_ktype_first_touch = UNDEFINED_KTYPE;
+    //! type of the main kernel
+    kernel_t m_ktype_main = UNDEFINED_KTYPE;
+    //! type of the last touch kernel
+    kernel_t m_ktype_last_touch = UNDEFINED_KTYPE;
+
+    //! true if the outermost C dimension represents the complex dimension
+    bool m_cpx_outer_c = false;
+
+    //! complex stride of the left tensor
+    int64_t m_cpx_stride_in_left_bytes = 0;
+    //! complex stride of the right tensor
+    int64_t m_cpx_stride_in_right_bytes = 0;
+    //! complex stride of the auxiliary output tensor
+    int64_t m_cpx_stride_out_aux_bytes = 0;
+    //! complex stride of the output tensor
+    int64_t m_cpx_stride_out_bytes = 0;
+
   public:
     /**
      * Kernel applied to the output tensor before the contraction.
@@ -172,6 +192,9 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_num_bytes_scalar_left number of bytes per scalar in the left tensor.
      * @param i_num_bytes_scalar_right number of bytes per scalar in the right tensor.
      * @param i_num_bytes_scalar_out number of bytes per scalar in the output tensor.
+     * @param i_ktype_first_touch type of the first touch kernel.
+     * @param i_ktype_main type of the main kernel.
+     * @param i_ktype_last_touch type of the last touch kernel.
      **/
     void init( int64_t         i_num_dims_c,
                int64_t         i_num_dims_m,
@@ -195,7 +218,10 @@ class einsum_ir::backend::ContractionLoops {
                int64_t const * i_strides_out_n,
                int64_t         i_num_bytes_scalar_left,
                int64_t         i_num_bytes_scalar_right,
-               int64_t         i_num_bytes_scalar_out );
+               int64_t         i_num_bytes_scalar_out,
+               kernel_t        i_ktype_first_touch,
+               kernel_t        i_ktype_main,
+               kernel_t        i_ktype_last_touch );
 
     /**
      * Compiles the contraction loop interface.

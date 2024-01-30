@@ -347,28 +347,30 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
   }
 
   // set leading dimensions
-  // alternatives (l_m, l_k, l_m*l_r) have no purpose other than satisfying the BLAS implementations
-  int64_t l_blas_ld_a = m_num_dims_kb > 0 ? m_strides_left_k[  m_num_dims_k - 1 ] : l_blas_size_m;
-  int64_t l_blas_ld_b = m_num_dims_nb > 0 ? m_strides_right_n[ m_num_dims_n - 1 ] : l_blas_size_k;
+  // alternatives (m*c, k*c, m*l_c) have no purpose other than satisfying the BLAS implementations
+  int64_t l_blas_ld_a = m_num_dims_kb > 0 ? m_strides_left_k[  m_num_dims_k - 1 ] : l_blas_size_m*l_blas_size_c;
+  int64_t l_blas_ld_b = m_num_dims_nb > 0 ? m_strides_right_n[ m_num_dims_n - 1 ] : l_blas_size_k*l_blas_size_c;
   int64_t l_blas_ld_c = m_num_dims_nb > 0 ? m_strides_out_n[   m_num_dims_n - 1 ] : l_blas_size_m*l_blas_size_c;
 
   // check that the same data type is used everywhere
   if(    m_dtype_comp != m_dtype_left
       || m_dtype_comp != m_dtype_right
       || m_dtype_comp != m_dtype_out ) {
-    return einsum_ir::COMPILATION_FAILED;
+    return einsum_ir::err_t::INVALID_KTYPE;
   }
 
   // check supported kernel types
   if(    m_ktype_first_touch != einsum_ir::kernel_t::UNDEFINED_KTYPE
-      && m_ktype_first_touch != einsum_ir::kernel_t::ZERO ) {
-    return einsum_ir::COMPILATION_FAILED;
+      && m_ktype_first_touch != einsum_ir::kernel_t::ZERO
+      && m_ktype_first_touch != einsum_ir::kernel_t::CPX_ZERO ) {
+    return einsum_ir::err_t::INVALID_KTYPE;
   }
-  if( m_ktype_main != einsum_ir::kernel_t::MADD ) {
-    return einsum_ir::COMPILATION_FAILED;
+  if(    m_ktype_main != einsum_ir::kernel_t::MADD
+      && m_ktype_main != einsum_ir::kernel_t::CPX_MADD ) {
+    return einsum_ir::err_t::INVALID_KTYPE;
   }
   if( m_ktype_last_touch != einsum_ir::kernel_t::UNDEFINED_KTYPE ) {
-    return einsum_ir::COMPILATION_FAILED;
+    return einsum_ir::err_t::INVALID_KTYPE;
   }
 
   // init contraction loops
@@ -395,7 +397,6 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
                      m_dtype_comp,
                      false,
                      false,
-                     false,
                      l_blas_size_c,
                      l_blas_size_m,
                      l_blas_size_n,
@@ -403,9 +404,8 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
                      l_blas_ld_a,
                      l_blas_ld_b,
                      l_blas_ld_c,
-                     1.0,
-                     1.0,
                      m_ktype_first_touch,
+                     m_ktype_main,
                      m_ktype_last_touch );
 
   l_err = m_cont_loops.compile();

@@ -23,6 +23,9 @@ void einsum_ir::backend::ContractionLoopsTpp::init( int64_t                     
                                                     int64_t                              i_num_bytes_scalar_left,
                                                     int64_t                              i_num_bytes_scalar_right,
                                                     int64_t                              i_num_bytes_scalar_out,
+                                                    kernel_t                             i_ktype_first_touch,
+                                                    kernel_t                             i_ktype_main,
+                                                    kernel_t                             i_ktype_last_touch,
                                                     libxsmm_meltwfunction_unary  const   i_xmm_kernel_first_touch_unary,
                                                     libxsmm_meltwfunction_binary const   i_xmm_kernel_first_touch_binary,
                                                     libxsmm_gemmfunction         const   i_xmm_kernel_main,
@@ -51,7 +54,10 @@ void einsum_ir::backend::ContractionLoopsTpp::init( int64_t                     
                           i_strides_out_n,
                           i_num_bytes_scalar_left,
                           i_num_bytes_scalar_right,
-                          i_num_bytes_scalar_out );
+                          i_num_bytes_scalar_out,
+                          i_ktype_first_touch,
+                          i_ktype_main,
+                          i_ktype_last_touch );
 
   m_xmm_kernel_first_touch_unary  = i_xmm_kernel_first_touch_unary;
   m_xmm_kernel_first_touch_binary = i_xmm_kernel_first_touch_binary;

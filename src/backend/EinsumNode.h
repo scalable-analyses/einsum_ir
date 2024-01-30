@@ -74,6 +74,10 @@ class einsum_ir::backend::EinsumNode {
     //! effective offset in bytes
     int64_t m_offset_bytes = 0;
 
+    //! backend types
+    backend_t m_btype_unary  = backend_t::UNDEFINED_BACKEND;
+    backend_t m_btype_binary = backend_t::UNDEFINED_BACKEND;
+
     //! unary operation
     Unary * m_unary = nullptr;
 
@@ -100,7 +104,7 @@ class einsum_ir::backend::EinsumNode {
     ~EinsumNode();
 
     /**
-     * Initializes the node.
+     * Initializes an input node.
      *
      * @param i_num_dims number of tensor dimensions.
      * @param i_dim_ids ids of the tensor dimensions.
@@ -115,6 +119,25 @@ class einsum_ir::backend::EinsumNode {
                std::map< int64_t, int64_t > const * i_dim_sizes_outer,
                data_t                               i_dtype,
                void                               * i_data_ptr );
+
+    /**
+     * Initializes a node with a single child.
+     *
+     * @param i_num_dims number of tensor dimensions.
+     * @param i_dim_ids ids of the tensor dimensions.
+     * @param i_dim_sizes_inner dimension id to inner size mapping.
+     * @param i_dim_sizes_outer dimension id to outer size mapping. optional: use nullptr if not needed.
+     * @param i_dtype datatype of the node's tensor.
+     * @param i_data_ptr data pointer of the tensor.
+     * @param i_child child of the node.
+     **/
+    void init( int64_t                              i_num_dims,
+               int64_t                      const * i_dim_ids,
+               std::map< int64_t, int64_t > const * i_dim_sizes_inner,
+               std::map< int64_t, int64_t > const * i_dim_sizes_outer,
+               data_t                               i_dtype,
+               void                               * i_data_ptr,
+               EinsumNode                         * i_child );
 
     /**
      * Initializes the node with two children.

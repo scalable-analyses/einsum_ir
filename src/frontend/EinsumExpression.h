@@ -30,6 +30,9 @@ class einsum_ir::frontend::EinsumExpression {
 
     //! datatype of all tensors
     data_t m_dtype = data_t::UNDEFINED_DTYPE;
+    //! complex type of the external tensors
+    complex_t m_ctype_ext = complex_t::UNDEFINED_CTYPE;
+
     //! data points of the tensors 
     void * const * m_data_ptrs = nullptr;
 
@@ -113,6 +116,29 @@ class einsum_ir::frontend::EinsumExpression {
     static void unique_tensor_ids( int64_t         i_num_conts,
                                    int64_t const * i_path,
                                    int64_t       * o_path );
+
+    /**
+     * Initializes the einsum expression.
+     *
+     * @param i_num_dims number of dimensions.
+     * @param i_dim_sizes sizes of the dimensions.
+     * @param i_num_conts number of binary contractions.
+     * @param i_string_num_ids sizes of the substrings describing the input tensors and output tensor.
+     * @param i_string_dim_ids einsum string containing the dimension ids.
+     * @param i_path contraction path.
+     * @param i_ctype complex type of all tensors.
+     * @param i_dtype datatype of all tensors.
+     * @param i_data_ptr pointers to the tensor's data.
+     **/
+    void init( int64_t                 i_num_dims,
+               int64_t const         * i_dim_sizes,
+               int64_t                 i_num_conts,
+               int64_t const         * i_string_num_dims,
+               int64_t const         * i_string_dim_ids,
+               int64_t const         * i_path,
+               complex_t               i_ctype,
+               data_t                  i_dtype,
+               void          * const * i_data_ptrs );
 
     /**
      * Initializes the einsum expression.

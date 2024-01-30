@@ -11,12 +11,6 @@ namespace einsum_ir {
 
 class einsum_ir::backend::ContractionLoopsBlas: public ContractionLoops {
   private:
-    //! type of the first touch kernel
-    kernel_t m_ktype_first_touch = UNDEFINED_KTYPE;
-
-    //! type of the last touch kernel
-    kernel_t m_ktype_last_touch = UNDEFINED_KTYPE;
-
     //! number of bytes in a scalar
     int64_t m_num_bytes_scalar = 0;
 
@@ -45,11 +39,6 @@ class einsum_ir::backend::ContractionLoopsBlas: public ContractionLoops {
     //! leading dimension of the BLAS matrix C (part of the output tensor)
     int64_t m_blas_ld_c = 0;
 
-    //! BLAS parameter alpha
-    double m_blas_alpha = 0.0;
-    //! BLAS parameter beta
-    double m_blas_beta  = 0.0;
-
     /**
      * 32-bit kernel zeroing a column-major matrix.
      *
@@ -75,19 +64,6 @@ class einsum_ir::backend::ContractionLoopsBlas: public ContractionLoops {
                                 int64_t   i_n,
                                 int64_t   i_ld,
                                 void    * io_out );
-
-    /**
-     * 128-bit kernel zeroing a column-major matrix.
-     *
-     * @param i_m number of rows.
-     * @param i_n number of columns.
-     * @param i_ld leading dimension.
-     * @param io_out pointer to the matrix.
-     */
-    static void kernel_zero_128( int64_t   i_m,
-                                 int64_t   i_n,
-                                 int64_t   i_ld,
-                                 void    * io_out );
 
     /**
      * 32-bit kernel transposing a column-major matrix.
@@ -121,64 +97,44 @@ class einsum_ir::backend::ContractionLoopsBlas: public ContractionLoops {
                                  void    * io_out );
 
     /**
-     * 128-bit kernel transposing a column-major matrix.
-     * The matrix is transposed in-place.
-     *
-     * @param i_m number of rows.
-     * @param i_n number of columns.
-     * @param i_ld_a leading dimension of the input matrix.
-     * @param i_ld_b leading dimension of the output matrix.
-     * @param io_out pointer to the matrix. 
-     **/
-    static void kernel_trans_128( int64_t   i_m,
-                                  int64_t   i_n,
-                                  int64_t   i_ld_a,
-                                  int64_t   i_ld_b,
-                                  void    * io_out );
-
-    /**
      * FP32 GEMM kernel.
      *
+     * @param i_alpha parameter alpha.
      * @param i_a pointer to matrix A.
      * @param i_b pointer to matrix B.
      * @param io_c pointer to matrix C.
      **/
-    void kernel_gemm_fp32( void const * i_a,
-                           void const * i_b,
-                           void       * io_c );
+    void kernel_gemm_fp32( float         i_alpha,
+                           void  const * i_a,
+                           void  const * i_b,
+                           void        * io_c );
 
     /**
      * FP64 GEMM kernel.
      *
+     * @param i_alpha parameter alpha.
      * @param i_a pointer to matrix A.
      * @param i_b pointer to matrix B.
      * @param io_c pointer to matrix C.
      **/
-    void kernel_gemm_fp64( void const * i_a,
-                           void const * i_b,
-                           void       * io_c );
+    void kernel_gemm_fp64( double         i_alpha,
+                           void   const * i_a,
+                           void   const * i_b,
+                           void         * io_c );
 
     /**
-     * Complex FP32 GEMM kernel.
+     * Partially executes the first touch kernel on the given real or imaginary data section of the tensor.
      *
-     * @param i_a pointer to matrix A.
-     * @param i_b pointer to matrix B.
-     * @param io_c pointer to matrix C.
+     * @param io_out pointer to a data section of the output tensor.
      **/
-    void kernel_gemm_cfp32( void const * i_a,
-                            void const * i_b,
-                            void       * io_c );
+    void kernel_first_touch_part( void * io_out );
 
     /**
-     * Complex FP64 GEMM kernel.
+     * Partially executes the last touch kernel on the given real or imaginary data section of the tensor.
      *
-     * @param i_a pointer to matrix A.
-     * @param i_b pointer to matrix B.
-     * @param io_c pointer to matrix C.
+     * @param io_out pointer to a data section of the output tensor.
      **/
-    void kernel_gemm_cfp64( void const * i_a,
-                            void const * i_b,
-                            void       * io_c );
+    void kernel_last_touch_part( void * io_out );
 
   public:
     /**
@@ -210,8 +166,7 @@ class einsum_ir::backend::ContractionLoopsBlas: public ContractionLoops {
      * @param i_strides_out_c C strides of the output tensor.
      * @param i_strides_out_m M strides of the output tensor.
      * @param i_strides_out_n N strides of the output tensor.
-     * @param i_blas_dtype BLAS data type, 0: float, 1: double.
-     * @param i_blas_row_major row-major ordering if true, column-major ordering otherwise.
+     * @param i_blas_dtype BLAS data type.
      * @param i_blas_trans_a A is transposed if true, not transposed otherwise.
      * @param i_blas_trans_b B is transposed if true, not transposed otherwise.
      * @param i_blas_size_c size of the C dimension w.r.t. packed GEMMs.
@@ -221,46 +176,43 @@ class einsum_ir::backend::ContractionLoopsBlas: public ContractionLoops {
      * @param i_blas_ld_a leading dimension of the BLAS matrix A (part of the left tensor).
      * @param i_blas_ld_b leading dimension of the BLAS matrix B (part of the right tensor).
      * @param i_blas_ld_c leading dimension of the BLAS matrix C (part of the output tensor).
-     * @param i_blas_alpha BLAS parameter alpha.
-     * @param i_blas_beta BLAS parameter beta.
      * @param i_ktype_first_touch type of the first touch kernel.
+     * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
      **/
-    void init( int64_t                             i_num_dims_c,
-               int64_t                             i_num_dims_m,
-               int64_t                             i_num_dims_n,
-               int64_t                             i_num_dims_k,
-               int64_t                     const * i_sizes_c,
-               int64_t                     const * i_sizes_m,
-               int64_t                     const * i_sizes_n,
-               int64_t                     const * i_sizes_k,
-               int64_t                     const * i_strides_in_left_c,
-               int64_t                     const * i_strides_in_left_m,
-               int64_t                     const * i_strides_in_left_k,
-               int64_t                     const * i_strides_in_right_c,
-               int64_t                     const * i_strides_in_right_n,
-               int64_t                     const * i_strides_in_right_k,
-               int64_t                     const * i_strides_out_aux_c,
-               int64_t                     const * i_strides_out_aux_m,
-               int64_t                     const * i_strides_out_aux_n,
-               int64_t                     const * i_strides_out_c,
-               int64_t                     const * i_strides_out_m,
-               int64_t                     const * i_strides_out_n,
-               data_t                              i_blas_dtype,
-               bool                                i_blas_row_major,
-               bool                                i_blas_trans_a,
-               bool                                i_blas_trans_b,
-               int64_t                             i_blas_size_c,
-               int64_t                             i_blas_size_m,
-               int64_t                             i_blas_size_n,
-               int64_t                             i_blas_size_k,
-               int64_t                             i_blas_ld_a,
-               int64_t                             i_blas_ld_b,
-               int64_t                             i_blas_ld_c,
-               double                              i_blas_alpha,
-               double                              i_blas_beta,
-               kernel_t                            i_ktype_first_touch,
-               kernel_t                            i_ktype_last_touch );
+    void init( int64_t         i_num_dims_c,
+               int64_t         i_num_dims_m,
+               int64_t         i_num_dims_n,
+               int64_t         i_num_dims_k,
+               int64_t const * i_sizes_c,
+               int64_t const * i_sizes_m,
+               int64_t const * i_sizes_n,
+               int64_t const * i_sizes_k,
+               int64_t const * i_strides_in_left_c,
+               int64_t const * i_strides_in_left_m,
+               int64_t const * i_strides_in_left_k,
+               int64_t const * i_strides_in_right_c,
+               int64_t const * i_strides_in_right_n,
+               int64_t const * i_strides_in_right_k,
+               int64_t const * i_strides_out_aux_c,
+               int64_t const * i_strides_out_aux_m,
+               int64_t const * i_strides_out_aux_n,
+               int64_t const * i_strides_out_c,
+               int64_t const * i_strides_out_m,
+               int64_t const * i_strides_out_n,
+               data_t          i_blas_dtype,
+               bool            i_blas_trans_a,
+               bool            i_blas_trans_b,
+               int64_t         i_blas_size_c,
+               int64_t         i_blas_size_m,
+               int64_t         i_blas_size_n,
+               int64_t         i_blas_size_k,
+               int64_t         i_blas_ld_a,
+               int64_t         i_blas_ld_b,
+               int64_t         i_blas_ld_c,
+               kernel_t        i_ktype_first_touch,
+               kernel_t        i_ktype_main,
+               kernel_t        i_ktype_last_touch );
 
     /**
      * Derives the threading data for the contraction loops.

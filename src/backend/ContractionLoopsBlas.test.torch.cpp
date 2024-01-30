@@ -45,7 +45,6 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction loops implementation."
                     einsum_ir::FP32,
                     false,
                     false,
-                    false,
                     1,
                     5,
                     7,
@@ -53,9 +52,8 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction loops implementation."
                     5,
                     8,
                     5,
-                    1.0,
-                    1.0,
                     einsum_ir::kernel_t::ZERO,
+                    einsum_ir::kernel_t::MADD,
                     einsum_ir::kernel_t::UNDEFINED_KTYPE );                    
   l_cont_blas.compile();
 
@@ -114,7 +112,6 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction loops implementation."
                     einsum_ir::FP64,
                     false,
                     false,
-                    false,
                     1,
                     5,
                     7,
@@ -122,9 +119,8 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction loops implementation."
                     5,
                     8,
                     5,
-                    1.0,
-                    1.0,
                     einsum_ir::kernel_t::UNDEFINED_KTYPE,
+                    einsum_ir::kernel_t::MADD,
                     einsum_ir::kernel_t::UNDEFINED_KTYPE );
   l_cont_blas.compile();
 
@@ -190,7 +186,6 @@ TEST_CASE( "Simple batched FP64 matmul using the BLAS contraction loops implemen
                     einsum_ir::FP64,
                     false,
                     false,
-                    false,
                     1,
                     5,
                     7,
@@ -198,9 +193,8 @@ TEST_CASE( "Simple batched FP64 matmul using the BLAS contraction loops implemen
                     5,
                     8,
                     5,
-                    1.0,
-                    1.0,
                     einsum_ir::kernel_t::UNDEFINED_KTYPE,
+                    einsum_ir::kernel_t::MADD,
                     einsum_ir::kernel_t::UNDEFINED_KTYPE );
   l_cont_blas.compile();
 
@@ -283,7 +277,6 @@ TEST_CASE( "FP32 tensor contraction using the BLAS contraction loops implementat
                     einsum_ir::FP32,
                     false,
                     false,
-                    false,
                     1,
                     12,
                     7,
@@ -291,9 +284,8 @@ TEST_CASE( "FP32 tensor contraction using the BLAS contraction loops implementat
                     12,
                     9,
                     12,
-                    1.0,
-                    1.0,
                     einsum_ir::kernel_t::ZERO,
+                    einsum_ir::kernel_t::MADD,
                     einsum_ir::kernel_t::UNDEFINED_KTYPE );
 
   l_cont_blas.compile();
@@ -355,7 +347,6 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction loops implement
                     einsum_ir::FP64,
                     false,
                     false,
-                    false,
                     3,
                     5,
                     7,
@@ -363,9 +354,8 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction loops implement
                     5,
                     8,
                     15,
-                    1.0,
-                    1.0,
                     einsum_ir::kernel_t::UNDEFINED_KTYPE,
+                    einsum_ir::kernel_t::MADD,
                     einsum_ir::kernel_t::UNDEFINED_KTYPE );
   l_cont_blas.compile();
 
@@ -450,7 +440,6 @@ TEST_CASE( "FP32 packed tensor contraction using the BLAS contraction loops impl
                     einsum_ir::FP32,
                     false,
                     false,
-                    false,
                     4,
                     12,
                     7,
@@ -458,9 +447,8 @@ TEST_CASE( "FP32 packed tensor contraction using the BLAS contraction loops impl
                     12,
                     9,
                     4*12,
-                    1.0,
-                    1.0,
                     einsum_ir::kernel_t::ZERO,
+                    einsum_ir::kernel_t::MADD,
                     einsum_ir::kernel_t::UNDEFINED_KTYPE );
 
   l_cont_blas.compile();

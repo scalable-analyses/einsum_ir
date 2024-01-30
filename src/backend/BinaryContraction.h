@@ -13,7 +13,6 @@ namespace einsum_ir {
 }
 
 class einsum_ir::backend::BinaryContraction {
-
   public:
     //! number of dimensions of the left tensor
     int64_t m_num_dims_left = 0;

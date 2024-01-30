@@ -52,7 +52,10 @@ void einsum_ir::backend::ContractionLoopsSimple::init( int64_t         i_num_dim
                                               i_strides_out_n,
                                               i_num_bytes_scalar_left,
                                               i_num_bytes_scalar_right,
-                                              i_num_bytes_scalar_out );
+                                              i_num_bytes_scalar_out,
+                                              kernel_t::CUSTOM_KTYPE,
+                                              kernel_t::CUSTOM_KTYPE,
+                                              kernel_t::CUSTOM_KTYPE );
 
   m_kernel_first_touch = i_kernel_first_touch;
   m_kernel_main = i_kernel_main;

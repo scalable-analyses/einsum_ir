@@ -725,7 +725,7 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
                                                   kernel_t                             i_ktype_first_touch,
                                                   kernel_t                             i_ktype_main,
                                                   kernel_t                             i_ktype_last_touch ) {
-  m_num_dims_left   = i_num_dims_left;
+  m_num_dims_left  = i_num_dims_left;
   m_num_dims_right = i_num_dims_right;
   m_num_dims_out   = i_num_dims_out;
 
@@ -862,7 +862,12 @@ int64_t einsum_ir::backend::BinaryContraction::num_ops() {
 
   int64_t l_num_ops = l_size_c * l_size_m * l_size_n * l_size_k * 2;
 
-  if( m_ktype_first_touch == ZERO ) {
+  if( m_ktype_main == kernel_t::CPX_MADD ) {
+    l_num_ops *= 2; // four matrix mults ignoring previously counted batch dim
+  }
+
+  if(    m_ktype_first_touch == ZERO
+      || m_ktype_first_touch == CPX_ZERO ) {
     l_num_ops -= l_size_c * l_size_m * l_size_n;
   }
 

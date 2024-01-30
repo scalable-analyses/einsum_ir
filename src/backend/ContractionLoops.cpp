@@ -22,7 +22,10 @@ void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
                                                  int64_t const * i_strides_out_n,
                                                  int64_t         i_num_bytes_scalar_left,
                                                  int64_t         i_num_bytes_scalar_right,
-                                                 int64_t         i_num_bytes_scalar_out ) {
+                                                 int64_t         i_num_bytes_scalar_out,
+                                                 kernel_t        i_ktype_first_touch,
+                                                 kernel_t        i_ktype_main,
+                                                 kernel_t        i_ktype_last_touch ) {
   m_num_dims_c = i_num_dims_c;
   m_num_dims_m = i_num_dims_m;
   m_num_dims_n = i_num_dims_n;
@@ -49,9 +52,13 @@ void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
   m_strides_out_m = i_strides_out_m;
   m_strides_out_n = i_strides_out_n;
 
-  m_num_bytes_scalar_left = i_num_bytes_scalar_left;
+  m_num_bytes_scalar_left  = i_num_bytes_scalar_left;
   m_num_bytes_scalar_right = i_num_bytes_scalar_right;
-  m_num_bytes_scalar_out = i_num_bytes_scalar_out;
+  m_num_bytes_scalar_out   = i_num_bytes_scalar_out;
+
+  m_ktype_first_touch = i_ktype_first_touch;
+  m_ktype_main        = i_ktype_main;
+  m_ktype_last_touch  = i_ktype_last_touch;
 
   m_num_tasks_targeted = 1;
 
@@ -61,7 +68,43 @@ void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
 }
 
 einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
-  m_num_loops = m_num_dims_c + m_num_dims_m + m_num_dims_n + m_num_dims_k;
+  // determine if the outermost C dimension is complex
+  m_cpx_outer_c = false;
+  m_cpx_outer_c |= ce_cpx_op( m_ktype_first_touch );
+  m_cpx_outer_c |= ce_cpx_op( m_ktype_main );
+  m_cpx_outer_c |= ce_cpx_op( m_ktype_last_touch );
+
+  // check if a complex C dimension is possible
+  if( m_cpx_outer_c && m_num_dims_c == 0 ) {
+    return err_t::INVALID_CPX_DIM;
+  }
+  if( m_cpx_outer_c && m_sizes_c[0] != 2 ) {
+    return err_t::INVALID_CPX_DIM;
+  }
+  // derive complex strides
+  if( m_cpx_outer_c ) {
+    m_cpx_stride_in_left_bytes  = m_strides_in_left_c[0]  * m_num_bytes_scalar_left;
+    m_cpx_stride_in_right_bytes = m_strides_in_right_c[0] * m_num_bytes_scalar_right;
+    m_cpx_stride_out_aux_bytes  = m_strides_out_aux_c[0]  * m_num_bytes_scalar_out;
+    m_cpx_stride_out_bytes      = m_strides_out_c[0]      * m_num_bytes_scalar_out;
+  }
+  else {
+    m_cpx_stride_in_left_bytes  = 0;
+    m_cpx_stride_in_right_bytes = 0;
+    m_cpx_stride_out_aux_bytes  = 0;
+    m_cpx_stride_out_bytes      = 0;
+  }
+
+  // derive loop parameters for C dimension
+  int64_t         l_num_dims_c         = m_cpx_outer_c ? m_num_dims_c         - 1 : m_num_dims_c;
+  int64_t const * l_sizes_c            = m_cpx_outer_c ? m_sizes_c            + 1 : m_sizes_c;
+  int64_t const * l_strides_in_left_c  = m_cpx_outer_c ? m_strides_in_left_c  + 1 : m_strides_in_left_c;
+  int64_t const * l_strides_in_right_c = m_cpx_outer_c ? m_strides_in_right_c + 1 : m_strides_in_right_c;
+  int64_t const * l_strides_out_aux_c  = m_cpx_outer_c ? m_strides_out_aux_c  + 1 : m_strides_out_aux_c;
+  int64_t const * l_strides_out_c      = m_cpx_outer_c ? m_strides_out_c      + 1 : m_strides_out_c;
+
+
+  m_num_loops = l_num_dims_c + m_num_dims_m + m_num_dims_n + m_num_dims_k;
 
   m_loop_first_last_touch.clear();
   m_loop_dim_type.clear();
@@ -80,19 +123,19 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
   m_loop_strides_out.reserve(      m_num_loops );
 
   // add data of C dimensions
-  for( int64_t l_di = 0; l_di < m_num_dims_c; l_di++ ) {
-    if( l_di == m_num_dims_c-1 && m_num_dims_k == 0 && m_num_dims_m == 0 && m_num_dims_n == 0 ) {
+  for( int64_t l_di = 0; l_di < l_num_dims_c; l_di++ ) {
+    if( l_di == l_num_dims_c-1 && m_num_dims_k == 0 && m_num_dims_m == 0 && m_num_dims_n == 0 ) {
       m_loop_first_last_touch.push_back( EVERY_ITER );
     }
     else {
       m_loop_first_last_touch.push_back( NONE );
     }
     m_loop_dim_type.push_back(        dim_t::C                   );
-    m_loop_sizes.push_back(           m_sizes_c[l_di]            );
-    m_loop_strides_left.push_back(    m_strides_in_left_c[l_di]  );
-    m_loop_strides_right.push_back(   m_strides_in_right_c[l_di] );
-    m_loop_strides_out_aux.push_back( m_strides_out_aux_c[l_di]  );
-    m_loop_strides_out.push_back(     m_strides_out_c[l_di]      );
+    m_loop_sizes.push_back(           l_sizes_c[l_di]            );
+    m_loop_strides_left.push_back(    l_strides_in_left_c[l_di]  );
+    m_loop_strides_right.push_back(   l_strides_in_right_c[l_di] );
+    m_loop_strides_out_aux.push_back( l_strides_out_aux_c[l_di]  );
+    m_loop_strides_out.push_back(     l_strides_out_c[l_di]      );
   }
 
   // add data of N dimensions
@@ -178,6 +221,8 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::threading( int64_t i_num_
   m_num_tasks = i_num_tasks;
 
   int64_t l_num_parallel = m_num_dims_c + m_num_dims_m + m_num_dims_n;
+  l_num_parallel = m_cpx_outer_c ? l_num_parallel - 1 : l_num_parallel;
+
   m_iter_spaces.init( m_num_loops,
                       l_num_parallel,
                       nullptr,

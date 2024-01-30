@@ -73,15 +73,289 @@ TEST_CASE( "Simple matmul example without any intermediate data.", "[einsum_node
 
   // check node info
   REQUIRE( l_node_0.m_data_ptr_ext != nullptr );
-  REQUIRE( l_node_0.m_data_ptr_ext != nullptr );
+  REQUIRE( l_node_1.m_data_ptr_ext != nullptr );
   REQUIRE( l_node_2.m_data_ptr_ext != nullptr );
 
-  l_node_2.compile();
+  einsum_ir::err_t l_err = l_node_2.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
 
   l_node_2.eval();
 
   // check results
   REQUIRE( at::allclose( l_out, l_out_ref )  );
+}
+
+TEST_CASE( "Simple batch-outer complex matmul example without any intermediate data.", "[einsum_node]" ) {
+  // test case:
+  //
+  //    ___cnm___
+  //   /         \
+  // ckm         cnk
+  //
+  // char   id   size
+  //    m    0      2
+  //    n    1      3
+  //    k    2      4
+  //    c    3      2
+  std::map< int64_t, int64_t > l_dim_sizes;
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 0, 2 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 1, 3 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 2, 4 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 3, 2 ) );
+
+  int64_t l_dim_ids_ckm[3] = { 3, 2, 0 };
+  int64_t l_dim_ids_cnk[3] = { 3, 1, 2 };
+  int64_t l_dim_ids_cnm[3] = { 3, 1, 0 };
+
+  // data
+  at::Tensor l_left  = at::randn( {2, 4, 2} );
+  at::Tensor l_right = at::randn( {2, 3, 4} );
+  at::Tensor l_out   = at::randn( {2, 3, 2} );
+
+  // convert to complex
+  at::Tensor l_left_aos    = at::view_as_complex( l_left.permute( {1, 2, 0} ).contiguous() );
+  at::Tensor l_right_aos   = at::view_as_complex( l_right.permute( {1, 2, 0} ).contiguous() );
+  at::Tensor l_out_ref_aos = at::view_as_complex( l_out.permute( {1, 2, 0} ).contiguous() );
+
+  // reference
+  l_out_ref_aos += at::einsum( "km,nk->nm",
+                               {l_left_aos, l_right_aos} );
+
+  // einsum_ir
+  einsum_ir::backend::EinsumNode l_node_ckm;
+  einsum_ir::backend::EinsumNode l_node_cnk;
+  einsum_ir::backend::EinsumNode l_node_cnm;
+
+  l_node_ckm.init( 3,
+                   l_dim_ids_ckm,
+                   &l_dim_sizes,
+                   nullptr,
+                   einsum_ir::data_t::FP32,
+                   l_left.data_ptr() );
+
+  l_node_cnk.init( 3,
+                   l_dim_ids_cnk,
+                   &l_dim_sizes,
+                   nullptr,
+                   einsum_ir::data_t::FP32,
+                   l_right.data_ptr() );
+
+  l_node_cnm.init( 3,
+                   l_dim_ids_cnm,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   einsum_ir::data_t::FP32,
+                   nullptr,
+                   l_out.data_ptr(),
+                   einsum_ir::kernel_t::UNDEFINED_KTYPE,
+                   einsum_ir::kernel_t::CPX_MADD,
+                   einsum_ir::kernel_t::UNDEFINED_KTYPE,
+                   &l_node_ckm,
+                   &l_node_cnk );
+
+  // check node info
+  REQUIRE( l_node_ckm.m_data_ptr_ext != nullptr );
+  REQUIRE( l_node_cnk.m_data_ptr_ext != nullptr );
+  REQUIRE( l_node_cnm.m_data_ptr_ext != nullptr );
+
+  einsum_ir::err_t l_err = l_node_cnm.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  l_node_cnm.eval();
+
+  // check results
+  at::Tensor l_out_aos = at::view_as_complex( l_out.permute( {1, 2, 0} ).contiguous() );
+  REQUIRE( at::allclose( l_out_aos, l_out_ref_aos )  );
+}
+
+TEST_CASE( "Simple complex matmul example with batch-inner input and batch-outer output.", "[einsum_node]" ) {
+  // test case:
+  //
+  //    ___cnm___
+  //   /         \
+  // kmc         nkc
+  //
+  // char   id   size
+  //    m    0      2
+  //    n    1      3
+  //    k    2      4
+  //    c    3      2
+  std::map< int64_t, int64_t > l_dim_sizes;
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 0, 2 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 1, 3 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 2, 4 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 3, 2 ) );
+
+  int64_t l_dim_ids_kmc[3] = { 2, 0, 3 };
+  int64_t l_dim_ids_nkc[3] = { 1, 2, 3 };
+  int64_t l_dim_ids_cnm[3] = { 3, 1, 0 };
+
+  // data
+  at::Tensor l_left_aos  = at::ones( {4, 2},
+                                      at::ScalarType::ComplexFloat );
+  at::Tensor l_right_aos = at::ones( {3, 4},
+                                      at::ScalarType::ComplexFloat );
+  at::Tensor l_out       = at::ones( {2, 3, 2},
+                                      at::ScalarType::Float );
+
+  // reference
+  at::Tensor l_out_ref = at::einsum( "km,nk->nm",
+                                     {l_left_aos, l_right_aos} );
+
+  // einsum_ir
+  einsum_ir::backend::EinsumNode l_node_kmc;
+  einsum_ir::backend::EinsumNode l_node_nkc;
+  einsum_ir::backend::EinsumNode l_node_cnm;
+
+  l_node_kmc.init( 3,
+                   l_dim_ids_kmc,
+                   &l_dim_sizes,
+                   nullptr,
+                   einsum_ir::data_t::FP32,
+                   l_left_aos.data_ptr() );
+
+  l_node_nkc.init( 3,
+                   l_dim_ids_nkc,
+                   &l_dim_sizes,
+                   nullptr,
+                   einsum_ir::data_t::FP32,
+                   l_right_aos.data_ptr() );
+
+  l_node_cnm.init( 3,
+                   l_dim_ids_cnm,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   einsum_ir::data_t::FP32,
+                   nullptr,
+                   l_out.data_ptr(),
+                   einsum_ir::kernel_t::CPX_ZERO,
+                   einsum_ir::kernel_t::CPX_MADD,
+                   einsum_ir::kernel_t::UNDEFINED_KTYPE,
+                   &l_node_kmc,
+                   &l_node_nkc );
+
+  // check node info
+  REQUIRE( l_node_kmc.m_data_ptr_ext != nullptr );
+  REQUIRE( l_node_nkc.m_data_ptr_ext != nullptr );
+  REQUIRE( l_node_cnm.m_data_ptr_ext != nullptr );
+
+  einsum_ir::err_t l_err = l_node_cnm.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  l_node_cnm.eval();
+
+  // check results
+  at::Tensor l_out_aos = at::view_as_complex( l_out.permute( {1, 2, 0} ).contiguous() );
+
+  REQUIRE( at::allclose( l_out_aos, l_out_ref )  );
+}
+
+TEST_CASE( "Simple complex matmul example with batch-inner input and batch-inner output.", "[einsum_node]" ) {
+  // test case:
+  //
+  //       nmc
+  //        |
+  //    ___cnm___
+  //   /         \
+  // kmc         nkc
+  //
+  // char   id   size
+  //    m    0      2
+  //    n    1      3
+  //    k    2      4
+  //    c    3      2
+  std::map< int64_t, int64_t > l_dim_sizes;
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 0, 2 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 1, 3 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 2, 4 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 3, 2 ) );
+
+  int64_t l_dim_ids_kmc[3] = { 2, 0, 3 };
+  int64_t l_dim_ids_nkc[3] = { 1, 2, 3 };
+  int64_t l_dim_ids_cnm[3] = { 3, 1, 0 };
+  int64_t l_dim_ids_nmc[3] = { 1, 0, 3 };
+
+  // data
+  at::Tensor l_data_kmc = at::randn( {4, 2},
+                                      at::ScalarType::ComplexFloat );
+  at::Tensor l_data_nkc = at::randn( {3, 4},
+                                      at::ScalarType::ComplexFloat );
+  at::Tensor l_data_nmc = at::randn( {3, 2},
+                                      at::ScalarType::ComplexFloat );
+
+  // reference
+  at::Tensor l_data_nmc_ref = at::einsum( "km,nk->nm",
+                                          {l_data_kmc, l_data_nkc} );
+
+  // einsum_ir
+  einsum_ir::backend::EinsumNode l_node_kmc;
+  einsum_ir::backend::EinsumNode l_node_nkc;
+  einsum_ir::backend::EinsumNode l_node_cnm;
+  einsum_ir::backend::EinsumNode l_node_nmc;
+
+  l_node_kmc.init( 3,
+                   l_dim_ids_kmc,
+                   &l_dim_sizes,
+                   nullptr,
+                   einsum_ir::data_t::FP32,
+                   l_data_kmc.data_ptr() );
+
+  l_node_nkc.init( 3,
+                   l_dim_ids_nkc,
+                   &l_dim_sizes,
+                   nullptr,
+                   einsum_ir::data_t::FP32,
+                   l_data_nkc.data_ptr() );
+
+  l_node_cnm.init( 3,
+                   l_dim_ids_cnm,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   einsum_ir::data_t::FP32,
+                   nullptr,
+                   nullptr,
+                   einsum_ir::kernel_t::CPX_ZERO,
+                   einsum_ir::kernel_t::CPX_MADD,
+                   einsum_ir::kernel_t::UNDEFINED_KTYPE,
+                   &l_node_kmc,
+                   &l_node_nkc );
+
+  l_node_nmc.init( 3,
+                   l_dim_ids_nmc,
+                   &l_dim_sizes,
+                   nullptr,
+                   einsum_ir::data_t::FP32,
+                   l_data_nmc.data_ptr(),
+                   &l_node_cnm );
+
+  einsum_ir::err_t l_err = l_node_nmc.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  l_node_nmc.eval();
+
+  // check results
+  REQUIRE( at::allclose( l_data_nmc, l_data_nmc_ref )  );
 }
 
 TEST_CASE( "Two matmul example with external intermediate data.", "[einsum_node]" ) {
@@ -190,7 +464,8 @@ TEST_CASE( "Two matmul example with external intermediate data.", "[einsum_node]
                   &l_node_ba,
                   &l_node_da );
 
-  l_node_bd.compile();
+  einsum_ir::err_t l_err = l_node_bd.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
 
   // check node info
   REQUIRE( l_node_ca.m_data_ptr_ext != nullptr );
@@ -458,12 +733,144 @@ TEST_CASE( "Two matmul example with internal intermediate data.", "[einsum_node]
                   &l_node_ba,
                   &l_node_da );
 
-  l_node_bd.compile();
+  einsum_ir::err_t l_err = l_node_bd.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
 
   l_node_bd.eval();
 
   // check results
   REQUIRE( at::allclose( l_data_bd, l_data_bd_ref )  );
+}
+
+TEST_CASE( "Complex two matmul example with batch-inner input data and batch-outer internal intermediate data.", "[einsum_node]" ) {
+  // test case:
+  //
+  //           bdx
+  //            |
+  //         __xbd__
+  //        /       \
+  //    __bax___    dax
+  //   /        \
+  // cax          bcx
+  //
+  // char   id   size
+  //    a    0      2
+  //    b    1      3
+  //    c    2      4
+  //    d    3      5
+  //    x    4      2 // complex dimension
+  std::map< int64_t, int64_t > l_dim_sizes;
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 0, 2 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 1, 3 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 2, 4 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 3, 5 ) );
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >( 4, 2 ) );
+
+  int64_t l_dim_ids_cax[3] = { 2, 0, 4 };
+  int64_t l_dim_ids_bcx[3] = { 1, 2, 4 };
+  int64_t l_dim_ids_dax[3] = { 3, 0, 4 };
+  int64_t l_dim_ids_bax[3] = { 1, 0, 4 };
+  int64_t l_dim_ids_xbd[3] = { 4, 1, 3 };
+  int64_t l_dim_ids_bdx[3] = { 1, 3, 4 };
+
+  // data
+  at::Tensor l_data_cax     = at::randn( {4, 2},
+                                         at::ScalarType::ComplexFloat );
+  at::Tensor l_data_bcx     = at::randn( {3, 4},
+                                         at::ScalarType::ComplexFloat );
+  at::Tensor l_data_dax     = at::randn( {5, 2},
+                                         at::ScalarType::ComplexFloat );
+  at::Tensor l_data_bdx     = at::randn( {3, 5},
+                                         at::ScalarType::ComplexFloat );
+
+  // reference
+  at::Tensor l_data_bdx_ref = at::einsum( "ca,bc,da->bd",
+                                         {l_data_cax, l_data_bcx, l_data_dax} );
+
+  // einsum_ir
+  einsum_ir::backend::EinsumNode l_node_cax;
+  einsum_ir::backend::EinsumNode l_node_bcx;
+  einsum_ir::backend::EinsumNode l_node_dax;
+  einsum_ir::backend::EinsumNode l_node_bax;
+  einsum_ir::backend::EinsumNode l_node_xbd;
+  einsum_ir::backend::EinsumNode l_node_bdx;
+
+  l_node_cax.init( 3,
+                   l_dim_ids_cax,
+                   &l_dim_sizes,
+                   nullptr,
+                   einsum_ir::FP32,
+                   l_data_cax.data_ptr() );
+
+  l_node_bcx.init( 3,
+                   l_dim_ids_bcx,
+                   &l_dim_sizes,
+                   nullptr,
+                   einsum_ir::FP32,
+                   l_data_bcx.data_ptr() );
+
+  l_node_dax.init( 3,
+                   l_dim_ids_dax,
+                   &l_dim_sizes,
+                   nullptr,
+                   einsum_ir::FP32,
+                   l_data_dax.data_ptr() );
+
+  l_node_bax.init( 3,
+                   l_dim_ids_bax,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   einsum_ir::FP32,
+                   nullptr,
+                   nullptr,
+                   einsum_ir::CPX_ZERO,
+                   einsum_ir::CPX_MADD,
+                   einsum_ir::UNDEFINED_KTYPE,
+                   &l_node_cax,
+                   &l_node_bcx );
+
+  l_node_xbd.init( 3,
+                   l_dim_ids_xbd,
+                   &l_dim_sizes,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   einsum_ir::FP32,
+                   nullptr,
+                   nullptr,
+                   einsum_ir::CPX_ZERO,
+                   einsum_ir::CPX_MADD,
+                   einsum_ir::UNDEFINED_KTYPE,
+                   &l_node_bax,
+                   &l_node_dax );
+
+  l_node_bdx.init( 3,
+                   l_dim_ids_bdx,
+                   &l_dim_sizes,
+                   nullptr,
+                   einsum_ir::FP32,
+                   l_data_bdx.data_ptr(),
+                   &l_node_xbd );
+
+  einsum_ir::err_t l_err = l_node_bdx.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
+  l_node_bdx.eval();
+
+  // check results
+  REQUIRE( at::allclose( l_data_bdx, l_data_bdx_ref )  );
 }
 
 TEST_CASE( "Matmul example possibly requiring permuted input data.", "[einsum_node]" ) {
@@ -536,7 +943,8 @@ TEST_CASE( "Matmul example possibly requiring permuted input data.", "[einsum_no
                   &l_node_kn );
 
   // compile
-  l_node_nm.compile();
+  einsum_ir::err_t l_err = l_node_nm.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
 
   // check node info
   REQUIRE( l_node_mk.m_data_ptr_ext != nullptr );
@@ -559,10 +967,10 @@ TEST_CASE( "Einsum expression without batch dimensions.", "[einsum_node]" ) {
   //        _______________iefgh______
   //      /                          \
   //    _hacf____                   _iaecg_
-  //  /         \                 /       \
+  //  /         \                 /        \
   //  hd        _facd_           eai       gic
-  //          /      \
-  //          fb      abcd
+  //          /       \
+  //         fb      abcd
   //
   std::map< int64_t, int64_t > l_dim_sizes;
   l_dim_sizes.insert( std::pair< int64_t, int64_t >( 'a', 2 ) );
@@ -761,7 +1169,9 @@ TEST_CASE( "Einsum expression without batch dimensions.", "[einsum_node]" ) {
                      &l_node_hacf,
                      &l_node_iaecg );
 
-  l_node_iefgh.compile();
+  einsum_ir::err_t l_err = l_node_iefgh.compile();
+  REQUIRE( l_err == einsum_ir::SUCCESS );
+
   l_node_iefgh.eval();
 
   // reference
