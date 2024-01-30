@@ -31,11 +31,17 @@ void split_string( std::string                const & i_input,
 int main( int     i_argc,
           char  * i_argv[] ) {
   if( i_argc < 4 ) {
-    std::cerr << "usage: bench_expression einsum_string dimension_sizes contraction_path dtype store_lock" << std::endl;
-    std::cerr << "dimension sizes have to be in ascending order of the dimension ids" << std::endl;
-    std::cerr << "dtype maybe be either FP32 or FP64, default: FP32" << std::endl;
-    std::cerr << "if store_lock is 1, all einsum_ir input tensors are stored and locked before evaluation, default: 0" << std::endl;
-    std::cerr << "example: ./bench_expression \"iae,bf,dcba,cg,dh->hgfei\" \"32,8,4,2,16,64,8,8,8\" \"(1,2),(2,3),(0,1),(0,1)\"" << std::endl;
+    std::cerr << "Usage:" << std::endl;
+    std::cerr << "  bench_expression einsum_string dimension_sizes contraction_path dtype store_lock" << std::endl;
+    std::cerr << std::endl;
+    std::cerr << "Arguments:" << std::endl;
+    std::cerr << "  * dimension_sizes:  Dimension sizes have to be in ascending order of the dimension ids." << std::endl;
+    std::cerr << "  * contraction_path: Contraction path." << std::endl;
+    std::cerr << "  * dtype:            FP32, FP64, CPX_FP32 or CPX_FP64, default: FP32." << std::endl;
+    std::cerr << "  * store_lock:       If 1 all einsum_ir input tensors are stored and locked before evaluation, default: 0." << std::endl;
+    std::cerr << std::endl;
+    std::cerr << "Example:" << std::endl;
+    std::cerr << "  ./bench_expression \"iae,bf,dcba,cg,dh->hgfei\" \"32,8,4,2,16,64,8,8,8\" \"(1,2),(2,3),(0,1),(0,1)\"" << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -137,19 +143,49 @@ int main( int     i_argc,
   for( std::size_t l_di = 0; l_di < l_dim_names.size(); l_di++ ) {
     m_map_dim_name_to_id.insert( { l_dim_names[l_di], l_di } );
   }
+  int64_t l_cpx_batch_dim_id = l_dim_names.size();
 
   /*
-   * parse dtype
+   * parse cype and dtype
    */
   at::ScalarType l_dtype_at= at::ScalarType::Float;
-  einsum_ir::data_t l_dtype_einsum_ir = einsum_ir::FP32;
+  einsum_ir::complex_t l_ctype_einsum_ir = einsum_ir::REAL_ONLY;
+  einsum_ir::data_t    l_dtype_einsum_ir = einsum_ir::FP32;
   if( i_argc > 4 ) {
     std::string l_arg_dtype = std::string( i_argv[4] );
-    if( l_arg_dtype == "FP64" ) {
-      l_dtype_at = at::ScalarType::Double;
+    if( l_arg_dtype == "FP32" ) {
+      l_dtype_at        = at::ScalarType::Float;
+      l_ctype_einsum_ir = einsum_ir::REAL_ONLY;
+      l_dtype_einsum_ir = einsum_ir::FP32;
+    }
+    else if( l_arg_dtype == "FP64" ) {
+      l_dtype_at        = at::ScalarType::Double;
+      l_ctype_einsum_ir = einsum_ir::REAL_ONLY;
+      l_dtype_einsum_ir = einsum_ir::FP64;
+    }
+    else if( l_arg_dtype == "CPX_FP32" ) {
+      l_dtype_at        = at::ScalarType::ComplexFloat;
+      l_ctype_einsum_ir = einsum_ir::BATCH_INNER;
+      l_dtype_einsum_ir = einsum_ir::FP32;
+    }
+    else if( l_arg_dtype == "CPX_FP64" ) {
+      l_dtype_at        = at::ScalarType::ComplexDouble;
+      l_ctype_einsum_ir = einsum_ir::BATCH_INNER;
       l_dtype_einsum_ir = einsum_ir::FP64;
     }
   }
+
+  if( l_ctype_einsum_ir == einsum_ir::REAL_ONLY ) {
+    std::cout << "ctype: REAL_ONLY" << std::endl;
+  }
+  else if( l_ctype_einsum_ir == einsum_ir::BATCH_INNER ) {
+    std::cout << "ctype: BATCH_INNER" << std::endl;
+  }
+  else {
+    std::cerr << "failed to determine ctype" << std::endl;
+    return EXIT_FAILURE;
+  }
+
   if( l_dtype_einsum_ir == einsum_ir::FP32 ) {
     std::cout << "dtype: FP32" << std::endl;
   }
@@ -159,6 +195,10 @@ int main( int     i_argc,
   else {
     std::cerr << "failed to determine dtype" << std::endl;
     return EXIT_FAILURE;
+  }
+
+  if( l_ctype_einsum_ir != einsum_ir::REAL_ONLY ) {
+    l_dim_sizes.push_back( 2 );
   }
 
   /*
@@ -179,6 +219,9 @@ int main( int     i_argc,
   std::vector< int64_t > l_string_num_dims( l_num_tensors );
   for( int64_t l_te = 0; l_te < l_num_tensors; l_te++ ) {
     l_string_num_dims[l_te] = l_tensors[l_te].size();
+    if( l_ctype_einsum_ir != einsum_ir::REAL_ONLY ) {
+      l_string_num_dims[l_te] += 1;
+    }
   }
 
   std::vector< int64_t > l_string_dim_ids;
@@ -188,6 +231,9 @@ int main( int     i_argc,
     for( std::size_t l_ch = 0; l_ch < l_tensor.size(); l_ch++ ) {
       int64_t l_dim_id = m_map_dim_name_to_id[ l_tensor[l_ch] ];
       l_string_dim_ids.push_back( l_dim_id );
+    }
+    if( l_ctype_einsum_ir != einsum_ir::REAL_ONLY ) {
+      l_string_dim_ids.push_back( l_cpx_batch_dim_id );
     }
   }
 
@@ -212,7 +258,11 @@ int main( int     i_argc,
   for( int64_t l_te = 0; l_te < l_num_tensors; l_te++ ) {
     // assemble size of the tensor
     std::vector< int64_t > l_sizes;
-    for( int64_t l_di = 0; l_di < l_string_num_dims[l_te]; l_di++ ) {
+    int64_t l_num_dims = l_string_num_dims[l_te];
+    if( l_ctype_einsum_ir != einsum_ir::REAL_ONLY ) {
+      l_num_dims -= 1;
+    }
+    for( int64_t l_di = 0; l_di < l_num_dims; l_di++ ) {
       int64_t l_dim_id = l_string_dim_ids[l_off + l_di];
       int64_t l_size = l_dim_sizes[ l_dim_id ];
       l_sizes.push_back( l_size );
@@ -251,6 +301,7 @@ int main( int     i_argc,
                      l_string_num_dims.data(),
                      l_string_dim_ids.data(),
                      l_path.data(),
+                     l_ctype_einsum_ir,
                      l_dtype_einsum_ir,
                      l_data_ptrs.data() );
 
@@ -389,6 +440,10 @@ int main( int     i_argc,
       l_k *= l_bin_conts[l_co].m_cont->m_sizes_k[l_di];
     }
 
+    if( l_ctype_einsum_ir != einsum_ir::REAL_ONLY ) {
+      l_c /= 2;
+    }
+
     at::Tensor l_mat_a = at::randn( {l_c, l_k, l_m},
                                     l_dtype_at );
     at::Tensor l_mat_b = at::randn( {l_c, l_n, l_k},
@@ -405,7 +460,12 @@ int main( int     i_argc,
     l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
 
     l_time_eval += l_dur.count();
-    l_num_flops_matmul += 2 * l_c * l_m * l_n * l_k - l_c * l_m * l_n;
+    if( l_ctype_einsum_ir == einsum_ir::REAL_ONLY ) {
+      l_num_flops_matmul += 2 * l_c * l_m * l_n * l_k - l_c * l_m * l_n;
+    }
+    else {
+      l_num_flops_matmul += 4 * 2 * l_c * l_m * l_n * l_k - 2 * l_c * l_m * l_n;
+    }
 
     std::cout << "    #" << l_co << ": "
               <<  l_c << " " << l_m << " " << l_n << " " << l_k
