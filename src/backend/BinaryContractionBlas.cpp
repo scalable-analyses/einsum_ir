@@ -347,10 +347,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
   }
 
   // set leading dimensions
-  // alternatives (m*c, k*c, m*l_c) have no purpose other than satisfying the BLAS implementations
-  int64_t l_blas_ld_a = m_num_dims_kb > 0 ? m_strides_left_k[  m_num_dims_k - 1 ] : l_blas_size_m*l_blas_size_c;
-  int64_t l_blas_ld_b = m_num_dims_nb > 0 ? m_strides_right_n[ m_num_dims_n - 1 ] : l_blas_size_k*l_blas_size_c;
-  int64_t l_blas_ld_c = m_num_dims_nb > 0 ? m_strides_out_n[   m_num_dims_n - 1 ] : l_blas_size_m*l_blas_size_c;
+  int64_t l_blas_ld_a = m_num_dims_kb > 0 ? m_strides_left_k[  m_num_dims_k - 1 ] : l_blas_size_m;
+  int64_t l_blas_ld_b = m_num_dims_nb > 0 ? m_strides_right_n[ m_num_dims_n - 1 ] : l_blas_size_k;
+  int64_t l_blas_ld_c = m_num_dims_nb > 0 ? m_strides_out_n[   m_num_dims_n - 1 ] : l_blas_size_m;
 
   // check that the same data type is used everywhere
   if(    m_dtype_comp != m_dtype_left
