@@ -148,17 +148,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
 
     int64_t l_id_out = m_num_dims_out - 1;
 
-    // merge consecutive C dimensions
-    m_num_dims_cb = 0;
-    while( l_id_out >= 0 ) {
-      if( m_dim_types_out[ l_id_out ] == dim_t::C ) {
-        m_num_dims_cb++;
-        l_id_out--;
-      }
-      else {
-        break;
-      }
-    }
+    // packed GEMM with single C dimension
+    m_num_dims_cb = 1;
+    l_id_out--;
 
     // merge consecutive M dimensions
     m_num_dims_mb = 0;
