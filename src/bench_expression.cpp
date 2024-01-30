@@ -312,7 +312,7 @@ int main( int     i_argc,
   l_time_compile = l_dur.count();
 
   if( l_err != einsum_ir::SUCCESS ) {
-    std::cerr << "error: failed to compile einsum_ir expressions" << std::endl;
+    std::cerr << "error: failed to compile einsum_ir expression" << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -496,6 +496,11 @@ int main( int     i_argc,
   /*
    * compare solution
    */
+  std::cout << std::endl;
+  std::cout << "*** comparing solution ***:" << std::endl;
+  std::cout << "  maximum absolute entry in ATen solution:      " << at::max( at::abs( l_out_aten ) ).item() << std::endl;
+  std::cout << "  maximum absolute entry in einsum_ir solution: " << at::max( at::abs( l_data.back() ) ).item() << std::endl;
+  std::cout << "  maximum element-wise difference:              " << at::max( at::abs( l_out_aten - l_data.back() ) ).item() << std::endl;
   if( !at::allclose( l_out_aten, l_data.back() ) ) {
     std::cerr << "warning: einsum_ir solution is not close to at:einsum!" << std::endl;
     return EXIT_FAILURE;
