@@ -263,7 +263,9 @@ void einsum_ir::backend::ContractionLoops::contract_iter( int64_t         i_id_t
 
     l_ptr_left    += l_it * m_loop_strides_left[    i_id_loop ];
     l_ptr_right   += l_it * m_loop_strides_right[   i_id_loop ];
-    l_ptr_out_aux += l_it * m_loop_strides_out_aux[ i_id_loop ];
+    if( l_ptr_out_aux != nullptr ) {
+      l_ptr_out_aux += l_it * m_loop_strides_out_aux[ i_id_loop ];
+    }
     l_ptr_out     += l_it * m_loop_strides_out[     i_id_loop ];
 
     if( m_loop_first_last_touch[i_id_loop] == EVERY_ITER ) {
