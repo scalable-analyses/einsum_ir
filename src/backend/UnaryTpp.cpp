@@ -85,9 +85,9 @@ einsum_ir::err_t einsum_ir::backend::UnaryTpp::compile() {
                                                                              l_xmm_dtype_comp );
 
   if( m_ktype_main == COPY ) {
-    m_xmm_kernel_main = libxsmm_dispatch_meltw_unary_v2( LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_NORMT,
-                                                         l_shape_main,
-                                                         l_flag_out_unary );
+    m_xmm_kernel_main = libxsmm_dispatch_meltw_unary( LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_NORMT,
+                                                      l_shape_main,
+                                                      l_flag_out_unary );
   }
   else if( m_ktype_main != UNDEFINED_KTYPE ) {
     return err_t::COMPILATION_FAILED;

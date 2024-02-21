@@ -591,19 +591,19 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
 
   // first touch kernel
   if( m_ktype_first_touch == ZERO ) {
-    m_xmm_kernel_first_touch_unary = libxsmm_dispatch_meltw_unary_v2( LIBXSMM_MELTW_TYPE_UNARY_XOR,
-                                                                      l_shape_single_touch,
-                                                                      LIBXSMM_MELTW_FLAG_UNARY_NONE );
+    m_xmm_kernel_first_touch_unary = libxsmm_dispatch_meltw_unary( LIBXSMM_MELTW_TYPE_UNARY_XOR,
+                                                                   l_shape_single_touch,
+                                                                   LIBXSMM_MELTW_FLAG_UNARY_NONE );
   }
   else if( m_ktype_first_touch == COPY ) {
-    m_xmm_kernel_first_touch_unary = libxsmm_dispatch_meltw_unary_v2( LIBXSMM_MELTW_TYPE_UNARY_IDENTITY,
-                                                                      l_shape_single_touch_aux_unary,
-                                                                      l_flag_out_aux_unary );
+    m_xmm_kernel_first_touch_unary = libxsmm_dispatch_meltw_unary( LIBXSMM_MELTW_TYPE_UNARY_IDENTITY,
+                                                                   l_shape_single_touch_aux_unary,
+                                                                   l_flag_out_aux_unary );
   }
   else if( m_ktype_first_touch == ADD ) {
-    m_xmm_kernel_first_touch_binary = libxsmm_dispatch_meltw_binary_v2( LIBXSMM_MELTW_TYPE_BINARY_ADD,
-                                                                        l_shape_single_touch_aux_binary,
-                                                                        l_flag_out_aux_binary );
+    m_xmm_kernel_first_touch_binary = libxsmm_dispatch_meltw_binary( LIBXSMM_MELTW_TYPE_BINARY_ADD,
+                                                                     l_shape_single_touch_aux_binary,
+                                                                     l_flag_out_aux_binary );
   }
   else if( m_ktype_first_touch != UNDEFINED_KTYPE ) {
     return err_t::COMPILATION_FAILED;
@@ -611,14 +611,14 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
 
   // last touch kernel
   if( m_ktype_last_touch == RELU ) {
-    m_xmm_kernel_last_touch_unary = libxsmm_dispatch_meltw_unary_v2( LIBXSMM_MELTW_TYPE_UNARY_RELU,
-                                                                     l_shape_single_touch,
-                                                                     LIBXSMM_MELTW_FLAG_UNARY_NONE );
+    m_xmm_kernel_last_touch_unary = libxsmm_dispatch_meltw_unary( LIBXSMM_MELTW_TYPE_UNARY_RELU,
+                                                                  l_shape_single_touch,
+                                                                  LIBXSMM_MELTW_FLAG_UNARY_NONE );
   }
   else if( m_ktype_last_touch == ADD ) {
-    m_xmm_kernel_last_touch_binary = libxsmm_dispatch_meltw_binary_v2( LIBXSMM_MELTW_TYPE_BINARY_ADD,
-                                                                       l_shape_single_touch_aux_binary,
-                                                                       l_flag_out_aux_binary );
+    m_xmm_kernel_last_touch_binary = libxsmm_dispatch_meltw_binary( LIBXSMM_MELTW_TYPE_BINARY_ADD,
+                                                                    l_shape_single_touch_aux_binary,
+                                                                    l_flag_out_aux_binary );
   }
   else if( m_ktype_last_touch != UNDEFINED_KTYPE ) {
     return err_t::COMPILATION_FAILED;
@@ -661,10 +661,10 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   l_brconfig.br_unroll_hint = 0;
 
   if( m_tensor_ordering == LEFT_BC_BM_BI_BK_IB_KB_MB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_OUT_NATIVE ) {
-    m_xmm_kernel_main.gemm = libxsmm_dispatch_brgemm_v2( l_shape_brgemm,
-                                                         l_flags_brgemm,
-                                                         l_prefetch_flags_brgemm,
-                                                         l_brconfig );
+    m_xmm_kernel_main.gemm = libxsmm_dispatch_brgemm( l_shape_brgemm,
+                                                      l_flags_brgemm,
+                                                      l_prefetch_flags_brgemm,
+                                                      l_brconfig );
   }
   else if( m_tensor_ordering == LEFT_BC_BM_BI_BK_IB_KB_MB_CB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_CB_OUT_NATIVE ) {
     m_xmm_kernel_main.gemm = libxsmm_create_packed_gemm( l_shape_brgemm,
