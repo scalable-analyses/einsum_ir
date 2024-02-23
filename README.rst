@@ -13,9 +13,16 @@ Building the Code
    make BLAS=0 -j8
    cd ..
 
+   wget https://github.com/OpenMathLib/OpenBLAS/archive/refs/tags/v0.3.26.tar.gz
+   tar -xvf v0.3.26.tar.gz
+   cd OpenBLAS-0.3.26
+   make -j8
+   make PREFIX=$(pwd)/../openblas install
+   cd ..
+
    wget https://github.com/catchorg/Catch2/releases/download/v2.13.10/catch.hpp
 
-   scons libtorch=/home/alex/.conda/envs/pytorch/lib/python3.11/site-packages/torch libxsmm=$(pwd)/libxsmm -j4
+   scons libtorch=/home/alex/.conda/envs/pytorch/lib/python3.11/site-packages/torch libxsmm=$(pwd)/libxsmm blas=$(pwd)/openblas -j4
 
 Benchmarking Einsum Expressions
 -------------------------------
