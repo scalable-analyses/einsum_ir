@@ -54,17 +54,26 @@ class einsum_ir::backend::Unary {
      *
      * @param i_num_dims number of dimensions.
      * @param i_dim_sizes dimension sizes.
-     * @param i_dim_ids_in dimension ids of the input tensor.
-     * @param i_dim_ids_out dimension ids of the output tensor.
-     * @param o_strides_in will be set to the strides of the input tensor, dimension ordering follows output tensor.
-     * @param o_strides_out will be set to the strides of the output tensor.
+     * @param i_dim_ids dimension ids of the tensor.
+     * @param o_strides will be set to the strides of the tensor.
      **/
     static void strides( int64_t                              i_num_dims,
                          std::map< int64_t, int64_t > const * i_dim_sizes,
-                         int64_t                      const * i_dim_ids_in,
-                         int64_t                      const * i_dim_ids_out,
-                         int64_t                            * o_strides_in,
-                         int64_t                            * o_strides_out );
+                         int64_t                      const * i_dim_ids,
+                         int64_t                            * o_strides);
+
+    /**
+     * Reorders the strides of the input tensor based on the dimensions of the output tensor.
+     *
+     * @param i_num_dims number of dimensions.
+     * @param i_dim_ids dimension ids of the input tensor.
+     * @param i_dim_ids dimension ids of the output tensor.
+     * @param io_strides will be set to the reordered strides of the tensor.
+     **/
+    static void order_strides_output_based( int64_t         i_num_dims,
+                                            int64_t const * i_dim_ids_in,
+                                            int64_t const * i_dim_ids_out,
+                                            int64_t       * io_strides);
 
     /**
      * Virtual destructor.
@@ -89,6 +98,32 @@ class einsum_ir::backend::Unary {
                std::map< int64_t, int64_t > const * i_dim_sizes,
                int64_t                      const * i_dim_ids_in,
                int64_t                      const * i_dim_ids_out,
+               data_t                               i_dtype_in,
+               data_t                               i_dtype_comp,
+               data_t                               i_dtype_out,
+               kernel_t                             i_ktype_main );
+
+
+    /**
+     * Initializes the unary operation with predefined strides
+     *
+     * @param i_num_dims number of dimensions.
+     * @param i_dim_sizes dimension sizes.
+     * @param i_dim_ids_in dimension ids of the input tensor.
+     * @param i_dim_ids_out dimension ids of the output tensor.
+     * @param i_strides_in will be set to the strides of the input tensor.
+     * @param i_strides_out will be set to the strides of the output tensor.
+     * @param i_dtype_in datatype of the input.
+     * @param i_dtype_comp compute data type.
+     * @param i_dtype_out datatype of the output.
+     * @param i_ktype_main type of the main kernel.
+     **/
+    void init( int64_t                              i_num_dims,
+               std::map< int64_t, int64_t > const * i_dim_sizes,
+               int64_t                      const * i_dim_ids_in,
+               int64_t                      const * i_dim_ids_out,
+               int64_t                            * i_strides_in,
+               int64_t                            * i_strides_out,
                data_t                               i_dtype_in,
                data_t                               i_dtype_comp,
                data_t                               i_dtype_out,

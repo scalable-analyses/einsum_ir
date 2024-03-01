@@ -16,10 +16,17 @@ TEST_CASE( "Stride derivation.", "[unary]" ) {
   einsum_ir::backend::Unary::strides( 3,
                                       &l_dim_sizes,
                                       l_dim_ids_in,
+                                      l_strides_in );
+
+  einsum_ir::backend::Unary::strides( 3,
+                                      &l_dim_sizes,
                                       l_dim_ids_out,
-                                      l_strides_in,
                                       l_strides_out );
 
+  einsum_ir::backend::Unary::order_strides_output_based( 3,
+                                                         l_dim_ids_in,
+                                                         l_dim_ids_out,
+                                                         l_strides_in );
   REQUIRE( l_strides_in[0]  == 12 );
   REQUIRE( l_strides_in[1]  ==  1 );
   REQUIRE( l_strides_in[2]  ==  4 );
