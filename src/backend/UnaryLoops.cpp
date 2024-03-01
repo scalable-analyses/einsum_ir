@@ -217,7 +217,7 @@ void einsum_ir::backend::UnaryLoops::eval( void const * i_tensor_in,
                             i_tensor_in,
                             io_tensor_out );
     }
-    if( m_threading_num_loops == 3 ) {
+    else if( m_threading_num_loops == 3 ) {
       eval_iter_parallel_3( 0,
                             i_tensor_in,
                             io_tensor_out );
