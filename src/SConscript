@@ -1,7 +1,8 @@
 Import('g_env')
+import copy
 
 # special defines for the binary contraction factory
-l_bin_cont_defines = g_env['CPPDEFINES'].copy()
+l_bin_cont_defines = copy.deepcopy( g_env['CPPDEFINES'] )
 
 if( g_env['libxsmm'] != False ):
   l_bin_cont_defines.append( 'PP_EINSUM_IR_HAS_LIBXSMM' )
