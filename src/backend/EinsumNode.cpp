@@ -1,9 +1,7 @@
 #include "EinsumNode.h"
 #include "UnaryTpp.h"
-#include "BinaryContractionScalar.h"
-#include "BinaryContractionTpp.h"
-#include "BinaryContractionBlas.h"
 #include "Tensor.h"
+#include "BinaryContractionFactory.h"
 
 einsum_ir::backend::EinsumNode::~EinsumNode() {
   if( m_unary != nullptr ) {
@@ -124,12 +122,6 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
   m_ktype_main          = i_ktype_main;
   m_ktype_last_touch    = i_ktype_last_touch;
 
-  if(    ce_cpx_op(m_ktype_first_touch)
-      || ce_cpx_op(m_ktype_main)
-      || ce_cpx_op(m_ktype_last_touch) ) {
-    m_btype_binary = backend_t::BLAS;
-  }
-
   m_strides_children.resize( 2 );
   m_strides_children[0] = i_strides_left;
   m_strides_children[1] = i_strides_right;
@@ -142,6 +134,31 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
 einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_ids_req ) {
   err_t l_err = err_t::UNDEFINED_ERROR;
 
+  // derive backend for binary contractions
+  if( m_btype_binary == backend_t::AUTO ) {
+    if(    ce_cpx_op(m_ktype_first_touch)
+        || ce_cpx_op(m_ktype_main)
+        || ce_cpx_op(m_ktype_last_touch) ) {
+      m_btype_binary = backend_t::BLAS;
+    }
+    else if( BinaryContractionFactory::supports( backend_t::TPP ) ) {
+      m_btype_binary = backend_t::TPP;
+    }
+    else if( BinaryContractionFactory::supports( backend_t::TBLIS ) ) {
+      m_btype_binary = backend_t::TBLIS;
+    }
+    else if( BinaryContractionFactory::supports( backend_t::BLAS ) ) {
+      m_btype_binary = backend_t::BLAS;
+    }
+    else {
+      m_btype_binary = backend_t::SCALAR;
+    }
+  }
+
+  if( BinaryContractionFactory::supports( m_btype_binary ) == false ) {
+    return err_t::INVALID_BACKEND;
+  }
+
   m_dim_ids_int = i_dim_ids_req;
 
   m_size = Tensor::size( ce_n_bytes( m_dtype ),
@@ -151,23 +168,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
 
   // compile contraction
   if( m_children.size() == 2 ) {
-    // determine backend for binary contraction
-    if( m_btype_binary == backend_t::AUTO ) {
-      m_cont = new BinaryContractionTpp;
-    }
-    else if( m_btype_binary == backend_t::SCALAR ) {
-      m_cont = new BinaryContractionScalar;
-    }
-    else if( m_btype_binary == backend_t::TPP ) {
-      m_cont = new BinaryContractionTpp;
-    }
-    else if( m_btype_binary == backend_t::BLAS ) {
-      m_cont = new BinaryContractionBlas;
-    }
-    else {
-      return err_t::INVALID_BACKEND;
-    }
-
+    m_cont = BinaryContractionFactory::create( m_btype_binary );
     m_cont->init( m_children[0]->m_num_dims,
                   m_children[1]->m_num_dims,
                   m_num_dims,

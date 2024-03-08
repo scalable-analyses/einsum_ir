@@ -16,11 +16,14 @@ l_vars.AddVariables(
                 'omp',
                  allowed_values=('none', 'omp') ),
   PackageVariable( 'libxsmm',
-                   'Enable libxsmm.',
-                   'no' ),
+                   'Enable libxsmm backend.',
+                   'yes' ),
   PackageVariable( 'blas',
-                   'Enable BLAS.',
-                   'no' ),
+                   'Enable BLAS backend.',
+                   'yes' ),
+  PackageVariable( 'tblis',
+                   'Enable TBLIS backend.',
+                   'yes' ),
   PackageVariable( 'libtorch',
                    'Enable libtorch.',
                    'no' )
@@ -117,7 +120,6 @@ if g_env['libtorch'] != False:
           g_conf.CheckLibWithHeader( 'libtorch',
                                      ['ATen/ATen.h', 'torch/torch.h'],
                                      'CXX' ) ):
-    print( 'warning: disabling libtorch' )
     g_env['libtorch'] = False
 
 if g_env['libxsmm'] != False:
@@ -129,8 +131,7 @@ if g_env['libxsmm'] != False:
     if not g_conf.CheckLibWithHeader( 'libxsmm',
                                       'libxsmm.h',
                                       'CXX' ):
-     print( 'warning: disabling libxsmm' )
-     g_env['libxsmm'] = False
+      g_env['libxsmm'] = False
 
 if g_env['blas'] != False:
   if g_env['blas'] != True:
@@ -138,23 +139,38 @@ if g_env['blas'] != False:
     g_env.AppendUnique( LIBPATH = [ g_env['blas'] + '/lib'] )
     g_env.AppendUnique( RPATH = [ g_env['blas'] + '/lib'] )
 
+  # try to discover NVPL BLAS
+  if g_conf.CheckLibWithHeader( 'nvpl_blas_lp64_seq',
+                                'nvpl_blas_cblas.h',
+                                'CXX' ):
+     g_env['blas'] = 'nvpl'
   # try to discover accelerate
-  if( g_env['blas'] == True and g_env['HOST_OS'] == "darwin" ):
+  elif( g_env['blas'] == True and g_env['HOST_OS'] == "darwin" ):
     g_env.AppendUnique( CXXFLAGS  = [ '-I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/Headers/' ] )
     g_env.AppendUnique( LINKFLAGS = [ '-framework',  'Accelerate' ] )
   # try to discover openblas
-  else:
-    g_conf.CheckLibWithHeader( 'openblas',
-                               'cblas.h',
-                               'CXX' )
+  elif g_conf.CheckLibWithHeader( 'openblas',
+                                  'cblas.h',
+                                  'CXX' ):
+    g_env['blas'] = 'openblas'
 
   # check if the required BLAS routines (sgemm, dgemm) and extensiosn (simatcopy, dimatcopy) are available
   if    not g_conf.CheckFunc('cblas_sgemm',     language='CXX') \
      or not g_conf.CheckFunc('cblas_dgemm',     language='CXX') \
      or not g_conf.CheckFunc('cblas_simatcopy', language='CXX') \
      or not g_conf.CheckFunc('cblas_dimatcopy', language='CXX'):
-    print( 'warning: disabling blas' )
     g_env['blas'] = False
+
+if g_env['tblis'] != False:
+  if g_env['tblis'] != True:
+    g_env.AppendUnique( CXXFLAGS = [ ('-isystem',  g_env['tblis'] + '/include') ] )
+    g_env.AppendUnique( LIBPATH = [ g_env['tblis'] + '/lib'] )
+    g_env.AppendUnique( RPATH = [ g_env['tblis'] + '/lib'] )
+
+  # try to discover tblis
+  g_env['tblis'] = g_conf.CheckLibWithHeader( 'tblis',
+                                              'tblis/tblis.h',
+                                              'CXX' )
 
 # build
 g_env['build_dir'] = 'build'

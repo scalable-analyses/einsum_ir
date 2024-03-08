@@ -220,13 +220,16 @@ einsum_ir::err_t einsum_ir::backend::BinaryContraction::order_dims_in( tenord_t 
                                                                        int64_t       * o_dim_ids_left,
                                                                        int64_t       * o_dim_ids_right ) {
   // check for valid input
-  if(    i_num_dims_cb > i_num_dims_c
-      || i_num_dims_mb > i_num_dims_m
-      || i_num_dims_nb > i_num_dims_n
-      || i_num_dims_kb > i_num_dims_k
-      || i_num_dims_ib > i_num_dims_i
-      || i_num_dims_jb > i_num_dims_j ) {
-    return DIMENSION_ORDERING_FAILED;
+  if( i_tensor_ordering == tenord_t::LEFT_NATIVE_RIGHT_NATIVE_OUT_NATIVE ) {
+    return err_t::SUCCESS;
+  }
+  else if(    i_num_dims_cb > i_num_dims_c
+           || i_num_dims_mb > i_num_dims_m
+           || i_num_dims_nb > i_num_dims_n
+           || i_num_dims_kb > i_num_dims_k
+           || i_num_dims_ib > i_num_dims_i
+           || i_num_dims_jb > i_num_dims_j ) {
+    return err_t::DIMENSION_ORDERING_FAILED;
   }
 
   int64_t l_id_left  = i_num_dims_c + i_num_dims_m + i_num_dims_k + i_num_dims_i - 1;

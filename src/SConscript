@@ -1,5 +1,20 @@
 Import('g_env')
 
+# special defines for the binary contraction factory
+l_bin_cont_defines = g_env['CPPDEFINES'].copy()
+
+if( g_env['libxsmm'] != False ):
+  l_bin_cont_defines.append( 'PP_EINSUM_IR_HAS_LIBXSMM' )
+if( g_env['blas'] != False ):
+  l_bin_cont_defines.append( 'PP_EINSUM_IR_HAS_BLAS' )
+if( g_env['tblis'] != False ):
+  l_bin_cont_defines.append( 'PP_EINSUM_IR_HAS_TBLIS' )
+
+l_bin_cont_factory = g_env.Object( 'backend/BinaryContractionFactory.cpp',
+                                   CPPDEFINES = l_bin_cont_defines )
+g_env.sources.append( l_bin_cont_factory )
+
+# default files
 l_sources = [ 'backend/Tensor.cpp',
               'backend/IterationSpaces.cpp',
               'backend/UnaryLoops.cpp',
@@ -24,6 +39,9 @@ if g_env['libxsmm'] != False:
 if g_env['blas'] != False:
   l_sources += [ 'backend/ContractionLoopsBlas.cpp',
                  'backend/BinaryContractionBlas.cpp' ]
+
+if g_env['tblis'] != False:
+  l_sources += [ 'backend/BinaryContractionTblis.cpp' ]
 
 l_tests = [ 'tests.cpp',
             'backend/IterationSpaces.test.cpp',
@@ -51,6 +69,9 @@ if g_env['libxsmm'] != False and g_env['libtorch'] != False:
 if g_env['blas'] != False and g_env['libtorch'] != False:
   l_tests += [ 'backend/ContractionLoopsBlas.test.torch.cpp',
                'backend/BinaryContractionBlas.test.torch.cpp' ]
+
+if g_env['tblis'] != False and g_env['libtorch'] != False:
+  l_tests += [ 'backend/BinaryContractionTblis.test.torch.cpp' ]
 
 for l_source in l_sources:
   g_env.sources.append( g_env.Object( l_source ) )

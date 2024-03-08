@@ -32,7 +32,8 @@ namespace einsum_ir {
     INVALID_ID                = 5,
     INVALID_BACKEND           = 6,
     INVALID_CPX_DIM           = 7,
-    INVALID_KTYPE             = 8,
+    INVALID_DTYPE             = 8,
+    INVALID_KTYPE             = 9,
     UNDEFINED_ERROR           = 99
   } err_t;
 
@@ -70,6 +71,7 @@ namespace einsum_ir {
     SCALAR = 1,
     TPP    = 2,
     BLAS   = 3,
+    TBLIS  = 4,
     UNDEFINED_BACKEND = 99
   } backend_t;
 
