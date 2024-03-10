@@ -133,6 +133,8 @@ if g_env['libxsmm'] != False:
                                       'CXX' ):
       g_env['libxsmm'] = False
 
+g_env['blas_has_imatcopy'] = False
+
 if g_env['blas'] != False:
   if g_env['blas'] != True:
     g_env.AppendUnique( CXXFLAGS = [ ('-isystem',  g_env['blas'] + '/include') ] )
@@ -156,10 +158,12 @@ if g_env['blas'] != False:
 
   # check if the required BLAS routines (sgemm, dgemm) and extensiosn (simatcopy, dimatcopy) are available
   if    not g_conf.CheckFunc('cblas_sgemm',     language='CXX') \
-     or not g_conf.CheckFunc('cblas_dgemm',     language='CXX') \
-     or not g_conf.CheckFunc('cblas_simatcopy', language='CXX') \
-     or not g_conf.CheckFunc('cblas_dimatcopy', language='CXX'):
+     or not g_conf.CheckFunc('cblas_dgemm',     language='CXX'):
     g_env['blas'] = False
+
+  if     g_conf.CheckFunc('cblas_simatcopy', language='CXX') \
+     and g_conf.CheckFunc('cblas_dimatcopy', language='CXX'):
+    g_env['blas_has_imatcopy'] = True
 
 if g_env['tblis'] != False:
   if g_env['tblis'] != True:
