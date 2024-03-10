@@ -40,6 +40,7 @@ void einsum_ir::backend::ContractionLoopsBlas::kernel_trans_32( int64_t   i_m,
                                                                 void    * io_out ) {
   float * l_out = (float *) io_out;
 
+#ifdef PP_EINSUM_IR_HAS_BLAS_IMATCOPY
   cblas_simatcopy( CblasColMajor,
                    CblasTrans,
                    i_m,
@@ -48,6 +49,26 @@ void einsum_ir::backend::ContractionLoopsBlas::kernel_trans_32( int64_t   i_m,
                    l_out,
                    i_ld_a,
                    i_ld_b );
+#else
+  // TODO: inefficient fall back implementation
+  //       1) repeated memory allocations inside of OMP
+  //       2) transpose + copy
+  float * l_scratch = new float[ i_m * i_n ];
+
+  for( int64_t l_n = 0; l_n < i_n; l_n++ ) {
+    for( int64_t l_m = 0; l_m < i_m; l_m++ ) {
+      l_scratch[ l_n * i_m + l_m ] = l_out[ l_n * i_ld_a + l_m ];
+    }
+  }
+
+  for( int64_t l_n = 0; l_n < i_n; l_n++ ) {
+    for( int64_t l_m = 0; l_m < i_m; l_m++ ) {
+      l_out[ l_m * i_ld_b + l_n ] = l_scratch[ l_n * i_m + l_m ];
+    }
+  }
+
+  delete [] l_scratch;
+#endif
 }
 
 void einsum_ir::backend::ContractionLoopsBlas::kernel_trans_64( int64_t   i_m,
@@ -57,6 +78,7 @@ void einsum_ir::backend::ContractionLoopsBlas::kernel_trans_64( int64_t   i_m,
                                                                 void    * io_out ) {
   double * l_out = (double *) io_out;
 
+#ifdef PP_EINSUM_IR_HAS_BLAS_IMATCOPY
   cblas_dimatcopy( CblasColMajor,
                    CblasTrans,
                    i_m,
@@ -65,6 +87,26 @@ void einsum_ir::backend::ContractionLoopsBlas::kernel_trans_64( int64_t   i_m,
                    l_out,
                    i_ld_a,
                    i_ld_b );
+#else
+  // TODO: inefficient fall back implementation
+  //       1) repeated memory allocations inside of OMP
+  //       2) transpose + copy
+  double * l_scratch = new double[ i_m * i_n ];
+
+  for( int64_t l_n = 0; l_n < i_n; l_n++ ) {
+    for( int64_t l_m = 0; l_m < i_m; l_m++ ) {
+      l_scratch[ l_n * i_m + l_m ] = l_out[ l_n * i_ld_a + l_m ];
+    }
+  }
+
+  for( int64_t l_n = 0; l_n < i_n; l_n++ ) {
+    for( int64_t l_m = 0; l_m < i_m; l_m++ ) {
+      l_out[ l_m * i_ld_b + l_n ] = l_scratch[ l_n * i_m + l_m ];
+    }
+  }
+
+  delete [] l_scratch;
+#endif
 }
 
 void einsum_ir::backend::ContractionLoopsBlas::kernel_gemm_fp32( float         i_alpha,
@@ -170,16 +212,16 @@ void einsum_ir::backend::ContractionLoopsBlas::init( int64_t         i_num_dims_
                           i_ktype_main,
                           i_ktype_last_touch );
 
-  m_blas_dtype     = i_blas_dtype;
-  m_blas_trans_a   = i_blas_trans_a;
-  m_blas_trans_b   = i_blas_trans_b;
-  m_blas_size_c    = i_blas_size_c;
-  m_blas_size_m    = i_blas_size_m;
-  m_blas_size_n    = i_blas_size_n;
-  m_blas_size_k    = i_blas_size_k;
-  m_blas_ld_a      = i_blas_ld_a;
-  m_blas_ld_b      = i_blas_ld_b;
-  m_blas_ld_c      = i_blas_ld_c;
+  m_blas_dtype   = i_blas_dtype;
+  m_blas_trans_a = i_blas_trans_a;
+  m_blas_trans_b = i_blas_trans_b;
+  m_blas_size_c  = i_blas_size_c;
+  m_blas_size_m  = i_blas_size_m;
+  m_blas_size_n  = i_blas_size_n;
+  m_blas_size_k  = i_blas_size_k;
+  m_blas_ld_a    = i_blas_ld_a;
+  m_blas_ld_b    = i_blas_ld_b;
+  m_blas_ld_c    = i_blas_ld_c;
 }
 
 void einsum_ir::backend::ContractionLoopsBlas::kernel_first_touch_part( void * io_out ) {
