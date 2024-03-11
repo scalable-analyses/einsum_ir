@@ -66,8 +66,8 @@ class einsum_ir::backend::Unary {
      * Reorders the strides of the input tensor based on the dimensions of the output tensor.
      *
      * @param i_num_dims number of dimensions.
-     * @param i_dim_ids dimension ids of the input tensor.
-     * @param i_dim_ids dimension ids of the output tensor.
+     * @param i_dim_ids_in dimension ids of the input tensor.
+     * @param i_dim_ids_out dimension ids of the output tensor.
      * @param io_strides will be set to the reordered strides of the tensor.
      **/
     static void order_strides_output_based( int64_t         i_num_dims,
