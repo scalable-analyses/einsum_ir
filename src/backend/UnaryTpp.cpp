@@ -21,30 +21,95 @@ einsum_ir::err_t einsum_ir::backend::UnaryTpp::compile() {
   int64_t l_n      = 1;
   int64_t l_ld_in  = 1;
   int64_t l_ld_out = 1;
+  bool l_op_supports_transpose = true;
+  bool l_transpose_kernel = false;
 
-  // identify matrix dimensions
+  // identify matrix dimensions and kernel type
   int64_t l_id_in  = m_dim_ids_in[  m_num_dims - 1 ];
   int64_t l_id_out = m_dim_ids_out[ m_num_dims - 1 ];
-  if( m_num_dims > 0 ) {
-    l_m = m_dim_sizes->at( l_id_in );
-
-    if( l_id_in != l_id_out ) {
-      l_n = m_dim_sizes->at( l_id_out );
-    }
-  }
-
-  // identify leading dimensions
-  for( int64_t l_di = 0; l_di < m_num_dims; l_di++ ) {
-    // note: strides are given based dimension ordering of output tensor
-    if( m_dim_ids_out[l_di] == l_id_out ) {
-      l_ld_in = m_strides_in[l_di];
-      break;
-    }
-  }
+  int64_t l_stride_out_last = m_strides_out[ m_num_dims - 1 ];
+  int64_t l_stride_in_last = 1;
   for( int64_t l_di = 0; l_di < m_num_dims; l_di++ ) {
     if( m_dim_ids_out[l_di] == l_id_in ) {
-      l_ld_out = m_strides_out[l_di];
+      l_stride_in_last = m_strides_in[l_di];
       break;
+    }
+  }
+
+  if(l_stride_in_last == 1 && l_stride_out_last == 1 && l_id_in == l_id_out){
+    l_m = m_dim_sizes->at( l_id_in );
+    // Kernel MxN -> MxN
+    if( m_num_dims > 1 ) {
+      l_id_out = m_dim_ids_out[ m_num_dims - 2 ];
+      l_n = m_dim_sizes->at( l_id_out );
+    }
+    // Kernel Mx1 -> Mx1
+    else{
+      l_id_out = l_id_in;
+    }
+  }
+  // Kernel MxN -> NxM
+  else if(l_stride_in_last == 1 && l_stride_out_last == 1 && l_op_supports_transpose){
+    l_transpose_kernel = true;
+    l_m = m_dim_sizes->at( l_id_in );
+    l_n = m_dim_sizes->at( l_id_out );
+  }
+  // Kernel Mx1 -> 1xM
+  else if( l_stride_in_last == 1 && l_op_supports_transpose){
+    l_transpose_kernel = true;
+    l_id_out = l_id_in;
+    l_m = m_dim_sizes->at( l_id_in );
+  }
+  // Kernel 1xN -> Nx1
+  else if(l_stride_out_last == 1 && l_op_supports_transpose){
+    l_transpose_kernel = true;
+    l_id_in = l_id_out;
+    l_n = m_dim_sizes->at( l_id_out );
+  }
+  // Kernel 1xN -> 1xN
+  else{
+    l_n = m_dim_sizes->at( l_id_out );
+    l_id_in = l_id_out;
+  }
+
+
+  // identify leading dimensions
+  if( l_n != 1 ){
+    for( int64_t l_di = 0; l_di < m_num_dims; l_di++ ) {
+      // note: strides are given based dimension ordering of output tensor
+      if( m_dim_ids_out[l_di] == l_id_out ) {
+        l_ld_in = m_strides_in[l_di];
+        break;
+      }
+    }
+  }
+  else{
+    l_ld_in = l_m;
+  }
+  if( l_transpose_kernel ){
+    if( l_m != 1 ){
+      for( int64_t l_di = 0; l_di < m_num_dims; l_di++ ) {
+        if( m_dim_ids_out[l_di] == l_id_in ) {
+          l_ld_out = m_strides_out[l_di];
+          break;
+        }
+      }
+    }
+    else{
+      l_ld_out = l_n;
+    }
+  }
+  else {
+    if( l_n != 1 ){
+      for( int64_t l_di = 0; l_di < m_num_dims; l_di++ ) {
+        if( m_dim_ids_out[l_di] == l_id_out ) {
+          l_ld_out = m_strides_out[l_di];
+          break;
+        }
+      }
+    }
+    else{
+      l_ld_out = l_m;
     }
   }
 
@@ -66,9 +131,6 @@ einsum_ir::err_t einsum_ir::backend::UnaryTpp::compile() {
     }
   }
 
-  // adjust leading dimensions for single row/column cases to satisfy jitter
-  l_ld_in  = (l_n == 1) ? l_m : l_ld_in;
-  l_ld_out = (l_m == 1) ? l_n : l_ld_out;
 
   libxsmm_datatype l_xmm_dtype_in   = dtype_to_libxsmm( m_dtype_in );
   libxsmm_datatype l_xmm_dtype_comp = dtype_to_libxsmm( m_dtype_comp );
@@ -85,9 +147,16 @@ einsum_ir::err_t einsum_ir::backend::UnaryTpp::compile() {
                                                                              l_xmm_dtype_comp );
 
   if( m_ktype_main == COPY ) {
-    m_xmm_kernel_main = libxsmm_dispatch_meltw_unary( LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_NORMT,
-                                                      l_shape_main,
-                                                      l_flag_out_unary );
+    if(l_transpose_kernel){
+      m_xmm_kernel_main = libxsmm_dispatch_meltw_unary( LIBXSMM_MELTW_TYPE_UNARY_TRANSFORM_NORM_TO_NORMT,
+                                                        l_shape_main,
+                                                        l_flag_out_unary );
+    }
+    else{
+      m_xmm_kernel_main = libxsmm_dispatch_meltw_unary( LIBXSMM_MELTW_TYPE_UNARY_IDENTITY,
+                                                        l_shape_main,
+                                                        l_flag_out_unary );   
+    }
   }
   else if( m_ktype_main != UNDEFINED_KTYPE ) {
     return err_t::COMPILATION_FAILED;
