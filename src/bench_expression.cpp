@@ -3,30 +3,7 @@
 
 #include <ATen/ATen.h>
 #include "frontend/EinsumExpression.h"
-
-/**
- * Splits an input string by the given separation string.
- *
- * @param i_input input string.
- * @param i_separation separation string.
- * @param o_output output substrings.
- **/
-void split_string( std::string                const & i_input,
-                   std::string                const & i_separation,
-                   std::vector< std::string >       & o_output ) {
-  std::string l_string = i_input;
-  int64_t l_off = 0;
-  int64_t l_size_string = l_string.size();
-  while( l_off < l_size_string ) {
-    l_off = l_string.find( i_separation );
-    if( l_off < 0 ) break;
-    o_output.push_back( l_string.substr( 0, l_off ) );
-    l_string.erase( 0, l_off + i_separation.size() );
-  }
-  if( l_string.size() > 0 ) {
-    o_output.push_back( l_string );
-  }
-}
+#include "frontend/EinsumExpressionAscii.h"
 
 int main( int     i_argc,
           char  * i_argv[] ) {
@@ -49,21 +26,9 @@ int main( int     i_argc,
    * parse input tensors and output tensors
    **/
   std::string l_expression_string( i_argv[1] );
-  l_expression_string.erase( std::remove( l_expression_string.begin(),
-                                          l_expression_string.end(),
-                                          ' '),
-                             l_expression_string.end());
-  std::vector< std::string > l_tensors_tmp;
-
-  split_string( l_expression_string,
-                std::string("->"),
-                l_tensors_tmp );
-
   std::vector< std::string > l_tensors;
-  split_string( l_tensors_tmp[0],
-                std::string(","),
-                l_tensors );
-  l_tensors.push_back( l_tensors_tmp[1] );
+  einsum_ir::frontend::EinsumExpressionAscii::parse_tensors( l_expression_string,
+                                                             l_tensors );
   int64_t l_num_tensors = l_tensors.size();
 
   std::cout << "parsed tensors:" << std::endl;
@@ -75,44 +40,17 @@ int main( int     i_argc,
    * parse dimension sizes
    */
   std::string l_dim_sizes_string( i_argv[2] );
-  l_dim_sizes_string.erase( std::remove( l_dim_sizes_string.begin(),
-                                         l_dim_sizes_string.end(),
-                                         ' '),
-                            l_dim_sizes_string.end());
-
-  std::vector< std::string > l_dim_sizes_tmp;
-  split_string( l_dim_sizes_string,
-                std::string(","),
-                l_dim_sizes_tmp );
-  std::vector< int64_t > l_dim_sizes( l_dim_sizes_tmp.size() );
-  for( std::size_t l_di = 0; l_di < l_dim_sizes_tmp.size(); l_di++ ) {
-    l_dim_sizes[l_di] = std::stoi( l_dim_sizes_tmp[l_di] );
-  }
+  std::vector< int64_t > l_dim_sizes;
+  einsum_ir::frontend::EinsumExpressionAscii::parse_dim_sizes( l_dim_sizes_string,
+                                                               l_dim_sizes );
 
   /*
    * parse contraction path
    */
   std::string l_path_string( i_argv[3] );
-  l_path_string.erase( std::remove( l_path_string.begin(),
-                                    l_path_string.end(),
-                                    ' '),
-                       l_path_string.end());
-  l_path_string.erase( std::remove( l_path_string.begin(),
-                                    l_path_string.end(),
-                                    '('),
-                       l_path_string.end());
-  l_path_string.erase( std::remove( l_path_string.begin(),
-                                    l_path_string.end(),
-                                    ')'),
-                       l_path_string.end());
-  std::vector< std::string > l_path_tmp;
-  split_string( l_path_string,
-                std::string(","),
-                l_path_tmp );
-  std::vector< int64_t > l_path( l_path_tmp.size() );
-  for( std::size_t l_co = 0; l_co < l_path_tmp.size(); l_co++ ) {
-    l_path[l_co] = std::stoi( l_path_tmp[l_co] );
-  }
+  std::vector< int64_t > l_path;
+  einsum_ir::frontend::EinsumExpressionAscii::parse_path( l_path_string,
+                                                          l_path );
 
   std::cout << "parsed contraction path: ";
   for( std::size_t l_co = 0; l_co < l_path.size(); l_co++ ) {
@@ -123,55 +61,47 @@ int main( int     i_argc,
   /*
    * create mapping from dimension name to id
    */
-  std::set< char > l_dim_names_set;
-  for( int64_t l_te = 0; l_te < l_num_tensors; l_te++ ) {
-    std::string l_tensor = l_tensors[l_te];
-
-    for( std::size_t l_ch = 0; l_ch < l_tensor.size(); l_ch++ ) {
-      l_dim_names_set.insert( l_tensor[l_ch] );
-    }
-  }
-  std::vector< char > l_dim_names( l_dim_names_set.begin(),
-                                   l_dim_names_set.end() );
+  std::map< char, int64_t > m_map_dim_name_to_id;
+  einsum_ir::frontend::EinsumExpressionAscii::parse_dim_ids( l_expression_string,
+                                                             m_map_dim_name_to_id );
 
   std::cout << "parsed dimension sizes:" << std::endl;
-  for( std::size_t l_di = 0; l_di < l_dim_sizes.size(); l_di++ ) {
-    std::cout << "  " << l_dim_names[l_di] << ": " << l_dim_sizes[l_di] << std::endl;
+  // iterate over keys of map dim name to id
+  for( std::map< char, int64_t >::iterator l_di = m_map_dim_name_to_id.begin(); l_di != m_map_dim_name_to_id.end(); l_di++ ) {
+    char l_dim_name = l_di->first;
+    int64_t l_dim_id = l_di->second;
+    int64_t l_dim_size = l_dim_sizes[ l_dim_id ];
+
+    std::cout << "  " << l_dim_name << ": " <<  l_dim_size << std::endl;
   }
 
-  std::map< char, int64_t > m_map_dim_name_to_id;
-  for( std::size_t l_di = 0; l_di < l_dim_names.size(); l_di++ ) {
-    m_map_dim_name_to_id.insert( { l_dim_names[l_di], l_di } );
-  }
-  int64_t l_cpx_batch_dim_id = l_dim_names.size();
+  int64_t l_cpx_batch_dim_id = m_map_dim_name_to_id.size();
 
   /*
-   * parse cype and dtype
+   * parse ctype and dtype
    */
-  at::ScalarType l_dtype_at= at::ScalarType::Float;
+  at::ScalarType l_dtype_at = at::ScalarType::Float;
   einsum_ir::complex_t l_ctype_einsum_ir = einsum_ir::REAL_ONLY;
   einsum_ir::data_t    l_dtype_einsum_ir = einsum_ir::FP32;
   if( i_argc > 4 ) {
     std::string l_arg_dtype = std::string( i_argv[4] );
+
+    einsum_ir::frontend::EinsumExpressionAscii::parse_dtype( l_arg_dtype,
+                                                             l_dtype_einsum_ir );
+    einsum_ir::frontend::EinsumExpressionAscii::parse_ctype( l_arg_dtype,
+                                                             l_ctype_einsum_ir );
+
     if( l_arg_dtype == "FP32" ) {
-      l_dtype_at        = at::ScalarType::Float;
-      l_ctype_einsum_ir = einsum_ir::REAL_ONLY;
-      l_dtype_einsum_ir = einsum_ir::FP32;
+      l_dtype_at = at::ScalarType::Float;
     }
     else if( l_arg_dtype == "FP64" ) {
-      l_dtype_at        = at::ScalarType::Double;
-      l_ctype_einsum_ir = einsum_ir::REAL_ONLY;
-      l_dtype_einsum_ir = einsum_ir::FP64;
+      l_dtype_at = at::ScalarType::Double;
     }
     else if( l_arg_dtype == "CPX_FP32" ) {
-      l_dtype_at        = at::ScalarType::ComplexFloat;
-      l_ctype_einsum_ir = einsum_ir::BATCH_INNER;
-      l_dtype_einsum_ir = einsum_ir::FP32;
+      l_dtype_at = at::ScalarType::ComplexFloat;
     }
     else if( l_arg_dtype == "CPX_FP64" ) {
-      l_dtype_at        = at::ScalarType::ComplexDouble;
-      l_ctype_einsum_ir = einsum_ir::BATCH_INNER;
-      l_dtype_einsum_ir = einsum_ir::FP64;
+      l_dtype_at = at::ScalarType::ComplexDouble;
     }
   }
 
