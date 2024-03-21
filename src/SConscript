@@ -40,6 +40,7 @@ l_sources = [ 'backend/Tensor.cpp',
               'backend/BinaryContractionScalar.cpp',
               'backend/EinsumNode.cpp',
               'frontend/EinsumExpression.cpp',
+              'frontend/EinsumExpressionAscii.cpp',
               'frontend/ResidualBlock.cpp',
               'frontend/ResidualBlockDownSample.cpp' ]
 
