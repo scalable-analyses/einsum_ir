@@ -1,5 +1,9 @@
 #include "ContractionLoopsBlas.h"
+#ifdef PP_EINSUM_IR_HAS_BLAS_NVPL
+#include <nvpl_blas_cblas.h>
+#else
 #include <cblas.h>
+#endif
 
 void einsum_ir::backend::ContractionLoopsBlas::kernel_zero_32( int64_t   i_m,
                                                                int64_t   i_n,
