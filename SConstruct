@@ -202,8 +202,6 @@ if( g_env['libxsmm'] and g_env['libtorch'] ):
                  source = g_env.sources + g_env.exe['bench_expression'] )
   g_env.Program( g_env['build_dir']+'/bench_mlp',
                  source = g_env.sources + g_env.exe['bench_mlp'] )
-  g_env.Program( g_env['build_dir']+'/bench_resnet',
-                 source = g_env.sources + g_env.exe['bench_resnet'] )
 
 g_env.Program( g_env['build_dir']+'/tests',
                source = g_env.tests )
