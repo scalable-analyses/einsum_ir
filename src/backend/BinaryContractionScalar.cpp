@@ -38,186 +38,68 @@ void einsum_ir::backend::BinaryContractionScalar::kernel_madd( void const * i_le
   *l_out += (*l_left) * (*l_right);
 }
 
-einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile( tenord_t i_tensor_ordering ) {
+einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
   BinaryContraction::compile_base();
 
-  // reorder input dimensions if requested
-  int64_t const * l_dim_ids_left  = m_dim_ids_left_native;
-  int64_t const * l_dim_ids_right = m_dim_ids_right_native;
-  m_dim_ids_left_ordered.resize(0);
-  m_dim_ids_right_ordered.resize(0);
-
-  if( i_tensor_ordering == LEFT_NATIVE_RIGHT_NATIVE_OUT_NATIVE ) {}
-  else if( i_tensor_ordering == LEFT_BC_BM_BI_BK_RIGHT_BC_BN_BJ_BK_OUT_NATIVE ) {
-    m_dim_ids_left_ordered.resize( m_num_dims_left );
-    m_dim_ids_right_ordered.resize( m_num_dims_right );
-    l_dim_ids_left = m_dim_ids_left_ordered.data();
-    l_dim_ids_right = m_dim_ids_right_ordered.data();
-
-    order_dims_in( i_tensor_ordering,
-                   m_num_dims_c,
-                   m_num_dims_m,
-                   m_num_dims_n,
-                   m_num_dims_k,
-                   m_num_dims_i,
-                   m_num_dims_j,
-                   0,
-                   0,
-                   0,
-                   0,
-                   0,
-                   0,
-                   m_dim_ids_c.data(),
-                   m_dim_ids_m.data(),
-                   m_dim_ids_n.data(),
-                   m_dim_ids_k.data(),
-                   m_dim_ids_i.data(),
-                   m_dim_ids_j.data(),
-                   m_dim_ids_left_ordered.data(),
-                   m_dim_ids_right_ordered.data() );
-
-    for( int64_t l_le = 0; l_le < m_num_dims_left; l_le++ ) {
-      if( m_dim_ids_left_native[l_le] != m_dim_ids_left_ordered[l_le] ) {
-        m_tensors_in_reordered = true;
-        break;
-      }
-    }
-    for( int64_t l_ri = 0; l_ri < m_num_dims_right; l_ri++ ) {
-      if( m_dim_ids_right_native[l_ri] != m_dim_ids_right_ordered[l_ri] ) {
-        m_tensors_in_reordered = true;
-        break;
-      }
-    }
-  }
-  else {
-    return COMPILATION_FAILED;
-  }
-
   // derive strides
-  m_strides_left_c.resize( m_num_dims_c );
-  m_strides_left_m.resize( m_num_dims_m );
-  m_strides_left_k.resize( m_num_dims_k );
-  m_strides_left_i.resize( m_num_dims_i );
-
-  m_strides_right_c.resize( m_num_dims_c );
-  m_strides_right_n.resize( m_num_dims_n );
-  m_strides_right_k.resize( m_num_dims_k );
-  m_strides_right_j.resize( m_num_dims_j );
-
-  m_strides_out_aux_c.resize( m_num_dims_c );
-  m_strides_out_aux_m.resize( m_num_dims_m );
-  m_strides_out_aux_n.resize( m_num_dims_n );
-
-  m_strides_out_c.resize( m_num_dims_c );
-  m_strides_out_m.resize( m_num_dims_m );
-  m_strides_out_n.resize( m_num_dims_n );
+  std::map< int64_t, int64_t > l_strides_left;
+  std::map< int64_t, int64_t > l_strides_right;
+  std::map< int64_t, int64_t > l_strides_out;
+  std::map< int64_t, int64_t > l_strides_out_aux;
 
   strides( m_num_dims_left,
-           m_num_dims_right,
-           m_num_dims_out,
-           m_num_dims_c,
-           m_num_dims_m,
-           m_num_dims_n,
-           m_num_dims_k,
-           m_num_dims_i,
-           m_num_dims_j,
-           l_dim_ids_left,
-           l_dim_ids_right,
-           m_dim_ids_out,
-           m_dim_ids_c.data(),
-           m_dim_ids_m.data(),
-           m_dim_ids_n.data(),
-           m_dim_ids_k.data(),
-           m_dim_ids_i.data(),
-           m_dim_ids_j.data(),
+           m_dim_ids_left,
            m_dim_sizes_outer_left,
+           &l_strides_left );
+
+  strides( m_num_dims_right,
+           m_dim_ids_right,
            m_dim_sizes_outer_right,
-           m_dim_sizes_outer_out_aux,
+           &l_strides_right );
+
+  strides( m_num_dims_out,
+           m_dim_ids_out,
            m_dim_sizes_outer_out,
-           m_strides_left_c.data(),
-           m_strides_left_m.data(),
-           m_strides_left_k.data(),
-           m_strides_left_i.data(),
-           m_strides_right_c.data(),
-           m_strides_right_n.data(),
-           m_strides_right_k.data(),
-           m_strides_right_j.data(),
-           m_strides_out_aux_c.data(),
-           m_strides_out_aux_m.data(),
-           m_strides_out_aux_n.data(),
-           m_strides_out_c.data(),
-           m_strides_out_m.data(),
-           m_strides_out_n.data() );
+           &l_strides_out );
 
-  // treat secondary I dimensions as K internally
-  for( int64_t l_di_i = 0; l_di_i < m_num_dims_i; l_di_i++ ) {
-    int64_t l_di_n = 0;
-    err_t l_err = link_secondary_to_primary( m_dim_ids_i[l_di_i],
-                                             m_num_dims_n,
-                                             m_dim_ids_n.data(),
-                                             *m_dim_link_s_to_p,
-                                             l_di_n );
-    if( l_err != err_t::SUCCESS ) {
-      return err_t::COMPILATION_FAILED;
-    }
-
-    // corresponding contraction info
-    int64_t l_size_s   = m_sizes_i[l_di_i];
-    int64_t l_stride_p = m_strides_right_n[l_di_n];
-    int64_t l_stride_s = m_strides_left_i[l_di_i];
-
-    // add to K dimensions
-    m_num_dims_k++;
-    m_sizes_k.push_back( l_size_s );
-    m_strides_left_k.push_back( l_stride_s );
-    m_strides_right_k.push_back( l_stride_p );
+  if( m_dim_sizes_outer_out_aux != nullptr ) {
+    strides( m_num_dims_out,
+             m_dim_ids_out,
+             m_dim_sizes_outer_out_aux,
+             &l_strides_out_aux );
+  }
+  else {
+    l_strides_out_aux = l_strides_out;
   }
 
-  // treat secondary J dimensions as K internally
-  for( int64_t l_di_j = 0; l_di_j < m_num_dims_j; l_di_j++ ) {
-    int64_t l_di_m = 0;
-    err_t l_err = link_secondary_to_primary( m_dim_ids_j[l_di_j],
-                                             m_num_dims_m,
-                                             m_dim_ids_m.data(),
-                                             *m_dim_link_s_to_p,
-                                             l_di_m );
-    if( l_err != err_t::SUCCESS ) {
-      return err_t::COMPILATION_FAILED;
-    }
-
-    // corresponding contraction info
-    int64_t l_size_s   = m_sizes_j[l_di_j];
-    int64_t l_stride_p = m_strides_left_m[l_di_m];
-    int64_t l_stride_s = m_strides_right_j[l_di_j];
-
-    // add to K dimensions
-    m_num_dims_k++;
-    m_sizes_k.push_back( l_size_s );
-    m_strides_left_k.push_back( l_stride_p );
-    m_strides_right_k.push_back( l_stride_s );
+  // derive stride of non-blocked dimensions
+  for( std::size_t l_di = 0; l_di < m_dim_ids_c.size(); l_di++ ) {
+    int64_t l_dim_id = m_dim_ids_c[l_di];
+    m_strides_left_c.push_back(    l_strides_left[    l_dim_id ] );
+    m_strides_right_c.push_back(   l_strides_right[   l_dim_id ] );
+    m_strides_out_c.push_back(     l_strides_out[     l_dim_id ] );
+    m_strides_out_aux_c.push_back( l_strides_out_aux[ l_dim_id ] );
   }
 
-  // apply stride multipliers (excludes K obtained from secondary)
-  apply_stride_multipliers( m_num_dims_c,
-                            m_num_dims_m,
-                            m_num_dims_n,
-                            m_num_dims_k-m_num_dims_i-m_num_dims_j,
-                            m_stride_multipliers_left,
-                            m_stride_multipliers_right,
-                            m_stride_multipliers_out,
-                            m_dim_ids_c.data(),
-                            m_dim_ids_m.data(),
-                            m_dim_ids_n.data(),
-                            m_dim_ids_k.data(),
-                            m_strides_left_c.data(),
-                            m_strides_left_m.data(),
-                            m_strides_left_k.data(),
-                            m_strides_right_c.data(),
-                            m_strides_right_n.data(),
-                            m_strides_right_k.data(),
-                            m_strides_out_c.data(),
-                            m_strides_out_m.data(),
-                            m_strides_out_n.data() );
+  for( std::size_t l_di = 0; l_di < m_dim_ids_m.size(); l_di++ ) {
+    int64_t l_dim_id = m_dim_ids_m[l_di];
+    m_strides_left_m.push_back(    l_strides_left[    l_dim_id ] );
+    m_strides_out_m.push_back(     l_strides_out[     l_dim_id ] );
+    m_strides_out_aux_m.push_back( l_strides_out_aux[ l_dim_id ] );
+  }
+
+  for( std::size_t l_di = 0; l_di < m_dim_ids_n.size(); l_di++ ) {
+    int64_t l_dim_id = m_dim_ids_n[l_di];
+    m_strides_right_n.push_back(   l_strides_right[   l_dim_id ] );
+    m_strides_out_n.push_back(     l_strides_out[     l_dim_id ] );
+    m_strides_out_aux_n.push_back( l_strides_out_aux[ l_dim_id ] );
+  }
+
+  for( std::size_t l_di = 0; l_di < m_dim_ids_k.size(); l_di++ ) {
+    int64_t l_dim_id = m_dim_ids_k[l_di];
+    m_strides_left_k.push_back(  l_strides_left[  l_dim_id ] );
+    m_strides_right_k.push_back( l_strides_right[ l_dim_id ] );
+  }
 
   // determine if all dtypes are FP32 or FP64
   bool l_dtype_all_fp32 = false;
@@ -331,11 +213,6 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile( tenord_t 
   m_compiled = true;
 
   return einsum_ir::SUCCESS;
-}
-
-einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
-  err_t l_err = compile( LEFT_NATIVE_RIGHT_NATIVE_OUT_NATIVE );
-  return l_err;
 }
 
 void einsum_ir::backend::BinaryContractionScalar::contract( void const * i_tensor_left,

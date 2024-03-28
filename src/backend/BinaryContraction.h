@@ -32,30 +32,15 @@ class einsum_ir::backend::BinaryContraction {
     //! mapping from the dimension ids to the outer dimension sizes of the output tensor
     std::map< int64_t, int64_t > const * m_dim_sizes_outer_out = nullptr;
 
-    //! stride multipliers of the left tensor
-    std::map< int64_t, int64_t > const * m_stride_multipliers_left;
-    //! stride multipliers of the right tensor
-    std::map< int64_t, int64_t > const * m_stride_multipliers_right;
-    //! stride multipliers of the output tensor
-    std::map< int64_t, int64_t > const * m_stride_multipliers_out;
-
-    //! left tensor's native dimension ids, i.e., without any imposed ordering
-    int64_t const * m_dim_ids_left_native = nullptr;
-    //! right tensor's native dimension ids, i.e., without any imposed ordering
-    int64_t const * m_dim_ids_right_native = nullptr;
+    //! left tensor's dimension ids
+    int64_t const * m_dim_ids_left = nullptr;
+    //! right tensor's dimension ids
+    int64_t const * m_dim_ids_right = nullptr;
     //! output tensor's dimension ids
     int64_t const * m_dim_ids_out = nullptr;
 
-    //! link between secondary dimensions and primary dimensions
-    std::map< int64_t, int64_t > const * m_dim_link_s_to_p = nullptr;
-
     //! dimension types of the output tensor
     std::vector< dim_t > m_dim_types_out;
-
-    //! ordered dim ids of the left tensor
-    std::vector< int64_t > m_dim_ids_left_ordered;
-    //! ordered dim ids of the right tensor
-    std::vector< int64_t > m_dim_ids_right_ordered;
 
     //! number of C dimensions
     int64_t m_num_dims_c = 0;
@@ -96,38 +81,6 @@ class einsum_ir::backend::BinaryContraction {
     //! sizes of the J dimensions
     std::vector< int64_t > m_sizes_j;
 
-    //! C strides of the left tensor
-    std::vector< int64_t > m_strides_left_c;
-    //! M strides of the left tensor
-    std::vector< int64_t > m_strides_left_m;
-    //! K strides of the left tensor
-    std::vector< int64_t > m_strides_left_k;
-    //! I strides of the left tensor
-    std::vector< int64_t > m_strides_left_i;
-
-    //! C strides of the right tensor
-    std::vector< int64_t > m_strides_right_c;
-    //! N strides of the right tensor
-    std::vector< int64_t > m_strides_right_n;
-    //! K strides of the right tensor
-    std::vector< int64_t > m_strides_right_k;
-    //! J strides of the right tensor
-    std::vector< int64_t > m_strides_right_j;
-
-    //! C strides of the auxiliary output tensor
-    std::vector< int64_t > m_strides_out_aux_c;
-    //! M strides of the auxiliary output tensor
-    std::vector< int64_t > m_strides_out_aux_m;
-    //! N strides of the auxiliary output tensor
-    std::vector< int64_t > m_strides_out_aux_n;
-
-    //! C strides of the output tensor
-    std::vector< int64_t > m_strides_out_c;
-    //! M strides of the output tensor
-    std::vector< int64_t > m_strides_out_m;
-    //! N strides of the output tensor
-    std::vector< int64_t > m_strides_out_n;
-
     //! datatype of the left input
     data_t m_dtype_left = UNDEFINED_DTYPE;
 
@@ -148,12 +101,6 @@ class einsum_ir::backend::BinaryContraction {
 
     //! type of the last touch kernel
     kernel_t m_ktype_last_touch = UNDEFINED_KTYPE;
-
-    //! true if the input tensors were reordered
-    bool m_tensors_in_reordered = false;
-
-    //! true if left and right tensor have been swapped
-    bool m_tensors_in_swapped = false;
 
     //! true if the binary contraction was compiled
     bool m_compiled = false;
@@ -184,6 +131,29 @@ class einsum_ir::backend::BinaryContraction {
                            dim_t           i_dim_type_t2_t1,
                            dim_t           i_dim_type_t2_t0_t1,
                            dim_t         * o_dim_types_t2 );
+
+    /**
+     * Derives the dimension types of the left, right and output tensor w.r.t. the binary contraction.
+     *
+     * @param i_num_dims_left number of dimensions of the left tensor.
+     * @param i_num_dims_right number of dimensions of the right tensor.
+     * @param i_num_dims_out number of dimensions of the output tensor.
+     * @param i_dim_ids_left dimension ids of the left tensor.
+     * @param i_dim_ids_right dimension ids of the right tensor.
+     * @param i_dim_ids_out dimensions ids of the output tensor.
+     * @param o_dim_types_left will be set to dimension types of the left tensor.
+     * @param o_dim_types_right will be set to dimension types of the right tensor.
+     * @param o_dim_types_out will be set to dimension types of the output tensor.
+     **/
+    static void dim_types( int64_t                                 i_num_dims_left,
+                           int64_t                                 i_num_dims_right,
+                           int64_t                                 i_num_dims_out,
+                           int64_t                         const * i_dim_ids_left,
+                           int64_t                         const * i_dim_ids_right,
+                           int64_t                         const * i_dim_ids_out,
+                           std::vector< einsum_ir::dim_t >       * o_dim_types_left,
+                           std::vector< einsum_ir::dim_t >       * o_dim_types_right,
+                           std::vector< einsum_ir::dim_t >       * o_dim_types_out );
 
     /**
      * Filters the dimension ids based on the given dimension type.
@@ -224,62 +194,13 @@ class einsum_ir::backend::BinaryContraction {
                                int64_t                         const * i_dim_ids_left,
                                int64_t                         const * i_dim_ids_right,
                                int64_t                         const * i_dim_ids_out,
-                               std::vector< einsum_ir::dim_t >       & o_dim_types_out,
-                               std::vector<          int64_t >       & o_dim_ids_c,
-                               std::vector<          int64_t >       & o_dim_ids_m,
-                               std::vector<          int64_t >       & o_dim_ids_n,
-                               std::vector<          int64_t >       & o_dim_ids_k,
-                               std::vector<          int64_t >       & o_dim_ids_i,
-                               std::vector<          int64_t >       & o_dim_ids_j );
-
-    /**
-     * Orders the dimensions of the left and right input tensor according to the given kernel type.
-     *
-     * @param i_kernel_type ordering of the input tensors.
-     * @param i_num_dims_c number of C dimensions.
-     * @param i_num_dims_m number of M dimensions.
-     * @param i_num_dims_n number of N dimensions.
-     * @param i_num_dims_k number of K dimensions.
-     * @param i_num_dims_i number of I dimensions.
-     * @param i_num_dims_j number of J dimensions.
-     * @param i_num_dims_cb number of blocked C dimensions.
-     * @param i_num_dims_mb number of blocked M dimensions.
-     * @param i_num_dims_nb number of blocked N dimensions.
-     * @param i_num_dims_kb number of blocked K dimensions.
-     * @param i_num_dims_ib number of blocked I dimensions.
-     * @param i_num_dims_jb number of blocked J dimensions.
-     * @param i_dim_ids_c ids of the C dimensions.
-     * @param i_dim_ids_m ids of the M dimensions.
-     * @param i_dim_ids_n ids of the N dimensions.
-     * @param i_dim_ids_k ids of the K dimensions.
-     * @param i_dim_ids_i ids of the I dimensions.
-     * @param i_dim_ids_j ids of the J dimensions.
-     * @param o_dim_ids_left ordered dimension ids of the left tensor.
-     * @param o_dim_ids_right ordered dimensions ids of the right tensor.
-     *
-     * @return SUCCESS if successful, DIMENSION_ORDERING_FAILED if not.
-     **/
-    static err_t order_dims_in( tenord_t        i_tensor_ordering,
-                                int64_t         i_num_dims_c,
-                                int64_t         i_num_dims_m,
-                                int64_t         i_num_dims_n,
-                                int64_t         i_num_dims_k,
-                                int64_t         i_num_dims_i,
-                                int64_t         i_num_dims_j,
-                                int64_t         i_num_dims_cb,
-                                int64_t         i_num_dims_mb,
-                                int64_t         i_num_dims_nb,
-                                int64_t         i_num_dims_kb,
-                                int64_t         i_num_dims_ib,
-                                int64_t         i_num_dims_jb,
-                                int64_t const * i_dim_ids_c,
-                                int64_t const * i_dim_ids_m,
-                                int64_t const * i_dim_ids_n,
-                                int64_t const * i_dim_ids_k,
-                                int64_t const * i_dim_ids_i,
-                                int64_t const * i_dim_ids_j,
-                                int64_t       * o_dim_ids_left,
-                                int64_t       * o_dim_ids_right );
+                               std::vector< einsum_ir::dim_t >       * o_dim_types_out,
+                               std::vector<          int64_t >       * o_dim_ids_c,
+                               std::vector<          int64_t >       * o_dim_ids_m,
+                               std::vector<          int64_t >       * o_dim_ids_n,
+                               std::vector<          int64_t >       * o_dim_ids_k,
+                               std::vector<          int64_t >       * o_dim_ids_i,
+                               std::vector<          int64_t >       * o_dim_ids_j );
 
     /**
      * Derives the strides for the dimensions in a tensor.
@@ -290,161 +211,9 @@ class einsum_ir::backend::BinaryContraction {
      * @param o_strides will be set set to key-value (dim_id-stride) strides of the dimensions.
      **/
     static void strides( int64_t                              i_num_dims,
-                         int64_t const *                      i_dim_ids,
+                         int64_t                      const * i_dim_ids,
                          std::map< int64_t, int64_t > const * i_dim_sizes,
                          std::map< int64_t, int64_t >       * o_strides );
-
-    /**
-     * Derives the strides based on on the sizes of the dimensions in the respective tensors.
-     *
-     * @param i_num_dims_left number of dimensions of the left tensor.
-     * @param i_num_dims_right number of dimensions of the right tensor.
-     * @param i_num_dims_out number of dimensions of the output tensor.
-     * @param i_num_dims_c number of C dimensions.
-     * @param i_num_dims_m number of M dimensions.
-     * @param i_num_dims_n number of N dimensions.
-     * @param i_num_dims_k number of K dimensions.
-     * @param i_num_dims_i number of I dimensions.
-     * @param i_num_dims_j number of J dimensions.
-     * @param i_dim_ids_left dimension ids of the left tensor.
-     * @param i_dim_ids_right dimension ids of the right tensor.
-     * @param i_dim_ids_out dimensions ids of the output tensor.
-     * @param i_dim_ids_c ids of the C dimensions.
-     * @param i_dim_ids_m ids of the M dimensions.
-     * @param i_dim_ids_n ids of the N dimensions.
-     * @param i_dim_ids_k ids of the K dimensions.
-     * @param i_dim_ids_i ids of the I dimensions.
-     * @param i_dim_ids_j ids of the J dimensions.
-     * @param i_dim_sizes_left outer dimension sizes of the left tensor.
-     * @param i_dim_sizes_right outer dimension sizes of the right tensor.
-     * @param i_dim_sizes_out_aux outer dimension sizes of the auxiliary output tensor.
-     * @param i_dim_sizes_out outer dimension sizes of the output tensor.
-     * @param o_strides_left_c will be set to the strides of the left tensor's C dimensions.
-     * @param o_strides_left_m will be set to the strides of the left tensor's M dimensions.
-     * @param o_strides_left_k will be set to the strides of the left tensor's K dimensions.
-     * @param o_strides_left_i will be set to the strides of the left tensor's I dimensions.
-     * @param o_strides_right_c will be set to the strides of the right tensor's C dimensions.
-     * @param o_strides_right_n will be set to the strides of the right tensor's N dimensions.
-     * @param o_strides_right_k will be set to the strides of the right tensor's K dimensions.
-     * @param o_strides_right_j will be set to the strides of the right tensor's J dimensions.
-     * @param o_strides_out_aux_c will be set to the strides of the auxiliary output tensor's C dimensions.
-     * @param o_strides_out_aux_m will be set to the strides of the auxiliary output tensor's M dimensions.
-     * @param o_strides_out_aux_n will be set to the strides of the auxiliary output tensor's N dimensions.
-     * @param o_strides_out_c will be set to the strides of the output tensor's C dimensions.
-     * @param o_strides_out_m will be set to the strides of the output tensor's M dimensions.
-     * @param o_strides_out_n will be set to the strides of the output tensor's N dimensions.
-     **/
-    void strides( int64_t                              i_num_dims_left,
-                  int64_t                              i_num_dims_right,
-                  int64_t                              i_num_dims_out,
-                  int64_t                              i_num_dims_c,
-                  int64_t                              i_num_dims_m,
-                  int64_t                              i_num_dims_n,
-                  int64_t                              i_num_dims_k,
-                  int64_t                              i_num_dims_i,
-                  int64_t                              i_num_dims_j,
-                  int64_t                      const * i_dim_ids_left,
-                  int64_t                      const * i_dim_ids_right,
-                  int64_t                      const * i_dim_ids_out,
-                  int64_t                      const * i_dim_ids_c,
-                  int64_t                      const * i_dim_ids_m,
-                  int64_t                      const * i_dim_ids_n,
-                  int64_t                      const * i_dim_ids_k,
-                  int64_t                      const * i_dim_ids_i,
-                  int64_t                      const * i_dim_ids_j,
-                  std::map< int64_t, int64_t > const * i_dim_sizes_left,
-                  std::map< int64_t, int64_t > const * i_dim_sizes_right,
-                  std::map< int64_t, int64_t > const * i_dim_sizes_out_aux,
-                  std::map< int64_t, int64_t > const * i_dim_sizes_out,
-                  int64_t                            * o_strides_left_c,
-                  int64_t                            * o_strides_left_m,
-                  int64_t                            * o_strides_left_k,
-                  int64_t                            * o_strides_left_i,
-                  int64_t                            * o_strides_right_c,
-                  int64_t                            * o_strides_right_n,
-                  int64_t                            * o_strides_right_k,
-                  int64_t                            * o_strides_right_j,
-                  int64_t                            * o_strides_out_aux_c,
-                  int64_t                            * o_strides_out_aux_m,
-                  int64_t                            * o_strides_out_aux_n,
-                  int64_t                            * o_strides_out_c,
-                  int64_t                            * o_strides_out_m,
-                  int64_t                            * o_strides_out_n );
-
-    /**
-     * Applies the stride multiplier if possible.
-     *
-     * @param i_num_dims number of dimensions.
-     * @param i_dim_ids ids of the dimensions.
-     * @param i_mult_dim_id dimension id of the stride multiplier.
-     * @param i_mult_value value of the stride multiplier.
-     * @param io_strides strides of the dimensions which are possibly multiplied with the given value.
-     **/
-    static void apply_stride_multiplier( int64_t         i_num_dims,
-                                         int64_t const * i_dim_ids,
-                                         int64_t         i_mult_dim_id,
-                                         int64_t         i_mult_value,
-                                         int64_t       * io_strides );
-
-    /**
-     * Applies the given stride multipliers.
-     *
-     * @param i_num_dims_c number of C dimensions.
-     * @param i_num_dims_m number of M dimensions.
-     * @param i_num_dims_n number of N dimensions.
-     * @param i_num_dims_k number of K dimensions.
-     * @param i_stride_multipliers_left stride multipliers of the left tensor.
-     * @param i_stride_multipliers_right stride multipliers of the right tensor.
-     * @param i_stride_multipliers_out stride multipliers of the output tensor.
-     * @param i_dim_ids_c ids of the C dimensions.
-     * @param i_dim_ids_m ids of the M dimensions.
-     * @param i_dim_ids_n ids of the N dimensions.
-     * @param i_dim_ids_k ids of the K dimensions.
-     * @param io_strides_left_c left tensor's C strides which will be updated if a respective multipliers exists.
-     * @param io_strides_left_m left tensor's M strides which will be updated if a respective multipliers exists.
-     * @param io_strides_left_k left tensor's K strides which will be updated if a respective multipliers exists.
-     * @param io_strides_right_c right tensor's C strides which will be updated if a respective multipliers exists.
-     * @param io_strides_right_n right tensor's N strides which will be updated if a respective multipliers exists.
-     * @param io_strides_right_k right tensor's K strides which will be updated if a respective multipliers exists.
-     * @param io_strides_out_c output tensor's C strides which will be updated if a respective multipliers exists.
-     * @param io_strides_out_m output tensor's M strides which will be updated if a respective multipliers exists.
-     * @param io_strides_out_n output tensor's N strides which will be updated if a respective multipliers exists.
-     **/
-    static void apply_stride_multipliers( int64_t                              i_num_dims_c,
-                                          int64_t                              i_num_dims_m,
-                                          int64_t                              i_num_dims_n,
-                                          int64_t                              i_num_dims_k,
-                                          std::map< int64_t, int64_t > const * i_stride_multipliers_left,
-                                          std::map< int64_t, int64_t > const * i_stride_multipliers_right,
-                                          std::map< int64_t, int64_t > const * i_stride_multipliers_out,
-                                          int64_t                      const * i_dim_ids_c,
-                                          int64_t                      const * i_dim_ids_m,
-                                          int64_t                      const * i_dim_ids_n,
-                                          int64_t                      const * i_dim_ids_k,
-                                          int64_t                            * io_strides_left_c,
-                                          int64_t                            * io_strides_left_m,
-                                          int64_t                            * io_strides_left_k,
-                                          int64_t                            * io_strides_right_c,
-                                          int64_t                            * io_strides_right_n,
-                                          int64_t                            * io_strides_right_k,
-                                          int64_t                            * io_strides_out_c,
-                                          int64_t                            * io_strides_out_m,
-                                          int64_t                            * io_strides_out_n );
-
-    /**
-     * Determines the location of the primary dimension in a tensor corresponding to the given secondary one.
-     *
-     * @param i_dim_id_s id of the secondary dimension.
-     * @param i_num_dims_p number of primary dimensions.
-     * @param i_dim_ids_p dimension ids of the primary dimensions.
-     * @param i_dim_link_s_to_p dimension link from the secondary to the primary dimensions.
-     * @param o_location will be set to location of primary dimension in the tensor.
-     **/
-    static err_t link_secondary_to_primary( int64_t                              i_dim_id_s,
-                                            int64_t                              i_num_dims_p,
-                                            int64_t                      const * i_dim_ids_p,
-                                            std::map< int64_t, int64_t > const & i_dim_link_s_to_p,
-                                            int64_t                            & o_location );
 
     /**
      * Virtual destructor.
@@ -462,13 +231,9 @@ class einsum_ir::backend::BinaryContraction {
      * @param i_dim_sizes_outer_right mapping from the dimension ids to the right tensor's outer sizes.
      * @param i_dim_sizes_outer_out_aux mapping from the dimension ids to the auxiliary out tensor's outer sizes.
      * @param i_dim_sizes_outer_out mapping from the dimension ids to the out tensor's outer sizes.
-     * @param i_stride_multipliers_left stride multipliers of the left tensor (if any).
-     * @param i_stride_multipliers_right stride multipliers of the right tensor (if any).
-     * @param i_stride_multipliers_out stride multipliers of the output tensor (if any).
      * @param i_dim_ids_left dimension ids of the left tensor.
      * @param i_dim_ids_right dimension ids of the right tensor.
      * @param i_dim_ids_out dimensions ids of the output tensor.
-     * @param i_dim_link_s_to_p link from secondary dims to primary ones.
      * @param i_dtype_left datatype of the left input.
      * @param i_dtype_right datatype of the right input.
      * @param i_dtype_comp compute data type.
@@ -485,13 +250,9 @@ class einsum_ir::backend::BinaryContraction {
                std::map< int64_t, int64_t > const * i_dim_sizes_outer_right,
                std::map< int64_t, int64_t > const * i_dim_sizes_outer_out_aux,
                std::map< int64_t, int64_t > const * i_dim_sizes_outer_out,
-               std::map< int64_t, int64_t > const * i_stride_multipliers_left,
-               std::map< int64_t, int64_t > const * i_stride_multipliers_right,
-               std::map< int64_t, int64_t > const * i_stride_multipliers_out,
                int64_t                      const * i_dim_ids_left,
                int64_t                      const * i_dim_ids_right,
                int64_t                      const * i_dim_ids_out,
-               std::map< int64_t, int64_t > const * i_dim_link_s_to_p,
                data_t                               i_dtype_left,
                data_t                               i_dtype_right,
                data_t                               i_dtype_comp,
@@ -537,14 +298,6 @@ class einsum_ir::backend::BinaryContraction {
                            void const * i_tensor_right,
                            void const * i_tensor_out_aux,
                            void       * io_tensor_out ) = 0;
-
-    /**
-     * Gets the dimensions ids of the inputs in the order assumed by the contraction.
-     *
-     * @param i_side side for which the dimension are requested (0: left, 1:right).
-     * @return ordered dimension ids.
-     **/
-    int64_t const * dim_ids_in_ordered( int64_t i_side );
 
     /**
      * Gets the number of operations for a single contraction.

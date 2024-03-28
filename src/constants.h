@@ -15,25 +15,31 @@ namespace einsum_ir {
   } dim_t;
 
   typedef enum {
-    LEFT_NATIVE_RIGHT_NATIVE_OUT_NATIVE                                   = 0,
-    LEFT_BC_BM_BI_BK_RIGHT_BC_BN_BJ_BK_OUT_NATIVE                         = 1,
-    LEFT_BC_BM_BI_BK_IB_KB_MB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_OUT_NATIVE       = 2,
-    LEFT_BC_BM_BI_BK_IB_KB_MB_CB_RIGHT_BC_BN_BJ_BK_NB_JB_KB_CB_OUT_NATIVE = 3,
-    LEFT_BC_BM_BI_BK_CB_KB_MB_RIGHT_BC_BN_BJ_BK_CB_NB_KB_OUT_NATIVE       = 4,
-    UNDEFINED_TENORD                                                      = 99
+    LEFT_NATIVE_RIGHT_NATIVE_OUT_NATIVE                             = 0,
+    LEFT_BC_BM_BK_BI_KB_MB_RIGHT_BC_BN_BK_BJ_NB_KB_OUT_NATIVE       = 1,
+    LEFT_BC_BM_BK_BI_KB_MB_CB_RIGHT_BC_BN_BK_BJ_NB_KB_CB_OUT_NATIVE = 2,
+    LEFT_BC_BM_BK_BI_CB_KB_MB_RIGHT_BC_BN_BK_BJ_CB_NB_KB_OUT_NATIVE = 3,
+    UNDEFINED_TENORD                                                = 99
   } tenord_t;
 
   typedef enum {
-    SUCCESS                   = 0,
-    COMPILATION_FAILED        = 1,
-    DIMENSION_ORDERING_FAILED = 2,
-    NO_DATA_PTR_PROVIDED      = 3,
-    CALLED_BEFORE_COMPILATION = 4,
-    INVALID_ID                = 5,
-    INVALID_BACKEND           = 6,
-    INVALID_CPX_DIM           = 7,
-    INVALID_DTYPE             = 8,
-    INVALID_KTYPE             = 9,
+    LEFT_KB_X_MB_CB_RIGHT_NB_X_KB_CB_OUT_NB_X_MB_CB = 0,
+    LEFT_X_CB_KB_MB_RIGHT_X_CB_NB_KB_OUT_NB_X_MB_CB = 1,
+    UNDEFINED_PRIMBLO                               = 99
+  } primblo_t;
+
+  typedef enum {
+    SUCCESS                   =  0,
+    COMPILATION_FAILED        =  1,
+    DIMENSION_ORDERING_FAILED =  2,
+    TENSOR_BLOCKING_FAILED    =  3,
+    NO_DATA_PTR_PROVIDED      =  4,
+    CALLED_BEFORE_COMPILATION =  5,
+    INVALID_ID                =  6,
+    INVALID_BACKEND           =  7,
+    INVALID_CPX_DIM           =  8,
+    INVALID_DTYPE             =  9,
+    INVALID_KTYPE             = 10,
     UNDEFINED_ERROR           = 99
   } err_t;
 

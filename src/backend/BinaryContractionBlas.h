@@ -15,17 +15,46 @@ class einsum_ir::backend::BinaryContractionBlas: public BinaryContraction {
     //! contraction loop interface
     ContractionLoopsBlas m_cont_loops;
 
-    //! used tensor ordering
-    tenord_t m_tensor_ordering = UNDEFINED_TENORD;
+    //! BC sizes
+    std::vector< int64_t > m_sizes_bc;
+    //! BM sizes
+    std::vector< int64_t > m_sizes_bm;
+    //! BN sizes
+    std::vector< int64_t > m_sizes_bn;
+    //! BK sizes
+    std::vector< int64_t > m_sizes_bk;
 
-    //! number of blocked C dimensions
-    int64_t m_num_dims_cb = 0;
-    //! number of blocked M dimensions
-    int64_t m_num_dims_mb = 0;
-    //! number of blocked N dimensions
-    int64_t m_num_dims_nb = 0;
-    //! number of blocked K dimensions
-    int64_t m_num_dims_kb = 0;
+    //! BC strides of of the left tensor
+    std::vector< int64_t > m_strides_left_bc;
+    //! BM strides of the left tensor
+    std::vector< int64_t > m_strides_left_bm;
+    //! BK strides of the left tensor
+    std::vector< int64_t > m_strides_left_bk;
+    //! BI strides of the left tensor
+    std::vector< int64_t > m_strides_left_bi;
+
+    //! BC strides of the right tensor
+    std::vector< int64_t > m_strides_right_bc;
+    //! BN strides of the right tensor
+    std::vector< int64_t > m_strides_right_bn;
+    //! BK strides of the right tensor
+    std::vector< int64_t > m_strides_right_bk;
+    //! BJ strides of the right tensor
+    std::vector< int64_t > m_strides_right_bj;
+
+    //! BC strides of the auxiliary output tensor
+    std::vector< int64_t > m_strides_out_aux_bc;
+    //! BM strides of the auxiliary output tensor
+    std::vector< int64_t > m_strides_out_aux_bm;
+    //! BN strides of the auxiliary output tensor
+    std::vector< int64_t > m_strides_out_aux_bn;
+
+    //! BC strides of the output tensor
+    std::vector< int64_t > m_strides_out_bc;
+    //! BM strides of the output tensor
+    std::vector< int64_t > m_strides_out_bm;
+    //! BN strides of the output tensor
+    std::vector< int64_t > m_strides_out_bn;
 
   public:
     /**

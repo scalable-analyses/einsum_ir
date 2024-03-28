@@ -19,7 +19,6 @@ class einsum_ir::backend::BinaryContractionTpp: public BinaryContraction {
     //! LIBXSMM-based binary first-touch TPP
     libxsmm_meltwfunction_binary m_xmm_kernel_first_touch_binary = nullptr;
 
-
     //! LIBXSMM-based main TPP which is called in the innermost loop
     libxsmm_xmmfunction m_xmm_kernel_main;
 
@@ -29,32 +28,49 @@ class einsum_ir::backend::BinaryContractionTpp: public BinaryContraction {
     //! LIBXSMM-based binary last-touch TPP
     libxsmm_meltwfunction_binary m_xmm_kernel_last_touch_binary = nullptr;
 
-    //! used tensor ordering
-    tenord_t m_tensor_ordering = UNDEFINED_TENORD;
-
-    //! target blocked M dimension size of the generated standard GEMMs
-    int64_t m_size_mb_gemm_target = 64;
-
-    //! target blocked N dimension size of the generated standard GEMMs
-    int64_t m_size_nb_gemm_target = 48;
-
-    //! target blocked K dimension size of the generated standard GEMMs
-    int64_t m_size_kb_gemm_target = 64;
-
-    //! target block C dimension size of the generated packed GEMMs
-    int64_t m_size_cb_packed_gemm_target = 8;
-
-    //! number of blocked C dimensions
-    int64_t m_num_dims_cb = 0;
-    //! number of blocked M dimensions
-    int64_t m_num_dims_mb = 0;
-    //! number of blocked N dimensions
-    int64_t m_num_dims_nb = 0;
-    //! number of blocked K dimensions
-    int64_t m_num_dims_kb = 0;
-
     //! contraction loop interface
     ContractionLoopsTpp m_cont_loops;
+
+    //! BC sizes
+    std::vector< int64_t > m_sizes_bc;
+    //! BM sizes
+    std::vector< int64_t > m_sizes_bm;
+    //! BN sizes
+    std::vector< int64_t > m_sizes_bn;
+    //! BK sizes
+    std::vector< int64_t > m_sizes_bk;
+
+    //! BC strides of of the left tensor
+    std::vector< int64_t > m_strides_left_bc;
+    //! BM strides of the left tensor
+    std::vector< int64_t > m_strides_left_bm;
+    //! BK strides of the left tensor
+    std::vector< int64_t > m_strides_left_bk;
+    //! BI strides of the left tensor
+    std::vector< int64_t > m_strides_left_bi;
+
+    //! BC strides of the right tensor
+    std::vector< int64_t > m_strides_right_bc;
+    //! BN strides of the right tensor
+    std::vector< int64_t > m_strides_right_bn;
+    //! BK strides of the right tensor
+    std::vector< int64_t > m_strides_right_bk;
+    //! BJ strides of the right tensor
+    std::vector< int64_t > m_strides_right_bj;
+
+    //! BC strides of the auxiliary output tensor
+    std::vector< int64_t > m_strides_out_aux_bc;
+    //! BM strides of the auxiliary output tensor
+    std::vector< int64_t > m_strides_out_aux_bm;
+    //! BN strides of the auxiliary output tensor
+    std::vector< int64_t > m_strides_out_aux_bn;
+
+    //! BC strides of the output tensor
+    std::vector< int64_t > m_strides_out_bc;
+    //! BM strides of the output tensor
+    std::vector< int64_t > m_strides_out_bm;
+    //! BN strides of the output tensor
+    std::vector< int64_t > m_strides_out_bn;
 
     /**
      * Converts the given native datatype to a LIBXSMM datatype.

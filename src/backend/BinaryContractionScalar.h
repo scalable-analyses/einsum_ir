@@ -15,6 +15,38 @@ class einsum_ir::backend::BinaryContractionScalar: public BinaryContraction {
     //! contraction loop interface
     ContractionLoopsSimple m_cont_loops;
 
+    //! C strides of the left tensor
+    std::vector< int64_t > m_strides_left_c;
+    //! M strides of the left tensor
+    std::vector< int64_t > m_strides_left_m;
+    //! K strides of the left tensor
+    std::vector< int64_t > m_strides_left_k;
+    //! I strides of the left tensor
+    std::vector< int64_t > m_strides_left_i;
+
+    //! C strides of the right tensor
+    std::vector< int64_t > m_strides_right_c;
+    //! N strides of the right tensor
+    std::vector< int64_t > m_strides_right_n;
+    //! K strides of the right tensor
+    std::vector< int64_t > m_strides_right_k;
+    //! J strides of the right tensor
+    std::vector< int64_t > m_strides_right_j;
+
+    //! C strides of the auxiliary output tensor
+    std::vector< int64_t > m_strides_out_aux_c;
+    //! M strides of the auxiliary output tensor
+    std::vector< int64_t > m_strides_out_aux_m;
+    //! N strides of the auxiliary output tensor
+    std::vector< int64_t > m_strides_out_aux_n;
+
+    //! C strides of the output tensor
+    std::vector< int64_t > m_strides_out_c;
+    //! M strides of the output tensor
+    std::vector< int64_t > m_strides_out_m;
+    //! N strides of the output tensor
+    std::vector< int64_t > m_strides_out_n;
+
     /**
      * Compiler-based zero kernel.
      *
@@ -74,14 +106,6 @@ class einsum_ir::backend::BinaryContractionScalar: public BinaryContraction {
                                   void       * ) = nullptr;
 
   public:
-    /**
-     * Compiles the binary contraction.
-     *
-     * @param i_tensor_ordering used ordering of the input tensors.
-     * @return SUCCESS if successful, error code otherwise.
-     **/
-    err_t compile( tenord_t i_tensor_ordering );
-
     /**
      * Compiles the binary contraction.
      * @return SUCCESS if successful, error code otherwise.

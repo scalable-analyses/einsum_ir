@@ -32,7 +32,7 @@ class einsum_ir::backend::EinsumNode {
     //! external dimension ids of the node's tensor
     int64_t const * m_dim_ids_ext = nullptr;
     //! internal dimension ids of the node's tensor
-    int64_t const * m_dim_ids_int = nullptr;
+    std::vector< int64_t > m_dim_ids_int;
 
     //! id to size mapping for the inner dimensions
     std::map< int64_t, int64_t > const * m_dim_sizes_inner = nullptr;
@@ -42,14 +42,6 @@ class einsum_ir::backend::EinsumNode {
 
     //! id to size mapping for the tensor's (if any) outer dimensions
     std::map< int64_t, int64_t > const * m_dim_sizes_outer = nullptr;
-
-    //! strides (if any) of the tensor's children if other than one
-    std::vector< std::map< int64_t, int64_t > const * > m_strides_children;
-    //! strides of the tensor itself
-    std::map< int64_t, int64_t > const * m_strides = nullptr;
-
-    //! link between secondary dimensions and primary dimensions
-    std::map< int64_t, int64_t > const * m_dim_link_s_to_p = nullptr;
 
 
     //! children of the node
@@ -148,10 +140,6 @@ class einsum_ir::backend::EinsumNode {
      * @param i_dim_sizes_outer dimension id to outer size mapping for the data. optional: use nullptr if not needed.
      * @param i_offsets_aux offsets applied to the auxiliary data pointer in the node-local binary contraction. optional: use nullptr if not needed.
      * @param i_offsets offsets applied to the data pointer in the node-local binary contraction. optional: use nullptr if not needed.
-     * @param i_strides_left left strides of the dimensions, default: stride is assumed to be 1. optional: use nullptr if not needed.
-     * @param i_strides_right right strides of the dimensions, default: stride is assumed to be 1. optional: use nullptr if not needed.
-     * @param i_strides strides of the tensor itself dimensions, default: stride is assumed to be 1. optional: use nullptr if not needed.
-     * @param i_dim_link_s_to_p link from secondary dims to primary ones. optional: use nullptr if not needed.
      * @param i_dtype datatype of the node's tensor.
      * @param i_data_ptr_aux data pointer of the auxiliary tensor. optional: use nullptr if not needed.
      * @param i_data_ptr data pointer of the tensor.
@@ -168,10 +156,6 @@ class einsum_ir::backend::EinsumNode {
                std::map< int64_t, int64_t > const * i_dim_sizes_outer,
                std::map< int64_t, int64_t > const * i_offsets_aux,
                std::map< int64_t, int64_t > const * i_offsets,
-               std::map< int64_t, int64_t > const * i_strides_left,
-               std::map< int64_t, int64_t > const * i_strides_right,
-               std::map< int64_t, int64_t > const * i_strides,
-               std::map< int64_t, int64_t > const * i_dim_link_s_to_p,
                data_t                               i_dtype,
                void                               * i_data_ptr_aux,
                void                               * i_data_ptr,
@@ -180,13 +164,6 @@ class einsum_ir::backend::EinsumNode {
                kernel_t                             i_ktype_last_touch,
                EinsumNode                         * i_left,
                EinsumNode                         * i_right );
-
-    /**
-     * Compiles the contraction of the node and recursively those of all children.
-     *
-     * @param i_dim_ids_req required ordering of the tensors dimension. 
-     **/
-    err_t compile( int64_t const * i_dim_ids_req );
 
     /**
      * Compiles the contraction of the node and recursively those of all children.

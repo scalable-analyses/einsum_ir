@@ -2,6 +2,8 @@
 #include "UnaryTpp.h"
 #include "Tensor.h"
 #include "BinaryContractionFactory.h"
+#include "BinaryPrimitives.h"
+#include <algorithm>
 
 einsum_ir::backend::EinsumNode::~EinsumNode() {
   if( m_unary != nullptr ) {
@@ -31,7 +33,10 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
 
   m_num_dims            = i_num_dims;
   m_dim_ids_ext         = i_dim_ids;
-  m_dim_ids_int         = nullptr;
+  m_dim_ids_int.resize( m_num_dims );
+  std::copy( m_dim_ids_ext,
+             m_dim_ids_ext + m_num_dims,
+             m_dim_ids_int.begin() );
 
   m_dim_sizes_inner     = i_dim_sizes_inner;
   if( i_dim_sizes_outer != nullptr ) {
@@ -43,11 +48,6 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
 
   m_offsets_aux_ext     = nullptr;
   m_offsets_ext         = nullptr;
-
-  m_strides_children.resize(0);
-  m_strides             = nullptr;
-
-  m_dim_link_s_to_p     = nullptr;
 
   m_children.resize(0);
   m_data_ptr_int        = nullptr;
@@ -93,10 +93,6 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
                                            std::map< int64_t, int64_t > const * i_dim_sizes_outer,
                                            std::map< int64_t, int64_t > const * i_offsets_aux,
                                            std::map< int64_t, int64_t > const * i_offsets,
-                                           std::map< int64_t, int64_t > const * i_strides_left,
-                                           std::map< int64_t, int64_t > const * i_strides_right,
-                                           std::map< int64_t, int64_t > const * i_strides,
-                                           std::map< int64_t, int64_t > const * i_dim_link_s_to_p,
                                            data_t                               i_dtype,
                                            void                               * i_data_ptr_aux,
                                            void                               * i_data_ptr,
@@ -115,23 +111,17 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
   m_dim_sizes_aux_outer = i_dim_sizes_aux_outer;
   m_offsets_aux_ext     = i_offsets_aux;
   m_offsets_ext         = i_offsets;
-  m_strides             = i_strides;
-  m_dim_link_s_to_p     = i_dim_link_s_to_p;
   m_data_ptr_aux_ext    = i_data_ptr_aux;
   m_ktype_first_touch   = i_ktype_first_touch;
   m_ktype_main          = i_ktype_main;
   m_ktype_last_touch    = i_ktype_last_touch;
-
-  m_strides_children.resize( 2 );
-  m_strides_children[0] = i_strides_left;
-  m_strides_children[1] = i_strides_right;
 
   m_children.resize( 2 );
   m_children[0] = i_left;
   m_children[1] = i_right;
 }
 
-einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_ids_req ) {
+einsum_ir::err_t einsum_ir::backend::EinsumNode::compile() {
   err_t l_err = err_t::UNDEFINED_ERROR;
 
   // derive backend for binary contractions
@@ -159,8 +149,6 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
     return err_t::INVALID_BACKEND;
   }
 
-  m_dim_ids_int = i_dim_ids_req;
-
   m_size = Tensor::size( ce_n_bytes( m_dtype ),
                          m_num_dims,
                          m_dim_ids_ext,
@@ -168,6 +156,35 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
 
   // compile contraction
   if( m_children.size() == 2 ) {
+    // swap left and right if required by the primitives
+    bool l_swap_inputs = BinaryPrimitives::swap_inputs( m_children[0]->m_num_dims,
+                                                        m_children[1]->m_num_dims,
+                                                        m_num_dims,
+                                                        m_children[0]->m_dim_ids_ext,
+                                                        m_children[1]->m_dim_ids_ext,
+                                                        m_dim_ids_int.data() );
+    if( l_swap_inputs ) {
+      std::swap( m_children[0],
+                 m_children[1] );
+    }
+
+    // reorder dimensions of input tensors for the primitives
+    BinaryPrimitives l_bin_prims;
+    l_bin_prims.init( m_dtype,
+                      m_btype_binary );
+
+    l_err = l_bin_prims.reorder( m_btype_binary,
+                                 m_children[0]->m_num_dims,
+                                 m_children[1]->m_num_dims,
+                                 m_num_dims,
+                                 m_dim_sizes_inner,
+                                 m_children[0]->m_dim_ids_int.data(),
+                                 m_children[1]->m_dim_ids_int.data(),
+                                 m_dim_ids_int.data() );
+    if( l_err != einsum_ir::SUCCESS ) {
+      return l_err;
+    }
+
     m_cont = BinaryContractionFactory::create( m_btype_binary );
     m_cont->init( m_children[0]->m_num_dims,
                   m_children[1]->m_num_dims,
@@ -177,13 +194,9 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
                   m_children[1]->m_dim_sizes_outer,
                   m_dim_sizes_aux_outer,
                   m_dim_sizes_outer,
-                  m_strides_children[0],
-                  m_strides_children[1],
-                  m_strides,
-                  m_children[0]->m_dim_ids_ext,
-                  m_children[1]->m_dim_ids_ext,
-                  i_dim_ids_req,
-                  m_dim_link_s_to_p,
+                  m_children[0]->m_dim_ids_int.data(),
+                  m_children[1]->m_dim_ids_int.data(),
+                  m_dim_ids_int.data(),
                   m_children[0]->m_dtype,
                   m_children[1]->m_dtype,
                   m_dtype,
@@ -200,10 +213,10 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
 
   // check if a permutation of the inputs is required
   bool l_permute_inputs = false;
-  if(    m_dim_ids_ext != m_dim_ids_int
+  if(    m_dim_ids_ext != m_dim_ids_int.data()
       && m_data_ptr_ext != nullptr ) {
     for( int64_t l_di = 0; l_di < m_num_dims; l_di++ ) {
-      if( m_dim_ids_ext[l_di] != m_dim_ids_int[l_di] ) {
+      if( m_dim_ids_ext[l_di] != m_dim_ids_int.data()[l_di] ) {
         l_permute_inputs = true;
         break;
       }
@@ -217,7 +230,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
     m_unary->init( m_num_dims,
                    m_dim_sizes_outer,
                    m_dim_ids_ext,
-                   m_dim_ids_int,
+                   m_dim_ids_int.data(),
                    m_dtype,
                    m_dtype,
                    m_dtype,
@@ -283,8 +296,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile( int64_t const * i_dim_
   // compile children
   if( m_children.size() > 1 ) {
     for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
-      int64_t const * l_dim_ids_child = m_cont->dim_ids_in_ordered( l_ch );
-      l_err = m_children[l_ch]->compile( l_dim_ids_child );
+      l_err = m_children[l_ch]->compile();
       if( l_err != einsum_ir::SUCCESS ) {
         return l_err;
       }
@@ -324,11 +336,6 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::threading_intra_op( int64_t i_n
   }
 #endif
   return einsum_ir::SUCCESS;
-}
-
-einsum_ir::err_t einsum_ir::backend::EinsumNode::compile() {
-  err_t l_err = compile( m_dim_ids_ext );
-  return l_err;
 }
 
 einsum_ir::err_t einsum_ir::backend::EinsumNode::store_and_lock_data() {

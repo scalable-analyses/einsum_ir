@@ -38,11 +38,10 @@ l_sources = [ 'backend/Tensor.cpp',
               'backend/ContractionLoopsSimple.cpp',
               'backend/BinaryContraction.cpp',
               'backend/BinaryContractionScalar.cpp',
+              'backend/BinaryPrimitives.cpp',
               'backend/EinsumNode.cpp',
               'frontend/EinsumExpression.cpp',
-              'frontend/EinsumExpressionAscii.cpp',
-              'frontend/ResidualBlock.cpp',
-              'frontend/ResidualBlockDownSample.cpp' ]
+              'frontend/EinsumExpressionAscii.cpp' ]
 
 if g_env['libxsmm'] != False:
   l_sources += [ 'backend/UnaryLoopsTpp.cpp',
@@ -58,19 +57,15 @@ l_tests = [ 'tests.cpp',
             'backend/Unary.test.cpp',
             'backend/ContractionLoopsSimple.test.cpp',
             'backend/BinaryContraction.test.cpp',
+            'backend/BinaryPrimitives.test.cpp',
             'frontend/EinsumExpression.test.cpp' ]
-
-if g_env['libxsmm'] != False:
-  l_tests += [ 'backend/BinaryContractionTpp.test.cpp' ]
 
 if g_env['libtorch'] != False:
   l_tests += [ 'backend/UnaryLoopsSimple.test.torch.cpp',
                'backend/UnaryScalar.test.torch.cpp',
                'backend/BinaryContractionScalar.test.torch.cpp',
                'backend/EinsumNode.test.torch.cpp',
-               'frontend/EinsumExpression.test.torch.cpp',
-               'frontend/ResidualBlock.test.torch.cpp',
-               'frontend/ResidualBlockDownSample.test.torch.cpp' ]
+               'frontend/EinsumExpression.test.torch.cpp' ]
 
 if g_env['libxsmm'] != False and g_env['libtorch'] != False:
   l_tests += [ 'backend/UnaryTpp.test.torch.cpp',
@@ -95,6 +90,5 @@ if g_env['libxsmm'] != False and g_env['libtorch'] != False:
   g_env.exe['bench_binary']     = g_env.Object( 'bench_binary.cpp' )
   g_env.exe['bench_expression'] = g_env.Object( 'bench_expression.cpp' )
   g_env.exe['bench_mlp']        = g_env.Object( 'bench_mlp.cpp' )
-  g_env.exe['bench_resnet']     = g_env.Object( 'bench_resnet.cpp' )
 
 Export('g_env')

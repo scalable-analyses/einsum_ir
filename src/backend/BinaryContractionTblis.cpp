@@ -28,19 +28,16 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTblis::compile() {
     return einsum_ir::err_t::INVALID_KTYPE;
   }
 
-  int64_t const * l_dim_ids_left  = m_dim_ids_left_native;
-  int64_t const * l_dim_ids_right = m_dim_ids_right_native;
-
   // derive strides
   std::map< int64_t, int64_t > l_strides_left;
   strides( m_num_dims_left,
-           l_dim_ids_left,
+           m_dim_ids_left,
            m_dim_sizes_outer_left,
            &l_strides_left );
 
   std::map< int64_t, int64_t > l_strides_right;
   strides( m_num_dims_right,
-           l_dim_ids_right,
+           m_dim_ids_right,
            m_dim_sizes_outer_right,
            &l_strides_right );
 
@@ -53,13 +50,13 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTblis::compile() {
   // convert strides to tblis format
   m_tblis_strides_left.resize( m_num_dims_left );
   for( int64_t l_di = 0; l_di < m_num_dims_left; l_di++ ) {
-    int64_t l_id = l_dim_ids_left[ l_di ];
+    int64_t l_id = m_dim_ids_left[ l_di ];
     m_tblis_strides_left[ l_di ] = l_strides_left.at( l_id );
   }
 
   m_tblis_strides_right.resize( m_num_dims_right );
   for( int64_t l_di = 0; l_di < m_num_dims_right; l_di++ ) {
-    int64_t l_id = l_dim_ids_right[ l_di ];
+    int64_t l_id = m_dim_ids_right[ l_di ];
     m_tblis_strides_right[ l_di ] = l_strides_right.at( l_id );
   }
 
@@ -72,13 +69,13 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTblis::compile() {
   // convert sizes to tblis format
   m_tblis_sizes_left.resize( m_num_dims_left );
   for( int64_t l_di = 0; l_di < m_num_dims_left; l_di++ ) {
-    int64_t l_id = l_dim_ids_left[ l_di ];
+    int64_t l_id = m_dim_ids_left[ l_di ];
     m_tblis_sizes_left[ l_di ] = m_dim_sizes_inner->at( l_id );
   }
 
   m_tblis_sizes_right.resize( m_num_dims_right );
   for( int64_t l_di = 0; l_di < m_num_dims_right; l_di++ ) {
-    int64_t l_id = l_dim_ids_right[ l_di ];
+    int64_t l_id = m_dim_ids_right[ l_di ];
     m_tblis_sizes_right[ l_di ] = m_dim_sizes_inner->at( l_id );
   }
 
@@ -134,10 +131,10 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTblis::compile() {
   // derive unique dimension ids
   std::set< int64_t > l_ids_unique;
   for( int64_t l_di = 0; l_di < m_num_dims_left; l_di++ ) {
-    l_ids_unique.insert( l_dim_ids_left[ l_di ] );
+    l_ids_unique.insert( m_dim_ids_left[ l_di ] );
   }
   for( int64_t l_di = 0; l_di < m_num_dims_right; l_di++ ) {
-    l_ids_unique.insert( l_dim_ids_right[ l_di ] );
+    l_ids_unique.insert( m_dim_ids_right[ l_di ] );
   }
   for( int64_t l_di = 0; l_di < m_num_dims_out; l_di++ ) {
     l_ids_unique.insert( m_dim_ids_out[ l_di ] );
@@ -154,7 +151,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTblis::compile() {
   // create tblis ids
   m_tblis_dim_ids_left.resize( m_num_dims_left );
   for( int64_t l_di = 0; l_di < m_num_dims_left; l_di++ ) {
-    int64_t l_id = l_dim_ids_left[ l_di ];
+    int64_t l_id = m_dim_ids_left[ l_di ];
     l_id_tblis = l_ids_map[ l_id];
 
     if( l_id_tblis >= 256 ) {
@@ -165,7 +162,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTblis::compile() {
 
   m_tblis_dim_ids_right.resize( m_num_dims_right );
   for( int64_t l_di = 0; l_di < m_num_dims_right; l_di++ ) {
-    int64_t l_id = l_dim_ids_right[ l_di ];
+    int64_t l_id = m_dim_ids_right[ l_di ];
     l_id_tblis = l_ids_map[ l_id ];
 
     if( l_id_tblis >= 256 ) {
