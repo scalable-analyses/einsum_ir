@@ -274,7 +274,7 @@ int main( int     i_argc,
     l_tree = l_einsum_exp.to_string();
   }
   if( l_print_tree == 1 ) {
-    std::cout << std::endl << l_tree;
+    std::cout << l_tree;
   }
   else if( l_print_tree == 2 ) {
     // replace dimension ids with names (descending order)
@@ -290,7 +290,7 @@ int main( int     i_argc,
         l_pos += l_dim_name_str.size();
       }
     }
-    std::cout << std::endl << l_tree;
+    std::cout << l_tree;
   }
 
   // stage input tensors if requested
