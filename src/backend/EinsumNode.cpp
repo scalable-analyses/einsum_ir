@@ -73,9 +73,6 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
   else if( strcmp( l_btype, "SCALAR") == 0 ) {
     m_btype_binary = backend_t::SCALAR;
   }
-  else {
-    std::cout << "Invalid backend type: " << l_btype << std::endl;
-  }
 
   m_unary               = nullptr;
   m_cont                = nullptr;
