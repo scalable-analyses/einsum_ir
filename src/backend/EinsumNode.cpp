@@ -4,6 +4,7 @@
 #include "BinaryContractionFactory.h"
 #include "BinaryPrimitives.h"
 #include <algorithm>
+#include <cstdlib>
 
 einsum_ir::backend::EinsumNode::~EinsumNode() {
   if( m_unary != nullptr ) {
@@ -55,6 +56,26 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
 
   m_btype_unary         = backend_t::AUTO;
   m_btype_binary        = backend_t::AUTO;
+  char * l_btype = std::getenv( "EINSUM_IR_BACKEND" );
+  if( l_btype == nullptr ) {}
+  else if( strcmp( l_btype, "AUTO") == 0 ) {
+    m_btype_binary = backend_t::AUTO;
+  }
+  else if( strcmp( l_btype, "TPP") == 0 ) {
+    m_btype_binary = backend_t::TPP;
+  }
+  else if( strcmp( l_btype, "BLAS") == 0 ) {
+    m_btype_binary = backend_t::BLAS;
+  }
+  else if( strcmp( l_btype, "TBLIS") == 0 ) {
+    m_btype_binary = backend_t::TBLIS;
+  }
+  else if( strcmp( l_btype, "SCALAR") == 0 ) {
+    m_btype_binary = backend_t::SCALAR;
+  }
+  else {
+    std::cout << "Invalid backend type: " << l_btype << std::endl;
+  }
 
   m_unary               = nullptr;
   m_cont                = nullptr;
