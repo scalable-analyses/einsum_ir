@@ -74,6 +74,20 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
     m_btype_binary = backend_t::SCALAR;
   }
 
+  m_reorder_dims = true;
+  char * l_reorder_dims = std::getenv( "EINSUM_IR_REORDER_DIMS" );
+  if( l_reorder_dims != nullptr ) {
+    if( strcmp( l_reorder_dims, "1" ) == 0 ) {
+      m_reorder_dims = true;
+    }
+    else if( strcmp( l_reorder_dims, "true" ) == 0 ) {
+      m_reorder_dims = true;
+    }
+    else {
+      m_reorder_dims = false;
+    }
+  }
+
   m_unary               = nullptr;
   m_cont                = nullptr;
 
@@ -187,20 +201,22 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile() {
     }
 
     // reorder dimensions of input tensors for the primitives
-    BinaryPrimitives l_bin_prims;
-    l_bin_prims.init( m_dtype,
-                      m_btype_binary );
+    if( m_reorder_dims ) {
+      BinaryPrimitives l_bin_prims;
+      l_bin_prims.init( m_dtype,
+                        m_btype_binary );
 
-    l_err = l_bin_prims.reorder( m_btype_binary,
-                                 m_children[0]->m_num_dims,
-                                 m_children[1]->m_num_dims,
-                                 m_num_dims,
-                                 m_dim_sizes_inner,
-                                 m_children[0]->m_dim_ids_int.data(),
-                                 m_children[1]->m_dim_ids_int.data(),
-                                 m_dim_ids_int.data() );
-    if( l_err != einsum_ir::SUCCESS ) {
-      return l_err;
+      l_err = l_bin_prims.reorder( m_btype_binary,
+                                  m_children[0]->m_num_dims,
+                                  m_children[1]->m_num_dims,
+                                  m_num_dims,
+                                  m_dim_sizes_inner,
+                                  m_children[0]->m_dim_ids_int.data(),
+                                  m_children[1]->m_dim_ids_int.data(),
+                                  m_dim_ids_int.data() );
+      if( l_err != einsum_ir::SUCCESS ) {
+        return l_err;
+      }
     }
 
     m_cont = BinaryContractionFactory::create( m_btype_binary );

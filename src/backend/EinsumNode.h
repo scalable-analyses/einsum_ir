@@ -66,6 +66,9 @@ class einsum_ir::backend::EinsumNode {
     //! effective offset in bytes
     int64_t m_offset_bytes = 0;
 
+    //! true if dimension reordering is enabled
+    bool m_reorder_dims = false;
+
     //! backend types
     backend_t m_btype_unary  = backend_t::UNDEFINED_BACKEND;
     backend_t m_btype_binary = backend_t::UNDEFINED_BACKEND;
