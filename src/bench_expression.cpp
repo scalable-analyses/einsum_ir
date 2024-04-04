@@ -9,13 +9,14 @@ int main( int     i_argc,
           char  * i_argv[] ) {
   if( i_argc < 4 ) {
     std::cerr << "Usage:" << std::endl;
-    std::cerr << "  bench_expression einsum_string dimension_sizes contraction_path dtype store_lock" << std::endl;
+    std::cerr << "  bench_expression einsum_string dimension_sizes contraction_path dtype store_lock print_tree" << std::endl;
     std::cerr << std::endl;
     std::cerr << "Arguments:" << std::endl;
     std::cerr << "  * dimension_sizes:  Dimension sizes have to be in ascending order of the dimension ids." << std::endl;
     std::cerr << "  * contraction_path: Contraction path." << std::endl;
     std::cerr << "  * dtype:            FP32, FP64, CPX_FP32 or CPX_FP64, default: FP32." << std::endl;
     std::cerr << "  * store_lock:       If 1 all einsum_ir input tensors are stored and locked before evaluation, default: 0." << std::endl;
+    std::cerr << "  * print_tree:       If not 0 the einsum tree is printed (1: dimension ids, 2: characters), default: 0." << std::endl;
     std::cerr << std::endl;
     std::cerr << "Example:" << std::endl;
     std::cerr << "  ./bench_expression \"iae,bf,dcba,cg,dh->hgfei\" \"32,8,4,2,16,64,8,8,8\" \"(1,2),(2,3),(0,1),(0,1)\"" << std::endl;
@@ -64,6 +65,14 @@ int main( int     i_argc,
   std::map< char, int64_t > m_map_dim_name_to_id;
   einsum_ir::frontend::EinsumExpressionAscii::parse_dim_ids( l_expression_string,
                                                              m_map_dim_name_to_id );
+
+  std::cout << "parsed dimension ids:" << std::endl;
+  for( std::map< char, int64_t >::iterator l_di = m_map_dim_name_to_id.begin(); l_di != m_map_dim_name_to_id.end(); l_di++ ) {
+    char l_dim_name = l_di->first;
+    int64_t l_dim_id = l_di->second;
+
+    std::cout << "  " << l_dim_name << ": " <<  l_dim_id << std::endl;
+  }
 
   std::cout << "parsed dimension sizes:" << std::endl;
   // iterate over keys of map dim name to id
@@ -142,6 +151,19 @@ int main( int     i_argc,
     }
   }
   std::cout << "store and lock: " << l_store_and_lock << std::endl;
+
+  /*
+   * parse print_tree
+   */
+  int64_t l_print_tree = 0;
+  if( i_argc > 6 ) {
+    l_print_tree = std::stoi( i_argv[6] );
+  }
+  if( l_print_tree < 0 || l_print_tree > 2 ) {
+    std::cerr << "error: invalid print_tree argument" << std::endl;
+    return EXIT_FAILURE;
+  }
+  std::cout << "print_tree: " << l_print_tree << std::endl;
 
   /*
    * assemble einsum_ir data structures
@@ -244,6 +266,31 @@ int main( int     i_argc,
   if( l_err != einsum_ir::SUCCESS ) {
     std::cerr << "error: failed to compile einsum_ir expression" << std::endl;
     return EXIT_FAILURE;
+  }
+
+  // print einsum tree
+  std::string l_tree = "";
+  if( l_print_tree != 0 ) {
+    l_tree = l_einsum_exp.to_string();
+  }
+  if( l_print_tree == 1 ) {
+    std::cout << std::endl << l_tree;
+  }
+  else if( l_print_tree == 2 ) {
+    // replace dimension ids with names (descending order)
+    for( std::map< char, int64_t >::reverse_iterator l_di = m_map_dim_name_to_id.rbegin(); l_di != m_map_dim_name_to_id.rend(); l_di++ ) {
+      char l_dim_name = l_di->first;
+      int64_t l_dim_id = l_di->second;
+
+      std::string l_dim_id_str = std::to_string( l_dim_id );
+      std::string l_dim_name_str( 1, l_dim_name );
+      size_t l_pos = 0;
+      while( (l_pos = l_tree.find( l_dim_id_str, l_pos )) != std::string::npos ) {
+        l_tree.replace( l_pos, l_dim_id_str.size(), l_dim_name_str );
+        l_pos += l_dim_name_str.size();
+      }
+    }
+    std::cout << std::endl << l_tree;
   }
 
   // stage input tensors if requested

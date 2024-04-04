@@ -2,6 +2,8 @@
 #include <deque>
 #include <set>
 #include <cmath>
+#include <string>
+#include <sstream>
 #ifdef _OPENMP
 #include "omp.h"
 #endif
@@ -379,4 +381,130 @@ int64_t einsum_ir::frontend::EinsumExpression::num_ops() {
   else {
     return 0;
   }
+}
+
+std::string einsum_ir::frontend::EinsumExpression::to_string() const {
+  if( m_compiled == false ) {
+    return "Error: Expression not compiled.";
+  }
+
+  std::vector< backend::EinsumNode const * > l_nodes;
+  std::vector< int64_t > l_pos;
+  std::vector< int64_t > l_offset_lvl;
+
+  l_nodes.push_back( &m_nodes.back() );
+  l_pos.push_back( 0 );
+  l_offset_lvl.push_back( 0 );
+  l_offset_lvl.push_back( 1 );
+
+  int64_t l_lvl = 0;
+  while( true ) {
+    // extract nodes and positions of next level
+    for( int64_t l_no = l_offset_lvl[l_lvl]; l_no < l_offset_lvl[l_lvl+1]; l_no++ ) {
+      backend::EinsumNode const * l_node = l_nodes[l_no];
+
+      // add children
+      for( std::size_t l_ch = 0; l_ch < l_node->m_children.size(); l_ch++ ) {
+        l_nodes.push_back( l_node->m_children[l_ch] );
+        l_pos.push_back( 2*l_pos[l_no] + l_ch );
+      }
+    }
+
+    // update level offset
+    if( (int64_t) l_nodes.size() > l_offset_lvl.back() ) {
+      l_offset_lvl.push_back( l_nodes.size() );
+    }
+    else {
+      break;
+    }
+    l_lvl++;
+  }
+  int64_t l_num_lvls = l_lvl + 1;
+
+  // create a string representation of each node
+  std::vector< std::string > l_nodes_str( l_nodes.size() );
+  for( std::size_t l_no = 0; l_no < l_nodes.size(); l_no++ ) {
+    std::string l_dims = "";
+    for( int64_t l_di = 0; l_di < l_nodes[l_no]->m_num_dims; l_di++ ) {
+      l_dims += std::to_string( l_nodes[l_no]->m_dim_ids_int[l_di] );
+      if( l_di < l_nodes[l_no]->m_num_dims-1 ) {
+        l_dims += " ";
+      }
+    }
+    l_nodes_str[l_no] = l_dims;
+  }
+
+  // determine max size of string representations
+  int64_t l_max_size = 0;
+  for( std::size_t l_no = 0; l_no < l_nodes.size(); l_no++ ) {
+    if( (int64_t) l_nodes_str[l_no].size() > l_max_size ) {
+      l_max_size = l_nodes_str[l_no].size();
+    }
+  }
+
+  // pad string representations
+  for( std::size_t l_no = 0; l_no < l_nodes.size(); l_no++ ) {
+    while( (int64_t) l_nodes_str[l_no].size() < l_max_size ) {
+      l_nodes_str[l_no] += " ";
+    }
+  }
+
+  // scale positions to obtain correct spacing between nodes
+  // [...]
+  // lvl 3: 2^3 = 8
+  // lvl 2: 2^2 = 4
+  // lvl 0: 2^1 = 2
+  l_lvl = 0;
+  while( l_lvl < l_num_lvls ) {
+    int64_t l_scale = std::pow( 2, l_num_lvls-l_lvl );
+    for( int64_t l_no = l_offset_lvl[l_lvl]; l_no < l_offset_lvl[l_lvl+1]; l_no++ ) {
+      l_pos[l_no] *= l_scale;
+    }
+    l_lvl++;
+  }
+
+  // adjust positions to account for initial white space
+  // [...]
+  // lvl 2: 2^2 - 1 = 3
+  // lvl 1: 2^1 - 1 = 1
+  // lvl 0: 2^0 - 1 = 0
+  l_lvl = 0;
+  while( l_lvl < l_num_lvls ) {
+    int64_t l_num_ws = std::pow( 2, l_num_lvls-l_lvl-1 ) - 1;
+    for( int64_t l_no = l_offset_lvl[l_lvl]; l_no < l_offset_lvl[l_lvl+1]; l_no++ ) {
+      l_pos[l_no] += l_num_ws;
+    }
+    l_lvl++;
+  }
+
+  // create whitespaces matching the max dims sizes
+  std::string l_ws = std::string( l_max_size, ' ' );
+
+  // assemble output string
+  std::stringstream l_result;
+
+  l_lvl = 0;
+  while( l_lvl < (int64_t) l_offset_lvl.size() ) {
+    int64_t l_po = 0;
+
+    for( int64_t l_no = l_offset_lvl[l_lvl]; l_no < l_offset_lvl[l_lvl+1]; l_no++ ) {
+      while( l_po < l_pos[l_no] ) {
+        l_result << l_ws;
+        l_po++;
+      }
+
+      l_result << l_nodes_str[l_no];
+      l_po++;
+    }
+    l_result << std::endl;
+    l_lvl++;
+  }
+
+  return l_result.str();
+}
+
+std::ostream & einsum_ir::frontend::operator<<( std::ostream                                & io_stream,
+                                                einsum_ir::frontend::EinsumExpression const & i_expr ) {
+  io_stream << i_expr.to_string();
+  return io_stream;
 }

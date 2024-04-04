@@ -2,11 +2,23 @@
 #define EINSUM_IR_FRONTEND_EINSUM_EXPRESSION
 
 #include <cstdint>
+#include <string>
 #include "../backend/EinsumNode.h"
 
 namespace einsum_ir {
   namespace frontend {
     class EinsumExpression;
+
+    /**
+     * Overloads the << operator by adding a string representation of the einsum tree.
+     *
+     * @param io_stream output stream.
+     * @param i_expr einsum expression.
+     * @return modified output stream.
+     **/
+    std::ostream & operator<<( std::ostream           & io_stream,
+                               EinsumExpression const & i_expr );
+
   }
 }
 
@@ -187,8 +199,17 @@ class einsum_ir::frontend::EinsumExpression {
 
     /**
      * Gets the number of scalar operations required to evaluate the expression.
+     *
+     * @return number of scalar operations.
      **/
     int64_t num_ops();
+
+    /**
+     * Generates a string representation of the compiled einsum expression's tree.
+     *
+     * @return string representation of the einsum tree.
+     **/
+    std::string to_string() const;
 };
 
 #endif
