@@ -484,7 +484,7 @@ std::string einsum_ir::frontend::EinsumExpression::to_string() const {
   std::stringstream l_result;
 
   l_lvl = 0;
-  while( l_lvl < (int64_t) l_offset_lvl.size() ) {
+  while( l_lvl < l_num_lvls ) {
     int64_t l_po = 0;
 
     for( int64_t l_no = l_offset_lvl[l_lvl]; l_no < l_offset_lvl[l_lvl+1]; l_no++ ) {
