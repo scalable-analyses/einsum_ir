@@ -150,6 +150,7 @@ if g_env['blas'] != False:
   elif( g_env['blas'] == True and g_env['HOST_OS'] == "darwin" ):
     g_env.AppendUnique( CXXFLAGS  = [ '-I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/Headers/' ] )
     g_env.AppendUnique( LINKFLAGS = [ '-framework',  'Accelerate' ] )
+    g_env['blas'] = 'accelerate'
   # try to discover openblas
   elif g_conf.CheckLibWithHeader( 'openblas',
                                   'cblas.h',
