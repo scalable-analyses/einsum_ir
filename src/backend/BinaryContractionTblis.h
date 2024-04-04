@@ -12,9 +12,6 @@ namespace einsum_ir {
 
 class einsum_ir::backend::BinaryContractionTblis: public BinaryContraction {
   private:
-    //! used tensor ordering
-    tenord_t m_tensor_ordering = UNDEFINED_TENORD;
-
     //! tblis tensor descriptors
     tblis::tblis_tensor m_tblis_tensor_left;
     tblis::tblis_tensor m_tblis_tensor_right;
