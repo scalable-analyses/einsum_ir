@@ -974,7 +974,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::reorder_left_bc_bm_bk_bi_
   std::sort( l_dim_ids_k.begin(),
              l_dim_ids_k.end(),
              [i_dim_sizes]( int64_t i_lhs, int64_t i_rhs ) {
-               return i_dim_sizes->at( i_lhs ) <= i_dim_sizes->at( i_rhs );
+               return i_dim_sizes->at( i_lhs ) > i_dim_sizes->at( i_rhs );
              } );
 
   // derive blocked K dimensions
@@ -991,6 +991,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::reorder_left_bc_bm_bk_bi_
       break;
     }
   }
+  std::reverse( l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
 
   // derive non-blocked K dimensions
   l_dim_ids_bk = std::vector< int64_t >( l_dim_ids_k.begin() + l_dim_ids_kb.size(),
@@ -1233,7 +1234,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::reorder_left_bc_bm_bk_bi_
   std::sort( l_dim_ids_k.begin(),
              l_dim_ids_k.end(),
              [i_dim_sizes]( int64_t i_lhs, int64_t i_rhs ) {
-               return i_dim_sizes->at( i_lhs ) <= i_dim_sizes->at( i_rhs );
+               return i_dim_sizes->at( i_lhs ) > i_dim_sizes->at( i_rhs );
              } );
 
   // derive blocked K dimensions
@@ -1250,6 +1251,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::reorder_left_bc_bm_bk_bi_
       break;
     }
   }
+  std::reverse( l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
 
   // derive non-blocked K dimensions
   l_dim_ids_bk = std::vector< int64_t >( l_dim_ids_k.begin() + l_dim_ids_kb.size(),
@@ -1501,7 +1503,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::reorder_left_bc_bm_bk_bi_
   std::sort( l_dim_ids_k.begin(),
              l_dim_ids_k.end(),
              [i_dim_sizes]( int64_t i_lhs, int64_t i_rhs ) {
-               return i_dim_sizes->at( i_lhs ) <= i_dim_sizes->at( i_rhs );
+               return i_dim_sizes->at( i_lhs ) > i_dim_sizes->at( i_rhs );
              } );
 
   // derive blocked K dimensions
@@ -1518,6 +1520,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::reorder_left_bc_bm_bk_bi_
       break;
     }
   }
+  std::reverse( l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
 
   // derive non-blocked K dimensions
   l_dim_ids_bk = std::vector< int64_t >( l_dim_ids_k.begin() + l_dim_ids_kb.size(),
