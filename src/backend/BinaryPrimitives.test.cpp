@@ -675,8 +675,8 @@ TEST_CASE( "Reordering of a matrix-matrix multiplication with two K dims which h
   l_dim_sizes.insert( std::pair< int64_t, int64_t >( 'c', 2 ) );
   l_dim_sizes.insert( std::pair< int64_t, int64_t >( 'd', 2 ) );
 
-  int64_t l_dim_ids_left[ 3 ]  = { 'a', 'b', 'c' };
-  int64_t l_dim_ids_right[ 3 ] = { 'd', 'a', 'b' };
+  int64_t l_dim_ids_left[ 3 ]  = { 'b', 'a', 'c' };
+  int64_t l_dim_ids_right[ 3 ] = { 'd', 'b', 'a' };
   int64_t l_dim_ids_out[ 2 ]   = { 'd', 'c' };
 
   einsum_ir::err_t l_err = einsum_ir::err_t::UNDEFINED_ERROR;
@@ -691,13 +691,13 @@ TEST_CASE( "Reordering of a matrix-matrix multiplication with two K dims which h
 
   REQUIRE( l_err == einsum_ir::err_t::SUCCESS );
 
-  REQUIRE( l_dim_ids_left[ 0 ] == 'b' );
-  REQUIRE( l_dim_ids_left[ 1 ] == 'a' );
+  REQUIRE( l_dim_ids_left[ 0 ] == 'a' );
+  REQUIRE( l_dim_ids_left[ 1 ] == 'b' );
   REQUIRE( l_dim_ids_left[ 2 ] == 'c' );
   
   REQUIRE( l_dim_ids_right[ 0 ] == 'd' );
-  REQUIRE( l_dim_ids_right[ 1 ] == 'b' );
-  REQUIRE( l_dim_ids_right[ 2 ] == 'a' );
+  REQUIRE( l_dim_ids_right[ 1 ] == 'a' );
+  REQUIRE( l_dim_ids_right[ 2 ] == 'b' );
 
   REQUIRE( l_dim_ids_out[ 0 ] == 'd' );
   REQUIRE( l_dim_ids_out[ 1 ] == 'c' );

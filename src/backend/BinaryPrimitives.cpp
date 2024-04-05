@@ -974,24 +974,24 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::reorder_left_bc_bm_bk_bi_
   std::sort( l_dim_ids_k.begin(),
              l_dim_ids_k.end(),
              [i_dim_sizes]( int64_t i_lhs, int64_t i_rhs ) {
-               return i_dim_sizes->at( i_lhs ) > i_dim_sizes->at( i_rhs );
+               return i_dim_sizes->at( i_lhs ) >= i_dim_sizes->at( i_rhs );
              } );
 
   // derive blocked K dimensions
   l_block_dim_size = 1;
-  for( std::size_t l_id = 0; l_id < l_dim_ids_k.size(); l_id++ ) {
-    int64_t l_dim_size = i_dim_sizes->at( l_dim_ids_k[l_id] );
+  for( std::size_t l_di = 0; l_di < l_dim_ids_k.size(); l_di++ ) {
+    int64_t l_id = l_dim_ids_k[ l_di ];
+    int64_t l_dim_size = i_dim_sizes->at( l_id );
 
     if(    l_block_dim_size < i_size_kb_min
         || l_block_dim_size * l_dim_size <= i_size_kb_max ) {
       l_block_dim_size *= l_dim_size;
-      l_dim_ids_kb.push_back( l_dim_ids_k[l_id] );
+      l_dim_ids_kb.push_back( l_id );
     }
     else {
       break;
     }
   }
-  std::reverse( l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
 
   // derive non-blocked K dimensions
   l_dim_ids_bk = std::vector< int64_t >( l_dim_ids_k.begin() + l_dim_ids_kb.size(),
@@ -1234,24 +1234,24 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::reorder_left_bc_bm_bk_bi_
   std::sort( l_dim_ids_k.begin(),
              l_dim_ids_k.end(),
              [i_dim_sizes]( int64_t i_lhs, int64_t i_rhs ) {
-               return i_dim_sizes->at( i_lhs ) > i_dim_sizes->at( i_rhs );
+               return i_dim_sizes->at( i_lhs ) >= i_dim_sizes->at( i_rhs );
              } );
 
   // derive blocked K dimensions
   l_block_dim_size = 1;
-  for( std::size_t l_id = 0; l_id < l_dim_ids_k.size(); l_id++ ) {
-    int64_t l_dim_size = i_dim_sizes->at( l_dim_ids_k[l_id] );
+  for( std::size_t l_di = 0; l_di < l_dim_ids_k.size(); l_di++ ) {
+    int64_t l_id = l_dim_ids_k[ l_di ];
+    int64_t l_dim_size = i_dim_sizes->at( l_id );
 
     if(    l_block_dim_size < i_size_kb_min
         || l_block_dim_size * l_dim_size <= i_size_kb_max ) {
       l_block_dim_size *= l_dim_size;
-      l_dim_ids_kb.push_back( l_dim_ids_k[l_id] );
+      l_dim_ids_kb.push_back( l_id );
     }
     else {
       break;
     }
   }
-  std::reverse( l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
 
   // derive non-blocked K dimensions
   l_dim_ids_bk = std::vector< int64_t >( l_dim_ids_k.begin() + l_dim_ids_kb.size(),
@@ -1503,24 +1503,24 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::reorder_left_bc_bm_bk_bi_
   std::sort( l_dim_ids_k.begin(),
              l_dim_ids_k.end(),
              [i_dim_sizes]( int64_t i_lhs, int64_t i_rhs ) {
-               return i_dim_sizes->at( i_lhs ) > i_dim_sizes->at( i_rhs );
+               return i_dim_sizes->at( i_lhs ) >= i_dim_sizes->at( i_rhs );
              } );
 
   // derive blocked K dimensions
   l_block_dim_size = 1;
-  for( std::size_t l_id = 0; l_id < l_dim_ids_k.size(); l_id++ ) {
-    int64_t l_dim_size = i_dim_sizes->at( l_dim_ids_k[l_id] );
+  for( std::size_t l_di = 0; l_di < l_dim_ids_k.size(); l_di++ ) {
+    int64_t l_id = l_dim_ids_k[ l_di ];
+    int64_t l_dim_size = i_dim_sizes->at( l_id );
 
     if(    l_block_dim_size < i_size_kb_min
         || l_block_dim_size * l_dim_size <= i_size_kb_max ) {
       l_block_dim_size *= l_dim_size;
-      l_dim_ids_kb.push_back( l_dim_ids_k[l_id] );
+      l_dim_ids_kb.push_back( l_id );
     }
     else {
       break;
     }
   }
-  std::reverse( l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
 
   // derive non-blocked K dimensions
   l_dim_ids_bk = std::vector< int64_t >( l_dim_ids_k.begin() + l_dim_ids_kb.size(),
