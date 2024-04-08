@@ -151,47 +151,55 @@ int main( int     i_argc,
   einsum_ir::backend::EinsumNode l_node_weight_3;
   einsum_ir::backend::EinsumNode l_node_weight_4;
 
+  einsum_ir::backend::MemoryManager l_memory;
+
   l_node_input.init( 4,
                      l_dim_ids_input,
                      &l_dim_sizes,
                      nullptr,
                      einsum_ir::FP32,
-                     l_data.data_ptr() );
+                     l_data.data_ptr(),
+                     &l_memory );
 
   l_node_weight_0.init( 4,
                         l_dim_ids_weight_0,
                         &l_dim_sizes,
                         nullptr,
                         einsum_ir::FP32,
-                        l_fc_weights[0].data_ptr() );
+                        l_fc_weights[0].data_ptr(),
+                        &l_memory );
 
   l_node_weight_1.init( 4,
                         l_dim_ids_weight_1,
                         &l_dim_sizes,
                         nullptr,
                         einsum_ir::FP32,
-                        l_fc_weights[1].data_ptr() );
+                        l_fc_weights[1].data_ptr(),
+                        &l_memory );
 
   l_node_weight_2.init( 4,
                         l_dim_ids_weight_2,
                         &l_dim_sizes,
                         nullptr,
                         einsum_ir::FP32,
-                        l_fc_weights[2].data_ptr() );
+                        l_fc_weights[2].data_ptr(),
+                        &l_memory );
 
   l_node_weight_3.init( 4,
                         l_dim_ids_weight_3,
                         &l_dim_sizes,
                         nullptr,
                         einsum_ir::FP32,
-                        l_fc_weights[3].data_ptr() );
+                        l_fc_weights[3].data_ptr(),
+                        &l_memory );
 
   l_node_weight_4.init( 3,
                         l_dim_ids_weight_4,
                         &l_dim_sizes,
                         nullptr,
                         einsum_ir::FP32,
-                        l_fc_weights[4].data_ptr() );
+                        l_fc_weights[4].data_ptr(),
+                        &l_memory );
 
   l_node_hidden_0.init( 4,
                         l_dim_ids_hidden_0,
@@ -207,7 +215,8 @@ int main( int     i_argc,
                         einsum_ir::kernel_t::MADD,
                         einsum_ir::kernel_t::RELU,
                         &l_node_input,
-                        &l_node_weight_0 );
+                        &l_node_weight_0,
+                        &l_memory );
 
   l_node_hidden_1.init( 4,
                         l_dim_ids_hidden_1,
@@ -223,7 +232,8 @@ int main( int     i_argc,
                         einsum_ir::kernel_t::MADD,
                         einsum_ir::kernel_t::RELU,
                         &l_node_hidden_0,
-                        &l_node_weight_1 );
+                        &l_node_weight_1,
+                        &l_memory );
 
   l_node_hidden_2.init( 4,
                         l_dim_ids_hidden_2,
@@ -239,7 +249,8 @@ int main( int     i_argc,
                         einsum_ir::kernel_t::MADD,
                         einsum_ir::kernel_t::RELU,
                         &l_node_hidden_1,
-                        &l_node_weight_2 );
+                        &l_node_weight_2,
+                        &l_memory );
 
   l_node_hidden_3.init( 4,
                         l_dim_ids_hidden_3,
@@ -255,7 +266,8 @@ int main( int     i_argc,
                         einsum_ir::kernel_t::MADD,
                         einsum_ir::kernel_t::RELU,
                         &l_node_hidden_2,
-                        &l_node_weight_3 );
+                        &l_node_weight_3,
+                        &l_memory );
 
   l_node_out.init( 3,
                    l_dim_ids_out,
@@ -271,7 +283,8 @@ int main( int     i_argc,
                    einsum_ir::kernel_t::MADD,
                    einsum_ir::kernel_t::UNDEFINED_KTYPE,
                    &l_node_hidden_3,
-                   &l_node_weight_4 );
+                   &l_node_weight_4,
+                   &l_memory );
 
   // compile and stage weights
   l_tp0 = std::chrono::steady_clock::now();
@@ -289,6 +302,7 @@ int main( int     i_argc,
   if( l_store_and_lock ) {
     l_node_input.store_and_lock_data();
   }
+  l_memory.alloc_all_memory();
 
   // enable threading
 #ifdef _OPENMP

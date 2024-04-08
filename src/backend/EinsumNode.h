@@ -4,6 +4,7 @@
 #include <vector>
 #include "Unary.h"
 #include "BinaryContraction.h"
+#include "MemoryManager.h"
 #include "../constants.h"
 
 namespace einsum_ir {
@@ -79,6 +80,18 @@ class einsum_ir::backend::EinsumNode {
     //! binary contraction
     BinaryContraction * m_cont = nullptr;
 
+    //! Memory manager for intermendiate results
+    MemoryManager * m_memory = nullptr;
+
+    //! id of allocated memoy
+    int64_t m_mem_id = 0;
+
+    //! the required number of frees until reserved memory is actualy freed
+    int64_t m_req_men_frees = 1;
+
+    //! the number of reserved memory frees 
+    int64_t m_num_men_frees = 0;
+
     //! number of operations in the contraction
     int64_t m_num_ops_node = 0;
     //! number of operations of the children
@@ -113,7 +126,8 @@ class einsum_ir::backend::EinsumNode {
                std::map< int64_t, int64_t > const * i_dim_sizes_inner,
                std::map< int64_t, int64_t > const * i_dim_sizes_outer,
                data_t                               i_dtype,
-               void                               * i_data_ptr );
+               void                               * i_data_ptr,
+               MemoryManager                      * i_memory );
 
     /**
      * Initializes a node with a single child.
@@ -132,7 +146,8 @@ class einsum_ir::backend::EinsumNode {
                std::map< int64_t, int64_t > const * i_dim_sizes_outer,
                data_t                               i_dtype,
                void                               * i_data_ptr,
-               EinsumNode                         * i_child );
+               EinsumNode                         * i_child,
+               MemoryManager                      * i_memory );
 
     /**
      * Initializes the node with two children.
@@ -166,7 +181,8 @@ class einsum_ir::backend::EinsumNode {
                kernel_t                             i_ktype_main,
                kernel_t                             i_ktype_last_touch,
                EinsumNode                         * i_left,
-               EinsumNode                         * i_right );
+               EinsumNode                         * i_right,
+               MemoryManager                      * i_memory );
 
     /**
      * Compiles the contraction of the node and recursively those of all children.
@@ -204,6 +220,11 @@ class einsum_ir::backend::EinsumNode {
      * @param i_children if true the ops include those of all nodes in the tree; otherwise only this node.
      **/
     int64_t num_ops( bool i_children = true );
+
+    /** 
+     * Cancels a memory resrevation if this method is called from all parent einsum nodes 
+     **/
+    void cancel_memory_reservation();
 };
 
 #endif

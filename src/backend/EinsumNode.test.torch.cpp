@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include "catch.hpp"
 #include "EinsumNode.h"
+#include "MemoryManager.h"
 
 TEST_CASE( "Simple matmul example without any intermediate data.", "[einsum_node]" ) {
   // test case:
@@ -32,6 +33,9 @@ TEST_CASE( "Simple matmul example without any intermediate data.", "[einsum_node
   l_out_ref += at::einsum( "km,nk->nm",
                            {l_in_left, l_in_right} );
 
+  //Memory Manager
+  einsum_ir::backend::MemoryManager l_memory;
+
   // einsum_ir
   einsum_ir::backend::EinsumNode l_node_0;
   einsum_ir::backend::EinsumNode l_node_1;
@@ -42,14 +46,16 @@ TEST_CASE( "Simple matmul example without any intermediate data.", "[einsum_node
                  &l_dim_sizes,
                  nullptr,
                  einsum_ir::FP32,
-                 l_in_left.data_ptr() );
+                 l_in_left.data_ptr(),
+                 &l_memory );
 
   l_node_1.init( 2,
                  l_dim_ids_in_right,
                  &l_dim_sizes,
                  nullptr,
                  einsum_ir::FP32,
-                 l_in_right.data_ptr() );
+                 l_in_right.data_ptr(),
+                 &l_memory );
 
   l_node_2.init( 2,
                  l_dim_ids_out,
@@ -65,7 +71,8 @@ TEST_CASE( "Simple matmul example without any intermediate data.", "[einsum_node
                  einsum_ir::MADD,
                  einsum_ir::UNDEFINED_KTYPE,
                  &l_node_0,
-                 &l_node_1 );
+                 &l_node_1,
+                 &l_memory );
 
   // check node info
   REQUIRE( l_node_0.m_data_ptr_ext != nullptr );
@@ -75,6 +82,7 @@ TEST_CASE( "Simple matmul example without any intermediate data.", "[einsum_node
   einsum_ir::err_t l_err = l_node_2.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
+  l_memory.alloc_all_memory();
   l_node_2.eval();
 
   // check results
@@ -117,6 +125,9 @@ TEST_CASE( "Simple batch-outer complex matmul example without any intermediate d
   l_out_ref_aos += at::einsum( "km,nk->nm",
                                {l_left_aos, l_right_aos} );
 
+  //Memory Manager
+  einsum_ir::backend::MemoryManager l_memory;
+
   // einsum_ir
   einsum_ir::backend::EinsumNode l_node_ckm;
   einsum_ir::backend::EinsumNode l_node_cnk;
@@ -127,14 +138,16 @@ TEST_CASE( "Simple batch-outer complex matmul example without any intermediate d
                    &l_dim_sizes,
                    nullptr,
                    einsum_ir::data_t::FP32,
-                   l_left.data_ptr() );
+                   l_left.data_ptr(),
+                   &l_memory );
 
   l_node_cnk.init( 3,
                    l_dim_ids_cnk,
                    &l_dim_sizes,
                    nullptr,
                    einsum_ir::data_t::FP32,
-                   l_right.data_ptr() );
+                   l_right.data_ptr(),
+                   &l_memory );
 
   l_node_cnm.init( 3,
                    l_dim_ids_cnm,
@@ -150,7 +163,8 @@ TEST_CASE( "Simple batch-outer complex matmul example without any intermediate d
                    einsum_ir::kernel_t::CPX_MADD,
                    einsum_ir::kernel_t::UNDEFINED_KTYPE,
                    &l_node_ckm,
-                   &l_node_cnk );
+                   &l_node_cnk,
+                   &l_memory );
 
   // check node info
   REQUIRE( l_node_ckm.m_data_ptr_ext != nullptr );
@@ -160,6 +174,7 @@ TEST_CASE( "Simple batch-outer complex matmul example without any intermediate d
   einsum_ir::err_t l_err = l_node_cnm.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
+  l_memory.alloc_all_memory();
   l_node_cnm.eval();
 
   // check results
@@ -201,6 +216,9 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-outer
   at::Tensor l_out_ref = at::einsum( "km,nk->nm",
                                      {l_left_aos, l_right_aos} );
 
+  //Memory Manager
+  einsum_ir::backend::MemoryManager l_memory;
+
   // einsum_ir
   einsum_ir::backend::EinsumNode l_node_kmc;
   einsum_ir::backend::EinsumNode l_node_nkc;
@@ -211,14 +229,16 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-outer
                    &l_dim_sizes,
                    nullptr,
                    einsum_ir::data_t::FP32,
-                   l_left_aos.data_ptr() );
+                   l_left_aos.data_ptr(),
+                   &l_memory );
 
   l_node_nkc.init( 3,
                    l_dim_ids_nkc,
                    &l_dim_sizes,
                    nullptr,
                    einsum_ir::data_t::FP32,
-                   l_right_aos.data_ptr() );
+                   l_right_aos.data_ptr(),
+                   &l_memory );
 
   l_node_cnm.init( 3,
                    l_dim_ids_cnm,
@@ -234,7 +254,8 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-outer
                    einsum_ir::kernel_t::CPX_MADD,
                    einsum_ir::kernel_t::UNDEFINED_KTYPE,
                    &l_node_kmc,
-                   &l_node_nkc );
+                   &l_node_nkc,
+                   &l_memory );
 
   // check node info
   REQUIRE( l_node_kmc.m_data_ptr_ext != nullptr );
@@ -244,6 +265,7 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-outer
   einsum_ir::err_t l_err = l_node_cnm.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
+  l_memory.alloc_all_memory();
   l_node_cnm.eval();
 
   // check results
@@ -289,6 +311,9 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-inner
   at::Tensor l_data_nmc_ref = at::einsum( "km,nk->nm",
                                           {l_data_kmc, l_data_nkc} );
 
+  //Memory Manager
+  einsum_ir::backend::MemoryManager l_memory;
+
   // einsum_ir
   einsum_ir::backend::EinsumNode l_node_kmc;
   einsum_ir::backend::EinsumNode l_node_nkc;
@@ -300,14 +325,16 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-inner
                    &l_dim_sizes,
                    nullptr,
                    einsum_ir::data_t::FP32,
-                   l_data_kmc.data_ptr() );
+                   l_data_kmc.data_ptr(),
+                   &l_memory );
 
   l_node_nkc.init( 3,
                    l_dim_ids_nkc,
                    &l_dim_sizes,
                    nullptr,
                    einsum_ir::data_t::FP32,
-                   l_data_nkc.data_ptr() );
+                   l_data_nkc.data_ptr(),
+                   &l_memory );
 
   l_node_cnm.init( 3,
                    l_dim_ids_cnm,
@@ -323,7 +350,8 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-inner
                    einsum_ir::kernel_t::CPX_MADD,
                    einsum_ir::kernel_t::UNDEFINED_KTYPE,
                    &l_node_kmc,
-                   &l_node_nkc );
+                   &l_node_nkc,
+                   &l_memory );
 
   l_node_nmc.init( 3,
                    l_dim_ids_nmc,
@@ -331,11 +359,13 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-inner
                    nullptr,
                    einsum_ir::data_t::FP32,
                    l_data_nmc.data_ptr(),
-                   &l_node_cnm );
+                   &l_node_cnm,
+                   &l_memory );
 
   einsum_ir::err_t l_err = l_node_nmc.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
+  l_memory.alloc_all_memory();
   l_node_nmc.eval();
 
   // check results
@@ -380,6 +410,9 @@ TEST_CASE( "Two matmul example with external intermediate data.", "[einsum_node]
   l_data_bd_ref = at::einsum( "ca,bc,da->bd",
                               {l_data_ca, l_data_bc, l_data_da} );
 
+  //Memory Manager
+  einsum_ir::backend::MemoryManager l_memory;
+
   // einsum_ir
   einsum_ir::backend::EinsumNode l_node_ca;
   einsum_ir::backend::EinsumNode l_node_bc;
@@ -392,21 +425,24 @@ TEST_CASE( "Two matmul example with external intermediate data.", "[einsum_node]
                   &l_dim_sizes,
                   nullptr,
                   einsum_ir::FP32,
-                  l_data_ca.data_ptr() );
+                  l_data_ca.data_ptr(),
+                  &l_memory );
 
   l_node_bc.init( 2,
                   l_dim_ids_bc,
                   &l_dim_sizes,
                   nullptr,
                   einsum_ir::FP32,
-                  l_data_bc.data_ptr() );
+                  l_data_bc.data_ptr(),
+                  &l_memory );
 
   l_node_da.init( 2,
                   l_dim_ids_da,
                   &l_dim_sizes,
                   nullptr,
                   einsum_ir::FP32,
-                  l_data_da.data_ptr() );
+                  l_data_da.data_ptr(),
+                  &l_memory );
 
   l_node_ba.init( 2,
                   l_dim_ids_ba,
@@ -422,7 +458,8 @@ TEST_CASE( "Two matmul example with external intermediate data.", "[einsum_node]
                   einsum_ir::MADD,
                   einsum_ir::UNDEFINED_KTYPE,
                   &l_node_ca,
-                  &l_node_bc );
+                  &l_node_bc,
+                  &l_memory );
 
   l_node_bd.init( 2,
                   l_dim_ids_bd,
@@ -438,7 +475,8 @@ TEST_CASE( "Two matmul example with external intermediate data.", "[einsum_node]
                   einsum_ir::MADD,
                   einsum_ir::UNDEFINED_KTYPE,
                   &l_node_ba,
-                  &l_node_da );
+                  &l_node_da,
+                  &l_memory );
 
   einsum_ir::err_t l_err = l_node_bd.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
@@ -450,6 +488,7 @@ TEST_CASE( "Two matmul example with external intermediate data.", "[einsum_node]
   REQUIRE( l_node_ba.m_data_ptr_ext != nullptr );
   REQUIRE( l_node_bd.m_data_ptr_ext != nullptr );
 
+  l_memory.alloc_all_memory();
   l_node_bd.eval();
 
   // check results
@@ -493,6 +532,9 @@ TEST_CASE( "Two matmul example with locked data.", "[einsum_node]" ) {
   l_data_bd_ref = at::einsum( "ca,bc,da->bd",
                               {l_data_ca, l_data_bc, l_data_da} );
 
+  //Memory Manager
+  einsum_ir::backend::MemoryManager l_memory;
+
   // einsum_ir
   einsum_ir::backend::EinsumNode l_node_ca;
   einsum_ir::backend::EinsumNode l_node_bc;
@@ -505,21 +547,24 @@ TEST_CASE( "Two matmul example with locked data.", "[einsum_node]" ) {
                   &l_dim_sizes,
                   nullptr,
                   einsum_ir::FP32,
-                  l_data_ca.data_ptr() );
+                  l_data_ca.data_ptr(),
+                  &l_memory );
 
   l_node_bc.init( 2,
                   l_dim_ids_bc,
                   &l_dim_sizes,
                   nullptr,
                   einsum_ir::FP32,
-                  l_data_bc.data_ptr() );
+                  l_data_bc.data_ptr(),
+                  &l_memory );
 
   l_node_da.init( 2,
                   l_dim_ids_da,
                   &l_dim_sizes,
                   nullptr,
                   einsum_ir::FP32,
-                  l_data_da.data_ptr() );
+                  l_data_da.data_ptr(),
+                  &l_memory );
 
   l_node_ba.init( 2,
                   l_dim_ids_ba,
@@ -535,7 +580,8 @@ TEST_CASE( "Two matmul example with locked data.", "[einsum_node]" ) {
                   einsum_ir::MADD,
                   einsum_ir::UNDEFINED_KTYPE,
                   &l_node_ca,
-                  &l_node_bc );
+                  &l_node_bc,
+                  &l_memory );
 
   l_node_bd.init( 2,
                   l_dim_ids_bd,
@@ -551,7 +597,8 @@ TEST_CASE( "Two matmul example with locked data.", "[einsum_node]" ) {
                   einsum_ir::MADD,
                   einsum_ir::UNDEFINED_KTYPE,
                   &l_node_ba,
-                  &l_node_da );
+                  &l_node_da,
+                  &l_memory );
 
   einsum_ir::err_t l_err = l_node_bd.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
@@ -573,6 +620,7 @@ TEST_CASE( "Two matmul example with locked data.", "[einsum_node]" ) {
   l_data_bc += at::rand( {3, 4} );
   l_data_da += at::rand( {5, 2} );
 
+  l_memory.alloc_all_memory();
   l_node_bd.eval();
 
   // check results
@@ -633,6 +681,9 @@ TEST_CASE( "Two matmul example with internal intermediate data.", "[einsum_node]
   l_data_bd_ref = at::einsum( "ca,bc,da->bd",
                               {l_data_ca, l_data_bc, l_data_da} );
 
+  //Memory Manager
+  einsum_ir::backend::MemoryManager l_memory;
+
   // einsum_ir
   einsum_ir::backend::EinsumNode l_node_ca;
   einsum_ir::backend::EinsumNode l_node_bc;
@@ -645,21 +696,24 @@ TEST_CASE( "Two matmul example with internal intermediate data.", "[einsum_node]
                   &l_dim_sizes,
                   nullptr,
                   einsum_ir::FP32,
-                  l_data_ca.data_ptr() );
+                  l_data_ca.data_ptr(),
+                  &l_memory );
 
   l_node_bc.init( 2,
                   l_dim_ids_bc,
                   &l_dim_sizes,
                   nullptr,
                   einsum_ir::FP32,
-                  l_data_bc.data_ptr() );
+                  l_data_bc.data_ptr(),
+                  &l_memory );
 
   l_node_da.init( 2,
                   l_dim_ids_da,
                   &l_dim_sizes,
                   nullptr,
                   einsum_ir::FP32,
-                  l_data_da.data_ptr() );
+                  l_data_da.data_ptr(),
+                  &l_memory );
 
   l_node_ba.init( 2,
                   l_dim_ids_ba,
@@ -675,7 +729,8 @@ TEST_CASE( "Two matmul example with internal intermediate data.", "[einsum_node]
                   einsum_ir::MADD,
                   einsum_ir::UNDEFINED_KTYPE,
                   &l_node_ca,
-                  &l_node_bc );
+                  &l_node_bc,
+                  &l_memory );
 
   l_node_bd.init( 2,
                   l_dim_ids_bd,
@@ -691,11 +746,13 @@ TEST_CASE( "Two matmul example with internal intermediate data.", "[einsum_node]
                   einsum_ir::MADD,
                   einsum_ir::UNDEFINED_KTYPE,
                   &l_node_ba,
-                  &l_node_da );
+                  &l_node_da,
+                  &l_memory );
 
   einsum_ir::err_t l_err = l_node_bd.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
+  l_memory.alloc_all_memory();
   l_node_bd.eval();
 
   // check results
@@ -746,6 +803,9 @@ TEST_CASE( "Complex two matmul example with batch-inner input data and batch-out
   // reference
   at::Tensor l_data_bdx_ref = at::einsum( "ca,bc,da->bd",
                                          {l_data_cax, l_data_bcx, l_data_dax} );
+  
+  //Memory Manager
+  einsum_ir::backend::MemoryManager l_memory;
 
   // einsum_ir
   einsum_ir::backend::EinsumNode l_node_cax;
@@ -760,21 +820,24 @@ TEST_CASE( "Complex two matmul example with batch-inner input data and batch-out
                    &l_dim_sizes,
                    nullptr,
                    einsum_ir::FP32,
-                   l_data_cax.data_ptr() );
+                   l_data_cax.data_ptr(),
+                   &l_memory );
 
   l_node_bcx.init( 3,
                    l_dim_ids_bcx,
                    &l_dim_sizes,
                    nullptr,
                    einsum_ir::FP32,
-                   l_data_bcx.data_ptr() );
+                   l_data_bcx.data_ptr(),
+                   &l_memory );
 
   l_node_dax.init( 3,
                    l_dim_ids_dax,
                    &l_dim_sizes,
                    nullptr,
                    einsum_ir::FP32,
-                   l_data_dax.data_ptr() );
+                   l_data_dax.data_ptr(),
+                   &l_memory );
 
   l_node_bax.init( 3,
                    l_dim_ids_bax,
@@ -790,7 +853,8 @@ TEST_CASE( "Complex two matmul example with batch-inner input data and batch-out
                    einsum_ir::CPX_MADD,
                    einsum_ir::UNDEFINED_KTYPE,
                    &l_node_cax,
-                   &l_node_bcx );
+                   &l_node_bcx,
+                   &l_memory );
 
   l_node_xbd.init( 3,
                    l_dim_ids_xbd,
@@ -806,7 +870,8 @@ TEST_CASE( "Complex two matmul example with batch-inner input data and batch-out
                    einsum_ir::CPX_MADD,
                    einsum_ir::UNDEFINED_KTYPE,
                    &l_node_bax,
-                   &l_node_dax );
+                   &l_node_dax,
+                   &l_memory );
 
   l_node_bdx.init( 3,
                    l_dim_ids_bdx,
@@ -814,11 +879,13 @@ TEST_CASE( "Complex two matmul example with batch-inner input data and batch-out
                    nullptr,
                    einsum_ir::FP32,
                    l_data_bdx.data_ptr(),
-                   &l_node_xbd );
+                   &l_node_xbd,
+                   &l_memory );
 
   einsum_ir::err_t l_err = l_node_bdx.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
+  l_memory.alloc_all_memory();
   l_node_bdx.eval();
 
   // check results
@@ -854,6 +921,9 @@ TEST_CASE( "Matmul example possibly requiring permuted input data.", "[einsum_no
   // reference
   l_data_nm_ref = at::einsum( "mk,kn->nm",
                               {l_data_mk, l_data_kn} );
+    
+  //Memory Manager
+  einsum_ir::backend::MemoryManager l_memory;
 
   // einsum_ir
   einsum_ir::backend::EinsumNode l_node_mk;
@@ -865,14 +935,16 @@ TEST_CASE( "Matmul example possibly requiring permuted input data.", "[einsum_no
                   &l_dim_sizes,
                   nullptr,
                   einsum_ir::FP32,
-                  l_data_mk.data_ptr() );
+                  l_data_mk.data_ptr(),
+                  &l_memory );
 
   l_node_kn.init( 2,
                   l_dim_ids_kn,
                   &l_dim_sizes,
                   nullptr,
                   einsum_ir::FP32,
-                  l_data_kn.data_ptr() );
+                  l_data_kn.data_ptr(),
+                  &l_memory );
 
   l_node_nm.init( 2,
                   l_dim_ids_nm,
@@ -888,7 +960,8 @@ TEST_CASE( "Matmul example possibly requiring permuted input data.", "[einsum_no
                   einsum_ir::MADD,
                   einsum_ir::UNDEFINED_KTYPE,
                   &l_node_mk,
-                  &l_node_kn );
+                  &l_node_kn,
+                  &l_memory );
 
   // compile
   einsum_ir::err_t l_err = l_node_nm.compile();
@@ -899,10 +972,7 @@ TEST_CASE( "Matmul example possibly requiring permuted input data.", "[einsum_no
   REQUIRE( l_node_kn.m_data_ptr_ext != nullptr );
   REQUIRE( l_node_nm.m_data_ptr_ext != nullptr );
 
-  REQUIRE( l_node_mk.m_data_ptr_int != nullptr );
-  REQUIRE( l_node_kn.m_data_ptr_int != nullptr );
-  REQUIRE( l_node_nm.m_data_ptr_int == nullptr );
-
+  l_memory.alloc_all_memory();
   l_node_nm.eval();
 
   // check results
@@ -990,6 +1060,9 @@ TEST_CASE( "Einsum expression without batch dimensions.", "[einsum_node]" ) {
   at::Tensor l_data_iefgh_ref = at::rand( l_sizes_iefgh );
   at::Tensor l_data_iefgh     = l_data_iefgh_ref.clone();
 
+  //Memory Manager
+  einsum_ir::backend::MemoryManager l_memory;
+
   einsum_ir::backend::EinsumNode l_node_hd;
   einsum_ir::backend::EinsumNode l_node_fb;
   einsum_ir::backend::EinsumNode l_node_abcd;
@@ -1006,35 +1079,40 @@ TEST_CASE( "Einsum expression without batch dimensions.", "[einsum_node]" ) {
                   &l_dim_sizes,
                   nullptr,
                   einsum_ir::FP32,
-                  l_data_hd.data_ptr() );
+                  l_data_hd.data_ptr(),
+                  &l_memory );
 
   l_node_fb.init( 2,
                   l_dim_ids_fb,
                   &l_dim_sizes,
                   nullptr,
                   einsum_ir::FP32,
-                  l_data_fb.data_ptr() );
+                  l_data_fb.data_ptr(),
+                  &l_memory );
 
   l_node_abcd.init( 4,
                     l_dim_ids_abcd,
                     &l_dim_sizes,
                     nullptr,
                     einsum_ir::FP32,
-                    l_data_abcd.data_ptr() );
+                    l_data_abcd.data_ptr(),
+                    &l_memory );
 
   l_node_eai.init( 3,
                    l_dim_ids_eai,
                    &l_dim_sizes,
                    nullptr,
                    einsum_ir::FP32,
-                   l_data_eai.data_ptr() );
+                   l_data_eai.data_ptr(),
+                   &l_memory );
 
   l_node_gic.init( 3,
                    l_dim_ids_gic,
                    &l_dim_sizes,
                    nullptr,
                    einsum_ir::FP32,
-                   l_data_gic.data_ptr() );
+                   l_data_gic.data_ptr(),
+                   &l_memory );
 
   // dependent nodes
   l_node_hacf.init( 4,
@@ -1051,7 +1129,8 @@ TEST_CASE( "Einsum expression without batch dimensions.", "[einsum_node]" ) {
                     einsum_ir::MADD,
                     einsum_ir::UNDEFINED_KTYPE,
                     &l_node_hd,
-                    &l_node_facd );
+                    &l_node_facd,
+                    &l_memory );
 
   l_node_facd.init( 4,
                     l_dim_ids_facd,
@@ -1067,7 +1146,8 @@ TEST_CASE( "Einsum expression without batch dimensions.", "[einsum_node]" ) {
                     einsum_ir::MADD,
                     einsum_ir::UNDEFINED_KTYPE,
                     &l_node_fb,
-                    &l_node_abcd );
+                    &l_node_abcd,
+                    &l_memory );
 
   l_node_iaecg.init( 5,
                      l_dim_ids_iaecg,
@@ -1083,7 +1163,8 @@ TEST_CASE( "Einsum expression without batch dimensions.", "[einsum_node]" ) {
                      einsum_ir::MADD,
                      einsum_ir::UNDEFINED_KTYPE,
                      &l_node_eai,
-                     &l_node_gic );
+                     &l_node_gic,
+                    &l_memory );
 
   l_node_iefgh.init( 5,
                      l_dim_ids_iefgh,
@@ -1099,11 +1180,13 @@ TEST_CASE( "Einsum expression without batch dimensions.", "[einsum_node]" ) {
                      einsum_ir::MADD,
                      einsum_ir::UNDEFINED_KTYPE,
                      &l_node_hacf,
-                     &l_node_iaecg );
+                     &l_node_iaecg,
+                     &l_memory );
 
   einsum_ir::err_t l_err = l_node_iefgh.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
+  l_memory.alloc_all_memory();
   l_node_iefgh.eval();
 
   // reference

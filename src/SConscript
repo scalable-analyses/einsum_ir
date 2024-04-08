@@ -41,6 +41,7 @@ l_sources = [ 'backend/Tensor.cpp',
               'backend/BinaryContraction.cpp',
               'backend/BinaryContractionScalar.cpp',
               'backend/BinaryPrimitives.cpp',
+              'backend/MemoryManager.cpp',
               'backend/EinsumNode.cpp',
               'frontend/EinsumExpression.cpp',
               'frontend/EinsumExpressionAscii.cpp' ]
