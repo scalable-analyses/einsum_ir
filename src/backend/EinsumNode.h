@@ -87,10 +87,18 @@ class einsum_ir::backend::EinsumNode {
     int64_t m_mem_id = 0;
 
     //! the required number of frees until reserved memory is actualy freed
-    int64_t m_req_men_frees = 1;
+    int64_t m_req_mem_frees = 1;
 
     //! the number of reserved memory frees 
-    int64_t m_num_men_frees = 0;
+    int64_t m_num_mem_frees = 0;
+
+    // own required memory in bytes
+    int64_t m_req_mem = 0;
+    // reqired memory for subtree
+    int64_t m_mem_subtree = 0;
+
+    // execution oreder of nodes
+    std::vector< int64_t > m_exec_order; 
 
     //! number of operations in the contraction
     int64_t m_num_ops_node = 0;
@@ -190,6 +198,11 @@ class einsum_ir::backend::EinsumNode {
     err_t compile();
 
     /**
+     * recursive compilation call.
+     **/    
+    err_t compile_recursive();
+
+    /**
      * Stores the provided data internally and locks it, i.e.,
      * the provided data pointer is ignored in future evaluations.
      * Has to be called after compilation.
@@ -222,9 +235,14 @@ class einsum_ir::backend::EinsumNode {
     int64_t num_ops( bool i_children = true );
 
     /** 
-     * Cancels a memory resrevation if this method is called from all parent einsum nodes 
+     * Cancels a memory resrevation if this method is called m_req_mem_frees times
      **/
     void cancel_memory_reservation();
+
+    /**
+     * compiles the effective memory usage depending on the execution order 
+     **/
+    void calculate_memory_usage();
 };
 
 #endif

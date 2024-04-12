@@ -55,7 +55,7 @@ class einsum_ir::backend::MemoryManager{
      *
      * @param i_size size of reserved memory.
      * 
-    * @return id of the memory reservation.
+     * @return id of the memory reservation.
      **/
     int64_t reserve_memory(int64_t i_size);
 

@@ -302,7 +302,6 @@ int main( int     i_argc,
   if( l_store_and_lock ) {
     l_node_input.store_and_lock_data();
   }
-  l_memory.alloc_all_memory();
 
   // enable threading
 #ifdef _OPENMP

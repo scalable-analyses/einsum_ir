@@ -327,8 +327,6 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
 
   err_t l_err = m_nodes.back().compile();
 
-  m_memory.alloc_all_memory();
-
   /*
    * init intra-op parallelism
    */

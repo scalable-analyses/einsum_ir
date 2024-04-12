@@ -82,7 +82,6 @@ TEST_CASE( "Simple matmul example without any intermediate data.", "[einsum_node
   einsum_ir::err_t l_err = l_node_2.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
-  l_memory.alloc_all_memory();
   l_node_2.eval();
 
   // check results
@@ -174,7 +173,6 @@ TEST_CASE( "Simple batch-outer complex matmul example without any intermediate d
   einsum_ir::err_t l_err = l_node_cnm.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
-  l_memory.alloc_all_memory();
   l_node_cnm.eval();
 
   // check results
@@ -265,7 +263,6 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-outer
   einsum_ir::err_t l_err = l_node_cnm.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
-  l_memory.alloc_all_memory();
   l_node_cnm.eval();
 
   // check results
@@ -365,7 +362,6 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-inner
   einsum_ir::err_t l_err = l_node_nmc.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
-  l_memory.alloc_all_memory();
   l_node_nmc.eval();
 
   // check results
@@ -488,7 +484,6 @@ TEST_CASE( "Two matmul example with external intermediate data.", "[einsum_node]
   REQUIRE( l_node_ba.m_data_ptr_ext != nullptr );
   REQUIRE( l_node_bd.m_data_ptr_ext != nullptr );
 
-  l_memory.alloc_all_memory();
   l_node_bd.eval();
 
   // check results
@@ -620,7 +615,6 @@ TEST_CASE( "Two matmul example with locked data.", "[einsum_node]" ) {
   l_data_bc += at::rand( {3, 4} );
   l_data_da += at::rand( {5, 2} );
 
-  l_memory.alloc_all_memory();
   l_node_bd.eval();
 
   // check results
@@ -752,7 +746,6 @@ TEST_CASE( "Two matmul example with internal intermediate data.", "[einsum_node]
   einsum_ir::err_t l_err = l_node_bd.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
-  l_memory.alloc_all_memory();
   l_node_bd.eval();
 
   // check results
@@ -885,7 +878,6 @@ TEST_CASE( "Complex two matmul example with batch-inner input data and batch-out
   einsum_ir::err_t l_err = l_node_bdx.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
-  l_memory.alloc_all_memory();
   l_node_bdx.eval();
 
   // check results
@@ -972,7 +964,6 @@ TEST_CASE( "Matmul example possibly requiring permuted input data.", "[einsum_no
   REQUIRE( l_node_kn.m_data_ptr_ext != nullptr );
   REQUIRE( l_node_nm.m_data_ptr_ext != nullptr );
 
-  l_memory.alloc_all_memory();
   l_node_nm.eval();
 
   // check results
@@ -1186,7 +1177,6 @@ TEST_CASE( "Einsum expression without batch dimensions.", "[einsum_node]" ) {
   einsum_ir::err_t l_err = l_node_iefgh.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
 
-  l_memory.alloc_all_memory();
   l_node_iefgh.eval();
 
   // reference

@@ -159,8 +159,16 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
   m_children[0] = i_left;
   m_children[1] = i_right;
 }
+einsum_ir::err_t einsum_ir::backend::EinsumNode::compile(){
+  err_t l_err = err_t::UNDEFINED_ERROR;
+  l_err = compile_recursive();
+  calculate_memory_usage();
+  m_memory->alloc_all_memory();
 
-einsum_ir::err_t einsum_ir::backend::EinsumNode::compile() {
+  return l_err;
+}
+
+einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
   err_t l_err = err_t::UNDEFINED_ERROR;
 
   // derive backend for binary contractions
@@ -328,35 +336,51 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile() {
     m_offset_bytes *= ce_n_bytes( m_dtype );
   }
 
-  // compile children
-  m_memory->increase_layer();
+  // set required memory
+  if( m_data_ptr_ext == nullptr || l_permute_inputs ) {
+    m_req_mem = m_size;
+  }
+  else{
+    m_req_mem = 0;
+  }
+
+  // compile children and determine best execution order
   if( m_children.size() > 1 ) {
     for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
-      l_err = m_children[l_ch]->compile();
+      l_err = m_children[l_ch]->compile_recursive();
       if( l_err != einsum_ir::SUCCESS ) {
         return l_err;
       }
     }
+    int64_t m_mem_ch1 = m_children[0]-> m_mem_subtree;
+    int64_t m_mem_ch2 = m_children[1]-> m_mem_subtree;
+
+    int64_t m_max_ch1 = std::max(m_mem_ch1, m_mem_ch2 + m_children[0]->m_req_mem);
+    int64_t m_max_ch2 = std::max(m_mem_ch2, m_mem_ch1 + m_children[1]->m_req_mem);
+
+
+    if(m_max_ch1 <= m_max_ch2){
+      m_mem_subtree = m_max_ch1;
+      m_exec_order = {0,1};
+    }
+    else{
+      m_mem_subtree = m_max_ch2;
+      m_exec_order = {1,0};
+    }
+    m_mem_subtree = std::max(m_mem_subtree, m_req_mem + m_children[0]->m_req_mem + m_children[1]->m_req_mem);
   }
   else if( m_children.size() == 1 ) {
-    l_err = m_children[0]->compile();
+    l_err = m_children[0]->compile_recursive();
     if( l_err != einsum_ir::SUCCESS ) {
       return l_err;
     }
+    m_exec_order = {0};
+    m_mem_subtree = m_children[0]-> m_mem_subtree;
+    m_mem_subtree = std::max(m_mem_subtree, m_req_mem + m_children[0]->m_req_mem);
   }
-  m_memory->decrease_layer();
-
-  //allocate own mem
-  if( m_data_ptr_ext == nullptr || l_permute_inputs ) {
-    m_mem_id = m_memory->reserve_memory(m_size);
+  else{
+    m_mem_subtree = m_req_mem;
   }
-  //theoretical calculation
-
-  //deallocation of child memory
-  for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
-      m_children[l_ch]->cancel_memory_reservation();
-  }
-
 
   // derive the number of ops
   m_num_ops_node = 0;
@@ -424,7 +448,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::unlock_data() {
 
 void einsum_ir::backend::EinsumNode::eval() {
   for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
-    m_children[l_ch]->eval();
+    m_children[m_exec_order[l_ch]]->eval();
   }
 
   if( m_data_locked  == false && m_mem_id ) {
@@ -489,8 +513,30 @@ int64_t einsum_ir::backend::EinsumNode::num_ops( bool i_children ) {
 }
 
 void  einsum_ir::backend::EinsumNode::cancel_memory_reservation() {
-  m_num_men_frees++;
-  if(m_num_men_frees >= m_req_men_frees && m_mem_id ){
+  m_num_mem_frees++;
+  if(m_num_mem_frees >= m_req_mem_frees && m_mem_id ){
       m_memory->remove_reservation(m_mem_id);
   }
+}
+
+
+void einsum_ir::backend::EinsumNode::calculate_memory_usage(){
+  // compile children
+  m_memory->increase_layer();
+  for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
+      m_children[m_exec_order[l_ch]] -> calculate_memory_usage();
+  }
+  m_memory->decrease_layer();
+
+  //allocate own mem
+  if( m_req_mem ) {
+    m_mem_id = m_memory->reserve_memory(m_req_mem);
+  }
+  //theoretical calculation
+
+  //deallocation of child memory
+  for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
+      m_children[l_ch]->cancel_memory_reservation();
+  }
+
 }
