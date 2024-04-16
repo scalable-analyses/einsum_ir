@@ -1,5 +1,4 @@
 #include "MemoryManager.h"
-#include <memory>
 
 einsum_ir::backend::MemoryManager::~MemoryManager() {
   if(  m_memory_ptr != nullptr ) {
@@ -10,10 +9,10 @@ einsum_ir::backend::MemoryManager::~MemoryManager() {
 int64_t einsum_ir::backend::MemoryManager::reserve_memory(int64_t i_size){
   m_last_id++;
 
-  //actual allocated size must be a multiple of alignement
-  if( i_size % m_alignement_line != 0 ){
-      i_size += m_alignement_line - ( i_size % m_alignement_line );
-    }
+  //increase size to multiple of alignment
+  if( i_size % m_alignment_line != 0 ){
+    i_size += m_alignment_line - ( i_size % m_alignment_line );
+  }
   
   //caclculate new memory offset and append to allocation
   int64_t l_mem_id;
@@ -82,14 +81,14 @@ void einsum_ir::backend::MemoryManager::remove_reservation(int64_t i_id){
 void einsum_ir::backend::MemoryManager::alloc_all_memory(){
   if( m_req_mem > 0 ){
     //allocate memory 
-    char * l_data = new char[m_req_mem + m_alignement_page];
+    char * l_data = new char[m_req_mem + m_alignment_page];
     m_memory_ptr = l_data;
 
     //allign data in memory 
     m_aligned_memory_ptr = m_memory_ptr;
-    int64_t l_align_offset = (unsigned long)l_data % m_alignement_page;
+    int64_t l_align_offset = (unsigned long)l_data % m_alignment_page;
     if( l_align_offset ){
-      m_aligned_memory_ptr += m_alignement_page - l_align_offset;
+      m_aligned_memory_ptr += m_alignment_page - l_align_offset;
     }
   }
 }

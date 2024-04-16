@@ -70,7 +70,7 @@ class einsum_ir::frontend::EinsumExpression {
     //! nodes of the resulting einsum tree
     std::vector< backend::EinsumNode > m_nodes;
 
-    //Memory Manager
+    //! Memory Manager
     einsum_ir::backend::MemoryManager m_memory;
 
     //! true if the expression was compiled

@@ -28,11 +28,11 @@ class einsum_ir::backend::MemoryManager{
     // id of the current layer
     int64_t m_layer_id = 0;
 
-    // alignmement of memory to cache lines in bytes 
-    int64_t m_alignement_line = 64;
+    // alignment of memory to cache lines in bytes 
+    int64_t m_alignment_line = 64;
 
-    // alignmement of memory to pages in bytes 
-    int64_t m_alignement_page = 4096;
+    // alignment of memory to pages in bytes 
+    int64_t m_alignment_page = 4096;
 
     //offset of the tensor for pointer calculation
     std::vector<int64_t> m_tensor_offset;
@@ -51,7 +51,7 @@ class einsum_ir::backend::MemoryManager{
     ~MemoryManager();
 
     /**
-     * reserves memory for an actual calculation.
+     * reserves memory for a calculation. Only used in theoretical comilation of the memory manager. 
      *
      * @param i_size size of reserved memory.
      * 
@@ -60,7 +60,7 @@ class einsum_ir::backend::MemoryManager{
     int64_t reserve_memory(int64_t i_size);
 
     /**
-     * frees reserved memory.
+     * removes a memory reservation.
      *
      * @param i_id id of the memory reservation.
      **/

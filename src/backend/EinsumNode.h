@@ -88,11 +88,11 @@ class einsum_ir::backend::EinsumNode {
     //! id of allocated memoy
     int64_t m_mem_id = 0;
 
-    //! the required number of frees until reserved memory is actualy freed
-    int64_t m_req_mem_frees = 1;
+    //! the number of Einsumnodes that may access this data 
+    int64_t m_count_mem_users = 1;
 
-    //! the number of reserved memory frees 
-    int64_t m_num_mem_frees = 0;
+    //! the number of EinsumNodes that need to acces the data to finish the evaluation  
+    int64_t m_active_mem_users = 0;
 
     // own required memory in bytes
     int64_t m_req_mem = 0;

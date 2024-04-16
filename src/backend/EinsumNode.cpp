@@ -102,8 +102,8 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
 
 
   m_mem_id = 0;
-  m_req_mem_frees = 1;
-  m_num_mem_frees = 0;
+  m_count_mem_users  = 1;
+  m_active_mem_users = 0;
 
   m_req_mem = 0;
   m_mem_subtree = 0;
@@ -465,6 +465,7 @@ void einsum_ir::backend::EinsumNode::eval() {
   }
   else if( m_mem_id ){
     m_data_ptr_active = m_memory->get_mem_ptr(m_mem_id);
+    m_active_mem_users = m_count_mem_users;
   }
   else {
     m_data_ptr_active = m_data_ptr_ext;
@@ -511,8 +512,8 @@ int64_t einsum_ir::backend::EinsumNode::num_ops( bool i_children ) {
 }
 
 void  einsum_ir::backend::EinsumNode::cancel_memory_reservation() {
-  m_num_mem_frees++;
-  if( m_num_mem_frees >= m_req_mem_frees && m_mem_id ){
+  m_active_mem_users--;
+  if( m_active_mem_users <= 0 && m_mem_id ){
     m_memory->remove_reservation(m_mem_id);
   }
 }
