@@ -51,6 +51,8 @@ class einsum_ir::backend::EinsumNode {
     void * m_data_ptr_int = nullptr;
     //! external data
     void * m_data_ptr_ext = nullptr;
+    //! pointer to currently acctive data
+    void * m_data_ptr_active = nullptr;
 
     //! internal auxiliary data
     void * m_data_ptr_aux_int = nullptr;
@@ -94,7 +96,7 @@ class einsum_ir::backend::EinsumNode {
 
     // own required memory in bytes
     int64_t m_req_mem = 0;
-    // reqired memory for subtree
+    // required memory for subtree
     int64_t m_mem_subtree = 0;
 
     // execution oreder of nodes
@@ -242,7 +244,7 @@ class einsum_ir::backend::EinsumNode {
     /**
      * compiles the effective memory usage depending on the execution order 
      **/
-    void calculate_memory_usage();
+    void compile_memory_usage();
 };
 
 #endif
