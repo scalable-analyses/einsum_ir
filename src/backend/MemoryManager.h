@@ -51,7 +51,7 @@ class einsum_ir::backend::MemoryManager{
     ~MemoryManager();
 
     /**
-     * reserves memory for a calculation. Only used in theoretical comilation of the memory manager. 
+     * reserves memory for a calculation. Only used in theoretical compilation of the memory manager. 
      *
      * @param i_size size of reserved memory.
      * 
