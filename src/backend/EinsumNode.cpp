@@ -447,9 +447,12 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::unlock_data() {
   if( m_data_ptr_ext == nullptr ) {
     return err_t::NO_DATA_PTR_PROVIDED;
   }
+  // free locked data
+  if( m_data_ptr_int != nullptr ) {
+    delete [] (char *) m_data_ptr_int;
+    m_data_ptr_int = nullptr;
+  }
 
-  delete [] (char *) m_data_ptr_int;
-  m_data_ptr_int = nullptr;
   m_data_locked = false;
 
   return err_t::SUCCESS;
