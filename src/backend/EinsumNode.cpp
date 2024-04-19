@@ -23,7 +23,8 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
                                            std::map< int64_t, int64_t > const * i_dim_sizes_inner,
                                            std::map< int64_t, int64_t > const * i_dim_sizes_outer,
                                            data_t                               i_dtype,
-                                           void                               * i_data_ptr ) {
+                                           void                               * i_data_ptr,
+                                           MemoryManager                      * i_memory ) {
   m_dtype               = i_dtype;
 
   m_ktype_first_touch   = kernel_t::UNDEFINED_KTYPE;
@@ -52,6 +53,7 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
 
   m_children.resize(0);
   m_data_ptr_int        = nullptr;
+  m_data_ptr_active     = nullptr;
   m_data_ptr_ext        = i_data_ptr;
 
   m_btype_unary         = backend_t::AUTO;
@@ -96,6 +98,16 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
 
   m_num_tasks_intra_op  = 1;
 
+  m_memory = i_memory;
+
+
+  m_mem_id = 0;
+  m_count_mem_users  = 1;
+  m_active_mem_users = 0;
+
+  m_req_mem = 0;
+  m_mem_subtree = 0;
+
   m_compiled            = false;
   m_data_locked         = false;
 }
@@ -106,13 +118,15 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
                                            std::map< int64_t, int64_t > const * i_dim_sizes_outer,
                                            data_t                               i_dtype,
                                            void                               * i_data_ptr,
-                                           EinsumNode                         * i_child ) {
+                                           EinsumNode                         * i_child,
+                                           MemoryManager                      * i_memory ) {
   init( i_num_dims,
         i_dim_ids,
         i_dim_sizes_inner,
         i_dim_sizes_outer,
         i_dtype,
-        i_data_ptr );
+        i_data_ptr,
+        i_memory );
 
   m_children.resize(1);
   m_children[0] = i_child;
@@ -132,13 +146,15 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
                                            kernel_t                             i_ktype_main,
                                            kernel_t                             i_ktype_last_touch,
                                            EinsumNode                         * i_left,
-                                           EinsumNode                         * i_right ) {
+                                           EinsumNode                         * i_right,
+                                           MemoryManager                      * i_memory ) {
   init( i_num_dims,
         i_dim_ids,
         i_dim_sizes_inner,
         i_dim_sizes_outer,
         i_dtype,
-        i_data_ptr );
+        i_data_ptr,
+        i_memory );
 
   m_dim_sizes_aux_outer = i_dim_sizes_aux_outer;
   m_offsets_aux_ext     = i_offsets_aux;
@@ -152,8 +168,16 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
   m_children[0] = i_left;
   m_children[1] = i_right;
 }
+einsum_ir::err_t einsum_ir::backend::EinsumNode::compile(){
+  err_t l_err = err_t::UNDEFINED_ERROR;
+  l_err = compile_recursive();
+  compile_memory_usage();
+  m_memory->alloc_all_memory();
 
-einsum_ir::err_t einsum_ir::backend::EinsumNode::compile() {
+  return l_err;
+}
+
+einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
   err_t l_err = err_t::UNDEFINED_ERROR;
 
   // derive backend for binary contractions
@@ -286,12 +310,6 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile() {
     return l_err;
   }
 
-  // allocate memory for intermediate data if required
-  if( m_data_ptr_ext == nullptr || l_permute_inputs ) {
-    char * l_data = new char[m_size];
-    m_data_ptr_int = l_data;
-  }
-
   // compute offsets
   if( m_offsets_aux_ext != nullptr ) {
     int64_t l_di_int = m_num_dims - 1;
@@ -327,20 +345,50 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile() {
     m_offset_bytes *= ce_n_bytes( m_dtype );
   }
 
-  // compile children
+  // set required memory
+  if( m_data_ptr_ext == nullptr || l_permute_inputs ) {
+    m_req_mem = m_size;
+  }
+  else{
+    m_req_mem = 0;
+  }
+
+  // compile children and determine best execution order
   if( m_children.size() > 1 ) {
     for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
-      l_err = m_children[l_ch]->compile();
+      l_err = m_children[l_ch]->compile_recursive();
       if( l_err != einsum_ir::SUCCESS ) {
         return l_err;
       }
     }
+    int64_t l_mem_ch1 = m_children[0]-> m_mem_subtree;
+    int64_t l_mem_ch2 = m_children[1]-> m_mem_subtree;
+
+    int64_t l_max_ch1 = std::max(l_mem_ch1, l_mem_ch2 + m_children[0]->m_req_mem);
+    int64_t l_max_ch2 = std::max(l_mem_ch2, l_mem_ch1 + m_children[1]->m_req_mem);
+
+
+    if(l_max_ch1 <= l_max_ch2){
+      m_mem_subtree = l_max_ch1;
+      m_exec_order = {0,1};
+    }
+    else{
+      m_mem_subtree = l_max_ch2;
+      m_exec_order = {1,0};
+    }
+    m_mem_subtree = std::max(m_mem_subtree, m_req_mem + m_children[0]->m_req_mem + m_children[1]->m_req_mem);
   }
   else if( m_children.size() == 1 ) {
-    l_err = m_children[0]->compile();
+    l_err = m_children[0]->compile_recursive();
     if( l_err != einsum_ir::SUCCESS ) {
       return l_err;
     }
+    m_exec_order = {0};
+    m_mem_subtree = m_children[0]-> m_mem_subtree;
+    m_mem_subtree = std::max(m_mem_subtree, m_req_mem + m_children[0]->m_req_mem);
+  }
+  else{
+    m_mem_subtree = m_req_mem;
   }
 
   // derive the number of ops
@@ -399,6 +447,11 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::unlock_data() {
   if( m_data_ptr_ext == nullptr ) {
     return err_t::NO_DATA_PTR_PROVIDED;
   }
+  // free locked data
+  if( m_data_ptr_int != nullptr ) {
+    delete [] (char *) m_data_ptr_int;
+    m_data_ptr_int = nullptr;
+  }
 
   m_data_locked = false;
 
@@ -407,41 +460,41 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::unlock_data() {
 
 void einsum_ir::backend::EinsumNode::eval() {
   for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
-    m_children[l_ch]->eval();
+    m_children[m_exec_order[l_ch]]->eval();
+  }
+
+  if( m_data_locked ) {
+    m_data_ptr_active = m_data_ptr_int;
+  }
+  else if( m_mem_id ){
+    m_data_ptr_active = m_memory->get_mem_ptr(m_mem_id);
+    m_active_mem_users = m_count_mem_users;
+  }
+  else {
+    m_data_ptr_active = m_data_ptr_ext;
   }
 
   if( m_children.size() != 1 ) {
-    if(    m_data_locked  == false
-        && m_data_ptr_ext != nullptr
-        && m_data_ptr_int != nullptr ) {
+    if(    m_data_locked     == false
+        && m_data_ptr_ext    != nullptr
+        && m_req_mem         != 0 ) {
       m_unary->eval( m_data_ptr_ext,
-                     m_data_ptr_int );
+                     m_data_ptr_active );
     }
   }
   else {
-    if( m_children[0]->m_data_ptr_int != nullptr ) {
-      m_unary->eval( m_children[0]->m_data_ptr_int,
-                     m_data_ptr_ext );
-    }
-    else {
-      m_unary->eval( m_children[0]->m_data_ptr_ext,
-                     m_data_ptr_ext );
-    }
+    m_unary->eval( m_children[0]->m_data_ptr_active,
+                   m_data_ptr_ext );
   }
 
   if( m_children.size() == 2 ) {
-    void const * l_left_int = m_children[0]->m_data_ptr_int;
-    void const * l_left_ext = m_children[0]->m_data_ptr_ext;
-    void const * l_left = l_left_int != nullptr ? l_left_int : l_left_ext;
-
-    void const * l_right_int = m_children[1]->m_data_ptr_int;
-    void const * l_right_ext = m_children[1]->m_data_ptr_ext;
-    void const * l_right = l_right_int != nullptr ? l_right_int : l_right_ext;
+    void const * l_left  = m_children[0]->m_data_ptr_active;
+    void const * l_right = m_children[1]->m_data_ptr_active;
 
     void const * l_data_aux = m_data_ptr_aux_int != nullptr ? m_data_ptr_aux_int : m_data_ptr_aux_ext;
     l_data_aux = (char *) l_data_aux + m_offset_aux_bytes;
 
-    void * l_data = m_data_ptr_int != nullptr ? m_data_ptr_int  : m_data_ptr_ext;
+    void * l_data = m_data_ptr_active;
     l_data = (char *) l_data + m_offset_bytes;
 
     m_cont->contract( l_left,
@@ -459,4 +512,32 @@ int64_t einsum_ir::backend::EinsumNode::num_ops( bool i_children ) {
   }
 
   return l_num_ops;
+}
+
+void  einsum_ir::backend::EinsumNode::cancel_memory_reservation() {
+  m_active_mem_users--;
+  if( m_active_mem_users <= 0 && m_mem_id ){
+    m_memory->remove_reservation(m_mem_id);
+  }
+}
+
+
+void einsum_ir::backend::EinsumNode::compile_memory_usage(){
+  // compile children
+  m_memory->m_layer_id++;
+  for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
+    m_children[m_exec_order[l_ch]]->compile_memory_usage();
+  }
+  m_memory->m_layer_id--;
+
+  //reserve own mem
+  if( m_req_mem ) {
+    m_mem_id = m_memory->reserve_memory(m_req_mem);
+  }
+
+  //cancel reservation of child memory
+  for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
+    m_children[l_ch]->cancel_memory_reservation();
+  }
+
 }

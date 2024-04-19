@@ -4,6 +4,7 @@
 #include <vector>
 #include "Unary.h"
 #include "BinaryContraction.h"
+#include "MemoryManager.h"
 #include "../constants.h"
 
 namespace einsum_ir {
@@ -50,6 +51,8 @@ class einsum_ir::backend::EinsumNode {
     void * m_data_ptr_int = nullptr;
     //! external data
     void * m_data_ptr_ext = nullptr;
+    //! pointer to currently acctive data
+    void * m_data_ptr_active = nullptr;
 
     //! internal auxiliary data
     void * m_data_ptr_aux_int = nullptr;
@@ -78,6 +81,26 @@ class einsum_ir::backend::EinsumNode {
 
     //! binary contraction
     BinaryContraction * m_cont = nullptr;
+
+    //! Memory manager for intermendiate results
+    MemoryManager * m_memory = nullptr;
+
+    //! id of allocated memoy
+    int64_t m_mem_id = 0;
+
+    //! the number of Einsumnodes that may access this data 
+    int64_t m_count_mem_users = 0;
+
+    //! the number of EinsumNodes that need to acces the data to finish the evaluation  
+    int64_t m_active_mem_users = 0;
+
+    // own required memory in bytes
+    int64_t m_req_mem = 0;
+    // required memory for subtree
+    int64_t m_mem_subtree = 0;
+
+    // execution order of nodes
+    std::vector< int64_t > m_exec_order; 
 
     //! number of operations in the contraction
     int64_t m_num_ops_node = 0;
@@ -113,7 +136,8 @@ class einsum_ir::backend::EinsumNode {
                std::map< int64_t, int64_t > const * i_dim_sizes_inner,
                std::map< int64_t, int64_t > const * i_dim_sizes_outer,
                data_t                               i_dtype,
-               void                               * i_data_ptr );
+               void                               * i_data_ptr,
+               MemoryManager                      * i_memory );
 
     /**
      * Initializes a node with a single child.
@@ -132,7 +156,8 @@ class einsum_ir::backend::EinsumNode {
                std::map< int64_t, int64_t > const * i_dim_sizes_outer,
                data_t                               i_dtype,
                void                               * i_data_ptr,
-               EinsumNode                         * i_child );
+               EinsumNode                         * i_child,
+               MemoryManager                      * i_memory );
 
     /**
      * Initializes the node with two children.
@@ -166,23 +191,37 @@ class einsum_ir::backend::EinsumNode {
                kernel_t                             i_ktype_main,
                kernel_t                             i_ktype_last_touch,
                EinsumNode                         * i_left,
-               EinsumNode                         * i_right );
+               EinsumNode                         * i_right,
+               MemoryManager                      * i_memory );
 
     /**
      * Compiles the contraction of the node and recursively those of all children.
+     * 
+     * @return SUCCESS if successful, error code otherwise.
      **/    
     err_t compile();
+
+    /**
+     * recursive compilation call.
+     * 
+     * @return SUCCESS if successful, error code otherwise.
+     **/    
+    err_t compile_recursive();
 
     /**
      * Stores the provided data internally and locks it, i.e.,
      * the provided data pointer is ignored in future evaluations.
      * Has to be called after compilation.
+     * 
+     * @return SUCCESS if successful, error code otherwise.
      **/
     err_t store_and_lock_data();
 
     /**
      * Unlocks the data, i.e., the provided data pointer is used
      * in future evaluations.
+     * 
+     * @return SUCCESS if successful, error code otherwise.
      **/
     err_t unlock_data();
 
@@ -190,6 +229,8 @@ class einsum_ir::backend::EinsumNode {
      * Enables intra-op threading with the given number of tasks.
      *
      * @param i_num_tasks number of targeted tasks.
+     * 
+     * @return SUCCESS if successful, error code otherwise.
      **/
     err_t threading_intra_op( int64_t i_num_tasks );
 
@@ -204,6 +245,16 @@ class einsum_ir::backend::EinsumNode {
      * @param i_children if true the ops include those of all nodes in the tree; otherwise only this node.
      **/
     int64_t num_ops( bool i_children = true );
+
+    /** 
+     * Cancels a memory resrevation if this method is called m_req_mem_frees times
+     **/
+    void cancel_memory_reservation();
+
+    /**
+     * compiles the effective memory usage depending on the execution order 
+     **/
+    void compile_memory_usage();
 };
 
 #endif

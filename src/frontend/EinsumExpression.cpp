@@ -250,7 +250,8 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
                         &m_map_dim_sizes,
                         nullptr,
                         m_dtype,
-                        m_data_ptrs[l_te] );
+                        m_data_ptrs[l_te],
+                        &m_memory );
   }
 
   // derive kernel types
@@ -280,7 +281,8 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
                                          l_ktype_main,
                                          kernel_t::UNDEFINED_KTYPE,
                                          &m_nodes[l_id_left],
-                                         &m_nodes[l_id_right] );
+                                         &m_nodes[l_id_right],
+                                         &m_memory );
   }
 
   // add root contraction
@@ -304,7 +306,8 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
                                                     l_ktype_main,
                                                     kernel_t::UNDEFINED_KTYPE,
                                                     &m_nodes[l_root_id_left],
-                                                    &m_nodes[l_root_id_right] );
+                                                    &m_nodes[l_root_id_right],
+                                                    &m_memory );
 
   // add batch-outer to batch-inner conversion
   if( m_ctype_ext == complex_t::BATCH_INNER ) {
@@ -318,7 +321,8 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
                          nullptr,
                          m_dtype,
                          m_data_ptrs[l_num_tensors-1],
-                         &m_nodes[l_cpx_conv_child] );
+                         &m_nodes[l_cpx_conv_child],
+                         &m_memory );
   }
 
   err_t l_err = m_nodes.back().compile();
