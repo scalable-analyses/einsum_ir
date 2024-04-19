@@ -43,8 +43,6 @@ class einsum_ir::backend::MemoryManager{
     std::list<int64_t> m_allocated_offset_left;
     std::list<int64_t> m_allocated_offset_right;
     
-
-
     /**
      * Destructor.
      **/
@@ -77,16 +75,6 @@ class einsum_ir::backend::MemoryManager{
      * @param i_id id of the memory request.
      **/
     void * get_mem_ptr(int64_t i_id);
-
-    /**
-     * increases m_layer_id
-     **/
-    void increase_layer();
-
-    /**
-     * decreases m_layer_id
-     **/
-    void decrease_layer();
 };
 
 #endif

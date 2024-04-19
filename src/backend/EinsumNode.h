@@ -89,7 +89,7 @@ class einsum_ir::backend::EinsumNode {
     int64_t m_mem_id = 0;
 
     //! the number of Einsumnodes that may access this data 
-    int64_t m_count_mem_users = 1;
+    int64_t m_count_mem_users = 0;
 
     //! the number of EinsumNodes that need to acces the data to finish the evaluation  
     int64_t m_active_mem_users = 0;
@@ -99,7 +99,7 @@ class einsum_ir::backend::EinsumNode {
     // required memory for subtree
     int64_t m_mem_subtree = 0;
 
-    // execution oreder of nodes
+    // execution order of nodes
     std::vector< int64_t > m_exec_order; 
 
     //! number of operations in the contraction
@@ -196,11 +196,15 @@ class einsum_ir::backend::EinsumNode {
 
     /**
      * Compiles the contraction of the node and recursively those of all children.
+     * 
+     * @return SUCCESS if successful, error code otherwise.
      **/    
     err_t compile();
 
     /**
      * recursive compilation call.
+     * 
+     * @return SUCCESS if successful, error code otherwise.
      **/    
     err_t compile_recursive();
 
@@ -208,12 +212,16 @@ class einsum_ir::backend::EinsumNode {
      * Stores the provided data internally and locks it, i.e.,
      * the provided data pointer is ignored in future evaluations.
      * Has to be called after compilation.
+     * 
+     * @return SUCCESS if successful, error code otherwise.
      **/
     err_t store_and_lock_data();
 
     /**
      * Unlocks the data, i.e., the provided data pointer is used
      * in future evaluations.
+     * 
+     * @return SUCCESS if successful, error code otherwise.
      **/
     err_t unlock_data();
 
@@ -221,6 +229,8 @@ class einsum_ir::backend::EinsumNode {
      * Enables intra-op threading with the given number of tasks.
      *
      * @param i_num_tasks number of targeted tasks.
+     * 
+     * @return SUCCESS if successful, error code otherwise.
      **/
     err_t threading_intra_op( int64_t i_num_tasks );
 

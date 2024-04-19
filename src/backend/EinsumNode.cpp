@@ -524,18 +524,18 @@ void  einsum_ir::backend::EinsumNode::cancel_memory_reservation() {
 
 void einsum_ir::backend::EinsumNode::compile_memory_usage(){
   // compile children
-  m_memory->increase_layer();
+  m_memory->m_layer_id++;
   for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
     m_children[m_exec_order[l_ch]]->compile_memory_usage();
   }
-  m_memory->decrease_layer();
+  m_memory->m_layer_id--;
 
-  //allocate own mem
+  //reserve own mem
   if( m_req_mem ) {
     m_mem_id = m_memory->reserve_memory(m_req_mem);
   }
 
-  //deallocation of child memory
+  //cancel reservation of child memory
   for( std::size_t l_ch = 0; l_ch < m_children.size(); l_ch++ ) {
     m_children[l_ch]->cancel_memory_reservation();
   }

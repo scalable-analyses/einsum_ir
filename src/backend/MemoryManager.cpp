@@ -14,7 +14,7 @@ int64_t einsum_ir::backend::MemoryManager::reserve_memory(int64_t i_size){
     i_size += m_alignment_line - ( i_size % m_alignment_line );
   }
   
-  //caclculate new memory offset and append to allocation
+  //calculate new memory offset and append to allocation
   int64_t l_mem_id;
   int64_t l_offset = 0;
   if( m_layer_id % 2 == 0 ){
@@ -103,12 +103,4 @@ void * einsum_ir::backend::MemoryManager::get_mem_ptr(int64_t i_id){
     l_return_ptr = (void *) (m_aligned_memory_ptr + m_req_mem + m_tensor_offset[-i_id - 1]);
   }
   return l_return_ptr;
-}
-
-void einsum_ir::backend::MemoryManager::increase_layer(){
-  m_layer_id++;
-}
-
-void einsum_ir::backend::MemoryManager::decrease_layer(){
-  m_layer_id--;
 }
