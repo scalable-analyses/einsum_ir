@@ -216,6 +216,7 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
   int64_t const * l_dim_ids_ext_root = m_string_dim_ids_ext + l_string_offsets[l_num_tensors-1];
 
   if( m_ctype_ext == complex_t::BATCH_INNER ) {
+    m_string_num_dims_int.push_back( m_string_num_dims_ext[l_num_tensors-1] );
     m_string_dim_ids_int.push_back( l_dim_ids_ext_root[ m_string_num_dims_int.back()-1 ] ); // complex batch inner -> outermost dimension
     for( int64_t l_di = 0; l_di < m_string_num_dims_int.back()-1; l_di++ ) {
       m_string_dim_ids_int.push_back( l_dim_ids_ext_root[l_di] );
