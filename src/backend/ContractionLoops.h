@@ -73,6 +73,22 @@ class einsum_ir::backend::ContractionLoops {
     //! number of tasks
     int64_t m_num_tasks = 0;
 
+    //! amount of memory required to save for packing the left tensor on one core
+    int64_t m_memory_packing_left;
+
+    //! amount of memory required to save for packing the right tensor on one core
+    int64_t m_memory_packing_right;
+
+    //! pointer to memory for packing of left tensor
+    char * m_ptr_packing_left = nullptr;
+    //! pointer to memory for packing of left tensor with alignement
+    char * m_ptr_packing_left_aligned = nullptr;
+
+    //! pointer to memory for packing of right tensor
+    char * m_ptr_packing_right = nullptr;
+    //! pointer to memory for packing of right tensor with alignement
+    char * m_ptr_packing_right_aligned = nullptr;
+
     //! iteration spaces
     IterationSpaces m_iter_spaces;
 
@@ -132,6 +148,11 @@ class einsum_ir::backend::ContractionLoops {
 
   public:
     /**
+     * Destructor.
+     **/
+    ~ContractionLoops();
+
+    /**
      * Kernel applied to the output tensor before the contraction.
      *
      * @param i_out_aux pointer to a data section of the auxiliary output tensor.
@@ -159,6 +180,24 @@ class einsum_ir::backend::ContractionLoops {
     virtual void kernel_main( void const * i_left,
                               void const * i_right,
                               void       * io_out ) = 0;
+
+    /**
+     * Kernel to pack the left input tensor of the main kernel.
+     *
+     * @param i_in  pointer to a data section of the input tensor.
+     * @param i_out  pointer to output of packing.
+     **/
+    virtual void kernel_pack_left( void * i_in,
+                                   void * io_out ) = 0;
+    
+    /**
+     * Kernel to pack the right input tensor of the main kernel.
+     *
+     * @param i_in  pointer to a data section of the input tensor.
+     * @param i_out  pointer to output of packing.
+     **/
+    virtual void kernel_pack_right( void * i_in,
+                                    void * io_out ) = 0;
 
     /**
      * Initializes the the class.
@@ -219,6 +258,8 @@ class einsum_ir::backend::ContractionLoops {
                int64_t         i_num_bytes_scalar_left,
                int64_t         i_num_bytes_scalar_right,
                int64_t         i_num_bytes_scalar_out,
+               int64_t         i_memory_packing_left,
+               int64_t         i_memory_packing_right,
                kernel_t        i_ktype_first_touch,
                kernel_t        i_ktype_main,
                kernel_t        i_ktype_last_touch );

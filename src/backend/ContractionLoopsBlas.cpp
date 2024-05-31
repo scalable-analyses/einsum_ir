@@ -185,7 +185,7 @@ void einsum_ir::backend::ContractionLoopsBlas::init( int64_t         i_num_dims_
                                                      int64_t         i_blas_ld_c,
                                                      kernel_t        i_ktype_first_touch,
                                                      kernel_t        i_ktype_main,
-                                                     kernel_t        i_ktype_last_touch ) {
+                                                     kernel_t        i_ktype_last_touch) {
 
   m_num_bytes_scalar = ce_n_bytes( i_blas_dtype );
 
@@ -212,6 +212,8 @@ void einsum_ir::backend::ContractionLoopsBlas::init( int64_t         i_num_dims_
                           m_num_bytes_scalar,
                           m_num_bytes_scalar,
                           m_num_bytes_scalar,
+                          0,
+                          0,
                           i_ktype_first_touch,
                           i_ktype_main,
                           i_ktype_last_touch );
@@ -432,4 +434,12 @@ void einsum_ir::backend::ContractionLoopsBlas::kernel_last_touch( void const *,
   if( m_cpx_outer_c ) {
     kernel_last_touch_part( (char *) io_out + m_cpx_stride_out_bytes );
   }
+}
+
+void einsum_ir::backend::ContractionLoopsBlas::kernel_pack_left( void * i_in,
+                                                                 void * io_out ) {                                                             
+}
+
+void einsum_ir::backend::ContractionLoopsBlas::kernel_pack_right( void * i_in,
+                                                                  void * io_out ) {                                                        
 }

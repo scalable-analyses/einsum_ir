@@ -1,5 +1,21 @@
 #include "ContractionLoops.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+//TODO remove
+#include <iostream>
+
+einsum_ir::backend::ContractionLoops::~ContractionLoops() {
+  if( m_ptr_packing_left != nullptr ) {
+    delete [] (char *) m_ptr_packing_left;
+  }
+  if( m_ptr_packing_right != nullptr ) {
+    delete [] (char *) m_ptr_packing_right;
+  }
+}
+
 void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
                                                  int64_t         i_num_dims_m,
                                                  int64_t         i_num_dims_n,
@@ -23,6 +39,8 @@ void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
                                                  int64_t         i_num_bytes_scalar_left,
                                                  int64_t         i_num_bytes_scalar_right,
                                                  int64_t         i_num_bytes_scalar_out,
+                                                 int64_t         i_memory_packing_left,
+                                                 int64_t         i_memory_packing_right,
                                                  kernel_t        i_ktype_first_touch,
                                                  kernel_t        i_ktype_main,
                                                  kernel_t        i_ktype_last_touch ) {
@@ -61,6 +79,11 @@ void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
   m_ktype_last_touch  = i_ktype_last_touch;
 
   m_num_tasks_targeted = 1;
+
+  m_memory_packing_left =  i_memory_packing_left;
+  m_memory_packing_right = i_memory_packing_right;
+  m_ptr_packing_left = nullptr;
+  m_ptr_packing_right = nullptr;
 
   m_threading_first_last_touch = false;
 
@@ -235,6 +258,39 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::threading( int64_t i_num_
 
   m_num_tasks = m_iter_spaces.num_tasks();
 
+  int64_t l_num_threads = 1;
+  #ifdef _OPENMP
+  l_num_threads = omp_get_max_threads();
+  #endif
+
+  int64_t l_alignment = 4096;
+  if( m_memory_packing_left ){
+    //delete old
+    if( m_ptr_packing_left != nullptr ) {
+      delete [] (char *) m_ptr_packing_left;
+    }
+    //align memory and allocate new
+    if( m_memory_packing_left % l_alignment != 0 ){
+      m_memory_packing_left += l_alignment - ( m_memory_packing_left % l_alignment );
+    }
+    m_ptr_packing_left = new char[m_memory_packing_left * l_num_threads + l_alignment ];
+    m_ptr_packing_left_aligned = m_ptr_packing_left;
+    m_ptr_packing_left_aligned += (unsigned long) m_ptr_packing_left % l_alignment;
+  }
+  if( m_memory_packing_right ){
+    //delete old
+    if( m_ptr_packing_right != nullptr ) {
+      delete [] (char *) m_ptr_packing_right;
+    }
+    //align memory and allocate new
+    if( m_memory_packing_right % l_alignment != 0 ){
+      m_memory_packing_right += l_alignment - ( m_memory_packing_right % l_alignment );
+    }
+    m_ptr_packing_right = new char[m_memory_packing_right * l_num_threads + l_alignment];
+    m_ptr_packing_right_aligned = m_ptr_packing_right;
+    m_ptr_packing_right_aligned += (unsigned long) m_ptr_packing_right % l_alignment;
+  }
+  
   return err_t::SUCCESS;
 }
 
@@ -282,9 +338,30 @@ void einsum_ir::backend::ContractionLoops::contract_iter( int64_t         i_id_t
                      l_ptr_out );
     }
     else {
+      char * l_ptr_left_active  = l_ptr_left;
+      char * l_ptr_right_active = l_ptr_right;
+
+      int64_t l_thread_num = 0;
+      #ifdef _OPENMP
+        l_thread_num = omp_get_thread_num();
+      #endif
+
+      if( m_memory_packing_left ){
+        l_ptr_left_active = m_ptr_packing_left_aligned;
+        l_ptr_left_active += l_thread_num * m_memory_packing_left;
+        kernel_pack_left( l_ptr_left,
+                          l_ptr_left_active );
+      }
+      if( m_memory_packing_right ){
+        l_ptr_right_active = m_ptr_packing_right_aligned;
+        l_ptr_right_active += l_thread_num * m_memory_packing_right;
+        kernel_pack_right( l_ptr_right,
+                           l_ptr_right_active );
+      }
+
       // execute main kernel
-      kernel_main( l_ptr_left,
-                   l_ptr_right,
+      kernel_main( l_ptr_left_active,
+                   l_ptr_right_active,
                    l_ptr_out );
     }
 
@@ -316,4 +393,5 @@ void einsum_ir::backend::ContractionLoops::contract( void const * i_tensor_left,
                    i_tensor_out_aux,
                    io_tensor_out );
   }
+  std::cout << "test end cont" << std::endl;
 }

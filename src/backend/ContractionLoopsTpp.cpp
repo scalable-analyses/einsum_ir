@@ -1,5 +1,14 @@
 #include "ContractionLoopsTpp.h"
 
+einsum_ir::backend::ContractionLoopsTpp::~ContractionLoopsTpp() {
+  if( m_unary_packing_left != nullptr ) {
+    delete m_unary_packing_left;
+  }
+  if( m_unary_packing_right != nullptr ) {
+    delete m_unary_packing_right;
+  }
+}
+
 void einsum_ir::backend::ContractionLoopsTpp::init( int64_t                              i_num_dims_c,
                                                     int64_t                              i_num_dims_m,
                                                     int64_t                              i_num_dims_n,
@@ -30,8 +39,11 @@ void einsum_ir::backend::ContractionLoopsTpp::init( int64_t                     
                                                     libxsmm_meltwfunction_binary const   i_xmm_kernel_first_touch_binary,
                                                     libxsmm_gemmfunction         const   i_xmm_kernel_main,
                                                     libxsmm_meltwfunction_unary  const   i_xmm_kernel_last_touch_unary,
-                                                    libxsmm_meltwfunction_binary const   i_xmm_kernel_last_touch_binary ) {
-                                                                
+                                                    libxsmm_meltwfunction_binary const   i_xmm_kernel_last_touch_binary,
+                                                    UnaryTpp                           * i_unary_packing_left,
+                                                    UnaryTpp                           * i_unary_packing_right,
+                                                    int64_t                              i_memory_packing_left,
+                                                    int64_t                              i_memory_packing_right ) {
   ContractionLoops::init( i_num_dims_c,
                           i_num_dims_m,
                           i_num_dims_n,
@@ -55,6 +67,8 @@ void einsum_ir::backend::ContractionLoopsTpp::init( int64_t                     
                           i_num_bytes_scalar_left,
                           i_num_bytes_scalar_right,
                           i_num_bytes_scalar_out,
+                          i_memory_packing_left,
+                          i_memory_packing_right,
                           i_ktype_first_touch,
                           i_ktype_main,
                           i_ktype_last_touch );
@@ -64,6 +78,8 @@ void einsum_ir::backend::ContractionLoopsTpp::init( int64_t                     
   m_xmm_kernel_main               = i_xmm_kernel_main;
   m_xmm_kernel_last_touch_unary   = i_xmm_kernel_last_touch_unary;
   m_xmm_kernel_last_touch_binary  = i_xmm_kernel_last_touch_binary;
+  m_unary_packing_left            = i_unary_packing_left;
+  m_unary_packing_right           = i_unary_packing_right;
 }
 
 void einsum_ir::backend::ContractionLoopsTpp::kernel_first_touch( void const * i_out_aux,
@@ -109,4 +125,16 @@ void einsum_ir::backend::ContractionLoopsTpp::kernel_last_touch( void const * i_
     l_param.out.primary =          io_out;
     m_xmm_kernel_last_touch_binary( &l_param );
   }
+}
+
+void einsum_ir::backend::ContractionLoopsTpp::kernel_pack_left( void * i_in,
+                                                                void * io_out ) {
+  m_unary_packing_left->eval( i_in, 
+                              io_out );                                          
+}
+
+void einsum_ir::backend::ContractionLoopsTpp::kernel_pack_right( void * i_in,
+                                                                 void * io_out ) {
+  m_unary_packing_right->eval( i_in, 
+                               io_out );                                                   
 }

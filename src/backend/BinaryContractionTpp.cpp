@@ -1,6 +1,10 @@
 #include "BinaryContractionTpp.h"
 #include "BinaryPrimitives.h"
 
+#include "Unary.h"
+#include "UnaryTpp.h"
+#include <iostream>
+
 #include <algorithm>
 
 libxsmm_datatype einsum_ir::backend::BinaryContractionTpp::dtype_to_libxsmm( data_t i_dtype ) {
@@ -47,6 +51,11 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   if( l_err != err_t::SUCCESS ) {
     return l_err;
   }
+
+  //l_dim_ids_kb[0] = 8;
+  //l_dim_ids_kb.push_back(9);
+  bool l_pack_left = false;
+  bool l_pack_right = false;
 
   // derive IDs of non-blocked dimensions
   std::vector< int64_t > l_dim_ids_bc;
@@ -160,6 +169,81 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     m_strides_left_bk.push_back(  l_strides_left[  l_dim_id ] );
     m_strides_right_bk.push_back( l_strides_right[ l_dim_id ] );
   }
+
+  int64_t l_memory_packing_left = 0;
+  UnaryTpp * l_unary_left = nullptr;
+  if( l_pack_left ){
+
+    //determine packed dims (packed dims = kernel dims)
+    std::vector< int64_t > l_dim_ids_packed;
+    l_dim_ids_packed.reserve(l_dim_ids_cb.size()+ l_dim_ids_mb.size() + l_dim_ids_kb.size());
+    l_dim_ids_packed.insert( l_dim_ids_packed.end(), l_dim_ids_kb.begin(), l_dim_ids_kb.end());
+    l_dim_ids_packed.insert( l_dim_ids_packed.end(), l_dim_ids_mb.begin(), l_dim_ids_mb.end());
+    l_dim_ids_packed.insert( l_dim_ids_packed.end(), l_dim_ids_cb.begin(), l_dim_ids_cb.end());
+
+    //determine input dims and input strides
+    std::vector< int64_t > l_dim_ids_in;
+    std::vector< int64_t > l_strides_in;
+    l_dim_ids_in.reserve(l_dim_ids_packed.size());
+    for( int64_t l_di = 0; l_di < m_num_dims_left; l_di++ ) {
+      if( std::find( l_dim_ids_packed.begin(), l_dim_ids_packed.end(), m_dim_ids_left[l_di] ) != l_dim_ids_packed.end() ) {
+        int64_t l_dim_id = m_dim_ids_left[l_di];
+        l_dim_ids_in.push_back( l_dim_id );
+        l_strides_in.push_back( l_strides_left[l_dim_id] );
+      }
+    }    
+    //! unary operation
+    l_unary_left = new UnaryTpp;
+    l_unary_left->init( l_dim_ids_packed.size(),
+                        m_dim_sizes_inner,
+                        l_dim_ids_in.data(),
+                        l_dim_ids_packed.data(),
+                        nullptr,
+                        nullptr,
+                        m_dtype_right,
+                        m_dtype_right,
+                        m_dtype_right,
+                        kernel_t::COPY );
+    
+    l_err = l_unary_left->compile();
+    if( l_err != einsum_ir::SUCCESS ) {
+      return l_err;
+    }
+    l_unary_left->threading(1);
+
+    //determine required memory memory
+    l_memory_packing_left = 1;
+    for( int64_t l_di = 0; l_di < l_dim_ids_packed.size(); l_di++){
+      l_memory_packing_left *= m_dim_sizes_inner->at(l_dim_ids_packed[l_di]);
+    }
+    l_memory_packing_left *= ce_n_bytes(m_dtype_left);
+
+    //TODO remove
+    //prints for testing
+    std::cout << "dims packed:";
+    for(int i; i< l_dim_ids_packed.size(); i++){
+      std::cout<< l_dim_ids_packed[i] << " ";
+    }
+    std::cout<< std::endl;
+
+    std::cout<< "dims in: ";
+    for(int i; i< l_dim_ids_in.size(); i++){
+      std::cout<< l_dim_ids_in[i] << " ";
+    }
+    std::cout<< std::endl;
+
+    std::cout<<"strides: ";
+    for(int i; i< l_strides_in.size(); i++){
+      std::cout<< l_strides_in[i] << " ";
+    }
+    std::cout<< std::endl;
+
+    std::cout << "allocated mem: " << l_memory_packing_left << std::endl;
+  }
+
+  int64_t l_memory_packing_right = 0;
+  UnaryTpp * l_unary_right = nullptr;
+
 
   // libxsmm data types
   libxsmm_datatype l_xmm_dtype_left  = dtype_to_libxsmm( m_dtype_left );
@@ -419,7 +503,11 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                      m_xmm_kernel_first_touch_binary,
                      m_xmm_kernel_main.gemm,
                      m_xmm_kernel_last_touch_unary,
-                     m_xmm_kernel_last_touch_binary );
+                     m_xmm_kernel_last_touch_binary,
+                     l_unary_left,
+                     l_unary_right,
+                     l_memory_packing_left,
+                     l_memory_packing_right );
 
   l_err = m_cont_loops.compile();
   if( l_err != einsum_ir::SUCCESS ) {

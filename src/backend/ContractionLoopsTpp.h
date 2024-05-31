@@ -3,6 +3,7 @@
 
 #include "ContractionLoops.h"
 #include <libxsmm.h>
+#include "UnaryTpp.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -27,7 +28,18 @@ class einsum_ir::backend::ContractionLoopsTpp: public ContractionLoops {
     //! LIBXSMM-based unary last-touch TPP
     libxsmm_meltwfunction_binary m_xmm_kernel_last_touch_binary = nullptr;
 
+    // LIBXSMM-based unary for packing of left input
+    UnaryTpp * m_unary_packing_left = nullptr;
+
+    // LIBXSMM-based unary for packing of right input
+    UnaryTpp * m_unary_packing_right = nullptr;
+
   public:
+    /**
+     * Destructor.
+     **/
+    ~ContractionLoopsTpp();
+
     /**
      * Initializes the TPP-based contraction loops.
      *
@@ -68,6 +80,10 @@ class einsum_ir::backend::ContractionLoopsTpp: public ContractionLoops {
      * @param i_xmm_kernel_main tpp which is applied in the innermost loop.
      * @param i_xmm_kernel_last_touch_unary unary last-touch tpp.
      * @param i_xmm_kernel_last_touch_binary binary last-touch tpp.
+     * @param i_unary_packing_left unary packing kernel of left tensor
+     * @param i_unary_packing_right unary packing kernel of right tensor
+     * @param i_memory_packing_left memory for packing kernel of left tensor
+     * @param i_memory_packing_right memory for packing kernel of rigth tensor
      **/
     void init( int64_t                             i_num_dims_c,
                int64_t                             i_num_dims_m,
@@ -99,7 +115,11 @@ class einsum_ir::backend::ContractionLoopsTpp: public ContractionLoops {
                libxsmm_meltwfunction_binary const  i_xmm_kernel_first_touch_binary,
                libxsmm_gemmfunction         const  i_xmm_kernel_main,
                libxsmm_meltwfunction_unary  const  i_xmm_kernel_last_touch_unary,
-               libxsmm_meltwfunction_binary const  i_xmm_kernel_last_touch_binary );
+               libxsmm_meltwfunction_binary const  i_xmm_kernel_last_touch_binary,
+               UnaryTpp                          * i_unary_packing_left,
+               UnaryTpp                          * i_unary_packing_right,
+               int64_t                             i_memory_packing_left,
+               int64_t                             i_memory_packing_right );
 
     /**
      * Executes the first touch kernel on the given data section of the tensor.
@@ -129,6 +149,24 @@ class einsum_ir::backend::ContractionLoopsTpp: public ContractionLoops {
      **/
     void kernel_last_touch( void const * i_out_aux,
                             void       * io_out );
+    
+    /**
+     * Kernel to pack the left input tensor of the main kernel.
+     *
+     * @param i_in  pointer to a data section of the input tensor.
+     * @param i_out  pointer to output of packing.
+     **/
+    void kernel_pack_left( void * i_in,
+                           void * io_out );
+    
+    /**
+     * Kernel to pack the right input tensor of the main kernel.
+     *
+     * @param i_in  pointer to a data section of the input tensor.
+     * @param i_out  pointer to output of packing.
+     **/
+    void kernel_pack_right( void * i_in,
+                            void * io_out );
 };
 
 #endif

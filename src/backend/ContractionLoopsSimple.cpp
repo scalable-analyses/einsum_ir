@@ -53,6 +53,8 @@ void einsum_ir::backend::ContractionLoopsSimple::init( int64_t         i_num_dim
                                               i_num_bytes_scalar_left,
                                               i_num_bytes_scalar_right,
                                               i_num_bytes_scalar_out,
+                                              0,
+                                              0,
                                               kernel_t::CUSTOM_KTYPE,
                                               kernel_t::CUSTOM_KTYPE,
                                               kernel_t::CUSTOM_KTYPE );
@@ -84,4 +86,12 @@ void einsum_ir::backend::ContractionLoopsSimple::kernel_last_touch( void const *
     m_kernel_last_touch( i_out_aux,
                          io_out );
   }
+}
+
+void einsum_ir::backend::ContractionLoopsSimple::kernel_pack_left( void * i_in,
+                                                                   void * io_out ) {                                                          
+}
+
+void einsum_ir::backend::ContractionLoopsSimple::kernel_pack_right( void * i_in,
+                                                                    void * io_out ) {                                                          
 }
