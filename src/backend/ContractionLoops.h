@@ -79,15 +79,14 @@ class einsum_ir::backend::ContractionLoops {
     //! amount of memory required to save for packing the right tensor on one core
     int64_t m_memory_packing_right;
 
+    //! vector with alllocated memory
+    std::vector<char *> m_allocated_memory;
+
     //! pointer to memory for packing of left tensor
-    char * m_ptr_packing_left = nullptr;
-    //! pointer to memory for packing of left tensor with alignement
-    char * m_ptr_packing_left_aligned = nullptr;
+    std::vector<char *> m_ptr_packing_left;
 
     //! pointer to memory for packing of right tensor
-    char * m_ptr_packing_right = nullptr;
-    //! pointer to memory for packing of right tensor with alignement
-    char * m_ptr_packing_right_aligned = nullptr;
+    std::vector<char *> m_ptr_packing_right;
 
     //! iteration spaces
     IterationSpaces m_iter_spaces;

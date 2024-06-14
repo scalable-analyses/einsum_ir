@@ -4,16 +4,13 @@
 #include <omp.h>
 #endif
 
-//TODO remove
-#include <iostream>
-
 einsum_ir::backend::ContractionLoops::~ContractionLoops() {
-  if( m_ptr_packing_left != nullptr ) {
-    delete [] (char *) m_ptr_packing_left;
+  for( int l_id = 0; l_id < m_allocated_memory.size(); l_id++ ){
+    delete [] (char *) m_allocated_memory[l_id];
   }
-  if( m_ptr_packing_right != nullptr ) {
-    delete [] (char *) m_ptr_packing_right;
-  }
+  m_allocated_memory.clear();
+  m_ptr_packing_left.clear();
+  m_ptr_packing_right.clear();
 }
 
 void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
@@ -82,8 +79,7 @@ void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
 
   m_memory_packing_left =  i_memory_packing_left;
   m_memory_packing_right = i_memory_packing_right;
-  m_ptr_packing_left = nullptr;
-  m_ptr_packing_right = nullptr;
+
 
   m_threading_first_last_touch = false;
 
@@ -263,32 +259,34 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::threading( int64_t i_num_
   l_num_threads = omp_get_max_threads();
   #endif
 
-  int64_t l_alignment = 4096;
+  int64_t l_alignment = 64;
+
+  for( int l_id = 0; l_id < m_allocated_memory.size(); l_id++ ){
+    delete [] (char *) m_allocated_memory[l_id];
+  }
+  m_allocated_memory.clear();
+  m_ptr_packing_left.clear();
+  m_ptr_packing_right.clear();
+
   if( m_memory_packing_left ){
-    //delete old
-    if( m_ptr_packing_left != nullptr ) {
-      delete [] (char *) m_ptr_packing_left;
+    m_allocated_memory.reserve(m_allocated_memory.size() + l_num_threads);
+    m_ptr_packing_left.reserve(l_num_threads);
+    for( int l_id = 0; l_id < l_num_threads; l_id++ ){
+      char * l_ptr = new char[ m_memory_packing_left * l_num_threads + l_alignment ];
+      int64_t l_align_offset = (unsigned long)l_ptr % l_alignment;
+      m_allocated_memory.push_back( l_ptr );
+      m_ptr_packing_left.push_back( l_ptr + l_align_offset );
     }
-    //align memory and allocate new
-    if( m_memory_packing_left % l_alignment != 0 ){
-      m_memory_packing_left += l_alignment - ( m_memory_packing_left % l_alignment );
-    }
-    m_ptr_packing_left = new char[m_memory_packing_left * l_num_threads + l_alignment ];
-    m_ptr_packing_left_aligned = m_ptr_packing_left;
-    m_ptr_packing_left_aligned += (unsigned long) m_ptr_packing_left % l_alignment;
   }
   if( m_memory_packing_right ){
-    //delete old
-    if( m_ptr_packing_right != nullptr ) {
-      delete [] (char *) m_ptr_packing_right;
+    m_allocated_memory.reserve(m_allocated_memory.size() + l_num_threads);
+    m_ptr_packing_right.reserve(l_num_threads);
+    for( int l_id = 0; l_id < l_num_threads; l_id++ ){
+      char * l_ptr = new char[ m_memory_packing_right * l_num_threads + l_alignment ];
+      int64_t l_align_offset = (unsigned long)l_ptr % l_alignment;
+      m_allocated_memory.push_back( l_ptr  );
+      m_ptr_packing_right.push_back( l_ptr + l_align_offset );
     }
-    //align memory and allocate new
-    if( m_memory_packing_right % l_alignment != 0 ){
-      m_memory_packing_right += l_alignment - ( m_memory_packing_right % l_alignment );
-    }
-    m_ptr_packing_right = new char[m_memory_packing_right * l_num_threads + l_alignment];
-    m_ptr_packing_right_aligned = m_ptr_packing_right;
-    m_ptr_packing_right_aligned += (unsigned long) m_ptr_packing_right % l_alignment;
   }
   
   return err_t::SUCCESS;
@@ -347,14 +345,12 @@ void einsum_ir::backend::ContractionLoops::contract_iter( int64_t         i_id_t
       #endif
 
       if( m_memory_packing_left ){
-        l_ptr_left_active = m_ptr_packing_left_aligned;
-        l_ptr_left_active += l_thread_num * m_memory_packing_left;
+        l_ptr_left_active = m_ptr_packing_left[l_thread_num];
         kernel_pack_left( l_ptr_left,
                           l_ptr_left_active );
       }
       if( m_memory_packing_right ){
-        l_ptr_right_active = m_ptr_packing_right_aligned;
-        l_ptr_right_active += l_thread_num * m_memory_packing_right;
+        l_ptr_right_active = m_ptr_packing_right[l_thread_num];
         kernel_pack_right( l_ptr_right,
                            l_ptr_right_active );
       }
@@ -393,5 +389,4 @@ void einsum_ir::backend::ContractionLoops::contract( void const * i_tensor_left,
                    i_tensor_out_aux,
                    io_tensor_out );
   }
-  std::cout << "test end cont" << std::endl;
 }

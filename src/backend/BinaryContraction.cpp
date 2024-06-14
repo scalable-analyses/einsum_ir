@@ -248,6 +248,45 @@ void einsum_ir::backend::BinaryContraction::strides( int64_t                    
     l_id_tensor--;
   }
 }
+void einsum_ir::backend::BinaryContraction::init( int64_t                              i_num_dims_left,
+                                                  int64_t                              i_num_dims_right,
+                                                  int64_t                              i_num_dims_out,
+                                                  std::map< int64_t, int64_t > const * i_dim_sizes_inner,
+                                                  std::map< int64_t, int64_t > const * i_dim_sizes_outer_left,
+                                                  std::map< int64_t, int64_t > const * i_dim_sizes_outer_right,
+                                                  std::map< int64_t, int64_t > const * i_dim_sizes_outer_out_aux,
+                                                  std::map< int64_t, int64_t > const * i_dim_sizes_outer_out,
+                                                  int64_t                      const * i_dim_ids_left,
+                                                  int64_t                      const * i_dim_ids_right,
+                                                  int64_t                      const * i_dim_ids_out,
+                                                  data_t                               i_dtype_left,
+                                                  data_t                               i_dtype_right,
+                                                  data_t                               i_dtype_comp,
+                                                  data_t                               i_dtype_out,
+                                                  kernel_t                             i_ktype_first_touch,
+                                                  kernel_t                             i_ktype_main,
+                                                  kernel_t                             i_ktype_last_touch ) {
+  init( i_num_dims_left,
+        i_num_dims_right,
+        i_num_dims_out,
+        i_dim_sizes_inner,
+        i_dim_sizes_outer_left,
+        i_dim_sizes_outer_right,
+        i_dim_sizes_outer_out_aux,
+        i_dim_sizes_outer_out,
+        i_dim_ids_left,
+        i_dim_ids_right,
+        i_dim_ids_out,
+        nullptr,
+        nullptr,
+        i_dtype_left,
+        i_dtype_right,
+        i_dtype_comp,
+        i_dtype_out,
+        i_ktype_first_touch,
+        i_ktype_main,
+        i_ktype_last_touch );
+}
 
 void einsum_ir::backend::BinaryContraction::init( int64_t                              i_num_dims_left,
                                                   int64_t                              i_num_dims_right,
@@ -260,6 +299,8 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
                                                   int64_t                      const * i_dim_ids_left,
                                                   int64_t                      const * i_dim_ids_right,
                                                   int64_t                      const * i_dim_ids_out,
+                                                  int64_t                      const * i_dim_ids_permute_left,
+                                                  int64_t                      const * i_dim_ids_permute_right,
                                                   data_t                               i_dtype_left,
                                                   data_t                               i_dtype_right,
                                                   data_t                               i_dtype_comp,
@@ -280,6 +321,9 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
   m_dim_ids_left  = i_dim_ids_left;
   m_dim_ids_right = i_dim_ids_right;
   m_dim_ids_out   = i_dim_ids_out;
+
+  m_dim_ids_permute_left  = i_dim_ids_permute_left;
+  m_dim_ids_permute_right = i_dim_ids_permute_right;
 
   m_dtype_left  = i_dtype_left;
   m_dtype_right = i_dtype_right;

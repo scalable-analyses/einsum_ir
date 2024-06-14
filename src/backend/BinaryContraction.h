@@ -39,6 +39,11 @@ class einsum_ir::backend::BinaryContraction {
     //! output tensor's dimension ids
     int64_t const * m_dim_ids_out = nullptr;
 
+    //! permutation of dimension for the left tensor
+    int64_t const * m_dim_ids_permute_left = nullptr;
+    //! permutation of dimension for the right tensor
+    int64_t const * m_dim_ids_permute_right = nullptr;
+
     //! dimension types of the output tensor
     std::vector< dim_t > m_dim_types_out;
 
@@ -253,6 +258,51 @@ class einsum_ir::backend::BinaryContraction {
                int64_t                      const * i_dim_ids_left,
                int64_t                      const * i_dim_ids_right,
                int64_t                      const * i_dim_ids_out,
+               data_t                               i_dtype_left,
+               data_t                               i_dtype_right,
+               data_t                               i_dtype_comp,
+               data_t                               i_dtype_out,
+               kernel_t                             i_ktype_first_touch,
+               kernel_t                             i_ktype_main,
+               kernel_t                             i_ktype_last_touch );
+
+    /**
+     * Initializes the binary contraction with fused permutations of the input tensors
+     *
+     * @param i_num_dims_left number of dimensions of the left tensor.
+     * @param i_num_dims_right number of dimensions of the right tensor.
+     * @param i_num_dims_out number of dimensions of the output tensor.
+     * @param i_dim_sizes_inner mapping from the dimension ids to the inner sizes.
+     * @param i_dim_sizes_outer_left mapping from the dimension ids to the left tensor's outer sizes.
+     * @param i_dim_sizes_outer_right mapping from the dimension ids to the right tensor's outer sizes.
+     * @param i_dim_sizes_outer_out_aux mapping from the dimension ids to the auxiliary out tensor's outer sizes.
+     * @param i_dim_sizes_outer_out mapping from the dimension ids to the out tensor's outer sizes.
+     * @param i_dim_ids_left dimension ids of the left tensor.
+     * @param i_dim_ids_right dimension ids of the right tensor.
+     * @param i_dim_ids_out dimensions ids of the output tensor.
+     * @param i_dim_ids_permute_left permutation of dimension for the left tensor
+     * @param i_dim_ids_permute_right permutation of dimension for the right tensor
+     * @param i_dtype_left datatype of the left input.
+     * @param i_dtype_right datatype of the right input.
+     * @param i_dtype_comp compute data type.
+     * @param i_dtype_out datatype of the output.
+     * @param i_ktype_first_touch type of the first-touch kernel.
+     * @param i_ktype_main type of the main kernel.
+     * @param i_ktype_last_touch type of the last touch kernel.
+     **/
+    void init( int64_t                              i_num_dims_left,
+               int64_t                              i_num_dims_right,
+               int64_t                              i_num_dims_out,
+               std::map< int64_t, int64_t > const * i_dim_sizes_inner,
+               std::map< int64_t, int64_t > const * i_dim_sizes_outer_left,
+               std::map< int64_t, int64_t > const * i_dim_sizes_outer_right,
+               std::map< int64_t, int64_t > const * i_dim_sizes_outer_out_aux,
+               std::map< int64_t, int64_t > const * i_dim_sizes_outer_out,
+               int64_t                      const * i_dim_ids_left,
+               int64_t                      const * i_dim_ids_right,
+               int64_t                      const * i_dim_ids_out,
+               int64_t                      const * i_dim_ids_permute_left,
+               int64_t                      const * i_dim_ids_permute_right,
                data_t                               i_dtype_left,
                data_t                               i_dtype_right,
                data_t                               i_dtype_comp,
