@@ -72,6 +72,9 @@ class einsum_ir::backend::EinsumNode {
     //! true if dimension reordering is enabled
     bool m_reorder_dims = false;
 
+    //! true if packing is enabled
+    bool m_pack_inputs = false;
+
     //! backend types
     backend_t m_btype_unary  = backend_t::UNDEFINED_BACKEND;
     backend_t m_btype_binary = backend_t::UNDEFINED_BACKEND;
@@ -255,6 +258,13 @@ class einsum_ir::backend::EinsumNode {
      * compiles the effective memory usage depending on the execution order 
      **/
     void compile_memory_usage();
+
+    /**
+     * Determine if a permutation of Data is required for evalutation
+     * 
+     * @return true if the EinsumNode requires permutation of Data.
+     **/
+    bool requires_permutation();
 };
 
 #endif
