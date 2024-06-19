@@ -91,6 +91,16 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
   }
 
   m_pack_inputs = false;
+  char * l_pack_inputs = std::getenv( "EINSUM_IR_PACK_INPUTS" );
+  if( l_pack_inputs != nullptr ) {
+    if( strcmp( l_pack_inputs, "1" ) == 0 ) {
+      m_pack_inputs = true;
+    }
+    else if( strcmp( l_pack_inputs, "true" ) == 0 ) {
+      m_pack_inputs = true;
+    }
+  }
+
 
   m_unary               = nullptr;
   m_cont                = nullptr;

@@ -272,7 +272,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::threading( int64_t i_num_
     m_allocated_memory.reserve(m_allocated_memory.size() + l_num_threads);
     m_ptr_packing_left.reserve(l_num_threads);
     for( int l_id = 0; l_id < l_num_threads; l_id++ ){
-      char * l_ptr = new char[ m_memory_packing_left * l_num_threads + l_alignment ];
+      char * l_ptr = new char[ m_memory_packing_left + l_alignment ];
       int64_t l_align_offset = (unsigned long)l_ptr % l_alignment;
       m_allocated_memory.push_back( l_ptr );
       m_ptr_packing_left.push_back( l_ptr + l_align_offset );
@@ -282,7 +282,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::threading( int64_t i_num_
     m_allocated_memory.reserve(m_allocated_memory.size() + l_num_threads);
     m_ptr_packing_right.reserve(l_num_threads);
     for( int l_id = 0; l_id < l_num_threads; l_id++ ){
-      char * l_ptr = new char[ m_memory_packing_right * l_num_threads + l_alignment ];
+      char * l_ptr = new char[ m_memory_packing_right + l_alignment ];
       int64_t l_align_offset = (unsigned long)l_ptr % l_alignment;
       m_allocated_memory.push_back( l_ptr  );
       m_ptr_packing_right.push_back( l_ptr + l_align_offset );
