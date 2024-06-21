@@ -341,6 +341,15 @@ int main( int     i_argc,
   std::cout << "  time (eval):    " << l_time_eval    << std::endl;
   std::cout << "  gflops (eval):  " << l_gflops_eval  << std::endl;
   std::cout << "  gflops (total): " << l_gflops_total << std::endl;
+  std::cout << "CSV_DATA: "
+            << "einsum_ir,"
+            << "\"" << l_model_path << "\","
+            << l_num_flops << ","
+            << l_time_compile << ","
+            << l_time_eval << ","
+            << l_gflops_eval << ","
+            << l_gflops_total
+            << std::endl;
 
   /*
    * torchscript model
@@ -372,6 +381,15 @@ int main( int     i_argc,
   std::cout << "  time (eval):    " << l_time_eval    << std::endl;
   std::cout << "  gflops (eval):  " << l_gflops_eval  << std::endl;
   std::cout << "  gflops (total): " << l_gflops_total << std::endl;
+  std::cout << "CSV_DATA: "
+            << "torch::jit::script,"
+            << "\"" << l_model_path << "\","
+            << l_num_flops << ","
+            << l_time_compile << ","
+            << l_time_eval << ","
+            << l_gflops_eval << ","
+            << l_gflops_total
+            << std::endl;
 
   /*
    * compare solutions
