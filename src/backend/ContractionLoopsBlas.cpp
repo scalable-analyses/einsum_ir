@@ -212,6 +212,7 @@ void einsum_ir::backend::ContractionLoopsBlas::init( int64_t         i_num_dims_
                           m_num_bytes_scalar,
                           m_num_bytes_scalar,
                           m_num_bytes_scalar,
+                          nullptr,
                           0,
                           0,
                           i_ktype_first_touch,

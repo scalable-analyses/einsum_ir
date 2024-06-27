@@ -1,17 +1,9 @@
 #include "ContractionLoops.h"
+#include <iostream>
 
 #ifdef _OPENMP
 #include <omp.h>
 #endif
-
-einsum_ir::backend::ContractionLoops::~ContractionLoops() {
-  for( int l_id = 0; l_id < m_allocated_memory.size(); l_id++ ){
-    delete [] (char *) m_allocated_memory[l_id];
-  }
-  m_allocated_memory.clear();
-  m_ptr_packing_left.clear();
-  m_ptr_packing_right.clear();
-}
 
 void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
                                                  int64_t         i_num_dims_m,
@@ -36,8 +28,9 @@ void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
                                                  int64_t         i_num_bytes_scalar_left,
                                                  int64_t         i_num_bytes_scalar_right,
                                                  int64_t         i_num_bytes_scalar_out,
-                                                 int64_t         i_memory_packing_left,
-                                                 int64_t         i_memory_packing_right,
+                                                 MemoryManager * i_memory,
+                                                 int64_t         i_size_packing_left,
+                                                 int64_t         i_size_packing_right,
                                                  kernel_t        i_ktype_first_touch,
                                                  kernel_t        i_ktype_main,
                                                  kernel_t        i_ktype_last_touch ) {
@@ -77,8 +70,9 @@ void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
 
   m_num_tasks_targeted = 1;
 
-  m_memory_packing_left =  i_memory_packing_left;
-  m_memory_packing_right = i_memory_packing_right;
+  m_memory = i_memory;
+  m_size_packing_left =  i_size_packing_left;
+  m_size_packing_right = i_size_packing_right;
 
 
   m_threading_first_last_touch = false;
@@ -254,41 +248,6 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::threading( int64_t i_num_
 
   m_num_tasks = m_iter_spaces.num_tasks();
 
-  int64_t l_num_threads = 1;
-  #ifdef _OPENMP
-  l_num_threads = omp_get_max_threads();
-  #endif
-
-  int64_t l_alignment = 64;
-
-  for( int l_id = 0; l_id < m_allocated_memory.size(); l_id++ ){
-    delete [] (char *) m_allocated_memory[l_id];
-  }
-  m_allocated_memory.clear();
-  m_ptr_packing_left.clear();
-  m_ptr_packing_right.clear();
-
-  if( m_memory_packing_left ){
-    m_allocated_memory.reserve(m_allocated_memory.size() + l_num_threads);
-    m_ptr_packing_left.reserve(l_num_threads);
-    for( int l_id = 0; l_id < l_num_threads; l_id++ ){
-      char * l_ptr = new char[ m_memory_packing_left + l_alignment ];
-      int64_t l_align_offset = (unsigned long)l_ptr % l_alignment;
-      m_allocated_memory.push_back( l_ptr );
-      m_ptr_packing_left.push_back( l_ptr + l_align_offset );
-    }
-  }
-  if( m_memory_packing_right ){
-    m_allocated_memory.reserve(m_allocated_memory.size() + l_num_threads);
-    m_ptr_packing_right.reserve(l_num_threads);
-    for( int l_id = 0; l_id < l_num_threads; l_id++ ){
-      char * l_ptr = new char[ m_memory_packing_right + l_alignment ];
-      int64_t l_align_offset = (unsigned long)l_ptr % l_alignment;
-      m_allocated_memory.push_back( l_ptr  );
-      m_ptr_packing_right.push_back( l_ptr + l_align_offset );
-    }
-  }
-  
   return err_t::SUCCESS;
 }
 
@@ -344,13 +303,13 @@ void einsum_ir::backend::ContractionLoops::contract_iter( int64_t         i_id_t
         l_thread_num = omp_get_thread_num();
       #endif
 
-      if( m_memory_packing_left ){
-        l_ptr_left_active = m_ptr_packing_left[l_thread_num];
+      if( m_size_packing_left){
+        l_ptr_left_active = m_memory_packing[l_thread_num];
         kernel_pack_left( l_ptr_left,
                           l_ptr_left_active );
       }
-      if( m_memory_packing_right ){
-        l_ptr_right_active = m_ptr_packing_right[l_thread_num];
+      if( m_size_packing_right ){
+        l_ptr_right_active = m_memory_packing[l_thread_num] + m_size_packing_left;
         kernel_pack_right( l_ptr_right,
                            l_ptr_right_active );
       }
@@ -378,6 +337,8 @@ void einsum_ir::backend::ContractionLoops::contract( void const * i_tensor_left,
                                                      void const * i_tensor_right,
                                                      void const * i_tensor_out_aux,
                                                      void       * io_tensor_out ) {
+
+  m_memory_packing = (char**)m_memory->get_thread_memory();
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif

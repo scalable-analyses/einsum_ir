@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include "../constants.h"
+#include "MemoryManager.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -109,6 +110,9 @@ class einsum_ir::backend::BinaryContraction {
 
     //! true if the binary contraction was compiled
     bool m_compiled = false;
+
+    //! Memory manager for intermendiate results
+    MemoryManager * m_memory = nullptr;
 
     /**
      * Derives the dimension types of tensor t2 w.r.t. tensors t0 and t1.
@@ -282,6 +286,7 @@ class einsum_ir::backend::BinaryContraction {
      * @param i_dim_ids_out dimensions ids of the output tensor.
      * @param i_dim_ids_permute_left permutation of dimension for the left tensor
      * @param i_dim_ids_permute_right permutation of dimension for the right tensor
+     * @param i_memory memory manager for efficient memory usage.
      * @param i_dtype_left datatype of the left input.
      * @param i_dtype_right datatype of the right input.
      * @param i_dtype_comp compute data type.
@@ -303,6 +308,7 @@ class einsum_ir::backend::BinaryContraction {
                int64_t                      const * i_dim_ids_out,
                int64_t                      const * i_dim_ids_permute_left,
                int64_t                      const * i_dim_ids_permute_right,
+               MemoryManager                      * i_memory,
                data_t                               i_dtype_left,
                data_t                               i_dtype_right,
                data_t                               i_dtype_comp,

@@ -118,8 +118,8 @@ void blocked_matmul() {
   }
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
-  l_time = l_dur.count();
-  l_gflops = 1.0E-9 * l_n_flops / l_time * l_repitions;
+  l_time = l_dur.count() / l_repitions;
+  l_gflops = 1.0E-9 * l_n_flops / l_time;
 
   std::cout << "  time:   " << l_time << std::endl;
   std::cout << "  gflops: " << l_gflops << std::endl;
@@ -155,8 +155,8 @@ void blocked_matmul() {
   }
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
-  l_time = l_dur.count();
-  l_gflops = 1.0E-9 * l_n_flops / l_time * l_repitions;
+  l_time = l_dur.count() / l_repitions;
+  l_gflops = 1.0E-9 * l_n_flops / l_time;
 
   std::cout << "  time (contract): " << l_time << std::endl;
   std::cout << "  gflops: " << l_gflops << std::endl;
@@ -165,6 +165,8 @@ void blocked_matmul() {
    * einsum_ir
    */
   std::cout << "einsum_ir:" << std::endl;
+
+  einsum_ir::backend::MemoryManager l_memory;
 
   einsum_ir::backend::BinaryContractionTpp l_bin_cont;
   l_bin_cont.init( l_dim_ids_in_left.size(),
@@ -180,6 +182,7 @@ void blocked_matmul() {
                    l_dim_ids_out.data(),
                    l_dim_ids_permute_left.data(),
                    l_dim_ids_permute_right.data(),
+                   &l_memory,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -190,6 +193,8 @@ void blocked_matmul() {
 
   l_tp0 = std::chrono::steady_clock::now();
   l_bin_cont.compile();
+  std::cout << "test" << std::endl;
+  l_memory.alloc_all_memory();
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time_compile = l_dur.count();
@@ -221,8 +226,8 @@ void blocked_matmul() {
   }
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
-  l_time = l_dur.count();
-  l_gflops = 1.0E-9 * l_n_flops / l_time * l_repitions;
+  l_time = l_dur.count() / l_repitions;
+  l_gflops = 1.0E-9 * l_n_flops / l_time;
 
   std::cout << "  time (compile): " << l_time_compile << std::endl;
   std::cout << "  time (contract): " << l_time << std::endl;

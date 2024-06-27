@@ -606,6 +606,8 @@ TEST_CASE( "FP32 TPP-based binary contraction involving C, M, N and K dimensions
 
   int64_t l_dim_ids_pack_left[7] = { 8, 7, 3, 2, 4, 1, 0 };
 
+  einsum_ir::backend::MemoryManager l_memory;
+
   einsum_ir::backend::BinaryContractionTpp l_bin_cont;
   l_bin_cont.init( 7,
                    6,
@@ -620,6 +622,7 @@ TEST_CASE( "FP32 TPP-based binary contraction involving C, M, N and K dimensions
                    l_dim_ids_out,
                    l_dim_ids_pack_left,
                    nullptr,
+                   &l_memory,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
                    einsum_ir::FP32,
@@ -627,6 +630,8 @@ TEST_CASE( "FP32 TPP-based binary contraction involving C, M, N and K dimensions
                    einsum_ir::ZERO,
                    einsum_ir::MADD,
                    einsum_ir::UNDEFINED_KTYPE );
+
+  l_memory.alloc_all_memory();
 
   //                              y  x  g  c  a  e  i
   at::Tensor l_left = at::randn( {4, 3, 6, 7, 2, 8, 3} );

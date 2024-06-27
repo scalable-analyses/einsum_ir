@@ -82,8 +82,9 @@ class einsum_ir::backend::ContractionLoopsTpp: public ContractionLoops {
      * @param i_xmm_kernel_last_touch_binary binary last-touch tpp.
      * @param i_unary_packing_left unary packing kernel of left tensor
      * @param i_unary_packing_right unary packing kernel of right tensor
-     * @param i_memory_packing_left memory for packing kernel of left tensor
-     * @param i_memory_packing_right memory for packing kernel of rigth tensor
+     * @param i_memory_packing memory packing kernel of left tensor
+     * @param i_size_packing_left amount of memory required to pack left tensor
+     * @param i_size_packing_left amount of memory required to pack right tensor
      **/
     void init( int64_t                             i_num_dims_c,
                int64_t                             i_num_dims_m,
@@ -118,8 +119,9 @@ class einsum_ir::backend::ContractionLoopsTpp: public ContractionLoops {
                libxsmm_meltwfunction_binary const  i_xmm_kernel_last_touch_binary,
                UnaryTpp                          * i_unary_packing_left,
                UnaryTpp                          * i_unary_packing_right,
-               int64_t                             i_memory_packing_left,
-               int64_t                             i_memory_packing_right );
+               MemoryManager                     * i_memory,
+               int64_t                             i_size_packing_left,
+               int64_t                             i_size_packing_right );
 
     /**
      * Executes the first touch kernel on the given data section of the tensor.

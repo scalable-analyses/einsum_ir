@@ -288,6 +288,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
                   m_dim_ids_int.data(),
                   l_packing_left.data(),
                   l_packing_right.data(),
+                  m_memory,
                   m_children[0]->m_dtype,
                   m_children[1]->m_dtype,
                   m_dtype,

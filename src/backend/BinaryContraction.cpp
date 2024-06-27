@@ -279,6 +279,7 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
         i_dim_ids_out,
         nullptr,
         nullptr,
+        nullptr,
         i_dtype_left,
         i_dtype_right,
         i_dtype_comp,
@@ -301,6 +302,7 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
                                                   int64_t                      const * i_dim_ids_out,
                                                   int64_t                      const * i_dim_ids_permute_left,
                                                   int64_t                      const * i_dim_ids_permute_right,
+                                                  MemoryManager                      * i_memory,
                                                   data_t                               i_dtype_left,
                                                   data_t                               i_dtype_right,
                                                   data_t                               i_dtype_comp,
@@ -333,6 +335,8 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
   m_ktype_first_touch = i_ktype_first_touch;
   m_ktype_main        = i_ktype_main;
   m_ktype_last_touch  = i_ktype_last_touch;
+
+  m_memory = i_memory;
 }
 
 einsum_ir::err_t einsum_ir::backend::BinaryContraction::compile_base() {

@@ -168,8 +168,8 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     m_strides_right_bk.push_back( l_strides_right[ l_dim_id ] );
   }
 
-  int64_t l_memory_packing_left = 0;
-  int64_t l_memory_packing_right = 0;
+  int64_t l_size_packing_left = 0;
+  int64_t l_size_packing_right = 0;
   UnaryTpp * l_unary_left = nullptr;
   UnaryTpp * l_unary_right = nullptr;
 
@@ -212,11 +212,11 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     l_unary_left->threading(1);
 
     //determine required memory
-    l_memory_packing_left = 1;
+    l_size_packing_left = 1;
     for( int64_t l_di = 0; l_di < l_dim_ids_packed.size(); l_di++){
-      l_memory_packing_left *= m_dim_sizes_inner->at(l_dim_ids_packed[l_di]);
+      l_size_packing_left *= m_dim_sizes_inner->at(l_dim_ids_packed[l_di]);
     }
-    l_memory_packing_left *= ce_n_bytes(m_dtype_left);
+    l_size_packing_left *= ce_n_bytes(m_dtype_left);
   }
   if( m_dim_ids_permute_right != nullptr ){
     //determine packed dims (packed dims = kernel dims)
@@ -258,12 +258,14 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     l_unary_right->threading(1);
 
     //determine required memory
-    l_memory_packing_right = 1;
+    l_size_packing_right = 1;
     for( int64_t l_di = 0; l_di < l_dim_ids_packed.size(); l_di++){
-      l_memory_packing_right *= m_dim_sizes_inner->at(l_dim_ids_packed[l_di]);
+      l_size_packing_right *= m_dim_sizes_inner->at(l_dim_ids_packed[l_di]);
     }
-    l_memory_packing_right *= ce_n_bytes(m_dtype_right);
+    l_size_packing_right *= ce_n_bytes(m_dtype_right);
   }
+
+  m_memory->reserve_thread_memory( l_size_packing_left + l_size_packing_right );
 
   // libxsmm data types
   libxsmm_datatype l_xmm_dtype_left  = dtype_to_libxsmm( m_dtype_left );
@@ -306,8 +308,8 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   }
 
   // set leading dimensions
-  l_lda = l_dim_ids_kb.size() > 0 && !l_memory_packing_left  ? l_strides_left.at(  l_dim_ids_kb.back() ) : l_m*l_r;
-  l_ldb = l_dim_ids_nb.size() > 0 && !l_memory_packing_right ? l_strides_right.at( l_dim_ids_nb.back() ) : l_k*l_r;
+  l_lda = l_dim_ids_kb.size() > 0 && !l_size_packing_left  ? l_strides_left.at(  l_dim_ids_kb.back() ) : l_m*l_r;
+  l_ldb = l_dim_ids_nb.size() > 0 && !l_size_packing_right ? l_strides_right.at( l_dim_ids_nb.back() ) : l_k*l_r;
   l_ldc = l_dim_ids_nb.size() > 0 ? l_strides_out.at(   l_dim_ids_nb.back() ) : l_m*l_r;
 
   // first-touch and last-touch shape
@@ -526,8 +528,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                      m_xmm_kernel_last_touch_binary,
                      l_unary_left,
                      l_unary_right,
-                     l_memory_packing_left,
-                     l_memory_packing_right );
+                     m_memory,
+                     l_size_packing_left,
+                     l_size_packing_right );
 
   l_err = m_cont_loops.compile();
   if( l_err != einsum_ir::SUCCESS ) {

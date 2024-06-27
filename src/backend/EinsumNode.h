@@ -133,6 +133,7 @@ class einsum_ir::backend::EinsumNode {
      * @param i_dim_sizes_outer dimension id to outer size mapping. optional: use nullptr if not needed.
      * @param i_dtype datatype of the tensor.
      * @param i_data_ptr data pointer of the tensor.
+     * @param i_memory memory manager for efficient memory usage.
      **/
     void init( int64_t                              i_num_dims,
                int64_t                      const * i_dim_ids,
@@ -152,6 +153,7 @@ class einsum_ir::backend::EinsumNode {
      * @param i_dtype datatype of the node's tensor.
      * @param i_data_ptr data pointer of the tensor.
      * @param i_child child of the node.
+     * @param i_memory memory manager for efficient memory usage.
      **/
     void init( int64_t                              i_num_dims,
                int64_t                      const * i_dim_ids,
@@ -179,6 +181,7 @@ class einsum_ir::backend::EinsumNode {
      * @param i_ktype_last_touch type of the last touch kernel.
      * @param i_left left child.
      * @param i_right right child. 
+     * @param i_memory memory manager for efficient memory usage.
      **/
     void init( int64_t                              i_num_dims,
                int64_t                      const * i_dim_ids,

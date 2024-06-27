@@ -16,11 +16,20 @@ class einsum_ir::backend::MemoryManager{
     //! pointer to the start of all allocated memory
     char * m_memory_ptr = nullptr;
 
-    //! pointer to the start of alligend memory
+    //! pointer to the start of aligend memory
     char * m_aligned_memory_ptr = nullptr;
+
+    //! vector with alllocated memory for threads
+    std::vector<char *> m_thread_memory;
+
+    //! vector with aligned allocated memory for threads
+    std::vector<char *> m_aligned_thread_memory;
 
     //! the required memory for all data
     int64_t m_req_mem = 0;
+
+    //! required thread personal memory
+    int64_t m_req_thread_mem = 0;
 
     //! last id given to any tensor
     int64_t m_last_id = 0;
@@ -42,6 +51,9 @@ class einsum_ir::backend::MemoryManager{
     std::list<int64_t> m_allocated_id_right;
     std::list<int64_t> m_allocated_offset_left;
     std::list<int64_t> m_allocated_offset_right;
+    
+
+
     
     /**
      * Destructor.
@@ -75,6 +87,10 @@ class einsum_ir::backend::MemoryManager{
      * @param i_id id of the memory request.
      **/
     void * get_mem_ptr(int64_t i_id);
+
+    void reserve_thread_memory(int64_t i_size);
+
+    void * get_thread_memory();
 };
 
 #endif

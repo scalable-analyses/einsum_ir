@@ -5,6 +5,7 @@
 #include <vector>
 #include "../constants.h"
 #include "IterationSpaces.h"
+#include "MemoryManager.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -73,20 +74,17 @@ class einsum_ir::backend::ContractionLoops {
     //! number of tasks
     int64_t m_num_tasks = 0;
 
-    //! amount of memory required to save for packing the left tensor on one core
-    int64_t m_memory_packing_left;
+    //! vector of memory pointers for thread specific packing memory
+    MemoryManager * m_memory;
 
-    //! amount of memory required to save for packing the right tensor on one core
-    int64_t m_memory_packing_right;
+    //! amount of memory required for packing of the left tensor on one thread
+    int64_t  m_size_packing_left;
+
+    //! amount of memory required for packing of the right tensor on one thread
+    int64_t  m_size_packing_right;
 
     //! vector with alllocated memory
-    std::vector<char *> m_allocated_memory;
-
-    //! pointer to memory for packing of left tensor
-    std::vector<char *> m_ptr_packing_left;
-
-    //! pointer to memory for packing of right tensor
-    std::vector<char *> m_ptr_packing_right;
+    char ** m_memory_packing;
 
     //! iteration spaces
     IterationSpaces m_iter_spaces;
@@ -146,11 +144,6 @@ class einsum_ir::backend::ContractionLoops {
     int64_t m_cpx_stride_out_bytes = 0;
 
   public:
-    /**
-     * Destructor.
-     **/
-    ~ContractionLoops();
-
     /**
      * Kernel applied to the output tensor before the contraction.
      *
@@ -257,8 +250,9 @@ class einsum_ir::backend::ContractionLoops {
                int64_t         i_num_bytes_scalar_left,
                int64_t         i_num_bytes_scalar_right,
                int64_t         i_num_bytes_scalar_out,
-               int64_t         i_memory_packing_left,
-               int64_t         i_memory_packing_right,
+               MemoryManager * i_memory,
+               int64_t         i_size_packing_left,
+               int64_t         i_size_packing_right,
                kernel_t        i_ktype_first_touch,
                kernel_t        i_ktype_main,
                kernel_t        i_ktype_last_touch );

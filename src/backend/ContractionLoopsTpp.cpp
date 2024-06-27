@@ -42,8 +42,9 @@ void einsum_ir::backend::ContractionLoopsTpp::init( int64_t                     
                                                     libxsmm_meltwfunction_binary const   i_xmm_kernel_last_touch_binary,
                                                     UnaryTpp                           * i_unary_packing_left,
                                                     UnaryTpp                           * i_unary_packing_right,
-                                                    int64_t                              i_memory_packing_left,
-                                                    int64_t                              i_memory_packing_right ) {
+                                                    MemoryManager                      * i_memory,
+                                                    int64_t                              i_size_packing_left,
+                                                    int64_t                              i_size_packing_right ) {
   ContractionLoops::init( i_num_dims_c,
                           i_num_dims_m,
                           i_num_dims_n,
@@ -67,8 +68,9 @@ void einsum_ir::backend::ContractionLoopsTpp::init( int64_t                     
                           i_num_bytes_scalar_left,
                           i_num_bytes_scalar_right,
                           i_num_bytes_scalar_out,
-                          i_memory_packing_left,
-                          i_memory_packing_right,
+                          i_memory,
+                          i_size_packing_left,
+                          i_size_packing_right,
                           i_ktype_first_touch,
                           i_ktype_main,
                           i_ktype_last_touch );
