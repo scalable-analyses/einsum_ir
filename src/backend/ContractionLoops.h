@@ -24,42 +24,32 @@ class einsum_ir::backend::ContractionLoops {
     //! number of K dimensions
     int64_t m_num_dims_k = 0;
 
-    //! sizes of the C dimensions
-    int64_t const * m_sizes_c = nullptr;
-    //! sizes of the M dimensions
-    int64_t const * m_sizes_m = nullptr;
-    //! sizes of the N dimensions
-    int64_t const * m_sizes_n = nullptr;
-    //! sizes of the K dimensions
-    int64_t const * m_sizes_k = nullptr;
+    //! Ids of C dimension
+    int64_t const * m_dim_ids_c = nullptr;
+    //! Ids of M dimension
+    int64_t const * m_dim_ids_m = nullptr;
+    //! Ids of N dimension
+    int64_t const * m_dim_ids_n = nullptr;
+    //! Ids of K dimension
+    int64_t const * m_dim_ids_k = nullptr;
 
-    //! C strides of the left input tensor
-    int64_t const * m_strides_in_left_c = nullptr;
-    //! M strides of the left input tensor
-    int64_t const * m_strides_in_left_m = nullptr;
-    //! K strides of the left input tensor
-    int64_t const * m_strides_in_left_k = nullptr;
+    //! mapping from dimension id to type
+    std::map< int64_t, dim_t > const * m_dim_type = nullptr;
 
-    //! C strides of the right input tensor
-    int64_t const * m_strides_in_right_c = nullptr;
-    //! N strides of the right input tensor
-    int64_t const * m_strides_in_right_n = nullptr;
-    //! K strides of the right input tensor
-    int64_t const * m_strides_in_right_k = nullptr;
+    //! sizes of dimensions
+    std::map< int64_t, int64_t > const * m_sizes = nullptr;
 
-    //! C strides of the auxiliary output tensor
-    int64_t const * m_strides_out_aux_c = nullptr;
-    //! M strides of the auxiliary output tensor
-    int64_t const * m_strides_out_aux_m = nullptr;
-    //! N strides of the auxiliary output tensor
-    int64_t const * m_strides_out_aux_n = nullptr;
+    //! strides of the left input tensor
+    std::map< int64_t, int64_t > const * m_strides_left = nullptr;
 
-    //! C strides of the output tensor
-    int64_t const * m_strides_out_c = nullptr;
-    //! M strides of the output tensor
-    int64_t const * m_strides_out_m = nullptr;
-    //! N strides of the output tensor
-    int64_t const * m_strides_out_n = nullptr;
+    //! strides of the right input tensor
+    std::map< int64_t, int64_t > const * m_strides_right = nullptr;
+
+    //! strides of the auxiliary output tensor
+    std::map< int64_t, int64_t > const * m_strides_out_aux = nullptr;
+
+    //! strides of the output tensor
+    std::map< int64_t, int64_t > const * m_strides_out = nullptr;
 
     //! number of bytes for a scalar of the left input tensor
     int64_t m_num_bytes_scalar_left = 0;
@@ -172,7 +162,8 @@ class einsum_ir::backend::ContractionLoops {
 
     /**
      * Initializes the the class.
-     *
+     *  TODO: correct the description
+     * 
      * Shortcuts:
      *   C: batch dimensions which appears in all tensors.
      *   M: dimensions appear in left input and output.
@@ -183,22 +174,16 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_num_dims_m number of M dimensions.
      * @param i_num_dims_n number of N dimensions.
      * @param i_num_dims_k number of K dimensions.
-     * @param i_sizes_c sizes of the C dimensions.
-     * @param i_sizes_m sizes of the M dimensions.
-     * @param i_sizes_n sizes of the N dimensions.
-     * @param i_sizes_k sizes of the K dimensions.
-     * @param i_strides_in_left_c C strides of the left input tensor.
-     * @param i_strides_in_left_m M strides of the left input tensor.
-     * @param i_strides_in_left_k K strides of the left input tensor.
-     * @param i_strides_in_right_c C strides of the right input tensor.
-     * @param i_strides_in_right_n N strides of the right input tensor.
-     * @param i_strides_in_right_k K strides of the right input tensor.
-     * @param i_strides_out_aux_c C strides of the auxiliary output tensor.
-     * @param i_strides_out_aux_m M strides of the auxiliary output tensor.
-     * @param i_strides_out_aux_n N strides of the auxiliary output tensor.
-     * @param i_strides_out_c C strides of the output tensor.
-     * @param i_strides_out_m M strides of the output tensor.
-     * @param i_strides_out_n N strides of the output tensor.
+     * @param i_dim_ids_c dimensiom ids of the C dimensions.
+     * @param i_dim_ids_m dimensiom ids of the M dimensions.
+     * @param i_dim_ids_n dimensiom ids of the N dimensions.
+     * @param i_dim_ids_k dimensiom ids of the K dimensions.
+     * @param i_sizes sizes of the dimensions
+     * @param i_strides_left strides of the left input tensor.
+     * @param i_strides_right strides of the right input tensor.
+     * @param i_strides_out_aux strides of the auxiliary output tensor.
+     * @param i_strides_out strides of the output tensor.
+     * @param i_dim_type the tpye of th dimension
      * @param i_num_bytes_scalar_left number of bytes per scalar in the left tensor.
      * @param i_num_bytes_scalar_right number of bytes per scalar in the right tensor.
      * @param i_num_bytes_scalar_out number of bytes per scalar in the output tensor.
@@ -207,33 +192,27 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_ktype_last_touch type of the last touch kernel.
      * @param i_packing packing kerneles for contraction
      **/
-    void init( int64_t                 i_num_dims_c,
-               int64_t                 i_num_dims_m,
-               int64_t                 i_num_dims_n,
-               int64_t                 i_num_dims_k,
-               int64_t         const * i_sizes_c,
-               int64_t         const * i_sizes_m,
-               int64_t         const * i_sizes_n,
-               int64_t         const * i_sizes_k,
-               int64_t         const * i_strides_in_left_c,
-               int64_t         const * i_strides_in_left_m,
-               int64_t         const * i_strides_in_left_k,
-               int64_t         const * i_strides_in_right_c,
-               int64_t         const * i_strides_in_right_n,
-               int64_t         const * i_strides_in_right_k,
-               int64_t         const * i_strides_out_aux_c,
-               int64_t         const * i_strides_out_aux_m,
-               int64_t         const * i_strides_out_aux_n,
-               int64_t         const * i_strides_out_c,
-               int64_t         const * i_strides_out_m,
-               int64_t         const * i_strides_out_n,
-               int64_t                 i_num_bytes_scalar_left,
-               int64_t                 i_num_bytes_scalar_right,
-               int64_t                 i_num_bytes_scalar_out,
-               kernel_t                i_ktype_first_touch,
-               kernel_t                i_ktype_main,
-               kernel_t                i_ktype_last_touch,
-               ContractionPackingTpp * i_packing );
+void init( int64_t                              i_num_dims_c,
+           int64_t                              i_num_dims_m,
+           int64_t                              i_num_dims_n,
+           int64_t                              i_num_dims_k,
+           int64_t                      const * i_dim_ids_c,
+           int64_t                      const * i_dim_ids_m,
+           int64_t                      const * i_dim_ids_n,
+           int64_t                      const * i_dim_ids_k,
+           std::map< int64_t, int64_t > const * i_sizes,
+           std::map< int64_t, int64_t > const * i_strides_left,
+           std::map< int64_t, int64_t > const * i_strides_right,
+           std::map< int64_t, int64_t > const * i_strides_out_aux,
+           std::map< int64_t, int64_t > const * i_strides_out,
+           std::map< int64_t, dim_t >   const * i_dim_type,
+           int64_t                              i_num_bytes_scalar_left,
+           int64_t                              i_num_bytes_scalar_right,
+           int64_t                              i_num_bytes_scalar_out,
+           kernel_t                             i_ktype_first_touch,
+           kernel_t                             i_ktype_main,
+           kernel_t                             i_ktype_last_touch,
+           ContractionPackingTpp              * i_packing );
 
     /**
      * Compiles the contraction loop interface.

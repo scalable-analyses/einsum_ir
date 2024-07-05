@@ -36,22 +36,16 @@ class einsum_ir::backend::ContractionLoopsSimple: public ContractionLoops {
      * @param i_num_dims_m number of M dimensions.
      * @param i_num_dims_n number of N dimensions.
      * @param i_num_dims_k number of K dimensions.
-     * @param i_sizes_c sizes of the C dimensions.
-     * @param i_sizes_m sizes of the M dimensions.
-     * @param i_sizes_n sizes of the N dimensions.
-     * @param i_sizes_k sizes of the K dimensions.
-     * @param i_strides_in_left_c C strides of the left input tensor.
-     * @param i_strides_in_left_m M strides of the left input tensor.
-     * @param i_strides_in_left_k K strides of the left input tensor.
-     * @param i_strides_in_right_c C strides of the right input tensor.
-     * @param i_strides_in_right_n N strides of the right input tensor.
-     * @param i_strides_in_right_k K strides of the right input tensor.
-     * @param i_strides_out_aux_c C strides of the auxiliary output tensor.
-     * @param i_strides_out_aux_m M strides of the auxiliary output tensor.
-     * @param i_strides_out_aux_n N strides of the auxiliary output tensor.
-     * @param i_strides_out_c C strides of the output tensor.
-     * @param i_strides_out_m M strides of the output tensor.
-     * @param i_strides_out_n N strides of the output tensor.
+     * @param i_dim_ids_c dimensiom ids of the C dimensions.
+     * @param i_dim_ids_m dimensiom ids of the M dimensions.
+     * @param i_dim_ids_n dimensiom ids of the N dimensions.
+     * @param i_dim_ids_k dimensiom ids of the K dimensions.
+     * @param i_sizes sizes of the dimensions
+     * @param i_strides_left strides of the left input tensor.
+     * @param i_strides_right strides of the right input tensor.
+     * @param i_strides_out_aux strides of the auxiliary output tensor.
+     * @param i_strides_out strides of the output tensor.
+     * @param i_dim_type the tpye of th dimension
      * @param i_num_bytes_scalar_left number of bytes per scalar in the left tensor.
      * @param i_num_bytes_scalar_right number of bytes per scalar in the right tensor.
      * @param i_num_bytes_scalar_out number of bytes per scalar in the output tensor.
@@ -59,36 +53,30 @@ class einsum_ir::backend::ContractionLoopsSimple: public ContractionLoops {
      * @param i_kernel_main main kernel which is applied in the innermost loop.
      * @param i_kernel_last_touch last touch kernel, may be ignored by passing nullptr.
      **/
-    void init( int64_t         i_num_dims_c,
-               int64_t         i_num_dims_m,
-               int64_t         i_num_dims_n,
-               int64_t         i_num_dims_k,
-               int64_t const * i_sizes_c,
-               int64_t const * i_sizes_m,
-               int64_t const * i_sizes_n,
-               int64_t const * i_sizes_k,
-               int64_t const * i_strides_in_left_c,
-               int64_t const * i_strides_in_left_m,
-               int64_t const * i_strides_in_left_k,
-               int64_t const * i_strides_in_right_c,
-               int64_t const * i_strides_in_right_n,
-               int64_t const * i_strides_in_right_k,
-               int64_t const * i_strides_out_aux_c,
-               int64_t const * i_strides_out_aux_m,
-               int64_t const * i_strides_out_aux_n,
-               int64_t const * i_strides_out_c,
-               int64_t const * i_strides_out_m,
-               int64_t const * i_strides_out_n,
-               int64_t         i_num_bytes_scalar_left,
-               int64_t         i_num_bytes_scalar_right,
-               int64_t         i_num_bytes_scalar_out,
-               void         (* i_kernel_first_touch)( void const *,
-                                                      void       * ),
-               void         (* i_kernel_main)( void const *,
-                                               void const *,
-                                               void       * ),
-               void         (* i_kernel_last_touch)( void const *,
-                                                     void       * ) );
+    void init( int64_t                              i_num_dims_c,
+               int64_t                              i_num_dims_m,
+               int64_t                              i_num_dims_n,
+               int64_t                              i_num_dims_k,
+               int64_t                      const * i_dim_ids_c,
+               int64_t                      const * i_dim_ids_m,
+               int64_t                      const * i_dim_ids_n,
+               int64_t                      const * i_dim_ids_k,
+               std::map< int64_t, int64_t > const * i_sizes,
+               std::map< int64_t, int64_t > const * i_strides_left,
+               std::map< int64_t, int64_t > const * i_strides_right,
+               std::map< int64_t, int64_t > const * i_strides_out_aux,
+               std::map< int64_t, int64_t > const * i_strides_out,
+               std::map< int64_t, dim_t >   const * i_dim_type,
+               int64_t                              i_num_bytes_scalar_left,
+               int64_t                              i_num_bytes_scalar_right,
+               int64_t                              i_num_bytes_scalar_out,
+               void                              (* i_kernel_first_touch)( void const *,
+                                                                           void       * ),
+               void                              (* i_kernel_main)( void const *,
+                                                                    void const *,
+                                                                    void       * ),
+               void                              (* i_kernel_last_touch)( void const *,
+                                                                          void       * ) );
 
     /**
      * Executes the first touch kernel on the given data section of the output tensor.

@@ -152,18 +152,16 @@ class einsum_ir::backend::ContractionLoopsBlas: public ContractionLoops {
      * @param i_sizes_m sizes of the M dimensions.
      * @param i_sizes_n sizes of the N dimensions.
      * @param i_sizes_k sizes of the K dimensions.
-     * @param i_strides_in_left_c C strides of the left input tensor.
-     * @param i_strides_in_left_m M strides of the left input tensor.
-     * @param i_strides_in_left_k K strides of the left input tensor.
-     * @param i_strides_in_right_c C strides of the right input tensor.
-     * @param i_strides_in_right_n N strides of the right input tensor.
-     * @param i_strides_in_right_k K strides of the right input tensor.
-     * @param i_strides_out_aux_c C strides of the auxiliary output tensor.
-     * @param i_strides_out_aux_m M strides of the auxiliary output tensor.
-     * @param i_strides_out_aux_n N strides of the auxiliary output tensor.
-     * @param i_strides_out_c C strides of the output tensor.
-     * @param i_strides_out_m M strides of the output tensor.
-     * @param i_strides_out_n N strides of the output tensor.
+     * @param i_dim_ids_c dimensiom ids of the C dimensions.
+     * @param i_dim_ids_m dimensiom ids of the M dimensions.
+     * @param i_dim_ids_n dimensiom ids of the N dimensions.
+     * @param i_dim_ids_k dimensiom ids of the K dimensions.
+     * @param i_sizes sizes of the dimensions
+     * @param i_strides_left strides of the left input tensor.
+     * @param i_strides_right strides of the right input tensor.
+     * @param i_strides_out_aux strides of the auxiliary output tensor.
+     * @param i_strides_out strides of the output tensor.
+     * @param i_dim_type the tpye of th dimension
      * @param i_blas_dtype BLAS data type.
      * @param i_blas_trans_a A is transposed if true, not transposed otherwise.
      * @param i_blas_trans_b B is transposed if true, not transposed otherwise.
@@ -178,39 +176,33 @@ class einsum_ir::backend::ContractionLoopsBlas: public ContractionLoops {
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
      **/
-    void init( int64_t         i_num_dims_c,
-               int64_t         i_num_dims_m,
-               int64_t         i_num_dims_n,
-               int64_t         i_num_dims_k,
-               int64_t const * i_sizes_c,
-               int64_t const * i_sizes_m,
-               int64_t const * i_sizes_n,
-               int64_t const * i_sizes_k,
-               int64_t const * i_strides_in_left_c,
-               int64_t const * i_strides_in_left_m,
-               int64_t const * i_strides_in_left_k,
-               int64_t const * i_strides_in_right_c,
-               int64_t const * i_strides_in_right_n,
-               int64_t const * i_strides_in_right_k,
-               int64_t const * i_strides_out_aux_c,
-               int64_t const * i_strides_out_aux_m,
-               int64_t const * i_strides_out_aux_n,
-               int64_t const * i_strides_out_c,
-               int64_t const * i_strides_out_m,
-               int64_t const * i_strides_out_n,
-               data_t          i_blas_dtype,
-               bool            i_blas_trans_a,
-               bool            i_blas_trans_b,
-               int64_t         i_blas_size_c,
-               int64_t         i_blas_size_m,
-               int64_t         i_blas_size_n,
-               int64_t         i_blas_size_k,
-               int64_t         i_blas_ld_a,
-               int64_t         i_blas_ld_b,
-               int64_t         i_blas_ld_c,
-               kernel_t        i_ktype_first_touch,
-               kernel_t        i_ktype_main,
-               kernel_t        i_ktype_last_touch );
+    void init( int64_t                              i_num_dims_c,
+               int64_t                              i_num_dims_m,
+               int64_t                              i_num_dims_n,
+               int64_t                              i_num_dims_k,
+               int64_t                      const * i_dim_ids_c,
+               int64_t                      const * i_dim_ids_m,
+               int64_t                      const * i_dim_ids_n,
+               int64_t                      const * i_dim_ids_k,
+               std::map< int64_t, int64_t > const * i_sizes,
+               std::map< int64_t, int64_t > const * i_strides_left,
+               std::map< int64_t, int64_t > const * i_strides_right,
+               std::map< int64_t, int64_t > const * i_strides_out_aux,
+               std::map< int64_t, int64_t > const * i_strides_out,
+               std::map< int64_t, dim_t >   const * i_dim_type,
+               data_t                               i_blas_dtype,
+               bool                                 i_blas_trans_a,
+               bool                                 i_blas_trans_b,
+               int64_t                              i_blas_size_c,
+               int64_t                              i_blas_size_m,
+               int64_t                              i_blas_size_n,
+               int64_t                              i_blas_size_k,
+               int64_t                              i_blas_ld_a,
+               int64_t                              i_blas_ld_b,
+               int64_t                              i_blas_ld_c,
+               kernel_t                             i_ktype_first_touch,
+               kernel_t                             i_ktype_main,
+               kernel_t                             i_ktype_last_touch );
 
     /**
      * Derives the threading data for the contraction loops.
