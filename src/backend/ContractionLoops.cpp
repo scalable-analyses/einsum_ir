@@ -1,39 +1,38 @@
 #include "ContractionLoops.h"
+//TODO remove
 #include <iostream>
 
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 
-void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
-                                                 int64_t         i_num_dims_m,
-                                                 int64_t         i_num_dims_n,
-                                                 int64_t         i_num_dims_k,
-                                                 int64_t const * i_sizes_c,
-                                                 int64_t const * i_sizes_m,
-                                                 int64_t const * i_sizes_n,
-                                                 int64_t const * i_sizes_k,
-                                                 int64_t const * i_strides_in_left_c,
-                                                 int64_t const * i_strides_in_left_m,
-                                                 int64_t const * i_strides_in_left_k,
-                                                 int64_t const * i_strides_in_right_c,
-                                                 int64_t const * i_strides_in_right_n,
-                                                 int64_t const * i_strides_in_right_k,
-                                                 int64_t const * i_strides_out_aux_c,
-                                                 int64_t const * i_strides_out_aux_m,
-                                                 int64_t const * i_strides_out_aux_n,
-                                                 int64_t const * i_strides_out_c,
-                                                 int64_t const * i_strides_out_m,
-                                                 int64_t const * i_strides_out_n,
-                                                 int64_t         i_num_bytes_scalar_left,
-                                                 int64_t         i_num_bytes_scalar_right,
-                                                 int64_t         i_num_bytes_scalar_out,
-                                                 MemoryManager * i_memory,
-                                                 int64_t         i_size_packing_left,
-                                                 int64_t         i_size_packing_right,
-                                                 kernel_t        i_ktype_first_touch,
-                                                 kernel_t        i_ktype_main,
-                                                 kernel_t        i_ktype_last_touch ) {
+void einsum_ir::backend::ContractionLoops::init( int64_t                 i_num_dims_c,
+                                                 int64_t                 i_num_dims_m,
+                                                 int64_t                 i_num_dims_n,
+                                                 int64_t                 i_num_dims_k,
+                                                 int64_t         const * i_sizes_c,
+                                                 int64_t         const * i_sizes_m,
+                                                 int64_t         const * i_sizes_n,
+                                                 int64_t         const * i_sizes_k,
+                                                 int64_t         const * i_strides_in_left_c,
+                                                 int64_t         const * i_strides_in_left_m,
+                                                 int64_t         const * i_strides_in_left_k,
+                                                 int64_t         const * i_strides_in_right_c,
+                                                 int64_t         const * i_strides_in_right_n,
+                                                 int64_t         const * i_strides_in_right_k,
+                                                 int64_t         const * i_strides_out_aux_c,
+                                                 int64_t         const * i_strides_out_aux_m,
+                                                 int64_t         const * i_strides_out_aux_n,
+                                                 int64_t         const * i_strides_out_c,
+                                                 int64_t         const * i_strides_out_m,
+                                                 int64_t         const * i_strides_out_n,
+                                                 int64_t                 i_num_bytes_scalar_left,
+                                                 int64_t                 i_num_bytes_scalar_right,
+                                                 int64_t                 i_num_bytes_scalar_out,
+                                                 kernel_t                i_ktype_first_touch,
+                                                 kernel_t                i_ktype_main,
+                                                 kernel_t                i_ktype_last_touch,
+                                                 ContractionPackingTpp * i_packing ) {
   m_num_dims_c = i_num_dims_c;
   m_num_dims_m = i_num_dims_m;
   m_num_dims_n = i_num_dims_n;
@@ -70,10 +69,7 @@ void einsum_ir::backend::ContractionLoops::init( int64_t         i_num_dims_c,
 
   m_num_tasks_targeted = 1;
 
-  m_memory = i_memory;
-  m_size_packing_left =  i_size_packing_left;
-  m_size_packing_right = i_size_packing_right;
-
+  m_packing = i_packing;
 
   m_threading_first_last_touch = false;
 
@@ -219,6 +215,16 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
     m_loop_strides_out[l_lo]     *= m_num_bytes_scalar_out;
   }
 
+  //setup packing loops
+  m_id_packing_loop_left = m_num_loops;
+  m_id_packing_loop_right = m_num_loops;
+  if( m_packing != nullptr ){
+    m_id_packing_loop_left -= m_packing->m_packing_loop_offset_left;
+    m_id_packing_loop_right -= m_packing->m_packing_loop_offset_right;
+  }
+  //TODO order loop correctly
+  //(use map find for elements and reduce all these loops to one)
+
   // compile iteration spaces
   err_t l_err = threading( m_num_tasks_targeted );
   if( l_err != err_t::SUCCESS ) {
@@ -286,6 +292,13 @@ void einsum_ir::backend::ContractionLoops::contract_iter( int64_t         i_id_t
                           l_ptr_out );
     }
 
+    if( m_id_packing_loop_left == i_id_loop ){
+      l_ptr_left = m_packing->kernel_pack_left( l_ptr_left );
+    }
+    if( m_id_packing_loop_right == i_id_loop ){
+      l_ptr_right = m_packing->kernel_pack_right( l_ptr_right );
+    }
+
     if( i_id_loop + 1 < m_num_loops ) {
       contract_iter( i_id_task,
                      i_id_loop+1,
@@ -295,28 +308,9 @@ void einsum_ir::backend::ContractionLoops::contract_iter( int64_t         i_id_t
                      l_ptr_out );
     }
     else {
-      char * l_ptr_left_active  = l_ptr_left;
-      char * l_ptr_right_active = l_ptr_right;
-
-      int64_t l_thread_num = 0;
-      #ifdef _OPENMP
-        l_thread_num = omp_get_thread_num();
-      #endif
-
-      if( m_size_packing_left){
-        l_ptr_left_active = m_memory_packing[l_thread_num];
-        kernel_pack_left( l_ptr_left,
-                          l_ptr_left_active );
-      }
-      if( m_size_packing_right ){
-        l_ptr_right_active = m_memory_packing[l_thread_num] + m_size_packing_left;
-        kernel_pack_right( l_ptr_right,
-                           l_ptr_right_active );
-      }
-
       // execute main kernel
-      kernel_main( l_ptr_left_active,
-                   l_ptr_right_active,
+      kernel_main( l_ptr_left,
+                   l_ptr_right,
                    l_ptr_out );
     }
 
@@ -338,7 +332,9 @@ void einsum_ir::backend::ContractionLoops::contract( void const * i_tensor_left,
                                                      void const * i_tensor_out_aux,
                                                      void       * io_tensor_out ) {
 
-  m_memory_packing = (char**)m_memory->get_thread_memory();
+if( m_packing != nullptr){
+  m_packing->allocate_memory();
+}
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif

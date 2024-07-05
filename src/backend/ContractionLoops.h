@@ -5,7 +5,7 @@
 #include <vector>
 #include "../constants.h"
 #include "IterationSpaces.h"
-#include "MemoryManager.h"
+#include "ContractionPackingTpp.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -74,20 +74,17 @@ class einsum_ir::backend::ContractionLoops {
     //! number of tasks
     int64_t m_num_tasks = 0;
 
-    //! vector of memory pointers for thread specific packing memory
-    MemoryManager * m_memory;
-
-    //! amount of memory required for packing of the left tensor on one thread
-    int64_t  m_size_packing_left;
-
-    //! amount of memory required for packing of the right tensor on one thread
-    int64_t  m_size_packing_right;
-
-    //! vector with alllocated memory
-    char ** m_memory_packing;
-
     //! iteration spaces
     IterationSpaces m_iter_spaces;
+
+    //! id of packing loop for left input
+    int64_t m_id_packing_loop_left = 0;
+
+    //! id of packing loop for right input
+    int64_t m_id_packing_loop_right = 0;
+
+    //! packing kernel for contraction
+    ContractionPackingTpp * m_packing;
 
     //! true if the threading loops have to take care of fist/last touch ops
     bool m_threading_first_last_touch = false;
@@ -174,24 +171,6 @@ class einsum_ir::backend::ContractionLoops {
                               void       * io_out ) = 0;
 
     /**
-     * Kernel to pack the left input tensor of the main kernel.
-     *
-     * @param i_in  pointer to a data section of the input tensor.
-     * @param i_out  pointer to output of packing.
-     **/
-    virtual void kernel_pack_left( void * i_in,
-                                   void * io_out ) = 0;
-    
-    /**
-     * Kernel to pack the right input tensor of the main kernel.
-     *
-     * @param i_in  pointer to a data section of the input tensor.
-     * @param i_out  pointer to output of packing.
-     **/
-    virtual void kernel_pack_right( void * i_in,
-                                    void * io_out ) = 0;
-
-    /**
      * Initializes the the class.
      *
      * Shortcuts:
@@ -226,36 +205,35 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_ktype_first_touch type of the first touch kernel.
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
+     * @param i_packing packing kerneles for contraction
      **/
-    void init( int64_t         i_num_dims_c,
-               int64_t         i_num_dims_m,
-               int64_t         i_num_dims_n,
-               int64_t         i_num_dims_k,
-               int64_t const * i_sizes_c,
-               int64_t const * i_sizes_m,
-               int64_t const * i_sizes_n,
-               int64_t const * i_sizes_k,
-               int64_t const * i_strides_in_left_c,
-               int64_t const * i_strides_in_left_m,
-               int64_t const * i_strides_in_left_k,
-               int64_t const * i_strides_in_right_c,
-               int64_t const * i_strides_in_right_n,
-               int64_t const * i_strides_in_right_k,
-               int64_t const * i_strides_out_aux_c,
-               int64_t const * i_strides_out_aux_m,
-               int64_t const * i_strides_out_aux_n,
-               int64_t const * i_strides_out_c,
-               int64_t const * i_strides_out_m,
-               int64_t const * i_strides_out_n,
-               int64_t         i_num_bytes_scalar_left,
-               int64_t         i_num_bytes_scalar_right,
-               int64_t         i_num_bytes_scalar_out,
-               MemoryManager * i_memory,
-               int64_t         i_size_packing_left,
-               int64_t         i_size_packing_right,
-               kernel_t        i_ktype_first_touch,
-               kernel_t        i_ktype_main,
-               kernel_t        i_ktype_last_touch );
+    void init( int64_t                 i_num_dims_c,
+               int64_t                 i_num_dims_m,
+               int64_t                 i_num_dims_n,
+               int64_t                 i_num_dims_k,
+               int64_t         const * i_sizes_c,
+               int64_t         const * i_sizes_m,
+               int64_t         const * i_sizes_n,
+               int64_t         const * i_sizes_k,
+               int64_t         const * i_strides_in_left_c,
+               int64_t         const * i_strides_in_left_m,
+               int64_t         const * i_strides_in_left_k,
+               int64_t         const * i_strides_in_right_c,
+               int64_t         const * i_strides_in_right_n,
+               int64_t         const * i_strides_in_right_k,
+               int64_t         const * i_strides_out_aux_c,
+               int64_t         const * i_strides_out_aux_m,
+               int64_t         const * i_strides_out_aux_n,
+               int64_t         const * i_strides_out_c,
+               int64_t         const * i_strides_out_m,
+               int64_t         const * i_strides_out_n,
+               int64_t                 i_num_bytes_scalar_left,
+               int64_t                 i_num_bytes_scalar_right,
+               int64_t                 i_num_bytes_scalar_out,
+               kernel_t                i_ktype_first_touch,
+               kernel_t                i_ktype_main,
+               kernel_t                i_ktype_last_touch,
+               ContractionPackingTpp * i_packing );
 
     /**
      * Compiles the contraction loop interface.

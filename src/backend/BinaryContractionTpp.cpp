@@ -1,9 +1,6 @@
 #include "BinaryContractionTpp.h"
 #include "BinaryPrimitives.h"
-
-#include "Unary.h"
-#include "UnaryTpp.h"
-#include <iostream>
+#include "ContractionPackingTpp.h"
 
 #include <algorithm>
 
@@ -168,104 +165,61 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     m_strides_right_bk.push_back( l_strides_right[ l_dim_id ] );
   }
 
-  int64_t l_size_packing_left = 0;
-  int64_t l_size_packing_right = 0;
-  UnaryTpp * l_unary_left = nullptr;
-  UnaryTpp * l_unary_right = nullptr;
+  std::vector< int64_t > l_dim_ids_packed_left;
+  std::vector< int64_t > l_dim_ids_packed_right;
+  ContractionPackingTpp * l_packing  = nullptr;
+
 
   if( m_dim_ids_permute_left != nullptr ){
-    //determine packed dims (packed dims = kernel dims)
-    std::vector< int64_t > l_dim_ids_packed;
-    l_dim_ids_packed.reserve( l_dim_ids_cb.size() + l_dim_ids_mb.size() + l_dim_ids_kb.size() );
-    l_dim_ids_packed.insert( l_dim_ids_packed.end(), l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
-    l_dim_ids_packed.insert( l_dim_ids_packed.end(), l_dim_ids_mb.begin(), l_dim_ids_mb.end() );
-    l_dim_ids_packed.insert( l_dim_ids_packed.end(), l_dim_ids_cb.begin(), l_dim_ids_cb.end() );
-
-    //determine input dims and input strides
-    std::vector< int64_t > l_dim_ids_in;
-    std::vector< int64_t > l_strides_in;
-    l_dim_ids_in.reserve(l_dim_ids_packed.size());
-    for( int64_t l_di = 0; l_di < m_num_dims_left; l_di++ ) {
-      if( std::find( l_dim_ids_packed.begin(), l_dim_ids_packed.end(), m_dim_ids_left[l_di] ) != l_dim_ids_packed.end() ) {
-        int64_t l_dim_id = m_dim_ids_left[l_di];
-        l_dim_ids_in.push_back( l_dim_id );
-        l_strides_in.push_back( l_strides_left[l_dim_id] );
-      }
-    }    
-    //! unary operation
-    l_unary_left = new UnaryTpp;
-    l_unary_left->init( l_dim_ids_packed.size(),
-                        m_dim_sizes_inner,
-                        l_dim_ids_in.data(),
-                        l_dim_ids_packed.data(),
-                        l_strides_in.data(),
-                        nullptr,
-                        m_dtype_right,
-                        m_dtype_right,
-                        m_dtype_right,
-                        kernel_t::COPY );
-    
-    l_err = l_unary_left->compile();
-    if( l_err != einsum_ir::SUCCESS ) {
-      return l_err;
-    }
-    l_unary_left->threading(1);
-
-    //determine required memory
-    l_size_packing_left = 1;
-    for( int64_t l_di = 0; l_di < l_dim_ids_packed.size(); l_di++){
-      l_size_packing_left *= m_dim_sizes_inner->at(l_dim_ids_packed[l_di]);
-    }
-    l_size_packing_left *= ce_n_bytes(m_dtype_left);
+    l_dim_ids_packed_left.reserve( l_dim_ids_cb.size() + l_dim_ids_mb.size() + l_dim_ids_kb.size() );
+    l_dim_ids_packed_left.insert( l_dim_ids_packed_left.end(), l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
+    l_dim_ids_packed_left.insert( l_dim_ids_packed_left.end(), l_dim_ids_mb.begin(), l_dim_ids_mb.end() );
+    l_dim_ids_packed_left.insert( l_dim_ids_packed_left.end(), l_dim_ids_cb.begin(), l_dim_ids_cb.end() );
   }
   if( m_dim_ids_permute_right != nullptr ){
-    //determine packed dims (packed dims = kernel dims)
-    std::vector< int64_t > l_dim_ids_packed;
-    l_dim_ids_packed.reserve( l_dim_ids_cb.size() + l_dim_ids_kb.size() + l_dim_ids_nb.size() );
-    l_dim_ids_packed.insert( l_dim_ids_packed.end(), l_dim_ids_nb.begin(), l_dim_ids_nb.end() );
-    l_dim_ids_packed.insert( l_dim_ids_packed.end(), l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
-    l_dim_ids_packed.insert( l_dim_ids_packed.end(), l_dim_ids_cb.begin(), l_dim_ids_cb.end() );
-    
-    //determine input dims and input strides
-    std::vector< int64_t > l_dim_ids_in;
-    std::vector< int64_t > l_strides_in;
-    l_dim_ids_in.reserve(l_dim_ids_packed.size());
-    for( int64_t l_di = 0; l_di < m_num_dims_right; l_di++ ) {
-      if( std::find( l_dim_ids_packed.begin(), l_dim_ids_packed.end(), m_dim_ids_right[l_di] ) != l_dim_ids_packed.end() ) {
-        int64_t l_dim_id = m_dim_ids_right[l_di];
-        l_dim_ids_in.push_back( l_dim_id );
-        l_strides_in.push_back( l_strides_right[l_dim_id] );
-      }
+    l_dim_ids_packed_right.reserve( l_dim_ids_cb.size() + l_dim_ids_kb.size() + l_dim_ids_nb.size() );
+    l_dim_ids_packed_right.insert( l_dim_ids_packed_right.end(), l_dim_ids_nb.begin(), l_dim_ids_nb.end() );
+    l_dim_ids_packed_right.insert( l_dim_ids_packed_right.end(), l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
+    l_dim_ids_packed_right.insert( l_dim_ids_packed_right.end(), l_dim_ids_cb.begin(), l_dim_ids_cb.end() );
+  }
+  
+  if( m_dim_ids_permute_left != nullptr || m_dim_ids_permute_right != nullptr ) {
+    //TODO could move this to BinaryContraction.cpp and simplify some other code
+    std::map< int64_t, dim_t > l_dim_types;
+    for( const int64_t& l_dim : m_dim_ids_c ){
+      std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::C );
+      l_dim_types.insert( l_pair );
     }
+    for( const int64_t& l_dim : m_dim_ids_c ){
+      std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::C );
+      l_dim_types.insert( l_pair );
+    } 
+    for( const int64_t& l_dim : m_dim_ids_c ){
+      std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::C );
+      l_dim_types.insert( l_pair );
+    } 
+    for( const int64_t& l_dim : m_dim_ids_c ){
+      std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::C );
+      l_dim_types.insert( l_pair );
+    } 
 
-    //! unary operation
-    l_unary_right = new UnaryTpp;
-    l_unary_right->init( l_dim_ids_packed.size(),
-                         m_dim_sizes_inner,
-                         l_dim_ids_in.data(),
-                         l_dim_ids_packed.data(),
-                         l_strides_in.data(),
-                         nullptr,
-                         m_dtype_right,
-                         m_dtype_right,
-                         m_dtype_right,
-                         kernel_t::COPY );
-    
-    l_err = l_unary_right->compile();
-    if( l_err != einsum_ir::SUCCESS ) {
-      return l_err;
-    }
-    l_unary_right->threading(1);
-
-    //determine required memory
-    l_size_packing_right = 1;
-    for( int64_t l_di = 0; l_di < l_dim_ids_packed.size(); l_di++){
-      l_size_packing_right *= m_dim_sizes_inner->at(l_dim_ids_packed[l_di]);
-    }
-    l_size_packing_right *= ce_n_bytes(m_dtype_right);
+    l_packing = new ContractionPackingTpp;
+    l_packing->init( m_num_dims_left,
+                    m_num_dims_right,
+                    m_dim_sizes_inner,
+                    &l_strides_left,
+                    &l_strides_right, 
+                    &l_dim_types,
+                    m_dim_ids_left,
+                    m_dim_ids_right,
+                    &l_dim_ids_packed_left,
+                    &l_dim_ids_packed_right,
+                    m_dtype_left,
+                    m_dtype_out,
+                    m_memory );
+    l_packing->compile();
   }
 
-  m_memory->reserve_thread_memory( l_size_packing_left + l_size_packing_right );
 
   // libxsmm data types
   libxsmm_datatype l_xmm_dtype_left  = dtype_to_libxsmm( m_dtype_left );
@@ -308,8 +262,8 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   }
 
   // set leading dimensions
-  l_lda = l_dim_ids_kb.size() > 0 && !l_size_packing_left  ? l_strides_left.at(  l_dim_ids_kb.back() ) : l_m*l_r;
-  l_ldb = l_dim_ids_nb.size() > 0 && !l_size_packing_right ? l_strides_right.at( l_dim_ids_nb.back() ) : l_k*l_r;
+  l_lda = l_dim_ids_kb.size() > 0 && l_dim_ids_packed_left.size() == 0  ? l_strides_left.at(  l_dim_ids_kb.back() ) : l_m*l_r;
+  l_ldb = l_dim_ids_nb.size() > 0 && l_dim_ids_packed_right.size() == 0 ? l_strides_right.at( l_dim_ids_nb.back() ) : l_k*l_r;
   l_ldc = l_dim_ids_nb.size() > 0 ? l_strides_out.at(   l_dim_ids_nb.back() ) : l_m*l_r;
 
   // first-touch and last-touch shape
@@ -526,11 +480,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                      m_xmm_kernel_main.gemm,
                      m_xmm_kernel_last_touch_unary,
                      m_xmm_kernel_last_touch_binary,
-                     l_unary_left,
-                     l_unary_right,
-                     m_memory,
-                     l_size_packing_left,
-                     l_size_packing_right );
+                     l_packing );
 
   l_err = m_cont_loops.compile();
   if( l_err != einsum_ir::SUCCESS ) {

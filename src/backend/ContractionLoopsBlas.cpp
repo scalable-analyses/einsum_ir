@@ -212,12 +212,10 @@ void einsum_ir::backend::ContractionLoopsBlas::init( int64_t         i_num_dims_
                           m_num_bytes_scalar,
                           m_num_bytes_scalar,
                           m_num_bytes_scalar,
-                          nullptr,
-                          0,
-                          0,
                           i_ktype_first_touch,
                           i_ktype_main,
-                          i_ktype_last_touch );
+                          i_ktype_last_touch,
+                          nullptr );
 
   m_blas_dtype   = i_blas_dtype;
   m_blas_trans_a = i_blas_trans_a;

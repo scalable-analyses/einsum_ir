@@ -50,7 +50,8 @@ if g_env['libxsmm'] != False:
   l_sources += [ 'backend/UnaryLoopsTpp.cpp',
                  'backend/UnaryTpp.cpp',
                  'backend/ContractionLoopsTpp.cpp',
-                 'backend/BinaryContractionTpp.cpp' ]
+                 'backend/BinaryContractionTpp.cpp',
+                 'backend/ContractionPackingTpp.cpp', ]
 
 if g_env['tblis'] != False:
   l_sources += [ 'backend/BinaryContractionTblis.cpp' ]
