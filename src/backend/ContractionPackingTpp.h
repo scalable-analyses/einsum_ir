@@ -42,6 +42,12 @@ class einsum_ir::backend::ContractionPackingTpp {
 
     //! mapping from the dimension ids to dimension type of contactoin
     std::map< int64_t, dim_t > const * m_dim_type = nullptr;
+
+    //! mapping from the dimension ids to strides of left tensor
+    std::map< int64_t, int64_t > m_strides_packed_left;
+
+    //! mapping from the dimension ids to strides of right tensor
+    std::map< int64_t, int64_t > m_strides_packed_right;
  
 
     //! left tensor's dimension ids
@@ -53,6 +59,8 @@ class einsum_ir::backend::ContractionPackingTpp {
     std::vector< int64_t > const * m_dim_ids_kernel_left;
     //! permutation of dimension for the right tensor
     std::vector< int64_t > const * m_dim_ids_kernel_right;
+    //! extra loops for packing
+    std::vector< int64_t > m_dim_ids_extra;
 
     //! datatype of the left input
     data_t m_dtype_left = UNDEFINED_DTYPE;
@@ -94,6 +102,7 @@ class einsum_ir::backend::ContractionPackingTpp {
                          int64_t                      const * i_dim_ids_original,
                          std::vector< int64_t >       const * i_dim_ids_packed,
                          std::map< int64_t, int64_t > const * i_strides_original,
+                         std::map< int64_t, int64_t >       * o_strides_packed,
                          std::map< int64_t, int64_t > const * i_dim_sizes,
                          data_t                               i_dtype,
                          int64_t                            * o_size_packing,

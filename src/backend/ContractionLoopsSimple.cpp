@@ -74,11 +74,3 @@ void einsum_ir::backend::ContractionLoopsSimple::kernel_last_touch( void const *
                          io_out );
   }
 }
-
-void einsum_ir::backend::ContractionLoopsSimple::kernel_pack_left( void * i_in,
-                                                                   void * io_out ) {                                                          
-}
-
-void einsum_ir::backend::ContractionLoopsSimple::kernel_pack_right( void * i_in,
-                                                                    void * io_out ) {                                                          
-}

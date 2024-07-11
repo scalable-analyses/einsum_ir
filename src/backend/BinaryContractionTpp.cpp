@@ -79,32 +79,6 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     }
   }
 
-  // derive sizes of non-blocked dimensions
-  m_sizes_bc.clear();
-  m_sizes_bm.clear();
-  m_sizes_bn.clear();
-  m_sizes_bk.clear();
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bc.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bc[l_di];
-    m_sizes_bc.push_back( m_dim_sizes_inner->at( l_dim_id ) );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bm.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bm[l_di];
-    m_sizes_bm.push_back( m_dim_sizes_inner->at( l_dim_id ) );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bn.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bn[l_di];
-    m_sizes_bn.push_back( m_dim_sizes_inner->at( l_dim_id ) );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bk.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bk[l_di];
-    m_sizes_bk.push_back( m_dim_sizes_inner->at( l_dim_id ) );
-  }
-
   // derive strides
   std::map< int64_t, int64_t > l_strides_left;
   std::map< int64_t, int64_t > l_strides_right;
@@ -135,41 +109,10 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   else {
     l_strides_out_aux = l_strides_out;
   }
-
-  // derive stride of non-blocked dimensions
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bc.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bc[l_di];
-    m_strides_left_bc.push_back(    l_strides_left[    l_dim_id ] );
-    m_strides_right_bc.push_back(   l_strides_right[   l_dim_id ] );
-    m_strides_out_bc.push_back(     l_strides_out[     l_dim_id ] );
-    m_strides_out_aux_bc.push_back( l_strides_out_aux[ l_dim_id ] );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bm.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bm[l_di];
-    m_strides_left_bm.push_back(    l_strides_left[    l_dim_id ] );
-    m_strides_out_bm.push_back(     l_strides_out[     l_dim_id ] );
-    m_strides_out_aux_bm.push_back( l_strides_out_aux[ l_dim_id ] );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bn.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bn[l_di];
-    m_strides_right_bn.push_back(   l_strides_right[   l_dim_id ] );
-    m_strides_out_bn.push_back(     l_strides_out[     l_dim_id ] );
-    m_strides_out_aux_bn.push_back( l_strides_out_aux[ l_dim_id ] );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bk.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bk[l_di];
-    m_strides_left_bk.push_back(  l_strides_left[  l_dim_id ] );
-    m_strides_right_bk.push_back( l_strides_right[ l_dim_id ] );
-  }
-
+  
   std::vector< int64_t > l_dim_ids_packed_left;
   std::vector< int64_t > l_dim_ids_packed_right;
-  ContractionPackingTpp * l_packing  = nullptr;
-
-
+  ContractionPackingTpp * l_packing = nullptr;
   if( m_dim_ids_permute_left != nullptr ){
     l_dim_ids_packed_left.reserve( l_dim_ids_cb.size() + l_dim_ids_mb.size() + l_dim_ids_kb.size() );
     l_dim_ids_packed_left.insert( l_dim_ids_packed_left.end(), l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
@@ -183,33 +126,16 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     l_dim_ids_packed_right.insert( l_dim_ids_packed_right.end(), l_dim_ids_cb.begin(), l_dim_ids_cb.end() );
   }
   
-  if( m_dim_ids_permute_left != nullptr || m_dim_ids_permute_right != nullptr ) {
-    //TODO could move this to BinaryContraction.cpp and simplify some other code
-    std::map< int64_t, dim_t > l_dim_types;
-    for( const int64_t& l_dim : m_dim_ids_c ){
-      std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::C );
-      l_dim_types.insert( l_pair );
-    }
-    for( const int64_t& l_dim : m_dim_ids_c ){
-      std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::C );
-      l_dim_types.insert( l_pair );
-    } 
-    for( const int64_t& l_dim : m_dim_ids_c ){
-      std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::C );
-      l_dim_types.insert( l_pair );
-    } 
-    for( const int64_t& l_dim : m_dim_ids_c ){
-      std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::C );
-      l_dim_types.insert( l_pair );
-    } 
 
+  if( m_dim_ids_permute_left != nullptr || m_dim_ids_permute_right != nullptr ) {
+    //compile packing
     l_packing = new ContractionPackingTpp;
     l_packing->init( m_num_dims_left,
                     m_num_dims_right,
                     m_dim_sizes_inner,
                     &l_strides_left,
                     &l_strides_right, 
-                    &l_dim_types,
+                    &m_dim_types,
                     m_dim_ids_left,
                     m_dim_ids_right,
                     &l_dim_ids_packed_left,
@@ -218,6 +144,14 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                     m_dtype_out,
                     m_memory );
     l_packing->compile();
+
+    //update strides
+    for( auto const& elem : l_packing->m_strides_packed_left ) {
+      l_strides_left.insert_or_assign(elem.first, elem.second);
+    }
+    for( auto const& elem : l_packing->m_strides_packed_right ) {
+      l_strides_right.insert_or_assign(elem.first, elem.second);
+    }
   }
 
 
@@ -262,8 +196,8 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   }
 
   // set leading dimensions
-  l_lda = l_dim_ids_kb.size() > 0 && l_dim_ids_packed_left.size() == 0  ? l_strides_left.at(  l_dim_ids_kb.back() ) : l_m*l_r;
-  l_ldb = l_dim_ids_nb.size() > 0 && l_dim_ids_packed_right.size() == 0 ? l_strides_right.at( l_dim_ids_nb.back() ) : l_k*l_r;
+  l_lda = l_dim_ids_kb.size() > 0 ? l_strides_left.at(  l_dim_ids_kb.back() ) : l_m*l_r;
+  l_ldb = l_dim_ids_nb.size() > 0 ? l_strides_right.at( l_dim_ids_nb.back() ) : l_k*l_r;
   l_ldc = l_dim_ids_nb.size() > 0 ? l_strides_out.at(   l_dim_ids_nb.back() ) : l_m*l_r;
 
   // first-touch and last-touch shape
@@ -453,22 +387,16 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                      l_dim_ids_bm.size(),
                      l_dim_ids_bn.size(),
                      l_dim_ids_bk.size(),
-                     m_sizes_bc.data(),
-                     m_sizes_bm.data(),
-                     m_sizes_bn.data(),
-                     m_sizes_bk.data(),
-                     m_strides_left_bc.data(),
-                     m_strides_left_bm.data(),
-                     m_strides_left_bk.data(),
-                     m_strides_right_bc.data(),
-                     m_strides_right_bn.data(),
-                     m_strides_right_bk.data(),
-                     m_strides_out_aux_bc.data(),
-                     m_strides_out_aux_bm.data(),
-                     m_strides_out_aux_bn.data(),
-                     m_strides_out_bc.data(),
-                     m_strides_out_bm.data(),
-                     m_strides_out_bn.data(),
+                     l_dim_ids_bc.data(),
+                     l_dim_ids_bm.data(),
+                     l_dim_ids_bn.data(),
+                     l_dim_ids_bk.data(),
+                     m_dim_sizes_inner,
+                     &l_strides_left,
+                     &l_strides_right,
+                     &l_strides_out_aux,
+                     &l_strides_out,
+                     &m_dim_types,
                      ce_n_bytes( m_dtype_left ),
                      ce_n_bytes( m_dtype_right ),
                      ce_n_bytes( m_dtype_out ),

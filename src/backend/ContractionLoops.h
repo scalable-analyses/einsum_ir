@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <map>
 #include "../constants.h"
 #include "IterationSpaces.h"
 #include "ContractionPackingTpp.h"
@@ -92,6 +93,8 @@ class einsum_ir::backend::ContractionLoops {
 
     //! number of loops
     int64_t m_num_loops = -1;
+    //! sum of k loop sizes before last touch kernel
+    int64_t m_loop_sum_k_sizes = 0;
     //! first/last touch type of the loops
     std::vector< touch_t > m_loop_first_last_touch;
     //! dimension types of the loops (C, M, N or K)
@@ -247,6 +250,26 @@ void init( int64_t                              i_num_dims_c,
                         void    const * i_ptr_right,
                         void    const * i_ptr_out_aux,
                         void          * i_ptr_out );
+
+    /**
+     * General purpose loop implementation featuring first and last touch operations.
+     * No threading is applied.
+     *
+     * @param i_id_task task id which is executing the loop.
+     * @param i_id_loop dimension id of the loop which is executed.
+     * @param i_id_k_loops loop id used to determine if it is the first time data of output is accessed
+     * @param i_ptr_left pointer to the left tensor's data.
+     * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
+     * @param i_ptr_out pointer to the output tensor's data.
+     **/
+    void contract_iter_packing( int64_t         i_id_task,
+                                int64_t         i_id_loop,
+                                int64_t         i_id_k_loops,
+                                void    const * i_ptr_left,
+                                void    const * i_ptr_right,
+                                void    const * i_ptr_out_aux,
+                                void          * i_ptr_out );
 
     /**
      * Contracts the two tensors.

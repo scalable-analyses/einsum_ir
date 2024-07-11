@@ -1,7 +1,11 @@
 #include "ATen/ATen.h"
 #include "catch.hpp"
 #include "ContractionLoopsBlas.h"
+#include "../constants.h"
 #include <cmath>
+#include <map>
+#include <vector>
+
 
 TEST_CASE( "Simple FP32 matmul using the BLAS contraction loops implementation.", "[contraction_loops_blas]" ) {
   // test case:
@@ -26,12 +30,6 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction loops implementation."
                     0,
                     0,
                     0,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
                     nullptr,
                     nullptr,
                     nullptr,
@@ -103,12 +101,6 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction loops implementation."
                     nullptr,
                     nullptr,
                     nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
                     einsum_ir::FP64,
                     false,
                     false,
@@ -134,6 +126,7 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction loops implementation."
   REQUIRE( at::allclose( l_out, l_out_ref ) );
 }
 
+
 TEST_CASE( "Simple batched FP64 matmul using the BLAS contraction loops implementation.", "[contraction_loops_blas]" ) {
   // test case:
   //
@@ -157,32 +150,34 @@ TEST_CASE( "Simple batched FP64 matmul using the BLAS contraction loops implemen
 
   einsum_ir::backend::ContractionLoopsBlas l_cont_blas;
 
-  int64_t l_sizes_c[1] = { 3 };
-  int64_t l_strides_in_left_c[1]  = { 8*5 };
-  int64_t l_strides_in_right_c[1] = { 7*8 };
-  int64_t l_strides_out_aux_c[1] = { 0 };
-  int64_t l_strides_out_c[1] = { 7*5 };
+  int64_t l_id_c = 0;
 
-  l_cont_blas.init( 1,
+  std::vector<int64_t> l_dim_ids_c = { l_id_c };
+
+  // per-dimension sizes
+  std::map< int64_t, int64_t > l_dim_sizes{ { l_id_c, 3 } };
+  
+  std::map< int64_t, einsum_ir::dim_t > l_dim_types{ { l_id_c, einsum_ir::C } };
+
+  std::map< int64_t, int64_t > l_strides_in_left{  { l_id_c, 8*5 } };
+  std::map< int64_t, int64_t > l_strides_in_right{ { l_id_c, 7*8 } };
+  std::map< int64_t, int64_t > l_strides_out_aux{  { l_id_c, 0   } };
+  std::map< int64_t, int64_t > l_strides_out{      { l_id_c, 7*5 } };
+
+  l_cont_blas.init( l_dim_ids_c.size(),
                     0,
                     0,
                     0,
-                    l_sizes_c,
+                    l_dim_ids_c.data(),
                     nullptr,
                     nullptr,
                     nullptr,
-                    l_strides_in_left_c,
-                    nullptr,
-                    nullptr,
-                    l_strides_in_right_c,
-                    nullptr,
-                    nullptr,
-                    l_strides_out_aux_c,
-                    nullptr,
-                    nullptr,
-                    l_strides_out_c,
-                    nullptr,
-                    nullptr,
+                    &l_dim_sizes,
+                    &l_strides_in_left,
+                    &l_strides_in_right,
+                    &l_strides_out_aux,
+                    &l_strides_out,
+                    &l_dim_types,
                     einsum_ir::FP64,
                     false,
                     false,
@@ -231,49 +226,57 @@ TEST_CASE( "FP32 tensor contraction using the BLAS contraction loops implementat
   at::Tensor l_out     = at::randn( { 5, 2, 8, 7, 12 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  int64_t l_sizes_c[1] = { 5 };
-  int64_t l_sizes_m[1] = { 2 };
-  int64_t l_sizes_n[1] = { 8 };
-  int64_t l_sizes_k[1] = { 3 };
+  int64_t l_id_c = 0;
+  int64_t l_id_m = 1;
+  int64_t l_id_n = 2;
+  int64_t l_id_k = 3;
 
-  int64_t l_strides_in_left_c[1]  = { 2*3*9*12 };
-  int64_t l_strides_in_left_m[1]  = {   3*9*12 };
-  int64_t l_strides_in_left_k[1]  = {     9*12 };
+  std::vector<int64_t> l_dim_ids_c = { l_id_c };
+  std::vector<int64_t> l_dim_ids_m = { l_id_m };
+  std::vector<int64_t> l_dim_ids_n = { l_id_n };
+  std::vector<int64_t> l_dim_ids_k = { l_id_k };
 
-  int64_t l_strides_in_right_c[1] = { 8*3*7*9 };
-  int64_t l_strides_in_right_n[1] = {   3*7*9 };
-  int64_t l_strides_in_right_k[1] = {     7*9 };
+  std::map< int64_t, int64_t > l_dim_sizes{ { l_id_c, 5 },
+                                            { l_id_m, 2 },
+                                            { l_id_n, 8 },
+                                            { l_id_k, 3 } };
+  
+  std::map< int64_t, einsum_ir::dim_t > l_dim_types{ { l_id_c, einsum_ir::C },
+                                                     { l_id_m, einsum_ir::M },
+                                                     { l_id_n, einsum_ir::N },
+                                                     { l_id_k, einsum_ir::K } };
 
-  int64_t l_strides_out_aux_c[1] = { 0 };
-  int64_t l_strides_out_aux_m[1] = { 0 };
-  int64_t l_strides_out_aux_n[1] = { 0 };
 
-  int64_t l_strides_out_c[1] = { 2*8*7*12 };
-  int64_t l_strides_out_m[1] = {   8*7*12 };
-  int64_t l_strides_out_n[1] = {     7*12 };
+  std::map< int64_t, int64_t > l_strides_in_left{ { l_id_c, 2*3*9*12 },
+                                                  { l_id_m,   3*9*12 },
+                                                  { l_id_k,     9*12 } };
+
+  std::map< int64_t, int64_t > l_strides_in_right{ { l_id_c, 8*3*7*9 },
+                                                   { l_id_n,   3*7*9 },
+                                                   { l_id_k,     7*9 } };
+
+  std::map< int64_t, int64_t > l_strides_out_aux{ };
+
+  std::map< int64_t, int64_t > l_strides_out{ { l_id_c, 2*8*7*12 },
+                                              { l_id_m,   8*7*12 },
+                                              { l_id_n,     7*12 } };
 
   einsum_ir::backend::ContractionLoopsBlas l_cont_blas;
 
-  l_cont_blas.init( 1,
-                    1,
-                    1,
-                    1,
-                    l_sizes_c,
-                    l_sizes_m,
-                    l_sizes_n,
-                    l_sizes_k,
-                    l_strides_in_left_c,
-                    l_strides_in_left_m,
-                    l_strides_in_left_k,
-                    l_strides_in_right_c,
-                    l_strides_in_right_n,
-                    l_strides_in_right_k,
-                    l_strides_out_aux_c,
-                    l_strides_out_aux_m,
-                    l_strides_out_aux_n,
-                    l_strides_out_c,
-                    l_strides_out_m,
-                    l_strides_out_n,
+  l_cont_blas.init( l_dim_ids_c.size(),
+                    l_dim_ids_m.size(),
+                    l_dim_ids_n.size(),
+                    l_dim_ids_k.size(),
+                    l_dim_ids_c.data(),
+                    l_dim_ids_m.data(),
+                    l_dim_ids_n.data(),
+                    l_dim_ids_k.data(),
+                    &l_dim_sizes,
+                    &l_strides_in_left,
+                    &l_strides_in_right,
+                    &l_strides_out_aux,
+                    &l_strides_out,
+                    &l_dim_types,
                     einsum_ir::FP32,
                     false,
                     false,
@@ -300,6 +303,7 @@ TEST_CASE( "FP32 tensor contraction using the BLAS contraction loops implementat
 
   REQUIRE( at::allclose( l_out, l_out_ref, 1E-4, 1E-5 ) );
 }
+
 
 TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction loops implementation.", "[contraction_loops_blas]" ) {
   // test case:
@@ -338,12 +342,6 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction loops implement
                     nullptr,
                     nullptr,
                     nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
                     einsum_ir::FP64,
                     false,
                     false,
@@ -370,6 +368,7 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction loops implement
   REQUIRE( at::allclose( l_out, l_out_ref ) );
 }
 
+
 TEST_CASE( "FP32 packed tensor contraction using the BLAS contraction loops implementation.", "[contraction_loops_blas]" ) {
   // test case:
   //
@@ -394,49 +393,57 @@ TEST_CASE( "FP32 packed tensor contraction using the BLAS contraction loops impl
   at::Tensor l_out     = at::randn( { 5, 2, 8, 7, 12, 4 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  int64_t l_sizes_c[1] = { 5 };
-  int64_t l_sizes_m[1] = { 2 };
-  int64_t l_sizes_n[1] = { 8 };
-  int64_t l_sizes_k[1] = { 3 };
+  int64_t l_id_c = 0;
+  int64_t l_id_m = 1;
+  int64_t l_id_n = 2;
+  int64_t l_id_k = 3;
 
-  int64_t l_strides_in_left_c[1]  = { 2*3*4*9*12 };
-  int64_t l_strides_in_left_m[1]  = {   3*4*9*12 };
-  int64_t l_strides_in_left_k[1]  = {     4*9*12 };
+  std::vector<int64_t> l_dim_ids_c = { l_id_c };
+  std::vector<int64_t> l_dim_ids_m = { l_id_m };
+  std::vector<int64_t> l_dim_ids_n = { l_id_n };
+  std::vector<int64_t> l_dim_ids_k = { l_id_k };
 
-  int64_t l_strides_in_right_c[1] = { 8*3*4*7*9 };
-  int64_t l_strides_in_right_n[1] = {   3*4*7*9 };
-  int64_t l_strides_in_right_k[1] = {     4*7*9 };
+  std::map< int64_t, int64_t > l_dim_sizes{ { l_id_c, 5 },
+                                            { l_id_m, 2 },
+                                            { l_id_n, 8 },
+                                            { l_id_k, 3 } };
+  
+  std::map< int64_t, einsum_ir::dim_t > l_dim_types{ { l_id_c, einsum_ir::C },
+                                                     { l_id_m, einsum_ir::M },
+                                                     { l_id_n, einsum_ir::N },
+                                                     { l_id_k, einsum_ir::K } };
 
-  int64_t l_strides_out_aux_c[1] = { 0 };
-  int64_t l_strides_out_aux_m[1] = { 0 };
-  int64_t l_strides_out_aux_n[1] = { 0 };
 
-  int64_t l_strides_out_c[1] = { 2*8*7*12*4 };
-  int64_t l_strides_out_m[1] = {   8*7*12*4 };
-  int64_t l_strides_out_n[1] = {     7*12*4 };
+  std::map< int64_t, int64_t > l_strides_in_left{ { l_id_c, 2*3*4*9*12 },
+                                                  { l_id_m,   3*4*9*12 },
+                                                  { l_id_k,     4*9*12 } };
+
+  std::map< int64_t, int64_t > l_strides_in_right{ { l_id_c, 8*3*4*7*9 },
+                                                   { l_id_n,   3*4*7*9 },
+                                                   { l_id_k,     4*7*9 } };
+
+  std::map< int64_t, int64_t > l_strides_out_aux{ };
+
+  std::map< int64_t, int64_t > l_strides_out{ { l_id_c, 2*8*7*12*4 },
+                                              { l_id_m,   8*7*12*4 },
+                                              { l_id_n,     7*12*4 } };
 
   einsum_ir::backend::ContractionLoopsBlas l_cont_blas;
 
-  l_cont_blas.init( 1,
-                    1,
-                    1,
-                    1,
-                    l_sizes_c,
-                    l_sizes_m,
-                    l_sizes_n,
-                    l_sizes_k,
-                    l_strides_in_left_c,
-                    l_strides_in_left_m,
-                    l_strides_in_left_k,
-                    l_strides_in_right_c,
-                    l_strides_in_right_n,
-                    l_strides_in_right_k,
-                    l_strides_out_aux_c,
-                    l_strides_out_aux_m,
-                    l_strides_out_aux_n,
-                    l_strides_out_c,
-                    l_strides_out_m,
-                    l_strides_out_n,
+  l_cont_blas.init( l_dim_ids_c.size(),
+                    l_dim_ids_m.size(),
+                    l_dim_ids_n.size(),
+                    l_dim_ids_k.size(),
+                    l_dim_ids_c.data(),
+                    l_dim_ids_m.data(),
+                    l_dim_ids_n.data(),
+                    l_dim_ids_k.data(),
+                    &l_dim_sizes,
+                    &l_strides_in_left,
+                    &l_strides_in_right,
+                    &l_strides_out_aux,
+                    &l_strides_out,
+                    &l_dim_types,
                     einsum_ir::FP32,
                     false,
                     false,

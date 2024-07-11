@@ -114,32 +114,6 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
     }
   }
 
-  // derive sizes of non-blocked dimensions
-  m_sizes_bc.clear();
-  m_sizes_bm.clear();
-  m_sizes_bn.clear();
-  m_sizes_bk.clear();
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bc.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bc[l_di];
-    m_sizes_bc.push_back( m_dim_sizes_inner->at( l_dim_id ) );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bm.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bm[l_di];
-    m_sizes_bm.push_back( m_dim_sizes_inner->at( l_dim_id ) );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bn.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bn[l_di];
-    m_sizes_bn.push_back( m_dim_sizes_inner->at( l_dim_id ) );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bk.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bk[l_di];
-    m_sizes_bk.push_back( m_dim_sizes_inner->at( l_dim_id ) );
-  }
-
   // derive strides
   std::map< int64_t, int64_t > l_strides_left;
   std::map< int64_t, int64_t > l_strides_right;
@@ -159,32 +133,6 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
            m_dim_ids_out,
            m_dim_sizes_inner,
            &l_strides_out );
-
-  // derive strides of non-blocked dimensions
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bc.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bc[l_di];
-    m_strides_left_bc.push_back(  l_strides_left[  l_dim_id ] );
-    m_strides_right_bc.push_back( l_strides_right[ l_dim_id ] );
-    m_strides_out_bc.push_back(   l_strides_out[   l_dim_id ] );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bm.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bm[l_di];
-    m_strides_left_bm.push_back(  l_strides_left[ l_dim_id ] );
-    m_strides_out_bm.push_back(   l_strides_out[  l_dim_id ] );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bn.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bn[l_di];
-    m_strides_right_bn.push_back( l_strides_right[ l_dim_id ] );
-    m_strides_out_bn.push_back(   l_strides_out[   l_dim_id ] );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bk.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bk[l_di];
-    m_strides_left_bk.push_back(  l_strides_left[  l_dim_id ] );
-    m_strides_right_bk.push_back( l_strides_right[ l_dim_id ] );
-  }
 
   // check that no I or J dimensions are present
   if( m_num_dims_i > 0 || m_num_dims_j > 0 ) {
@@ -245,22 +193,16 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
                      l_dim_ids_bm.size(),
                      l_dim_ids_bn.size(),
                      l_dim_ids_bk.size(),
-                     m_sizes_bc.data(),
-                     m_sizes_bm.data(),
-                     m_sizes_bn.data(),
-                     m_sizes_bk.data(),
-                     m_strides_left_bc.data(),
-                     m_strides_left_bm.data(),
-                     m_strides_left_bk.data(),
-                     m_strides_right_bc.data(),
-                     m_strides_right_bn.data(),
-                     m_strides_right_bk.data(),
-                     m_strides_out_bc.data(),
-                     m_strides_out_bm.data(),
-                     m_strides_out_bn.data(),
-                     m_strides_out_bc.data(),
-                     m_strides_out_bm.data(),
-                     m_strides_out_bn.data(),
+                     l_dim_ids_bc.data(),
+                     l_dim_ids_bm.data(),
+                     l_dim_ids_bn.data(),
+                     l_dim_ids_bk.data(),
+                     m_dim_sizes_inner,
+                     &l_strides_left,
+                     &l_strides_right,
+                     &l_strides_out,
+                     &l_strides_out,
+                     &m_dim_types,
                      m_dtype_comp,
                      false,
                      false,

@@ -47,15 +47,15 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::compile() {
   err_t l_err = err_t::UNDEFINED_ERROR;
   int64_t l_dim_id_extra_left = -1;
   int64_t l_dim_id_extra_right = -1;
-  std::vector< int64_t > l_dim_ids_extra;
+
 
   //determine if extra packing dimensions are necessary for left input
   if( m_dim_ids_kernel_left->size() > 0 ){
     int64_t l_stride_one_dim =  m_dim_ids_left[ m_num_dims_left - 1 ];
     if( std::find( m_dim_ids_kernel_left->begin(), m_dim_ids_kernel_left->end(), l_stride_one_dim ) == m_dim_ids_kernel_left->end() ) {
       l_dim_id_extra_left = l_stride_one_dim;
-      if( std::find( l_dim_ids_extra.begin(), l_dim_ids_extra.end(), l_stride_one_dim ) == l_dim_ids_extra.end() ) {
-        l_dim_ids_extra.push_back( l_stride_one_dim );
+      if( std::find( m_dim_ids_extra.begin(), m_dim_ids_extra.end(), l_stride_one_dim ) == m_dim_ids_extra.end() ) {
+        m_dim_ids_extra.push_back( l_stride_one_dim );
       }
     }
   }
@@ -65,39 +65,48 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::compile() {
     int64_t l_stride_one_dim =  m_dim_ids_right[ m_num_dims_right - 1 ];
     if( std::find( m_dim_ids_kernel_right->begin(), m_dim_ids_kernel_right->end(), l_stride_one_dim ) == m_dim_ids_kernel_right->end() ) {
        l_dim_id_extra_right = l_stride_one_dim;
-      if( std::find( l_dim_ids_extra.begin(), l_dim_ids_extra.end(), l_stride_one_dim ) == l_dim_ids_extra.end() ) {
-        dim_t dim_type = m_dim_type->at( l_stride_one_dim );
-        if( dim_type == einsum_ir::C || dim_type == einsum_ir::K ){
-          l_dim_ids_extra.insert( l_dim_ids_extra.begin(), l_stride_one_dim );
-        }
-        else{
-          l_dim_ids_extra.push_back( l_stride_one_dim );
-        }
+      if( std::find( m_dim_ids_extra.begin(), m_dim_ids_extra.end(), l_stride_one_dim ) == m_dim_ids_extra.end() ) {
+        m_dim_ids_extra.push_back( l_stride_one_dim );
       }
     }
   }
 
+  //sort packing dimensions
+  std::map< dim_t, int64_t > l_dim_t_to_pos = {{ einsum_ir::C,             1},
+                                               { einsum_ir::M,             6},
+                                               { einsum_ir::N,             5},
+                                               { einsum_ir::K,             0},
+                                               { einsum_ir::I,             4},
+                                               { einsum_ir::J,             3},
+                                               { einsum_ir::UNDEFINED_DIM, 2},};
+  std::sort(m_dim_ids_extra.begin(), 
+            m_dim_ids_extra.end(), 
+            [&](int64_t a, int64_t b){
+              return l_dim_t_to_pos.at(m_dim_type->at(a)) > l_dim_t_to_pos.at(m_dim_type->at(b));
+            });
+
+
   //determine packing dimensions
   std::vector< int64_t > l_dim_ids_packing_left;
   std::vector< int64_t > l_dim_ids_packing_right;
-  l_dim_ids_packing_left.reserve(  l_dim_ids_extra.size() + m_dim_ids_kernel_left->size()  );
-  l_dim_ids_packing_right.reserve( l_dim_ids_extra.size() + m_dim_ids_kernel_right->size() );
+  l_dim_ids_packing_left.reserve(  m_dim_ids_extra.size() + m_dim_ids_kernel_left->size()  );
+  l_dim_ids_packing_right.reserve( m_dim_ids_extra.size() + m_dim_ids_kernel_right->size() );
   
   //TODO: decide if this optimisation should allways be active
   if( true ) {
-    if( l_dim_ids_extra.size() > 0 ){
-      for( int64_t l_id = 0; l_id < l_dim_ids_extra.size(); l_id++ ) {
-        dim_t dim_type = m_dim_type->at( l_dim_ids_extra[l_id] );
-        if( m_packing_loop_offset_left || l_dim_ids_extra[l_id] == l_dim_id_extra_left ) { 
+    if( m_dim_ids_extra.size() > 0 ){
+      for( int64_t l_id = 0; l_id < m_dim_ids_extra.size(); l_id++ ) {
+        dim_t dim_type = m_dim_type->at( m_dim_ids_extra[l_id] );
+        if( m_packing_loop_offset_left || m_dim_ids_extra[l_id] == l_dim_id_extra_left ) { 
           m_packing_loop_offset_left++;
           if( dim_type != einsum_ir::N ) {
-            l_dim_ids_packing_left.push_back( l_dim_ids_extra[l_id] );
+            l_dim_ids_packing_left.push_back( m_dim_ids_extra[l_id] );
           }
         }
-        if( m_packing_loop_offset_right || l_dim_ids_extra[l_id] == l_dim_id_extra_right ) { 
+        if( m_packing_loop_offset_right || m_dim_ids_extra[l_id] == l_dim_id_extra_right ) { 
           m_packing_loop_offset_right++;
           if( dim_type != einsum_ir::M ){
-            l_dim_ids_packing_right.push_back( l_dim_ids_extra[l_id] );
+            l_dim_ids_packing_right.push_back( m_dim_ids_extra[l_id] );
           }
         }
       }
@@ -115,6 +124,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::compile() {
                            m_dim_ids_left,
                            &l_dim_ids_packing_left,
                            m_strides_left,
+                           &m_strides_packed_left,
                            m_dim_sizes,
                            m_dtype_left,
                            &m_size_packing_left,
@@ -131,6 +141,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::compile() {
                            m_dim_ids_right,
                            &l_dim_ids_packing_right,
                            m_strides_right,
+                           &m_strides_packed_right,
                            m_dim_sizes,
                            m_dtype_right,
                            &m_size_packing_right,
@@ -150,6 +161,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::create_kernel( int64
                                                                            int64_t                      const * i_dim_ids_original,
                                                                            std::vector< int64_t >       const * i_dim_ids_packed,
                                                                            std::map< int64_t, int64_t > const * i_strides_original,
+                                                                           std::map< int64_t, int64_t >       * o_strides_packed,
                                                                            std::map< int64_t, int64_t > const * i_dim_sizes,
                                                                            data_t                               i_dtype,
                                                                            int64_t                            * o_size_packing,
@@ -165,10 +177,22 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::create_kernel( int64
   for( int64_t l_di = 0; l_di < i_num_dims; l_di++ ) {
     if( std::find( i_dim_ids_packed->begin(), i_dim_ids_packed->end(), i_dim_ids_original[l_di] ) != i_dim_ids_packed->end() ) {
       int64_t l_dim_id = i_dim_ids_original[l_di];
-      int64_t l_stride_id = i_strides_original->at(l_dim_id);
+      int64_t l_stride = i_strides_original->at(l_dim_id);
       l_dim_ids_in.push_back( l_dim_id );
-      l_strides_in.push_back( l_stride_id );
+      l_strides_in.push_back( l_stride );
+      std::cout << l_stride << std::endl;
     }
+  }
+  //set output strides
+  std::vector< int64_t > l_strides_out;
+  l_strides_out.resize(i_dim_ids_packed->size());
+  o_unary->strides( l_strides_out.size(),
+                    i_dim_sizes,
+                    i_dim_ids_packed->data(),
+                    l_strides_out.data());
+  for( int64_t l_di = 0; l_di < l_strides_out.size(); l_di++ ) {
+    std::pair< int64_t, int64_t > l_pair( i_dim_ids_packed->data()[l_di], l_strides_out[l_di] );
+    o_strides_packed->insert( l_pair );
   }
 
   //determine required memory
@@ -184,7 +208,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::create_kernel( int64
                  l_dim_ids_in.data(),
                  i_dim_ids_packed->data(),
                  l_strides_in.data(),
-                 nullptr,
+                 l_strides_out.data(),
                  i_dtype,
                  i_dtype,
                  i_dtype,

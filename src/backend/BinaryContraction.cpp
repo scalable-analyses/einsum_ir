@@ -394,6 +394,24 @@ einsum_ir::err_t einsum_ir::backend::BinaryContraction::compile_base() {
     m_sizes_j[l_j] = m_dim_sizes_inner->at(l_id);
   }
 
+  std::map< int64_t, dim_t > l_dim_types;
+  for( const int64_t& l_dim : m_dim_ids_c ){
+    std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::C );
+    m_dim_types.insert( l_pair );
+  }
+  for( const int64_t& l_dim : m_dim_ids_m ){
+    std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::M );
+    m_dim_types.insert( l_pair );
+  } 
+  for( const int64_t& l_dim : m_dim_ids_n ){
+    std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::N );
+    m_dim_types.insert( l_pair );
+  } 
+  for( const int64_t& l_dim : m_dim_ids_k ){
+    std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::K );
+    m_dim_types.insert( l_pair );
+  } 
+
   return einsum_ir::SUCCESS;
 }
 

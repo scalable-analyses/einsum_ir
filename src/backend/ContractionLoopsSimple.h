@@ -106,24 +106,6 @@ class einsum_ir::backend::ContractionLoopsSimple: public ContractionLoops {
      **/
     void kernel_last_touch( void const * i_out_aux,
                             void       * io_out );
-    
-    /**
-     * Kernel to pack the left input tensor of the main kernel.
-     *
-     * @param i_in  pointer to a data section of the input tensor.
-     * @param i_out  pointer to output of packing.
-     **/
-    void kernel_pack_left( void * i_in,
-                           void * io_out );
-    
-    /**
-     * Kernel to pack the right input tensor of the main kernel.
-     *
-     * @param i_in  pointer to a data section of the input tensor.
-     * @param i_out  pointer to output of packing.
-     **/
-    void kernel_pack_right( void * i_in,
-                            void * io_out );
 };
 
 #endif

@@ -32,6 +32,9 @@ class einsum_ir::backend::BinaryContraction {
     std::map< int64_t, int64_t > const * m_dim_sizes_outer_out_aux = nullptr;
     //! mapping from the dimension ids to the outer dimension sizes of the output tensor
     std::map< int64_t, int64_t > const * m_dim_sizes_outer_out = nullptr;
+    
+    //! mapping from the dimension ids to dimension types
+    std::map< int64_t, dim_t > m_dim_types;
 
     //! left tensor's dimension ids
     int64_t const * m_dim_ids_left = nullptr;

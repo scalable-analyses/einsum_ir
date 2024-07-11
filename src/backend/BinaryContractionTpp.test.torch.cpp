@@ -551,7 +551,7 @@ TEST_CASE( "FP32 TPP-based binary contraction involving C, M, N and K dimensions
 }
 
 
-TEST_CASE( "FP32 TPP-based binary contraction involving C, M, N and K dimensions, stride-1 M with packing.", "[binary_contraction_tpp]" ) {
+TEST_CASE( "FP32 TPP-based binary contraction involving C, M, N and K dimensions, stride-1 M with packing.", "[binary_contraction_tpp_packing]" ) {
   // Test case:
   //
   //         ______________yhgfxei________________
@@ -631,8 +631,6 @@ TEST_CASE( "FP32 TPP-based binary contraction involving C, M, N and K dimensions
                    einsum_ir::MADD,
                    einsum_ir::UNDEFINED_KTYPE );
 
-  l_memory.alloc_all_memory();
-
   //                              y  x  g  c  a  e  i
   at::Tensor l_left = at::randn( {4, 3, 6, 7, 2, 8, 3} );
   //                               y  x  h  f  c  a
@@ -647,6 +645,7 @@ TEST_CASE( "FP32 TPP-based binary contraction involving C, M, N and K dimensions
 
   einsum_ir::err_t l_err = l_bin_cont.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
+  l_memory.alloc_all_memory();
 
   l_bin_cont.contract( l_left.data_ptr(),
                        l_right.data_ptr(),
