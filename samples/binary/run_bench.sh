@@ -40,8 +40,11 @@ echo "einsum_string,dim_sizes,cont_path,num_flops,time_compile,time_eval,gflops_
 # run configs
 while IFS= read -r args || [ -n "$args" ]
 do
+  # limit args to 3 (einsum_string, dim_sizes, cont_path)
+  args=$(echo $args | cut -d' ' -f1-3)
+
   command="$executable $args $precision $store_lock 2"
-  #output=$(eval $command)
+
   # set output incl error stream
   output=$(eval $command 2>&1)
   # filter for the line with form "CSV_DATA: einsum_ir,"beca,ade->dacb","8,8,2,256,16","(0,1)",1015808,0.00974585,0.00514188,0.197556,0.0682312"
