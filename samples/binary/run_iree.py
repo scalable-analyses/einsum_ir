@@ -129,7 +129,7 @@ if __name__ == "__main__":
   parser.add_argument( "--target_backend",                type=str, default="llvm-cpu" )
   parser.add_argument( "--compile_args",                  type=str, nargs='+', default=["--iree-llvmcpu-target-cpu-features=host"] )
   parser.add_argument( "--device",                        type=str, default="local-task" )
-  parser.add_argument( "--bench_min_time",                type=str, default="1.0s" )
+  parser.add_argument( "--bench_min_time",                type=str, default=None )
   parser.add_argument( "--task_topology_max_group_count", type=int, default=None )
   parser.add_argument( "--task_topology_cpu_ids",         type=str, default=None )
   args = parser.parse_args()
