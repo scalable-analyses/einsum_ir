@@ -1,8 +1,6 @@
 #include "ContractionLoops.h"
 
 #include <algorithm>
-//TODO remove
-#include <iostream>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -115,6 +113,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
       l_loop_dims.push_back( l_dim_ids_c[l_di] );
     }
   }
+  //TODO could swap the dims depneding on sizes, strides, ...
   for( int64_t l_di = 0; l_di < m_num_dims_m; l_di++ ) {
     if( std::find( l_packing_dims.begin(), l_packing_dims.end(), m_dim_ids_m[l_di] ) == l_packing_dims.end() ) {
       l_loop_dims.push_back( m_dim_ids_m[l_di] );
@@ -193,19 +192,19 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
     else {
       m_loop_strides_left.push_back( 0 );
     }
-        if(auto search = m_strides_right->find(l_dim_id); search != m_strides_right->end() ) {
+    if(auto search = m_strides_right->find(l_dim_id); search != m_strides_right->end() ) {
       m_loop_strides_right.push_back(search->second);
     }
     else {
       m_loop_strides_right.push_back( 0 );
     }
-        if(auto search = m_strides_out_aux->find(l_dim_id); search != m_strides_out_aux->end() ) {
+    if(auto search = m_strides_out_aux->find(l_dim_id); search != m_strides_out_aux->end() ) {
       m_loop_strides_out_aux.push_back(search->second);
     }
     else {
       m_loop_strides_out_aux.push_back( 0 );
     }
-        if(auto search = m_strides_out->find(l_dim_id); search != m_strides_out->end() ) {
+    if(auto search = m_strides_out->find(l_dim_id); search != m_strides_out->end() ) {
       m_loop_strides_out.push_back(search->second);
     }
     else {

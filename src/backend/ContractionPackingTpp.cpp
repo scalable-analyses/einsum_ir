@@ -1,8 +1,6 @@
 #include "ContractionPackingTpp.h"
 #include <algorithm>
 
-//TODO remove
-#include <iostream>
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -48,6 +46,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::compile() {
   int64_t l_dim_id_extra_left = -1;
   int64_t l_dim_id_extra_right = -1;
 
+  m_dim_ids_extra.clear();
 
   //determine if extra packing dimensions are necessary for left input
   if( m_dim_ids_kernel_left->size() > 0 ){
@@ -180,7 +179,6 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::create_kernel( int64
       int64_t l_stride = i_strides_original->at(l_dim_id);
       l_dim_ids_in.push_back( l_dim_id );
       l_strides_in.push_back( l_stride );
-      std::cout << l_stride << std::endl;
     }
   }
   //set output strides
