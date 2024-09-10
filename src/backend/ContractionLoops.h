@@ -243,33 +243,17 @@ void init( int64_t                              i_num_dims_c,
      * @param i_ptr_right pointer to the right tensor's data.
      * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
      * @param i_ptr_out pointer to the output tensor's data.
+     * @param i_first_access true if first time accessing this data
+     * @param i_last_access true if last time accessing this data
      **/
     void contract_iter( int64_t         i_id_task,
                         int64_t         i_id_loop,
                         void    const * i_ptr_left,
                         void    const * i_ptr_right,
                         void    const * i_ptr_out_aux,
-                        void          * i_ptr_out );
-
-    /**
-     * General purpose loop implementation featuring first and last touch operations.
-     * No threading is applied.
-     *
-     * @param i_id_task task id which is executing the loop.
-     * @param i_id_loop dimension id of the loop which is executed.
-     * @param i_id_k_loops loop id used to determine if it is the first time data of output is accessed
-     * @param i_ptr_left pointer to the left tensor's data.
-     * @param i_ptr_right pointer to the right tensor's data.
-     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
-     * @param i_ptr_out pointer to the output tensor's data.
-     **/
-    void contract_iter_packing( int64_t         i_id_task,
-                                int64_t         i_id_loop,
-                                int64_t         i_id_k_loops,
-                                void    const * i_ptr_left,
-                                void    const * i_ptr_right,
-                                void    const * i_ptr_out_aux,
-                                void          * i_ptr_out );
+                        void          * i_ptr_out,
+                        bool            i_first_access,
+                        bool            i_last_access );
 
     /**
      * Contracts the two tensors.
