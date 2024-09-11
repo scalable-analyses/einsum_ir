@@ -133,7 +133,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
 
   /*
   //Test of permutations
-  std::vector< int64_t > l_permutation = {0,2,1,3};
+  std::vector< int64_t > l_permutation = {0,1,2,3};
   std::vector< int64_t > l_loop_dims_perm = l_loop_dims;
   for(int64_t l_id = 0; l_id < l_permutation.size(); l_id++){
     int64_t l_perm = l_permutation[l_id];
@@ -141,6 +141,23 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
   }
   */
 
+  //setup packing loop execution
+  m_id_packing_loop_left  = m_num_loops;
+  m_id_packing_loop_right = m_num_loops;
+  if( m_packing != nullptr ){
+    m_id_packing_loop_left -= m_packing->m_packing_loop_offset_left;
+    m_id_packing_loop_right -= m_packing->m_packing_loop_offset_right;
+  }
+
+  // add dummy loop for non-existing loops such that the inner kernel and packing is executed
+  if( m_num_loops == 0 || m_id_packing_loop_left < 0 || m_id_packing_loop_right < 0) {
+    l_loop_dims.insert(l_loop_dims.begin(), -1);
+    m_num_loops++;
+    m_id_packing_loop_left++;
+    m_id_packing_loop_right++;
+  }
+
+  //setup loop structure
   m_loop_first_last_touch.clear();
   m_loop_dim_type.clear();
   m_loop_sizes.clear();
@@ -157,83 +174,26 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
   m_loop_strides_out_aux.reserve(  m_num_loops );
   m_loop_strides_out.reserve(      m_num_loops );
 
-  // add data of dimensions
-  int64_t l_num_dim_cbm = l_num_dims_c + m_num_dims_m + m_num_dims_n;
-  int64_t l_count_cbm = 0;
-  bool l_first_k = true;
   for( int64_t l_di = 0; l_di < m_num_loops; l_di++ ) {
-    int64_t l_dim_id = l_loop_dims_perm[l_di];
-    dim_t l_type = m_dim_type->at(l_dim_id);
+    int64_t l_dim_id = l_loop_dims[l_di];    
+    m_loop_first_last_touch.push_back( NONE );
+    m_loop_dim_type.push_back(        map_find_default<dim_t  >( m_dim_type,        l_dim_id, dim_t::UNDEFINED_DIM) );
+    m_loop_sizes.push_back(           map_find_default<int64_t>( m_sizes,           l_dim_id, 1                   ) );
+    m_loop_strides_left.push_back(    map_find_default<int64_t>( m_strides_left,    l_dim_id, 0                   ) );
+    m_loop_strides_right.push_back(   map_find_default<int64_t>( m_strides_right,   l_dim_id, 0                   ) );
+    m_loop_strides_out_aux.push_back( map_find_default<int64_t>( m_strides_out_aux, l_dim_id, 0                   ) );
+    m_loop_strides_out.push_back(     map_find_default<int64_t>( m_strides_out,     l_dim_id, 0                   ) );
 
-    //add first_last_touch to correct loop
-    if( l_type == einsum_ir::K ){
-      int64_t l_size_k = m_sizes->at(l_dim_id)-1;
-      if( l_num_dim_cbm == 0 && l_first_k ) {
-        l_first_k = false;
-        m_loop_first_last_touch.push_back( EVERY_ITER );
-      }
-      else {
-        m_loop_first_last_touch.push_back( NONE );
-      }
-    }
-    else{
-      l_count_cbm++;
-      if( l_count_cbm == l_num_dim_cbm ){
-        m_loop_first_last_touch.push_back( EVERY_ITER );
-      }
-      else {
-        m_loop_first_last_touch.push_back( NONE );
-      }
-    }
-    
-    //setup loop structure
-    m_loop_dim_type.push_back( l_type                );
-    m_loop_sizes.push_back(    m_sizes->at(l_dim_id) );
-    std::cout << "type: " << l_type <<" id: " << l_dim_id << " size: " << m_sizes->at(l_dim_id) << std::endl;
-    if(auto search = m_strides_left->find(l_dim_id); search != m_strides_left->end() ) {
-      m_loop_strides_left.push_back(search->second);
-    }
-    else {
-      m_loop_strides_left.push_back( 0 );
-    }
-    if(auto search = m_strides_right->find(l_dim_id); search != m_strides_right->end() ) {
-      m_loop_strides_right.push_back(search->second);
-    }
-    else {
-      m_loop_strides_right.push_back( 0 );
-    }
-    if(auto search = m_strides_out_aux->find(l_dim_id); search != m_strides_out_aux->end() ) {
-      m_loop_strides_out_aux.push_back(search->second);
-    }
-    else {
-      m_loop_strides_out_aux.push_back( 0 );
-    }
-    if(auto search = m_strides_out->find(l_dim_id); search != m_strides_out->end() ) {
-      m_loop_strides_out.push_back(search->second);
-    }
-    else {
-      m_loop_strides_out.push_back( 0 );
-    }
+    std::cout << "type: " << m_loop_dim_type[l_di] <<" id: " << l_dim_id << " size: " << m_loop_sizes[l_di] << std::endl;
   }
 
-  // add dummy data for non-existing loops such that the inner kernel is executed
-  if( m_num_loops == 0 ) {
-    m_num_loops = 1;
-    m_loop_dim_type.push_back(         dim_t::UNDEFINED_DIM );
-    m_loop_first_last_touch.push_back( EVERY_ITER           );
-    m_loop_sizes.push_back(            1                    );
-    m_loop_strides_left.push_back(     0                    );
-    m_loop_strides_right.push_back(    0                    );
-    m_loop_strides_out_aux.push_back(  0                    );
-    m_loop_strides_out.push_back(      0                    );
-  }
-
-  //setup extra packing loops
-  m_id_packing_loop_left  = m_num_loops;
-  m_id_packing_loop_right = m_num_loops;
-  if( m_packing != nullptr ){
-    m_id_packing_loop_left -= m_packing->m_packing_loop_offset_left;
-    m_id_packing_loop_right -= m_packing->m_packing_loop_offset_right;
+  //find correct loop for first last touch routine
+  for( int64_t l_di = m_num_loops-1; l_di >= 0; l_di-- ) {
+    dim_t l_dim_type =  m_loop_dim_type[l_di];
+    if(l_di == 0 || l_dim_type != einsum_ir::K){
+      m_loop_first_last_touch[l_di] = EVERY_ITER;
+      break;
+    }
   }
 
   // scale with size of data types
@@ -258,13 +218,31 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
 einsum_ir::err_t einsum_ir::backend::ContractionLoops::threading( int64_t i_num_tasks ) {
   m_num_tasks = i_num_tasks;
 
-  int64_t l_num_parallel = m_num_dims_c + m_num_dims_m + m_num_dims_n;
-  l_num_parallel = m_cpx_outer_c ? l_num_parallel - 1 : l_num_parallel;
+  //find the first parallelizable loop
+  m_id_first_parallel = 0;
+  int64_t l_num_parallel = 0;
+  bool l_found_non_k = false;
+  for( int64_t l_di = 0; l_di < m_loop_dim_type.size(); l_di++ ) {
+    dim_t l_type = m_loop_dim_type[l_di];
+    if( l_type == einsum_ir::K && !l_found_non_k){
+      m_id_first_parallel++;
+    }
+    else if(l_type != einsum_ir::K){
+      l_found_non_k = true;
+      l_num_parallel++;
+    }
+    else{
+      break;
+    }
+  }
+  if(l_num_parallel == 0){
+    m_id_first_parallel = 0;
+  }
 
   m_iter_spaces.init( m_num_loops,
                       l_num_parallel,
                       nullptr,
-                      m_loop_sizes.data(),
+                      m_loop_sizes.data() + m_id_first_parallel,
                       m_num_tasks );
   err_t l_err = m_iter_spaces.compile();
   if( l_err != err_t::SUCCESS ) {
@@ -285,24 +263,30 @@ void einsum_ir::backend::ContractionLoops::contract( void const * i_tensor_left,
     m_packing->allocate_memory();
   }
 
+  if(m_id_first_parallel > 0){
+    contract_iter_non_parallel( 0,
+                                i_tensor_left,
+                                i_tensor_right,
+                                i_tensor_out_aux,
+                                io_tensor_out,
+                                true,
+                                true );
+  }
+  else{
+
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for( int64_t l_ta = 0; l_ta < m_num_tasks; l_ta++ ) {
-    if( m_id_packing_loop_left == -1 ){
-      i_tensor_left = m_packing->kernel_pack_left( (char *) i_tensor_left );
+    for( int64_t l_ta = 0; l_ta < m_num_tasks; l_ta++ ) {
+      contract_iter( l_ta,
+                    0,
+                    i_tensor_left,
+                    i_tensor_right,
+                    i_tensor_out_aux,
+                    io_tensor_out,
+                    true,
+                    true );
     }
-    if( m_id_packing_loop_right == -1 ){
-      i_tensor_right = m_packing->kernel_pack_right( (char *) i_tensor_right );
-    }
-    contract_iter( l_ta,
-                   0,
-                   i_tensor_left,
-                   i_tensor_right,
-                   i_tensor_out_aux,
-                   io_tensor_out,
-                   true,
-                   true );
   }
 }
 
@@ -316,8 +300,8 @@ void einsum_ir::backend::ContractionLoops::contract_iter( int64_t         i_id_t
                                                           bool            i_first_access,
                                                           bool            i_last_access ) {
   // derive first element and number of iterations
-  int64_t l_first = m_iter_spaces.firsts(i_id_task)[ i_id_loop ];
-  int64_t l_size  = m_iter_spaces.sizes(i_id_task)[  i_id_loop ];
+  int64_t l_first = m_iter_spaces.firsts(i_id_task)[ i_id_loop - m_id_first_parallel ];
+  int64_t l_size  = m_iter_spaces.sizes(i_id_task)[  i_id_loop - m_id_first_parallel ];
 
   bool l_first_access = i_first_access;
   bool l_last_access  = i_last_access;
@@ -373,3 +357,77 @@ void einsum_ir::backend::ContractionLoops::contract_iter( int64_t         i_id_t
     }
   }
 }
+
+
+void einsum_ir::backend::ContractionLoops::contract_iter_non_parallel( int64_t         i_id_loop,
+                                                                       void    const * i_ptr_left,
+                                                                       void    const * i_ptr_right,
+                                                                       void    const * i_ptr_out_aux,
+                                                                       void          * i_ptr_out,
+                                                                       bool            i_first_access,
+                                                                       bool            i_last_access ) {
+  std::cout << "call parallel" << std::endl;
+  bool l_first_access = i_first_access;
+  bool l_last_access  = i_last_access;
+
+  // issue loop iterations
+  for( int64_t l_it = 0; l_it < m_loop_sizes[i_id_loop]; l_it++ ) {
+    char * l_ptr_left    = (char *) i_ptr_left;
+    char * l_ptr_right   = (char *) i_ptr_right;
+    char * l_ptr_out_aux = (char *) i_ptr_out_aux;
+    char * l_ptr_out     = (char *) i_ptr_out;
+
+    l_ptr_left    += l_it * m_loop_strides_left[    i_id_loop ];
+    l_ptr_right   += l_it * m_loop_strides_right[   i_id_loop ];
+    l_ptr_out_aux += l_it * m_loop_strides_out_aux[ i_id_loop ] * (l_ptr_out_aux != nullptr);
+    l_ptr_out     += l_it * m_loop_strides_out[     i_id_loop ];
+
+    if(m_loop_dim_type[i_id_loop] == einsum_ir::K){
+      l_first_access = i_first_access && l_it == 0 ;
+      l_last_access  = i_last_access  && l_it == m_loop_sizes[i_id_loop]-1 ;
+    }
+
+    if( m_loop_first_last_touch[i_id_loop] == EVERY_ITER && l_first_access ) {
+      kernel_first_touch( l_ptr_out_aux,
+                          l_ptr_out );
+    }
+
+    if( m_id_packing_loop_left == i_id_loop ){
+      l_ptr_left = m_packing->kernel_pack_left( l_ptr_left );
+    }
+    if( m_id_packing_loop_right == i_id_loop ){
+      l_ptr_right = m_packing->kernel_pack_right( l_ptr_right );
+    }
+
+    if( i_id_loop + 1 < m_id_first_parallel ) {
+      contract_iter_non_parallel( i_id_loop+1,
+                                  l_ptr_left,
+                                  l_ptr_right,
+                                  l_ptr_out_aux,
+                                  l_ptr_out,
+                                  l_first_access,
+                                  l_last_access );
+    }
+    else {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+      for( int64_t l_ta = 0; l_ta < m_num_tasks; l_ta++ ) {
+        contract_iter( l_ta,
+                      i_id_loop+1,
+                      l_ptr_left,
+                      l_ptr_right,
+                      l_ptr_out_aux,
+                      l_ptr_out,
+                      l_first_access,
+                      l_last_access);
+      }
+    }
+    if( m_loop_first_last_touch[i_id_loop] == EVERY_ITER && l_last_access ) {
+      kernel_last_touch( l_ptr_out_aux,
+                         l_ptr_out );
+    }
+  }
+}
+
+//possible bugs with packing or complex dimensions

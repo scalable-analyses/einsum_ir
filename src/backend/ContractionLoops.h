@@ -65,6 +65,9 @@ class einsum_ir::backend::ContractionLoops {
     //! number of tasks
     int64_t m_num_tasks = 0;
 
+    //! id of first parallel loop
+    int64_t m_id_first_parallel = 0;
+
     //! iteration spaces
     IterationSpaces m_iter_spaces;
 
@@ -256,6 +259,27 @@ void init( int64_t                              i_num_dims_c,
                         bool            i_last_access );
 
     /**
+     * General purpose loop implementation featuring first and last touch operations.
+     * No threading is applied.
+     *
+     * @param i_id_task task id which is executing the loop.
+     * @param i_id_loop dimension id of the loop which is executed.
+     * @param i_ptr_left pointer to the left tensor's data.
+     * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
+     * @param i_ptr_out pointer to the output tensor's data.
+     * @param i_first_access true if first time accessing this data
+     * @param i_last_access true if last time accessing this data
+     **/
+    void contract_iter_non_parallel( int64_t         i_id_loop,
+                                     void    const * i_ptr_left,
+                                     void    const * i_ptr_right,
+                                     void    const * i_ptr_out_aux,
+                                     void          * i_ptr_out,
+                                     bool            i_first_access,
+                                     bool            i_last_access );
+
+    /**
      * Contracts the two tensors.
      *
      * @param i_tensor_left left tensor.
@@ -267,6 +291,29 @@ void init( int64_t                              i_num_dims_c,
                    void const * i_tensor_right,
                    void const * i_tensor_out_aux,
                    void       * io_tensor_out );
+
+
+    /**
+     * Helper Function for map find with default value
+     *
+     * @param i_map map.
+     * @param i_key key.
+     * @param i_default default value.
+     * 
+     * @param return value or default value.
+     **/
+    template <typename T>
+    T map_find_default( std::map< int64_t, T > const * i_map,
+                        int64_t                        i_key,
+                        T                              i_default){
+      if(auto search = i_map->find(i_key); search != i_map->end() ) {
+        
+        return search->second;
+      }
+      else {
+        return i_default;
+      }
+    }
 };
 
 #endif

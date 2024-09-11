@@ -24,6 +24,13 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction loops implementation."
   at::Tensor l_out     = at::randn( { 7, 5 } );
   at::Tensor l_out_ref = l_out.clone();
 
+  std::map< int64_t, int64_t > l_dim_sizes;
+  std::map< int64_t, einsum_ir::dim_t > l_dim_types;
+  std::map< int64_t, int64_t > l_strides_in_left;
+  std::map< int64_t, int64_t > l_strides_in_right;
+  std::map< int64_t, int64_t > l_strides_out_aux;
+  std::map< int64_t, int64_t > l_strides_out;
+
   einsum_ir::backend::ContractionLoopsBlas l_cont_blas;
 
   l_cont_blas.init( 0,
@@ -34,12 +41,12 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction loops implementation."
                     nullptr,
                     nullptr,
                     nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
+                    &l_dim_sizes,
+                    &l_strides_in_left,
+                    &l_strides_in_right,
+                    &l_strides_out_aux,
+                    &l_strides_out,
+                    &l_dim_types,
                     einsum_ir::FP32,
                     false,
                     false,
@@ -85,6 +92,14 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction loops implementation."
                                     at::dtype( at::kDouble ) );
   at::Tensor l_out_ref = l_out.clone();
 
+  std::map< int64_t, int64_t > l_dim_sizes;
+  std::map< int64_t, einsum_ir::dim_t > l_dim_types;
+  std::map< int64_t, int64_t > l_strides_in_left;
+  std::map< int64_t, int64_t > l_strides_in_right;
+  std::map< int64_t, int64_t > l_strides_out_aux;
+  std::map< int64_t, int64_t > l_strides_out;
+
+
   einsum_ir::backend::ContractionLoopsBlas l_cont_blas;
 
   l_cont_blas.init( 0,
@@ -95,12 +110,12 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction loops implementation."
                     nullptr,
                     nullptr,
                     nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
+                    &l_dim_sizes,
+                    &l_strides_in_left,
+                    &l_strides_in_right,
+                    &l_strides_out_aux,
+                    &l_strides_out,
+                    &l_dim_types,
                     einsum_ir::FP64,
                     false,
                     false,
@@ -326,6 +341,13 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction loops implement
                                     at::dtype( at::kDouble ) );
   at::Tensor l_out_ref = l_out.clone();
 
+  std::map< int64_t, int64_t > l_dim_sizes;
+  std::map< int64_t, einsum_ir::dim_t > l_dim_types;
+  std::map< int64_t, int64_t > l_strides_in_left;
+  std::map< int64_t, int64_t > l_strides_in_right;
+  std::map< int64_t, int64_t > l_strides_out_aux;
+  std::map< int64_t, int64_t > l_strides_out;
+
   einsum_ir::backend::ContractionLoopsBlas l_cont_blas;
 
   l_cont_blas.init( 0,
@@ -336,12 +358,12 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction loops implement
                     nullptr,
                     nullptr,
                     nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
+                    &l_dim_sizes,
+                    &l_strides_in_left,
+                    &l_strides_in_right,
+                    &l_strides_out_aux,
+                    &l_strides_out,
+                    &l_dim_types,
                     einsum_ir::FP64,
                     false,
                     false,
