@@ -114,6 +114,30 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
     }
   }
 
+  //determine loop execution order
+  if( m_loop_ids_ext == nullptr ){
+    m_loop_ids_int.clear();
+    m_loop_ids_int.reserve( l_dim_ids_bc.size() + l_dim_ids_bm.size() + l_dim_ids_bn.size() + l_dim_ids_bk.size() );
+    m_loop_ids_int.insert( m_loop_ids_int.end(), l_dim_ids_bc.begin(), l_dim_ids_bc.end() );
+    m_loop_ids_int.insert( m_loop_ids_int.end(), l_dim_ids_bn.begin(), l_dim_ids_bn.end() );
+    m_loop_ids_int.insert( m_loop_ids_int.end(), l_dim_ids_bm.begin(), l_dim_ids_bm.end() );
+    m_loop_ids_int.insert( m_loop_ids_int.end(), l_dim_ids_bk.begin(), l_dim_ids_bk.end() );
+  }
+  else{
+    std::vector< int64_t > l_dim_ids_kernel;
+    l_dim_ids_kernel.reserve( l_dim_ids_cb.size() + l_dim_ids_mb.size() + l_dim_ids_nb.size() + l_dim_ids_kb.size() );
+    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_cb.begin(), l_dim_ids_cb.end() );
+    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_nb.begin(), l_dim_ids_nb.end() );
+    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_mb.begin(), l_dim_ids_mb.end() );
+    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
+    for( std::size_t l_di = 0; l_di < l_dim_ids_kernel.size(); l_di++){
+      auto l_found = std::find( m_loop_ids_int.begin(), m_loop_ids_int.end(), l_dim_ids_kernel[l_di] );
+      if( l_found != m_loop_ids_int.end() ) {
+        m_loop_ids_int.erase(l_found);
+      }
+    }
+  }
+
   // derive strides
   std::map< int64_t, int64_t > l_strides_left;
   std::map< int64_t, int64_t > l_strides_right;
@@ -203,6 +227,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
                      &l_strides_out,
                      &l_strides_out,
                      &m_dim_types,
+                     &m_loop_ids_int,
                      m_dtype_comp,
                      false,
                      false,

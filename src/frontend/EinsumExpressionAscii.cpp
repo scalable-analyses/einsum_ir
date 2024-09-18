@@ -155,3 +155,27 @@ void einsum_ir::frontend::EinsumExpressionAscii::parse_ctype( std::string const 
       o_ctype = einsum_ir::UNDEFINED_CTYPE;
     }
 }
+
+void einsum_ir::frontend::EinsumExpressionAscii::parse_loop_order( std::string               const & i_loop_string,
+                                                                   std::map< char, int64_t > const & i_map_dim_name_to_id,
+                                                                   std::vector< int64_t >          & o_loop_order ){
+
+  o_loop_order.clear();
+
+  std::string l_loops = i_loop_string;
+
+  l_loops.erase( std::remove( l_loops.begin(),
+                              l_loops.end(),
+                              ' '),
+                 l_loops.end());
+
+  std::vector< std::string > l_loop_dims_tmp;
+  split_string( l_loops,
+                std::string(","),
+                l_loop_dims_tmp );
+  
+  o_loop_order.reserve( l_loop_dims_tmp.size() );
+  for( std::size_t l_di = 0; l_di < l_loop_dims_tmp.size(); l_di++ ) {
+    o_loop_order.push_back( i_map_dim_name_to_id.at( l_loop_dims_tmp[l_di][0] ) );
+  }
+}

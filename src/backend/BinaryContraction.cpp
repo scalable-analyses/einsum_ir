@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cmath>
 #include "ContractionLoops.h"
+#include <iostream>
 
 void einsum_ir::backend::BinaryContraction::dim_types( int64_t         i_num_dims_t0,
                                                        int64_t         i_num_dims_t1,
@@ -274,6 +275,7 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
         i_dim_sizes_outer_right,
         i_dim_sizes_outer_out_aux,
         i_dim_sizes_outer_out,
+        nullptr,
         i_dim_ids_left,
         i_dim_ids_right,
         i_dim_ids_out,
@@ -297,6 +299,7 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
                                                   std::map< int64_t, int64_t > const * i_dim_sizes_outer_right,
                                                   std::map< int64_t, int64_t > const * i_dim_sizes_outer_out_aux,
                                                   std::map< int64_t, int64_t > const * i_dim_sizes_outer_out,
+                                                  std::vector< int64_t >       const * i_loop_ids_ext,
                                                   int64_t                      const * i_dim_ids_left,
                                                   int64_t                      const * i_dim_ids_right,
                                                   int64_t                      const * i_dim_ids_out,
@@ -319,6 +322,8 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
   m_dim_sizes_outer_right   = i_dim_sizes_outer_right;
   m_dim_sizes_outer_out_aux = i_dim_sizes_outer_out_aux;
   m_dim_sizes_outer_out     = i_dim_sizes_outer_out;
+
+  m_loop_ids_ext = i_loop_ids_ext;
 
   m_dim_ids_left  = i_dim_ids_left;
   m_dim_ids_right = i_dim_ids_right;
@@ -411,6 +416,12 @@ einsum_ir::err_t einsum_ir::backend::BinaryContraction::compile_base() {
     std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::K );
     m_dim_types.insert( l_pair );
   } 
+
+  if( m_loop_ids_ext != nullptr ){
+    m_loop_ids_int.clear();
+    m_loop_ids_int.reserve(m_loop_ids_ext->size());
+    m_loop_ids_int.insert(m_loop_ids_int.begin(), m_loop_ids_ext->begin(), m_loop_ids_ext->end());
+  }
 
   return einsum_ir::SUCCESS;
 }

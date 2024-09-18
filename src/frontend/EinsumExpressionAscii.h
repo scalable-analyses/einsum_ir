@@ -114,6 +114,17 @@ class einsum_ir::frontend::EinsumExpressionAscii {
      **/
     static void parse_ctype( std::string const & i_ctype_string,
                              complex_t         & o_ctype );
+
+    /**
+     * Extractes the loop execution order from a string 
+     *
+     * @param i_loop_string loop execution type string.
+     * @param i_map_dim_name_to_id map from dimension name to dimension ids.
+     * @param o_loop_order will be set to loop order as dimension ids
+     **/
+    static void parse_loop_order( std::string               const & i_loop_string,
+                                  std::map< char, int64_t > const & i_map_dim_name_to_id,
+                                  std::vector< int64_t >          & o_loop_order );
 };
 
 #endif

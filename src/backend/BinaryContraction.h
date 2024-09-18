@@ -48,6 +48,12 @@ class einsum_ir::backend::BinaryContraction {
     //! permutation of dimension for the right tensor
     int64_t const * m_dim_ids_permute_right = nullptr;
 
+    //! external loop execution order
+    std::vector< int64_t > const * m_loop_ids_ext = nullptr;
+
+    //! internal loop execution order
+    std::vector< int64_t > m_loop_ids_int;
+
     //! dimension types of the output tensor
     std::vector< dim_t > m_dim_types_out;
 
@@ -284,6 +290,7 @@ class einsum_ir::backend::BinaryContraction {
      * @param i_dim_sizes_outer_right mapping from the dimension ids to the right tensor's outer sizes.
      * @param i_dim_sizes_outer_out_aux mapping from the dimension ids to the auxiliary out tensor's outer sizes.
      * @param i_dim_sizes_outer_out mapping from the dimension ids to the out tensor's outer sizes.
+     * @param i_loop_ids_ext external loop execution order.
      * @param i_dim_ids_left dimension ids of the left tensor.
      * @param i_dim_ids_right dimension ids of the right tensor.
      * @param i_dim_ids_out dimensions ids of the output tensor.
@@ -306,6 +313,7 @@ class einsum_ir::backend::BinaryContraction {
                std::map< int64_t, int64_t > const * i_dim_sizes_outer_right,
                std::map< int64_t, int64_t > const * i_dim_sizes_outer_out_aux,
                std::map< int64_t, int64_t > const * i_dim_sizes_outer_out,
+               std::vector< int64_t >       const * i_loop_ids_ext,
                int64_t                      const * i_dim_ids_left,
                int64_t                      const * i_dim_ids_right,
                int64_t                      const * i_dim_ids_out,

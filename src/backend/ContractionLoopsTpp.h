@@ -80,6 +80,7 @@ class einsum_ir::backend::ContractionLoopsTpp: public ContractionLoops {
                std::map< int64_t, int64_t > const * i_strides_out_aux,
                std::map< int64_t, int64_t > const * i_strides_out,
                std::map< int64_t, dim_t >   const * i_dim_type,
+               std::vector<int64_t>               * i_loop_ids,
                int64_t                              i_num_bytes_scalar_left,
                int64_t                              i_num_bytes_scalar_right,
                int64_t                              i_num_bytes_scalar_out,

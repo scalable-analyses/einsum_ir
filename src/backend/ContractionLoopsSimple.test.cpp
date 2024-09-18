@@ -148,6 +148,7 @@ TEST_CASE( "K dimension of the contraction loops.", "[contraction_loops_k]" ) {
   std::vector<int64_t> l_dim_ids_m = { };
   std::vector<int64_t> l_dim_ids_n = { };
   std::vector<int64_t> l_dim_ids_k = { l_id_k };
+  std::vector<int64_t> l_loop_ids  = { l_id_k };
 
   // per-dimension sizes
   std::map< int64_t, int64_t > l_dim_sizes{ { l_id_k, 5 } };
@@ -187,6 +188,7 @@ TEST_CASE( "K dimension of the contraction loops.", "[contraction_loops_k]" ) {
                      &l_strides_out,
                      &l_strides_out,
                      &l_dim_types,
+                     &l_loop_ids,
                      4,
                      4,
                      4,
@@ -259,6 +261,7 @@ TEST_CASE( "Matmul with first and last touch.", "[contraction_loops]" ) {
   std::vector<int64_t> l_dim_ids_m = { l_id_m };
   std::vector<int64_t> l_dim_ids_n = { l_id_n };
   std::vector<int64_t> l_dim_ids_k = { l_id_k };
+  std::vector<int64_t> l_loop_ids  = { l_id_n, l_id_m, l_id_k };
 
   // per-dimension sizes
   std::map< int64_t, int64_t > l_dim_sizes{ { l_id_m, 5 },
@@ -328,6 +331,7 @@ TEST_CASE( "Matmul with first and last touch.", "[contraction_loops]" ) {
                      &l_strides_out,
                      &l_strides_out,
                      &l_dim_types,
+                     &l_loop_ids,
                      4,
                      4,
                      4,
@@ -395,6 +399,7 @@ TEST_CASE( "Nested loops used in binary contractions using a scalar kernel.", "[
   std::vector<int64_t> l_dim_ids_m = { l_id_g, l_id_e, l_id_i };
   std::vector<int64_t> l_dim_ids_n = { l_id_h, l_id_f };
   std::vector<int64_t> l_dim_ids_k = { l_id_c, l_id_a };
+  std::vector<int64_t> l_loop_ids  = { l_id_h, l_id_f , l_id_g, l_id_e, l_id_i, l_id_c, l_id_a };
 
   // per-dimension sizes
   std::map< int64_t, int64_t > l_dim_sizes{ { l_id_i, 3 }, 
@@ -558,6 +563,7 @@ TEST_CASE( "Nested loops used in binary contractions using a scalar kernel.", "[
                      &l_strides_out,
                      &l_strides_out,
                      &l_dim_types,
+                     &l_loop_ids,
                      4,
                      4,
                      4,
@@ -636,6 +642,7 @@ TEST_CASE( "Nested loops used in binary contractions using a matrix kernel.", "[
   std::vector<int64_t> l_dim_ids_m = { l_id_g, l_id_e, l_id_i };
   std::vector<int64_t> l_dim_ids_n = { l_id_h, l_id_f };
   std::vector<int64_t> l_dim_ids_k = { l_id_c, l_id_a };
+  std::vector<int64_t> l_loop_ids  = { l_id_y, l_id_x, l_id_h, l_id_g, l_id_c };
 
   std::map< int64_t, int64_t > l_dim_sizes{ { l_id_i, 3 }, 
                                             { l_id_e, 8 },
@@ -806,6 +813,7 @@ TEST_CASE( "Nested loops used in binary contractions using a matrix kernel.", "[
                      &l_strides_out,
                      &l_strides_out,
                      &l_dim_types,
+                     &l_loop_ids,
                      4,
                      4,
                      4,

@@ -617,6 +617,7 @@ TEST_CASE( "FP32 TPP-based binary contraction involving C, M, N and K dimensions
                    &l_dim_sizes,
                    nullptr,
                    &l_dim_sizes,
+                   nullptr,
                    l_dim_ids_left,
                    l_dim_ids_right,
                    l_dim_ids_out,

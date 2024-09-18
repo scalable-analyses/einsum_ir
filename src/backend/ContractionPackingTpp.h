@@ -55,12 +55,13 @@ class einsum_ir::backend::ContractionPackingTpp {
     //! right tensor's dimension ids
     int64_t const * m_dim_ids_right = nullptr;
 
+    //! loop execution order
+    std::vector< int64_t > const *  m_loop_dims;
+
     //! permutation of dimension for the left tensor
     std::vector< int64_t > const * m_dim_ids_kernel_left;
     //! permutation of dimension for the right tensor
     std::vector< int64_t > const * m_dim_ids_kernel_right;
-    //! extra loops for packing
-    std::vector< int64_t > m_dim_ids_extra;
 
     //! datatype of the left input
     data_t m_dtype_left = UNDEFINED_DTYPE;
@@ -91,6 +92,7 @@ class einsum_ir::backend::ContractionPackingTpp {
                int64_t                      const * i_dim_ids_right,
                std::vector< int64_t >       const * i_dim_ids_kernel_left,
                std::vector< int64_t >       const * i_dim_ids_kernel_right,
+               std::vector< int64_t >       const * i_loop_dims,
                data_t                               i_dtype_left,
                data_t                               i_dtype_right,
                MemoryManager                      * i_memory );

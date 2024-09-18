@@ -190,6 +190,7 @@ class einsum_ir::backend::ContractionLoopsBlas: public ContractionLoops {
                std::map< int64_t, int64_t > const * i_strides_out_aux,
                std::map< int64_t, int64_t > const * i_strides_out,
                std::map< int64_t, dim_t >   const * i_dim_type,
+               std::vector<int64_t>               * i_loop_ids,
                data_t                               i_blas_dtype,
                bool                                 i_blas_trans_a,
                bool                                 i_blas_trans_b,

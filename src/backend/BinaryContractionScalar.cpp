@@ -101,6 +101,16 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
     m_strides_right_k.push_back( l_strides_right[ l_dim_id ] );
   }
 
+  //determine loop execution order
+  if( m_loop_ids_ext == nullptr ){
+    m_loop_ids_int.clear();
+    m_loop_ids_int.reserve( m_dim_ids_c.size() + m_dim_ids_m.size() + m_dim_ids_n.size() + m_dim_ids_k.size() );
+    m_loop_ids_int.insert( m_loop_ids_int.end(), m_dim_ids_c.begin(), m_dim_ids_c.end() );
+    m_loop_ids_int.insert( m_loop_ids_int.end(), m_dim_ids_n.begin(), m_dim_ids_n.end() );
+    m_loop_ids_int.insert( m_loop_ids_int.end(), m_dim_ids_m.begin(), m_dim_ids_m.end() );
+    m_loop_ids_int.insert( m_loop_ids_int.end(), m_dim_ids_k.begin(), m_dim_ids_k.end() );
+  }
+
   // determine if all dtypes are FP32 or FP64
   bool l_dtype_all_fp32 = false;
   bool l_dtype_all_fp64 = false;
@@ -191,6 +201,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
                      &l_strides_out_aux,
                      &l_strides_out,
                      &m_dim_types,
+                     &m_loop_ids_int,
                      ce_n_bytes( m_dtype_left ),
                      ce_n_bytes( m_dtype_right ),
                      ce_n_bytes( m_dtype_out ),

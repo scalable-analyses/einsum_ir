@@ -15,6 +15,7 @@ void einsum_ir::backend::ContractionPackingTpp::init( int64_t                   
                                                       int64_t                      const * i_dim_ids_right,
                                                       std::vector< int64_t >       const * i_dim_ids_kernel_left,
                                                       std::vector< int64_t >       const * i_dim_ids_kernel_right,
+                                                      std::vector< int64_t >       const * i_loop_dims,
                                                       data_t                               i_dtype_left,
                                                       data_t                               i_dtype_right,
                                                       MemoryManager                      * i_memory ) {
@@ -36,6 +37,8 @@ void einsum_ir::backend::ContractionPackingTpp::init( int64_t                   
   m_dtype_left = i_dtype_left;
   m_dtype_right = i_dtype_right;
 
+  m_loop_dims = i_loop_dims;
+
   m_memory = i_memory;
 }
 
@@ -43,19 +46,18 @@ void einsum_ir::backend::ContractionPackingTpp::init( int64_t                   
 
 einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::compile() {
   err_t l_err = err_t::UNDEFINED_ERROR;
+
   int64_t l_dim_id_extra_left = -1;
   int64_t l_dim_id_extra_right = -1;
-
-  m_dim_ids_extra.clear();
+  std::vector< int64_t > l_dim_ids_possible_extra;
+  std::vector< int64_t > l_dim_ids_extra_packing;
 
   //determine if extra packing dimensions are necessary for left input
   if( m_dim_ids_kernel_left->size() > 0 ){
     int64_t l_stride_one_dim =  m_dim_ids_left[ m_num_dims_left - 1 ];
     if( std::find( m_dim_ids_kernel_left->begin(), m_dim_ids_kernel_left->end(), l_stride_one_dim ) == m_dim_ids_kernel_left->end() ) {
+      l_dim_ids_possible_extra.push_back(l_stride_one_dim);
       l_dim_id_extra_left = l_stride_one_dim;
-      if( std::find( m_dim_ids_extra.begin(), m_dim_ids_extra.end(), l_stride_one_dim ) == m_dim_ids_extra.end() ) {
-        m_dim_ids_extra.push_back( l_stride_one_dim );
-      }
     }
   }
 
@@ -63,55 +65,45 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::compile() {
   if( m_dim_ids_kernel_right->size() > 0 ){
     int64_t l_stride_one_dim =  m_dim_ids_right[ m_num_dims_right - 1 ];
     if( std::find( m_dim_ids_kernel_right->begin(), m_dim_ids_kernel_right->end(), l_stride_one_dim ) == m_dim_ids_kernel_right->end() ) {
+       l_dim_ids_possible_extra.push_back(l_stride_one_dim);
        l_dim_id_extra_right = l_stride_one_dim;
-      if( std::find( m_dim_ids_extra.begin(), m_dim_ids_extra.end(), l_stride_one_dim ) == m_dim_ids_extra.end() ) {
-        m_dim_ids_extra.push_back( l_stride_one_dim );
-      }
     }
   }
 
-  //sort packing dimensions
-  std::map< dim_t, int64_t > l_dim_t_to_pos = {{ einsum_ir::C,             1},
-                                               { einsum_ir::M,             6},
-                                               { einsum_ir::N,             5},
-                                               { einsum_ir::K,             0},
-                                               { einsum_ir::I,             4},
-                                               { einsum_ir::J,             3},
-                                               { einsum_ir::UNDEFINED_DIM, 2},};
-  std::sort(m_dim_ids_extra.begin(), 
-            m_dim_ids_extra.end(), 
-            [&](int64_t a, int64_t b){
-              return l_dim_t_to_pos.at(m_dim_type->at(a)) > l_dim_t_to_pos.at(m_dim_type->at(b));
-            });
-
+  //check if usage of extra packing dims is possible with given loop order
+  for(int64_t l_id = m_loop_dims->size()-1; l_id >= 0; l_id-- ){
+    auto l_found = std::find( l_dim_ids_possible_extra.begin(), l_dim_ids_possible_extra.end(), m_loop_dims->at(l_id));
+    if( l_found != l_dim_ids_possible_extra.end() ) {
+      l_dim_ids_extra_packing.insert(l_dim_ids_extra_packing.begin(), *l_found);
+    }
+    else{
+      break;
+    }
+  }
 
   //determine packing dimensions
   std::vector< int64_t > l_dim_ids_packing_left;
   std::vector< int64_t > l_dim_ids_packing_right;
-  l_dim_ids_packing_left.reserve(  m_dim_ids_extra.size() + m_dim_ids_kernel_left->size()  );
-  l_dim_ids_packing_right.reserve( m_dim_ids_extra.size() + m_dim_ids_kernel_right->size() );
+  l_dim_ids_packing_left.reserve(  l_dim_ids_extra_packing.size() + m_dim_ids_kernel_left->size()  );
+  l_dim_ids_packing_right.reserve( l_dim_ids_extra_packing.size() + m_dim_ids_kernel_right->size() );
   
-  //TODO: decide if this optimisation should allways be active
-  if( true ) {
-    if( m_dim_ids_extra.size() > 0 ){
-      for( int64_t l_id = 0; l_id < m_dim_ids_extra.size(); l_id++ ) {
-        dim_t dim_type = m_dim_type->at( m_dim_ids_extra[l_id] );
-        if( m_packing_loop_offset_left || m_dim_ids_extra[l_id] == l_dim_id_extra_left ) { 
-          m_packing_loop_offset_left++;
-          if( dim_type != einsum_ir::N ) {
-            l_dim_ids_packing_left.push_back( m_dim_ids_extra[l_id] );
-          }
-        }
-        if( m_packing_loop_offset_right || m_dim_ids_extra[l_id] == l_dim_id_extra_right ) { 
-          m_packing_loop_offset_right++;
-          if( dim_type != einsum_ir::M ){
-            l_dim_ids_packing_right.push_back( m_dim_ids_extra[l_id] );
-          }
-        }
+  for( int64_t l_id = 0; l_id < l_dim_ids_extra_packing.size(); l_id++ ) {
+    dim_t dim_type = m_dim_type->at( l_dim_ids_extra_packing[l_id] );
+    if( m_packing_loop_offset_left || l_dim_ids_extra_packing[l_id] == l_dim_id_extra_left ) { 
+      m_packing_loop_offset_left++;
+      if( dim_type != einsum_ir::N ) {
+        l_dim_ids_packing_left.push_back( l_dim_ids_extra_packing[l_id] );
+      }
+    }
+    if( m_packing_loop_offset_right || l_dim_ids_extra_packing[l_id] == l_dim_id_extra_right ) { 
+      m_packing_loop_offset_right++;
+      if( dim_type != einsum_ir::M ){
+        l_dim_ids_packing_right.push_back( l_dim_ids_extra_packing[l_id] );
       }
     }
   }
-  
+
+  //insert kernel dimensions
   l_dim_ids_packing_left.insert(  l_dim_ids_packing_left.end(),  m_dim_ids_kernel_left->begin(),  m_dim_ids_kernel_left->end()  );
   l_dim_ids_packing_right.insert( l_dim_ids_packing_right.end(), m_dim_ids_kernel_right->begin(), m_dim_ids_kernel_right->end() );
 
@@ -218,7 +210,6 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::create_kernel( int64
   return l_err;
 }
 
-//TODO I think it is better to determine the thread id at a different point in time
 char * einsum_ir::backend::ContractionPackingTpp::kernel_pack_left( char * i_in ) {
   int64_t l_thread_num = 0;
   #ifdef _OPENMP

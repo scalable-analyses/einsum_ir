@@ -283,6 +283,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
                   m_children[1]->m_dim_sizes_outer,
                   m_dim_sizes_aux_outer,
                   m_dim_sizes_outer,
+                  nullptr,
                   m_children[0]->m_dim_ids_int.data(),
                   m_children[1]->m_dim_ids_int.data(),
                   m_dim_ids_int.data(),
