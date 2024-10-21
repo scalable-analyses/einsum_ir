@@ -61,7 +61,8 @@ l_tests = [ 'tests.cpp',
             'backend/ContractionLoopsSimple.test.cpp',
             'backend/BinaryContraction.test.cpp',
             'backend/BinaryPrimitives.test.cpp',
-            'frontend/EinsumExpression.test.cpp' ]
+            'frontend/EinsumExpression.test.cpp',
+            'frontend/EinsumExpressionAscii.test.cpp' ]
 
 if g_env['libtorch'] != False:
   l_tests += [ 'backend/UnaryLoopsSimple.test.torch.cpp',

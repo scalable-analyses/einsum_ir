@@ -9,26 +9,49 @@ int main( int     i_argc,
           char  * i_argv[] ) {
   if( i_argc < 4 ) {
     std::cerr << "Usage:" << std::endl;
-    std::cerr << "  bench_expression einsum_string dimension_sizes contraction_path dtype store_lock print_tree" << std::endl;
+    std::cerr << "  ./bench_expression einsum_string dimension_sizes contraction_path dtype store_lock print_tree" << std::endl;
     std::cerr << std::endl;
     std::cerr << "Arguments:" << std::endl;
-    std::cerr << "  * dimension_sizes:  Dimension sizes have to be in ascending order of the dimension ids." << std::endl;
+    std::cerr << "  * einsum_string:    Einsum expression string. Either in single-character or standard format." << std::endl;
+    std::cerr << "  * dimension_sizes:  Dimension sizes have to be in ascending order of the dimension names." << std::endl;
+    std::cerr << "                      ASCII numbers (see Example #3) are sorted by their numeric value." << std::endl;
     std::cerr << "  * contraction_path: Contraction path." << std::endl;
     std::cerr << "  * dtype:            FP32, FP64, CPX_FP32 or CPX_FP64, default: FP32." << std::endl;
     std::cerr << "  * store_lock:       If 1 all einsum_ir input tensors are stored and locked before evaluation, default: 0." << std::endl;
     std::cerr << "  * print_tree:       If not 0 the einsum tree is printed (1: dimension ids, 2: characters), default: 0." << std::endl;
     std::cerr << std::endl;
-    std::cerr << "Example:" << std::endl;
+    std::cerr << "Example #1 (single character format):" << std::endl;
     std::cerr << "  ./bench_expression \"iae,bf,dcba,cg,dh->hgfei\" \"32,8,4,2,16,64,8,8,8\" \"(1,2),(2,3),(0,1),(0,1)\"" << std::endl;
+    std::cerr << "Example #2 (standard format):" << std::endl;
+    std::cerr << "  ./bench_expression \"[i,a,e],[b,f],[d,c,b,a],[c,g],[d,h]->[h,g,f,e,i]\" \"32,8,4,2,16,64,8,8,8\" \"(1,2),(2,3),(0,1),(0,1)\"" << std::endl;
+    std::cerr << "Example #3 (standard format using integers):" << std::endl;
+    std::cerr << "  ./bench_expression \"[8,0,4],[1,5],[3,2,1,0],[2,6],[3,7]->[7,6,5,4,8]\" \"32,8,4,2,16,64,8,8,8\" \"(1,2),(2,3),(0,1),(0,1)\"" << std::endl;
     return EXIT_FAILURE;
+  }
+
+  /**
+   * parse expression string
+   **/
+  std::string l_expression_string_arg( i_argv[1] );
+  std::string l_expression_string_std;
+  std::string l_expression_string_schar;
+
+  if( l_expression_string_arg[0] == '[' ) {
+    l_expression_string_std = l_expression_string_arg;
+    einsum_ir::frontend::EinsumExpressionAscii::standard_to_schar( l_expression_string_std,
+                                                                   l_expression_string_schar );
+  }
+  else {
+    l_expression_string_schar = l_expression_string_arg;
+    einsum_ir::frontend::EinsumExpressionAscii::schar_to_standard( l_expression_string_schar,
+                                                                   l_expression_string_std );
   }
 
   /**
    * parse input tensors and output tensors
    **/
-  std::string l_expression_string( i_argv[1] );
   std::vector< std::string > l_tensors;
-  einsum_ir::frontend::EinsumExpressionAscii::parse_tensors( l_expression_string,
+  einsum_ir::frontend::EinsumExpressionAscii::parse_tensors( l_expression_string_std,
                                                              l_tensors );
   int64_t l_num_tensors = l_tensors.size();
 
@@ -62,13 +85,13 @@ int main( int     i_argc,
   /*
    * create mapping from dimension name to id
    */
-  std::map< char, int64_t > m_map_dim_name_to_id;
-  einsum_ir::frontend::EinsumExpressionAscii::parse_dim_ids( l_expression_string,
+  std::map< std::string, int64_t > m_map_dim_name_to_id;
+  einsum_ir::frontend::EinsumExpressionAscii::parse_dim_ids( l_expression_string_std,
                                                              m_map_dim_name_to_id );
 
   std::cout << "parsed dimension ids:" << std::endl;
-  for( std::map< char, int64_t >::iterator l_di = m_map_dim_name_to_id.begin(); l_di != m_map_dim_name_to_id.end(); l_di++ ) {
-    char l_dim_name = l_di->first;
+  for( std::map< std::string, int64_t >::iterator l_di = m_map_dim_name_to_id.begin(); l_di != m_map_dim_name_to_id.end(); l_di++ ) {
+    std::string l_dim_name = l_di->first;
     int64_t l_dim_id = l_di->second;
 
     std::cout << "  " << l_dim_name << ": " <<  l_dim_id << std::endl;
@@ -76,8 +99,8 @@ int main( int     i_argc,
 
   std::cout << "parsed dimension sizes:" << std::endl;
   // iterate over keys of map dim name to id
-  for( std::map< char, int64_t >::iterator l_di = m_map_dim_name_to_id.begin(); l_di != m_map_dim_name_to_id.end(); l_di++ ) {
-    char l_dim_name = l_di->first;
+  for( std::map< std::string, int64_t >::iterator l_di = m_map_dim_name_to_id.begin(); l_di != m_map_dim_name_to_id.end(); l_di++ ) {
+    std::string l_dim_name = l_di->first;
     int64_t l_dim_id = l_di->second;
     int64_t l_dim_size = l_dim_sizes[ l_dim_id ];
 
@@ -170,7 +193,11 @@ int main( int     i_argc,
    */
   std::vector< int64_t > l_string_num_dims( l_num_tensors );
   for( int64_t l_te = 0; l_te < l_num_tensors; l_te++ ) {
-    l_string_num_dims[l_te] = l_tensors[l_te].size();
+    std::vector< std::string > l_tensor_dim_names;
+    einsum_ir::frontend::EinsumExpressionAscii::split_string( l_tensors[l_te],
+                                                              std::string(","),
+                                                              l_tensor_dim_names );
+    l_string_num_dims[l_te] = l_tensor_dim_names.size();
     if( l_ctype_einsum_ir != einsum_ir::REAL_ONLY ) {
       l_string_num_dims[l_te] += 1;
     }
@@ -180,8 +207,14 @@ int main( int     i_argc,
   for( int64_t l_te = 0; l_te < l_num_tensors; l_te++ ) {
     std::string l_tensor = l_tensors[l_te];
 
-    for( std::size_t l_ch = 0; l_ch < l_tensor.size(); l_ch++ ) {
-      int64_t l_dim_id = m_map_dim_name_to_id[ l_tensor[l_ch] ];
+    std::vector< std::string > l_tensor_dim_names;
+    einsum_ir::frontend::EinsumExpressionAscii::split_string( l_tensor,
+                                                              std::string(","),
+                                                              l_tensor_dim_names );
+
+    for( std::size_t l_na = 0; l_na < l_tensor_dim_names.size(); l_na++ ) {
+      std::string l_dim_name = l_tensor_dim_names[l_na];
+      int64_t l_dim_id = m_map_dim_name_to_id[ l_dim_name ];
       l_string_dim_ids.push_back( l_dim_id );
     }
     if( l_ctype_einsum_ir != einsum_ir::REAL_ONLY ) {
@@ -278,16 +311,15 @@ int main( int     i_argc,
   }
   else if( l_print_tree == 2 ) {
     // replace dimension ids with names (descending order)
-    for( std::map< char, int64_t >::reverse_iterator l_di = m_map_dim_name_to_id.rbegin(); l_di != m_map_dim_name_to_id.rend(); l_di++ ) {
-      char l_dim_name = l_di->first;
+    for( std::map< std::string, int64_t >::reverse_iterator l_di = m_map_dim_name_to_id.rbegin(); l_di != m_map_dim_name_to_id.rend(); l_di++ ) {
+      std::string l_dim_name = l_di->first;
       int64_t l_dim_id = l_di->second;
 
       std::string l_dim_id_str = std::to_string( l_dim_id );
-      std::string l_dim_name_str( 1, l_dim_name );
       size_t l_pos = 0;
       while( (l_pos = l_tree.find( l_dim_id_str, l_pos )) != std::string::npos ) {
-        l_tree.replace( l_pos, l_dim_id_str.size(), l_dim_name_str );
-        l_pos += l_dim_name_str.size();
+        l_tree.replace( l_pos, l_dim_id_str.size(), l_dim_name );
+        l_pos += l_dim_name.size();
       }
     }
     std::cout << l_tree;
@@ -326,7 +358,7 @@ int main( int     i_argc,
   std::cout << "  gflops (total): " << l_gflops_total << std::endl;
   std::cout << "CSV_DATA: "
             << "einsum_ir,"
-            << "\"" << l_expression_string << "\","
+            << "\"" << l_expression_string_arg << "\","
             << "\"" << l_dim_sizes_string << "\","
             << "\"" << l_path_string << "\","
             << l_num_flops << ","
@@ -339,46 +371,49 @@ int main( int     i_argc,
   /*
    * run at::einsum
    */
-  std::cout << "\n*** benchmarking at::einsum ***" << std::endl;
-  l_time_compile = 0;
-  l_time_eval = 0;
-  l_time_total = 0;
-  l_gflops_eval = 0;
-  l_gflops_total = 0;
+  at::Tensor l_out_aten;
+  if( m_map_dim_name_to_id.size() < 53 ) { // at::einsum does not support more than 52 dimensions
+    std::cout << "\n*** benchmarking at::einsum ***" << std::endl;
+    l_time_compile = 0;
+    l_time_eval = 0;
+    l_time_total = 0;
+    l_gflops_eval = 0;
+    l_gflops_total = 0;
 
-  std::vector< at::Tensor > l_data_in( l_num_tensors-1 );
-  for( int64_t l_te = 0; l_te < l_num_tensors - 1; l_te++ ) {
-    l_data_in[l_te] = l_data[l_te];
+    std::vector< at::Tensor > l_data_in( l_num_tensors-1 );
+    for( int64_t l_te = 0; l_te < l_num_tensors - 1; l_te++ ) {
+      l_data_in[l_te] = l_data[l_te];
+    }
+
+    // warmup run
+    l_out_aten = at::einsum( l_expression_string_schar,
+                             l_data_in,
+                             l_path );
+
+    l_tp0 = std::chrono::steady_clock::now();
+    l_out_aten = at::einsum( l_expression_string_schar,
+                            l_data_in,
+                            l_path );
+    l_tp1 = std::chrono::steady_clock::now();
+    l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
+    l_time_total = l_dur.count();
+    l_gflops_total = 1.0E-9 * l_num_flops / (l_time_total);
+
+    std::cout << "  #flops:         " << l_num_flops << std::endl;
+    std::cout << "  time (total):   " << l_time_total << std::endl;
+    std::cout << "  gflops (total): " << l_gflops_total << std::endl;
+    std::cout << "CSV_DATA: "
+              << "at::einsum,"
+              << "\"" << l_expression_string_arg << "\","
+              << "\"" << l_dim_sizes_string << "\","
+              << "\"" << l_path_string << "\","
+              << l_num_flops << ","
+              << l_time_compile << ","
+              << l_time_eval << ","
+              << l_gflops_eval << ","
+              << l_gflops_total
+              << std::endl;
   }
-
-  // warmup run
-  at::Tensor l_out_aten = at::einsum( l_expression_string,
-                                      l_data_in,
-                                      l_path );
-
-  l_tp0 = std::chrono::steady_clock::now();
-  l_out_aten = at::einsum( l_expression_string,
-                           l_data_in,
-                           l_path );
-  l_tp1 = std::chrono::steady_clock::now();
-  l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
-  l_time_total = l_dur.count();
-  l_gflops_total = 1.0E-9 * l_num_flops / (l_time_total);
-
-  std::cout << "  #flops:         " << l_num_flops << std::endl;
-  std::cout << "  time (total):   " << l_time_total << std::endl;
-  std::cout << "  gflops (total): " << l_gflops_total << std::endl;
-  std::cout << "CSV_DATA: "
-            << "at::einsum,"
-            << "\"" << l_expression_string << "\","
-            << "\"" << l_dim_sizes_string << "\","
-            << "\"" << l_path_string << "\","
-            << l_num_flops << ","
-            << l_time_compile << ","
-            << l_time_eval << ","
-            << l_gflops_eval << ","
-            << l_gflops_total
-            << std::endl;
 
   /*
    * run at::matmul
@@ -460,7 +495,7 @@ int main( int     i_argc,
   std::cout << "  gflops (eval):  " << l_gflops_eval << std::endl;
   std::cout << "CSV_DATA: "
             << "at::matmul,"
-            << "\"" << l_expression_string << "\","
+            << "\"" << l_expression_string_arg << "\","
             << "\"" << l_dim_sizes_string << "\","
             << "\"" << l_path_string << "\","
             << l_num_flops << ","
@@ -473,14 +508,16 @@ int main( int     i_argc,
   /*
    * compare solution
    */
-  std::cout << std::endl;
-  std::cout << "*** comparing solution ***:" << std::endl;
-  std::cout << "  maximum absolute entry in ATen solution:      " << at::max( at::abs( l_out_aten ) ).item() << std::endl;
-  std::cout << "  maximum absolute entry in einsum_ir solution: " << at::max( at::abs( l_data.back() ) ).item() << std::endl;
-  std::cout << "  maximum element-wise difference:              " << at::max( at::abs( l_out_aten - l_data.back() ) ).item() << std::endl;
-  if( !at::allclose( l_out_aten, l_data.back() ) ) {
-    std::cerr << "warning: einsum_ir solution is not close to at:einsum!" << std::endl;
-    return EXIT_FAILURE;
+  if( m_map_dim_name_to_id.size() < 53 ) { // at::einsum does not support more than 52 dimensions
+    std::cout << std::endl;
+    std::cout << "*** comparing solution ***:" << std::endl;
+    std::cout << "  maximum absolute entry in ATen solution:      " << at::max( at::abs( l_out_aten ) ).item() << std::endl;
+    std::cout << "  maximum absolute entry in einsum_ir solution: " << at::max( at::abs( l_data.back() ) ).item() << std::endl;
+    std::cout << "  maximum element-wise difference:              " << at::max( at::abs( l_out_aten - l_data.back() ) ).item() << std::endl;
+    if( !at::allclose( l_out_aten, l_data.back() ) ) {
+      std::cerr << "warning: einsum_ir solution is not close to at:einsum!" << std::endl;
+      return EXIT_FAILURE;
+    }
   }
 
   return EXIT_SUCCESS;
