@@ -29,7 +29,6 @@ class einsum_ir::backend::ContractionPackingTpp {
     int64_t m_size_packing_left = 0;
     //! required memory in bytes for packing of right tensor
     int64_t m_size_packing_right = 0;
-    
 
     //! mapping from the dimension ids to the inner dimension sizes
     std::map< int64_t, int64_t > const * m_dim_sizes = nullptr;
@@ -43,12 +42,11 @@ class einsum_ir::backend::ContractionPackingTpp {
     //! mapping from the dimension ids to dimension type of contactoin
     std::map< int64_t, dim_t > const * m_dim_type = nullptr;
 
-    //! mapping from the dimension ids to strides of left tensor
+    //! mapping from the dimension ids to packed strides of left tensor
     std::map< int64_t, int64_t > m_strides_packed_left;
 
-    //! mapping from the dimension ids to strides of right tensor
+    //! mapping from the dimension ids to packed strides of right tensor
     std::map< int64_t, int64_t > m_strides_packed_right;
- 
 
     //! left tensor's dimension ids
     int64_t const * m_dim_ids_left = nullptr;
@@ -81,7 +79,24 @@ class einsum_ir::backend::ContractionPackingTpp {
     //! array of memory pointers for thread specific packing memory
     char ** m_memory_packing;
 
-    //TODO add description
+    /**
+     * Initializes the packing class
+     *
+     * @param i_num_dims_left number of tensor dimensions of left tensor.
+     * @param i_num_dims_right number of tensor dimensions of right tensor.
+     * @param i_dim_sizes dimension id to size mapping.
+     * @param i_strides_left dimension id to left tensor strides mapping.
+     * @param i_strides_right dimension id to right tensor strides mapping.
+     * @param i_dim_type dimension id to dimension type mapping.
+     * @param i_dim_ids_left dimension ids of left tensor before permutation through packing.
+     * @param i_dim_ids_right dimension ids of right tensor before permutation through packing.
+     * @param i_dim_ids_kernel_left dimension ids of left tensor after permutation through packing.
+     * @param i_dim_ids_kernel_right dimension ids of right tensor after permutation through packing.
+     * @param i_loop_dims loop execution strategy.
+     * @param i_dtype_left datatype of the left tensor.
+     * @param i_dtype_right datatype of the right tensor.
+     * @param i_memory memory manager for efficient memory usage.
+     **/
     void init( int64_t                              i_num_dims_left,
                int64_t                              i_num_dims_right,
                std::map< int64_t, int64_t > const * i_dim_sizes,
@@ -97,9 +112,28 @@ class einsum_ir::backend::ContractionPackingTpp {
                data_t                               i_dtype_right,
                MemoryManager                      * i_memory );
 
+    /**
+     * Compiles the packing kernel
+     * 
+     * @return SUCCESS if successful, error code otherwise.
+     **/ 
     err_t compile();
-    
-    //TODO add description
+
+    /**
+     * Creates a packing Kernel for one Tensor
+     *
+     * @param i_num_dims number of tensor dimensions.
+     * @param i_dim_ids_original dimension ids of tensor before permutation through packing.
+     * @param i_dim_ids_packed dimension ids of tensor after permutation through packing.
+     * @param i_strides_original dimension id to tensor strides mapping.
+     * @param o_strides_packed dimension id to left packed sub tensro strides mapping.
+     * @param i_dim_sizes dimension id to size mapping.
+     * @param i_dtype datatype of the tensor.
+     * @param o_size_packing,
+     * @param o_unary
+     * 
+     * @return SUCCESS if successful, error code otherwise.
+     **/
     err_t create_kernel( int64_t                              i_num_dims,
                          int64_t                      const * i_dim_ids_original,
                          std::vector< int64_t >       const * i_dim_ids_packed,
@@ -114,16 +148,16 @@ class einsum_ir::backend::ContractionPackingTpp {
      * Kernel to pack the left input tensor of the main kernel.
      *
      * @param i_in  pointer to a data section of the input tensor.
-     * 
+     *
      * @return  pointer to packed data
      **/
     char * kernel_pack_left( char * i_in );
-    
+
     /**
      * Kernel to pack the right input tensor of the main kernel.
      *
      * @param i_in  pointer to a data section of the input tensor.
-     * 
+     *
      * @return   pointer to packed data
      **/
     char * kernel_pack_right( char * i_in );
@@ -137,5 +171,3 @@ class einsum_ir::backend::ContractionPackingTpp {
 };
 
 #endif
-
-

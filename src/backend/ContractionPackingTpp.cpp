@@ -86,16 +86,16 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::compile() {
   std::vector< int64_t > l_dim_ids_packing_right;
   l_dim_ids_packing_left.reserve(  l_dim_ids_extra_packing.size() + m_dim_ids_kernel_left->size()  );
   l_dim_ids_packing_right.reserve( l_dim_ids_extra_packing.size() + m_dim_ids_kernel_right->size() );
-  
+
   for( int64_t l_id = 0; l_id < l_dim_ids_extra_packing.size(); l_id++ ) {
     dim_t dim_type = m_dim_type->at( l_dim_ids_extra_packing[l_id] );
-    if( m_packing_loop_offset_left || l_dim_ids_extra_packing[l_id] == l_dim_id_extra_left ) { 
+    if( m_packing_loop_offset_left || l_dim_ids_extra_packing[l_id] == l_dim_id_extra_left ) {
       m_packing_loop_offset_left++;
       if( dim_type != einsum_ir::N ) {
         l_dim_ids_packing_left.push_back( l_dim_ids_extra_packing[l_id] );
       }
     }
-    if( m_packing_loop_offset_right || l_dim_ids_extra_packing[l_id] == l_dim_id_extra_right ) { 
+    if( m_packing_loop_offset_right || l_dim_ids_extra_packing[l_id] == l_dim_id_extra_right ) {
       m_packing_loop_offset_right++;
       if( dim_type != einsum_ir::M ){
         l_dim_ids_packing_right.push_back( l_dim_ids_extra_packing[l_id] );
@@ -203,7 +203,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::create_kernel( int64
                  i_dtype,
                  i_dtype,
                  kernel_t::COPY );
-  
+
   o_unary->threading(1);
   l_err = o_unary->compile();
 
@@ -216,9 +216,9 @@ char * einsum_ir::backend::ContractionPackingTpp::kernel_pack_left( char * i_in 
   l_thread_num = omp_get_thread_num();
   #endif
 
-  m_unary_left->eval( i_in, 
-                      m_memory_packing[l_thread_num] );    
-  return m_memory_packing[l_thread_num];                             
+  m_unary_left->eval( i_in,
+                      m_memory_packing[l_thread_num] );
+  return m_memory_packing[l_thread_num];
 }
 
 char * einsum_ir::backend::ContractionPackingTpp::kernel_pack_right( char * i_in ) {
@@ -227,9 +227,9 @@ char * einsum_ir::backend::ContractionPackingTpp::kernel_pack_right( char * i_in
   l_thread_num = omp_get_thread_num();
   #endif
 
-  m_unary_right->eval( i_in, 
+  m_unary_right->eval( i_in,
                        m_memory_packing[l_thread_num] + m_size_packing_left );
-  return m_memory_packing[l_thread_num] + m_size_packing_left;                                              
+  return m_memory_packing[l_thread_num] + m_size_packing_left;
 }
 
 void einsum_ir::backend::ContractionPackingTpp::allocate_memory(){
