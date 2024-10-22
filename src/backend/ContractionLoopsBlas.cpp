@@ -408,11 +408,3 @@ void einsum_ir::backend::ContractionLoopsBlas::kernel_last_touch( void const *,
     kernel_last_touch_part( (char *) io_out + m_cpx_stride_out_bytes );
   }
 }
-
-void einsum_ir::backend::ContractionLoopsBlas::kernel_pack_left( void * i_in,
-                                                                 void * io_out ) {                                                             
-}
-
-void einsum_ir::backend::ContractionLoopsBlas::kernel_pack_right( void * i_in,
-                                                                  void * io_out ) {                                                        
-}
