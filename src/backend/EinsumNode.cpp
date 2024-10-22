@@ -99,6 +99,9 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
     else if( strcmp( l_pack_inputs, "true" ) == 0 ) {
       m_pack_inputs = true;
     }
+    else {
+      m_pack_inputs = false;
+    }
   }
 
 
@@ -258,7 +261,6 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
 
       //packing is only supported for TPP
       if( m_btype_binary == backend_t::TPP && m_pack_inputs ){
-        //TODO check that packing is allowed
         if( m_children[0]->requires_permutation() ){
           l_packing_left = m_children[0]->m_dim_ids_int;
           std::copy(  m_children[0]->m_dim_ids_ext,
