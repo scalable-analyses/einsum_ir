@@ -1,0 +1,22 @@
+original number of parameters: 235200
+compressed number of parameters: 97500
+compression ratio: 2.41
+opt_einsum contraction path:
+([(1, 5), (4, 5), (1, 2), (1, 2), (1, 2), (1, 2), (1, 2), (0, 1)],   Complete contraction:  Babcd,aij,bik,ckl,dlm,ejp,fop,gno,hmn->Befgh
+         Naive scaling:  17
+     Optimized scaling:  10
+      Naive FLOP count:  1.058e+22
+  Optimized FLOP count:  1.565e+9
+   Theoretical speedup:  6.763e+12
+  Largest intermediate:  2.450e+6 elements
+--------------------------------------------------------------------------------
+scaling        BLAS                current                             remaining
+--------------------------------------------------------------------------------
+   5           TDOT          ejp,aij->epai    Babcd,bik,ckl,dlm,fop,gno,hmn,epai->Befgh
+   5           TDOT          gno,fop->gnfp    Babcd,bik,ckl,dlm,hmn,epai,gnfp->Befgh
+   5           TDOT          ckl,bik->clbi    Babcd,dlm,hmn,epai,gnfp,clbi->Befgh
+   5           TDOT          hmn,dlm->hndl      Babcd,epai,gnfp,clbi,hndl->Befgh
+   7           TDOT      gnfp,epai->gnfeai         Babcd,clbi,hndl,gnfeai->Befgh
+   7           TDOT      hndl,clbi->hndcbi            Babcd,gnfeai,hndcbi->Befgh
+  10           TDOT hndcbi,gnfeai->hdcbgfea                Babcd,hdcbgfea->Befgh
+   9           TDOT  hdcbgfea,Babcd->Befgh                          Befgh->Befgh)

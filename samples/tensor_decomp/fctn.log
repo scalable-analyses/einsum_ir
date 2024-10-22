@@ -1,0 +1,14 @@
+opt_einsum contraction path:
+([(2, 3), (0, 2), (0, 1)],   Complete contraction:  aefg,behi,cfhj,dgij->abcd
+         Naive scaling:  10
+     Optimized scaling:  8
+      Naive FLOP count:  1.510e+12
+  Optimized FLOP count:  3.074e+9
+   Theoretical speedup:  4.913e+2
+  Largest intermediate:  1.229e+7 elements
+--------------------------------------------------------------------------------
+scaling        BLAS                current                             remaining
+--------------------------------------------------------------------------------
+   7           GEMM      dgij,cfhj->dgicfh                aefg,behi,dgicfh->abcd
+   8           TDOT    dgicfh,aefg->dichae                     behi,dichae->abcd
+   7           TDOT      dichae,behi->abcd                            abcd->abcd)
