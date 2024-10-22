@@ -5,7 +5,6 @@
 #include <map>
 #include <vector>
 
-
 /**
  * Generic matrix multiplication C += AB.
  *
@@ -148,9 +147,9 @@ TEST_CASE( "K dimension of the contraction loops.", "[contraction_loops_k]" ) {
 
   // per-dimension sizes
   std::map< int64_t, int64_t > l_dim_sizes{ { l_id_k, 5 } };
-  
-  std::map< int64_t, einsum_ir::dim_t > l_dim_types{ { l_id_k, einsum_ir::K } };
 
+  // mapping from id to dimension type
+  std::map< int64_t, einsum_ir::dim_t > l_dim_types{ { l_id_k, einsum_ir::K } };
 
   // strides of the left input tensor
   std::map< int64_t, int64_t > l_strides_in_left{ { l_id_k, 1 } };
@@ -251,7 +250,8 @@ TEST_CASE( "Matmul with first and last touch.", "[contraction_loops]" ) {
   std::map< int64_t, int64_t > l_dim_sizes{ { l_id_m, 5 },
                                             { l_id_n, 7 },
                                             { l_id_k, 8 } };
-  
+
+  // mapping from id to dimension type
   std::map< int64_t, einsum_ir::dim_t > l_dim_types{ { l_id_m, einsum_ir::M },
                                                      { l_id_n, einsum_ir::N },
                                                      { l_id_k, einsum_ir::K } };
@@ -342,7 +342,6 @@ TEST_CASE( "Matmul with first and last touch.", "[contraction_loops]" ) {
   }
 }
 
-
 TEST_CASE( "Nested loops used in binary contractions using a scalar kernel.", "[contraction_loops_scalar]" ) {
   // Test case:
   //
@@ -373,14 +372,15 @@ TEST_CASE( "Nested loops used in binary contractions using a scalar kernel.", "[
   std::vector<int64_t> l_loop_ids  = { l_id_h, l_id_f , l_id_g, l_id_e, l_id_i, l_id_c, l_id_a };
 
   // per-dimension sizes
-  std::map< int64_t, int64_t > l_dim_sizes{ { l_id_i, 3 }, 
+  std::map< int64_t, int64_t > l_dim_sizes{ { l_id_i, 3 },
                                             { l_id_e, 8 },
                                             { l_id_a, 2 },
                                             { l_id_c, 7 },
                                             { l_id_g, 6 },
                                             { l_id_f, 5 },
                                             { l_id_h, 4 } };
-  
+
+  // mapping from id to dimension type
   std::map< int64_t, einsum_ir::dim_t > l_dim_types{ { l_id_i, einsum_ir::M },
                                                      { l_id_e, einsum_ir::M },
                                                      { l_id_g, einsum_ir::M },
@@ -393,7 +393,7 @@ TEST_CASE( "Nested loops used in binary contractions using a scalar kernel.", "[
   // in left:
   //   sizes:         6 (g), 7 (c), 2 (a), 8 (e), 3 (i)
   //   strides: 2016,   336,    48,    24,     3,     1
-  std::map< int64_t, int64_t > l_strides_in_left{ { l_id_g, 336 }, 
+  std::map< int64_t, int64_t > l_strides_in_left{ { l_id_g, 336 },
                                                   { l_id_c, 48  },
                                                   { l_id_a, 24  },
                                                   { l_id_e, 3   },
@@ -402,7 +402,7 @@ TEST_CASE( "Nested loops used in binary contractions using a scalar kernel.", "[
   // in right:
   //   sizes:        4 (h), 7 (c), 5 (f), 2 (a)
   //   strides: 280,    70,    10,     2,     1
-  std::map< int64_t, int64_t > l_strides_in_right{ { l_id_h, 70 }, 
+  std::map< int64_t, int64_t > l_strides_in_right{ { l_id_h, 70 },
                                                    { l_id_c, 10 },
                                                    { l_id_f, 2  },
                                                    { l_id_a, 1  } };
@@ -603,7 +603,8 @@ TEST_CASE( "Nested loops used in binary contractions using a matrix kernel.", "[
 
   std::vector<int64_t> l_loop_ids  = { l_id_y, l_id_x, l_id_h, l_id_g, l_id_c };
 
-  std::map< int64_t, int64_t > l_dim_sizes{ { l_id_i, 3 }, 
+  // mapping from id to dimension size
+  std::map< int64_t, int64_t > l_dim_sizes{ { l_id_i, 3 },
                                             { l_id_e, 8 },
                                             { l_id_a, 2 },
                                             { l_id_c, 7 },
@@ -612,7 +613,8 @@ TEST_CASE( "Nested loops used in binary contractions using a matrix kernel.", "[
                                             { l_id_h, 4 },
                                             { l_id_x, 3 },
                                             { l_id_y, 4 } };
-  
+
+  // mapping from id to dimension type
   std::map< int64_t, einsum_ir::dim_t > l_dim_types{ { l_id_i, einsum_ir::M },
                                                      { l_id_e, einsum_ir::M },
                                                      { l_id_g, einsum_ir::M },
@@ -627,7 +629,7 @@ TEST_CASE( "Nested loops used in binary contractions using a matrix kernel.", "[
   //   sizes:       4 (y), 6 (g), 7 (c), 3 (x), 2 (a), 8 (e), 3 (i)
   //   strides:      6048,  1008,   144,    48,    24,    3,     1
   std::map< int64_t, int64_t > l_strides_in_left{ { l_id_y, 6048 },
-                                                  { l_id_g, 1008 }, 
+                                                  { l_id_g, 1008 },
                                                   { l_id_c, 144  },
                                                   { l_id_x, 48   },
                                                   { l_id_a, 24   },
@@ -638,7 +640,7 @@ TEST_CASE( "Nested loops used in binary contractions using a matrix kernel.", "[
   //   sizes:       4 (y), 4 (h), 7 (c), 3 (x), 5 (f), 2 (a)
   //   strides:       840,   210,    30,    10,     2,     1
   std::map< int64_t, int64_t > l_strides_in_right{ { l_id_y, 840 },
-                                                   { l_id_h, 210 }, 
+                                                   { l_id_h, 210 },
                                                    { l_id_c, 30  },
                                                    { l_id_x, 10  },
                                                    { l_id_f, 2   },
