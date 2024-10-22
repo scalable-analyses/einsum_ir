@@ -152,7 +152,7 @@ class einsum_ir::backend::ContractionLoops {
 
     /**
      * Initializes the the class.
-     * 
+     *
      * Shortcuts:
      *   C: batch dimensions which appears in all tensors.
      *   M: dimensions appear in left input and output.
@@ -165,7 +165,7 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_strides_out_aux strides of the auxiliary output tensor.
      * @param i_strides_out strides of the output tensor.
      * @param i_dim_type types of the dimensions
-     * @param i_loop_ids the loop execution strategy 
+     * @param i_loop_ids the loop execution strategy
      * @param i_num_bytes_scalar_left number of bytes per scalar in the left tensor.
      * @param i_num_bytes_scalar_right number of bytes per scalar in the right tensor.
      * @param i_num_bytes_scalar_out number of bytes per scalar in the output tensor.
@@ -268,7 +268,7 @@ void init( std::map< int64_t, int64_t > const * i_sizes,
      * @param i_map map.
      * @param i_key key.
      * @param i_default default value.
-     * 
+     *
      * @param return value or default value.
      **/
     template <typename T>
@@ -276,7 +276,6 @@ void init( std::map< int64_t, int64_t > const * i_sizes,
                         int64_t                        i_key,
                         T                              i_default){
       if(auto search = i_map->find(i_key); search != i_map->end() ) {
-        
         return search->second;
       }
       else {

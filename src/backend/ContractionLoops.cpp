@@ -1,7 +1,5 @@
 #include "ContractionLoops.h"
-
 #include <algorithm>
-#include <iostream>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -113,15 +111,13 @@ einsum_ir::err_t einsum_ir::backend::ContractionLoops::compile() {
   m_loop_strides_out.reserve(      m_num_loops );
 
   for( int64_t l_di = 0; l_di < m_num_loops; l_di++ ) {
-    int64_t l_dim_id = m_loop_ids->at(l_di);    
+    int64_t l_dim_id = m_loop_ids->at(l_di);
     m_loop_dim_type.push_back(        map_find_default<dim_t  >( m_dim_type,        l_dim_id, dim_t::UNDEFINED_DIM) );
     m_loop_sizes.push_back(           map_find_default<int64_t>( m_sizes,           l_dim_id, 1                   ) );
     m_loop_strides_left.push_back(    map_find_default<int64_t>( m_strides_left,    l_dim_id, 0                   ) );
     m_loop_strides_right.push_back(   map_find_default<int64_t>( m_strides_right,   l_dim_id, 0                   ) );
     m_loop_strides_out_aux.push_back( map_find_default<int64_t>( m_strides_out_aux, l_dim_id, 0                   ) );
     m_loop_strides_out.push_back(     map_find_default<int64_t>( m_strides_out,     l_dim_id, 0                   ) );
-
-    //std::cout << "  type: " << m_loop_dim_type[l_di] <<" id: " << l_dim_id << " size: " << m_loop_sizes[l_di] << " stridesL: " << m_loop_strides_left[l_di] << " stridesR: " << m_loop_strides_right[l_di] << " stridesOut: " << m_loop_strides_out[l_di]<< std::endl;
   }
 
   //find correct loop for first last touch routine
