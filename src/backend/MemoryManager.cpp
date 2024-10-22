@@ -1,5 +1,4 @@
 #include "MemoryManager.h"
-#include <iostream>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -97,7 +96,6 @@ void einsum_ir::backend::MemoryManager::alloc_all_memory(){
     int64_t l_align_offset = (unsigned long)m_memory_ptr % m_alignment_page;
     l_align_offset = l_align_offset ? m_alignment_page - l_align_offset : 0;
     m_aligned_memory_ptr = m_memory_ptr + l_align_offset;
-    
   }
 
   if( m_req_thread_mem ){
@@ -109,18 +107,18 @@ void einsum_ir::backend::MemoryManager::alloc_all_memory(){
     m_thread_memory.reserve( l_num_threads );
     m_aligned_thread_memory.reserve(l_num_threads);
     for( int l_id = 0; l_id < l_num_threads; l_id++ ){
-      //allocate memory 
+      //allocate memory
       char * l_ptr = new char[ m_req_thread_mem * m_alignment_line ];
       m_thread_memory.push_back( l_ptr );
 
-      //allign data in memory 
+      //allign data in memory
       int64_t l_align_offset = (unsigned long)l_ptr % m_alignment_line;
-      l_align_offset = l_align_offset ? m_alignment_line - l_align_offset : 0; 
+      l_align_offset = l_align_offset ? m_alignment_line - l_align_offset : 0;
       m_aligned_thread_memory.push_back( l_ptr + l_align_offset );
     }
+
   
-    
-    //set memory to zero
+    //first touch policy
 #ifdef _OPENMP
     #pragma omp parallel
 #endif
@@ -133,7 +131,6 @@ void einsum_ir::backend::MemoryManager::alloc_all_memory(){
         m_aligned_thread_memory[l_thread_id][l_mem_id] = 0;
       }
     }
-    
   }
 }
 
