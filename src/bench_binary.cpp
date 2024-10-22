@@ -16,7 +16,7 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
                    std::vector< int64_t>        & i_dim_ids_in_left,
                    std::vector< int64_t>        & i_dim_ids_in_right,
                    std::vector< int64_t>        & i_dim_ids_out,
-                   std::vector< int64_t >       & i_loop_order,
+                   std::vector< int64_t >       * i_loop_order,
                    at::ScalarType                 i_dtype_at,
                    einsum_ir::data_t              i_dtype_einsum_ir,
                    std::string                    i_einsum_string) {
@@ -105,7 +105,6 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
   std::cout << "einsum_ir:" << std::endl;
 
   einsum_ir::backend::MemoryManager l_memory;
-
   einsum_ir::backend::BinaryContractionTpp l_bin_cont;
   l_bin_cont.init( i_dim_ids_in_left.size(),
                    i_dim_ids_in_right.size(),
@@ -115,7 +114,7 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
                    &i_dim_sizes_map,
                    nullptr,
                    &i_dim_sizes_map,
-                   &i_loop_order,   
+                   i_loop_order,   
                    i_dim_ids_in_left.data(),
                    i_dim_ids_in_right.data(),
                    i_dim_ids_out.data(),
@@ -336,13 +335,16 @@ int main( int     i_argc,
    * parse loop order
    */
   std::vector< int64_t > l_loop_order;
+  std::vector< int64_t > * l_loop_order_ptr = nullptr;
   if( i_argc > 4 ){
     std::string l_loop_string( i_argv[4] );
     einsum_ir::frontend::EinsumExpressionAscii::parse_loop_order( l_loop_string,
                                                                   m_map_dim_name_to_id,
                                                                   l_loop_order );
-    std::cout << "loop order: " << l_loop_string << std::endl;                                     
+    std::cout << "loop order: " << l_loop_string << std::endl;   
+    l_loop_order_ptr = &l_loop_order;                                 
   }
+
 
   /*
    * convert dim_sizes vector to map
@@ -382,7 +384,7 @@ int main( int     i_argc,
                 l_dim_ids_in_left,
                 l_dim_ids_in_right,
                 l_dim_ids_out,
-                l_loop_order,
+                l_loop_order_ptr,
                 l_dtype_at,
                 l_dtype_einsum_ir,
                 l_expression_string);
