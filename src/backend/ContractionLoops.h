@@ -16,24 +16,6 @@ namespace einsum_ir {
 
 class einsum_ir::backend::ContractionLoops {
   private:
-    //! number of C dimensions
-    int64_t m_num_dims_c = 0;
-    //! number of M dimensions
-    int64_t m_num_dims_m = 0;
-    //! number of N dimensions
-    int64_t m_num_dims_n = 0;
-    //! number of K dimensions
-    int64_t m_num_dims_k = 0;
-
-    //! Ids of C dimension
-    int64_t const * m_dim_ids_c = nullptr;
-    //! Ids of M dimension
-    int64_t const * m_dim_ids_m = nullptr;
-    //! Ids of N dimension
-    int64_t const * m_dim_ids_n = nullptr;
-    //! Ids of K dimension
-    int64_t const * m_dim_ids_k = nullptr;
-
     //! vector of loop execution order
     std::vector<int64_t> * m_loop_ids = nullptr;
 
@@ -177,14 +159,6 @@ class einsum_ir::backend::ContractionLoops {
      *   N: dimensions appear in right input and output.
      *   K: reduction dimensions which appear in both inputs,
      *
-     * @param i_num_dims_c number of C dimensions.
-     * @param i_num_dims_m number of M dimensions.
-     * @param i_num_dims_n number of N dimensions.
-     * @param i_num_dims_k number of K dimensions.
-     * @param i_dim_ids_c dimensiom ids of the C dimensions.
-     * @param i_dim_ids_m dimensiom ids of the M dimensions.
-     * @param i_dim_ids_n dimensiom ids of the N dimensions.
-     * @param i_dim_ids_k dimensiom ids of the K dimensions.
      * @param i_sizes sizes of the dimensions
      * @param i_strides_left strides of the left input tensor.
      * @param i_strides_right strides of the right input tensor.
@@ -200,15 +174,7 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_ktype_last_touch type of the last touch kernel.
      * @param i_packing packing kernel for contraction
      **/
-void init( int64_t                              i_num_dims_c,
-           int64_t                              i_num_dims_m,
-           int64_t                              i_num_dims_n,
-           int64_t                              i_num_dims_k,
-           int64_t                      const * i_dim_ids_c,
-           int64_t                      const * i_dim_ids_m,
-           int64_t                      const * i_dim_ids_n,
-           int64_t                      const * i_dim_ids_k,
-           std::map< int64_t, int64_t > const * i_sizes,
+void init( std::map< int64_t, int64_t > const * i_sizes,
            std::map< int64_t, int64_t > const * i_strides_left,
            std::map< int64_t, int64_t > const * i_strides_right,
            std::map< int64_t, int64_t > const * i_strides_out_aux,

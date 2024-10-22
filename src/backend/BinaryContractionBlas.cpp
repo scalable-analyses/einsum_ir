@@ -213,15 +213,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
   }
 
   // init contraction loops
-  m_cont_loops.init( l_dim_ids_bc.size(),
-                     l_dim_ids_bm.size(),
-                     l_dim_ids_bn.size(),
-                     l_dim_ids_bk.size(),
-                     l_dim_ids_bc.data(),
-                     l_dim_ids_bm.data(),
-                     l_dim_ids_bn.data(),
-                     l_dim_ids_bk.data(),
-                     m_dim_sizes_inner,
+  m_cont_loops.init( m_dim_sizes_inner,
                      &l_strides_left,
                      &l_strides_right,
                      &l_strides_out,

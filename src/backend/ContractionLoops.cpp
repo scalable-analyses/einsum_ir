@@ -7,15 +7,7 @@
 #include <omp.h>
 #endif
 
-void einsum_ir::backend::ContractionLoops::init( int64_t                              i_num_dims_c,
-                                                 int64_t                              i_num_dims_m,
-                                                 int64_t                              i_num_dims_n,
-                                                 int64_t                              i_num_dims_k,
-                                                 int64_t                      const * i_dim_ids_c,
-                                                 int64_t                      const * i_dim_ids_m,
-                                                 int64_t                      const * i_dim_ids_n,
-                                                 int64_t                      const * i_dim_ids_k,
-                                                 std::map< int64_t, int64_t > const * i_sizes,
+void einsum_ir::backend::ContractionLoops::init( std::map< int64_t, int64_t > const * i_sizes,
                                                  std::map< int64_t, int64_t > const * i_strides_left,
                                                  std::map< int64_t, int64_t > const * i_strides_right,
                                                  std::map< int64_t, int64_t > const * i_strides_out_aux,
@@ -29,16 +21,6 @@ void einsum_ir::backend::ContractionLoops::init( int64_t                        
                                                  kernel_t                             i_ktype_main,
                                                  kernel_t                             i_ktype_last_touch,
                                                  ContractionPackingTpp              * i_packing ) {
-  m_num_dims_c = i_num_dims_c;
-  m_num_dims_m = i_num_dims_m;
-  m_num_dims_n = i_num_dims_n;
-  m_num_dims_k = i_num_dims_k;
-
-  m_dim_ids_c = i_dim_ids_c;
-  m_dim_ids_m = i_dim_ids_m;
-  m_dim_ids_n = i_dim_ids_n;
-  m_dim_ids_k = i_dim_ids_k;
-
   m_sizes = i_sizes;
 
   m_strides_left = i_strides_left;

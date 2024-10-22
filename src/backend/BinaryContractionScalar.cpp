@@ -187,15 +187,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
     return einsum_ir::COMPILATION_FAILED;
   }
 
-  m_cont_loops.init( m_dim_ids_c.size(),
-                     m_dim_ids_m.size(),
-                     m_dim_ids_n.size(),
-                     m_dim_ids_k.size(),
-                     m_dim_ids_c.data(),
-                     m_dim_ids_m.data(),
-                     m_dim_ids_n.data(),
-                     m_dim_ids_k.data(),
-                     m_dim_sizes_inner,
+  m_cont_loops.init( m_dim_sizes_inner,
                      &l_strides_left,
                      &l_strides_right,
                      &l_strides_out_aux,

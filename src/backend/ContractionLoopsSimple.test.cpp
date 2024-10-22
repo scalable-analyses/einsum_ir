@@ -144,10 +144,6 @@ void transpose( int64_t         i_num_dims,
 TEST_CASE( "K dimension of the contraction loops.", "[contraction_loops_k]" ) {
   int64_t l_id_k = 0;
 
-  std::vector<int64_t> l_dim_ids_c = { };
-  std::vector<int64_t> l_dim_ids_m = { };
-  std::vector<int64_t> l_dim_ids_n = { };
-  std::vector<int64_t> l_dim_ids_k = { l_id_k };
   std::vector<int64_t> l_loop_ids  = { l_id_k };
 
   // per-dimension sizes
@@ -174,15 +170,7 @@ TEST_CASE( "K dimension of the contraction loops.", "[contraction_loops_k]" ) {
   float l_ref = 1*6 + 2*7 + 3*8 + 4*9 + 5*10;
   // binary contraction loops
   einsum_ir::backend::ContractionLoopsSimple l_cont_loops;
-  l_cont_loops.init( l_dim_ids_c.size(),
-                     l_dim_ids_m.size(),
-                     l_dim_ids_n.size(),
-                     l_dim_ids_k.size(),
-                     l_dim_ids_c.data(),
-                     l_dim_ids_m.data(),
-                     l_dim_ids_n.data(),
-                     l_dim_ids_k.data(),
-                     &l_dim_sizes,
+  l_cont_loops.init( &l_dim_sizes,
                      &l_strides_in_left,
                      &l_strides_in_right,
                      &l_strides_out,
@@ -257,10 +245,6 @@ TEST_CASE( "Matmul with first and last touch.", "[contraction_loops]" ) {
   int64_t l_id_n = 1;
   int64_t l_id_k = 2;
 
-  std::vector<int64_t> l_dim_ids_c = { };
-  std::vector<int64_t> l_dim_ids_m = { l_id_m };
-  std::vector<int64_t> l_dim_ids_n = { l_id_n };
-  std::vector<int64_t> l_dim_ids_k = { l_id_k };
   std::vector<int64_t> l_loop_ids  = { l_id_n, l_id_m, l_id_k };
 
   // per-dimension sizes
@@ -317,15 +301,7 @@ TEST_CASE( "Matmul with first and last touch.", "[contraction_loops]" ) {
   }
 
   einsum_ir::backend::ContractionLoopsSimple l_cont_loops;
-  l_cont_loops.init( l_dim_ids_c.size(),
-                     l_dim_ids_m.size(),
-                     l_dim_ids_n.size(),
-                     l_dim_ids_k.size(),
-                     l_dim_ids_c.data(),
-                     l_dim_ids_m.data(),
-                     l_dim_ids_n.data(),
-                     l_dim_ids_k.data(),
-                     &l_dim_sizes,
+  l_cont_loops.init( &l_dim_sizes,
                      &l_strides_in_left,
                      &l_strides_in_right,
                      &l_strides_out,
@@ -394,11 +370,6 @@ TEST_CASE( "Nested loops used in binary contractions using a scalar kernel.", "[
   int64_t l_id_a = 5;
   int64_t l_id_c = 6;
 
-
-  std::vector<int64_t> l_dim_ids_c = { };
-  std::vector<int64_t> l_dim_ids_m = { l_id_g, l_id_e, l_id_i };
-  std::vector<int64_t> l_dim_ids_n = { l_id_h, l_id_f };
-  std::vector<int64_t> l_dim_ids_k = { l_id_c, l_id_a };
   std::vector<int64_t> l_loop_ids  = { l_id_h, l_id_f , l_id_g, l_id_e, l_id_i, l_id_c, l_id_a };
 
   // per-dimension sizes
@@ -549,15 +520,7 @@ TEST_CASE( "Nested loops used in binary contractions using a scalar kernel.", "[
              l_c_ten );
 
   einsum_ir::backend::ContractionLoopsSimple l_cont_loops;
-  l_cont_loops.init( l_dim_ids_c.size(),
-                     l_dim_ids_m.size(),
-                     l_dim_ids_n.size(),
-                     l_dim_ids_k.size(),
-                     l_dim_ids_c.data(),
-                     l_dim_ids_m.data(),
-                     l_dim_ids_n.data(),
-                     l_dim_ids_k.data(),
-                     &l_dim_sizes,
+  l_cont_loops.init( &l_dim_sizes,
                      &l_strides_in_left,
                      &l_strides_in_right,
                      &l_strides_out,
@@ -638,10 +601,6 @@ TEST_CASE( "Nested loops used in binary contractions using a matrix kernel.", "[
   int64_t l_id_x = 7;
   int64_t l_id_y = 8;
 
-  std::vector<int64_t> l_dim_ids_c = { l_id_y, l_id_x };
-  std::vector<int64_t> l_dim_ids_m = { l_id_g, l_id_e, l_id_i };
-  std::vector<int64_t> l_dim_ids_n = { l_id_h, l_id_f };
-  std::vector<int64_t> l_dim_ids_k = { l_id_c, l_id_a };
   std::vector<int64_t> l_loop_ids  = { l_id_y, l_id_x, l_id_h, l_id_g, l_id_c };
 
   std::map< int64_t, int64_t > l_dim_sizes{ { l_id_i, 3 }, 
@@ -799,15 +758,7 @@ TEST_CASE( "Nested loops used in binary contractions using a matrix kernel.", "[
              l_c_ten );
 
   einsum_ir::backend::ContractionLoopsSimple l_cont_loops;
-  l_cont_loops.init( l_dim_ids_c.size(),
-                     l_dim_ids_m.size()-2,
-                     l_dim_ids_n.size()-1,
-                     l_dim_ids_k.size()-1,
-                     l_dim_ids_c.data(),
-                     l_dim_ids_m.data(),
-                     l_dim_ids_n.data(),
-                     l_dim_ids_k.data(),
-                     &l_dim_sizes,
+  l_cont_loops.init( &l_dim_sizes,
                      &l_strides_in_left,
                      &l_strides_in_right,
                      &l_strides_out,

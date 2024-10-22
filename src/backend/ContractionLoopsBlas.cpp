@@ -153,15 +153,7 @@ void einsum_ir::backend::ContractionLoopsBlas::kernel_gemm_fp64( double         
                m_blas_ld_c );
 }
 
-void einsum_ir::backend::ContractionLoopsBlas::init( int64_t                              i_num_dims_c,
-                                                     int64_t                              i_num_dims_m,
-                                                     int64_t                              i_num_dims_n,
-                                                     int64_t                              i_num_dims_k,
-                                                     int64_t                      const * i_dim_ids_c,
-                                                     int64_t                      const * i_dim_ids_m,
-                                                     int64_t                      const * i_dim_ids_n,
-                                                     int64_t                      const * i_dim_ids_k,
-                                                     std::map< int64_t, int64_t > const * i_sizes,
+void einsum_ir::backend::ContractionLoopsBlas::init( std::map< int64_t, int64_t > const * i_sizes,
                                                      std::map< int64_t, int64_t > const * i_strides_left,
                                                      std::map< int64_t, int64_t > const * i_strides_right,
                                                      std::map< int64_t, int64_t > const * i_strides_out_aux,
@@ -184,15 +176,7 @@ void einsum_ir::backend::ContractionLoopsBlas::init( int64_t                    
 
   m_num_bytes_scalar = ce_n_bytes( i_blas_dtype );
 
-  ContractionLoops::init( i_num_dims_c,
-                          i_num_dims_m,
-                          i_num_dims_n,
-                          i_num_dims_k,
-                          i_dim_ids_c,
-                          i_dim_ids_m,
-                          i_dim_ids_n,
-                          i_dim_ids_k,
-                          i_sizes,
+  ContractionLoops::init( i_sizes,
                           i_strides_left,
                           i_strides_right,
                           i_strides_out_aux,

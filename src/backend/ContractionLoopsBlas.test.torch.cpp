@@ -34,15 +34,7 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction loops implementation."
 
   einsum_ir::backend::ContractionLoopsBlas l_cont_blas;
 
-  l_cont_blas.init( 0,
-                    0,
-                    0,
-                    0,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    &l_dim_sizes,
+  l_cont_blas.init( &l_dim_sizes,
                     &l_strides_in_left,
                     &l_strides_in_right,
                     &l_strides_out_aux,
@@ -105,15 +97,7 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction loops implementation."
 
   einsum_ir::backend::ContractionLoopsBlas l_cont_blas;
 
-  l_cont_blas.init( 0,
-                    0,
-                    0,
-                    0,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    &l_dim_sizes,
+  l_cont_blas.init( &l_dim_sizes,
                     &l_strides_in_left,
                     &l_strides_in_right,
                     &l_strides_out_aux,
@@ -171,7 +155,6 @@ TEST_CASE( "Simple batched FP64 matmul using the BLAS contraction loops implemen
 
   int64_t l_id_c = 0;
 
-  std::vector< int64_t > l_dim_ids_c = { l_id_c };
   std::vector< int64_t > l_loop_ids = { l_id_c };
 
   // per-dimension sizes
@@ -184,15 +167,7 @@ TEST_CASE( "Simple batched FP64 matmul using the BLAS contraction loops implemen
   std::map< int64_t, int64_t > l_strides_out_aux{  { l_id_c, 0   } };
   std::map< int64_t, int64_t > l_strides_out{      { l_id_c, 7*5 } };
 
-  l_cont_blas.init( l_dim_ids_c.size(),
-                    0,
-                    0,
-                    0,
-                    l_dim_ids_c.data(),
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    &l_dim_sizes,
+  l_cont_blas.init( &l_dim_sizes,
                     &l_strides_in_left,
                     &l_strides_in_right,
                     &l_strides_out_aux,
@@ -252,10 +227,6 @@ TEST_CASE( "FP32 tensor contraction using the BLAS contraction loops implementat
   int64_t l_id_n = 2;
   int64_t l_id_k = 3;
 
-  std::vector< int64_t > l_dim_ids_c = { l_id_c };
-  std::vector< int64_t > l_dim_ids_m = { l_id_m };
-  std::vector< int64_t > l_dim_ids_n = { l_id_n };
-  std::vector< int64_t > l_dim_ids_k = { l_id_k };
   std::vector< int64_t > l_loop_ids  = { l_id_c, l_id_n, l_id_m, l_id_k };
 
   std::map< int64_t, int64_t > l_dim_sizes{ { l_id_c, 5 },
@@ -285,15 +256,7 @@ TEST_CASE( "FP32 tensor contraction using the BLAS contraction loops implementat
 
   einsum_ir::backend::ContractionLoopsBlas l_cont_blas;
 
-  l_cont_blas.init( l_dim_ids_c.size(),
-                    l_dim_ids_m.size(),
-                    l_dim_ids_n.size(),
-                    l_dim_ids_k.size(),
-                    l_dim_ids_c.data(),
-                    l_dim_ids_m.data(),
-                    l_dim_ids_n.data(),
-                    l_dim_ids_k.data(),
-                    &l_dim_sizes,
+  l_cont_blas.init( &l_dim_sizes,
                     &l_strides_in_left,
                     &l_strides_in_right,
                     &l_strides_out_aux,
@@ -359,15 +322,7 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction loops implement
 
   einsum_ir::backend::ContractionLoopsBlas l_cont_blas;
 
-  l_cont_blas.init( 0,
-                    0,
-                    0,
-                    0,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    nullptr,
-                    &l_dim_sizes,
+  l_cont_blas.init( &l_dim_sizes,
                     &l_strides_in_left,
                     &l_strides_in_right,
                     &l_strides_out_aux,
@@ -430,10 +385,6 @@ TEST_CASE( "FP32 packed tensor contraction using the BLAS contraction loops impl
   int64_t l_id_n = 2;
   int64_t l_id_k = 3;
 
-  std::vector< int64_t > l_dim_ids_c = { l_id_c };
-  std::vector< int64_t > l_dim_ids_m = { l_id_m };
-  std::vector< int64_t > l_dim_ids_n = { l_id_n };
-  std::vector< int64_t > l_dim_ids_k = { l_id_k };
   std::vector< int64_t > l_loop_ids  = { l_id_c, l_id_n, l_id_m, l_id_k };
 
   std::map< int64_t, int64_t > l_dim_sizes{ { l_id_c, 5 },
@@ -463,15 +414,7 @@ TEST_CASE( "FP32 packed tensor contraction using the BLAS contraction loops impl
 
   einsum_ir::backend::ContractionLoopsBlas l_cont_blas;
 
-  l_cont_blas.init( l_dim_ids_c.size(),
-                    l_dim_ids_m.size(),
-                    l_dim_ids_n.size(),
-                    l_dim_ids_k.size(),
-                    l_dim_ids_c.data(),
-                    l_dim_ids_m.data(),
-                    l_dim_ids_n.data(),
-                    l_dim_ids_k.data(),
-                    &l_dim_sizes,
+  l_cont_blas.init( &l_dim_sizes,
                     &l_strides_in_left,
                     &l_strides_in_right,
                     &l_strides_out_aux,
