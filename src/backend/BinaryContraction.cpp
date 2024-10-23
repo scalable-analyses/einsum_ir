@@ -4,7 +4,6 @@
 #include <cassert>
 #include <cmath>
 #include "ContractionLoops.h"
-#include <iostream>
 
 void einsum_ir::backend::BinaryContraction::dim_types( int64_t         i_num_dims_t0,
                                                        int64_t         i_num_dims_t1,
@@ -407,15 +406,15 @@ einsum_ir::err_t einsum_ir::backend::BinaryContraction::compile_base() {
   for( const int64_t& l_dim : m_dim_ids_m ){
     std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::M );
     m_dim_types.insert( l_pair );
-  } 
+  }
   for( const int64_t& l_dim : m_dim_ids_n ){
     std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::N );
     m_dim_types.insert( l_pair );
-  } 
+  }
   for( const int64_t& l_dim : m_dim_ids_k ){
     std::pair< int64_t, dim_t > l_pair( l_dim, einsum_ir::K );
     m_dim_types.insert( l_pair );
-  } 
+  }
 
   if( m_loop_ids_ext != nullptr ){
     m_loop_ids_int.clear();
