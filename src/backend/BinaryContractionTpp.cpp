@@ -133,7 +133,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   else {
     l_strides_out_aux = l_strides_out;
   }
-  
+
   std::vector< int64_t > l_dim_ids_packed_left;
   std::vector< int64_t > l_dim_ids_packed_right;
   ContractionPackingTpp * l_packing = nullptr;
@@ -149,7 +149,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     l_dim_ids_packed_right.insert( l_dim_ids_packed_right.end(), l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
     l_dim_ids_packed_right.insert( l_dim_ids_packed_right.end(), l_dim_ids_cb.begin(), l_dim_ids_cb.end() );
   }
-  
+
 
   if( m_dim_ids_permute_left != nullptr || m_dim_ids_permute_right != nullptr ) {
     //compile packing
@@ -158,7 +158,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                     m_num_dims_right,
                     m_dim_sizes_inner,
                     &l_strides_left,
-                    &l_strides_right, 
+                    &l_strides_right,
                     &m_dim_types,
                     m_dim_ids_left,
                     m_dim_ids_right,
