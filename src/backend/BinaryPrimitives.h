@@ -31,6 +31,15 @@ class einsum_ir::backend::BinaryPrimitives {
     //! maximum size of the blocked K dimension.
     int64_t m_size_kb_max = 0;
 
+    // target size for inner k loops
+    int64_t m_size_inner_k_loops = 32;
+    // target size for m loops
+    int64_t m_size_inner_m_loops = 32;
+    // target size for n loops
+    int64_t m_size_inner_n_loops = 32;
+
+    int64_t m_next_free_id = 100000;
+
     /**
      * Derives the primitive blocking in the following format:
      *  Left tensor:   kb x mb cb
@@ -379,6 +388,25 @@ class einsum_ir::backend::BinaryPrimitives {
                    int64_t                            * io_dim_ids_left,
                    int64_t                            * io_dim_ids_right,
                    int64_t                            * io_dim_ids_out ) const;
+
+
+    //TODO documenstation
+    void compileLoopOrder( std::map< int64_t, int64_t > & io_dim_sizes,
+                           std::map< int64_t, int64_t > & io_strides_left,
+                           std::map< int64_t, int64_t > & io_strides_right,
+                           std::map< int64_t, int64_t > & io_strides_out,
+                           //std::map< int64_t, int64_t > & i_strides_out_aux,
+                           std::vector< int64_t > & i_dim_ids_bc,
+                           std::vector< int64_t > & i_dim_ids_bm,
+                           std::vector< int64_t > & i_dim_ids_bn,
+                           std::vector< int64_t > & i_dim_ids_bk
+                           //std::vector< int64_t > & o_loop_order 
+                          );
+
+    int64_t splitDimension( int64_t i_dim_size,
+                            int64_t i_target_size
+                          );
+
 };
 
 #endif

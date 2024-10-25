@@ -134,6 +134,10 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     l_strides_out_aux = l_strides_out;
   }
 
+  std::map < int64_t, int64_t > l_dim_sizes;
+  l_dim_sizes.insert( m_dim_sizes_inner->begin(), m_dim_sizes_inner->end()); 
+  l_bin_prim.compileLoopOrder(l_dim_sizes,l_strides_left,l_strides_right, l_strides_out,l_dim_ids_bc,l_dim_ids_bm,l_dim_ids_bn,l_dim_ids_bk);
+
   std::vector< int64_t > l_dim_ids_packed_left;
   std::vector< int64_t > l_dim_ids_packed_right;
   ContractionPackingTpp * l_packing = nullptr;
