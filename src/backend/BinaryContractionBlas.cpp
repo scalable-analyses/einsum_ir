@@ -216,7 +216,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
 
   // set leading dimensions
   int64_t l_blas_ld_a = l_dim_ids_kb.size() > 0 ? l_strides_left.at(  l_dim_ids_kb.back() ) : l_blas_size_m;
-  int64_t l_blas_ld_b = l_dim_ids_nb.size() > 0 ? l_strides_right.at( l_dim_ids_nb.back() ) : l_blas_size_n;
+  int64_t l_blas_ld_b = l_dim_ids_nb.size() > 0 ? l_strides_right.at( l_dim_ids_nb.back() ) : l_blas_size_k;
   int64_t l_blas_ld_c = l_dim_ids_nb.size() > 0 ? l_strides_out.at(   l_dim_ids_nb.back() ) : l_blas_size_c * l_blas_size_m;
 
   // check that the same data type is used everywhere
