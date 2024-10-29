@@ -6,9 +6,9 @@ The script ``benchmark_convert.py`` can be used to convert benchmarks from https
 
    wget https://zenodo.org/records/11477304/files/instances.zip -O instances.zip
    unzip instances.zip
-   python benchmark_convert.py instances/lm_first_last_brackets_4_16d.pkl > lm_first_last_brackets_4_16d.txt
-   python benchmark_convert.py instances/lm_batch_likelihood_sentence_5_16d.pkl > lm_batch_likelihood_sentence_5_16d.txt
-   python benchmark_convert.py instances/str_nw_mera_open_26.pkl > str_nw_mera_open_26.txt
+   python benchmark_convert.py instances/lm_first_last_brackets_4_16d.pkl > lm_first_last_brackets_4_16d.cfg
+   python benchmark_convert.py instances/lm_batch_likelihood_sentence_5_16d.pkl | sed 's/3500/128/g' > lm_batch_likelihood_sentence_5_16d_batch128.cfg
+   python benchmark_convert.py instances/str_nw_mera_open_26.pkl > str_nw_mera_open_26.cfg
 
 TVM
 ---
