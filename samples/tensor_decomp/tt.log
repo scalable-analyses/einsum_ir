@@ -1,0 +1,47 @@
+loading coil100.npy
+dataset shape: (100, 72, 128, 128, 3)
+computing tensor decomposition
+decomposition metrics:
+5D TT tensor:
+
+ 100 72  128 128  3
+  |   |   |   |   |
+ (0) (1) (2) (3) (4)
+ / \ / \ / \ / \ / \
+1   71  305 32  3   1
+
+  compression ratio: 353894400/2827837 = 125.147
+  relative error: tensor(0.1703)
+  RMSE: tensor(14.5166)
+  R^2: tensor(0.9252)
+shape of tucker core: torch.Size([100, 72, 128, 128, 3])
+shape and dtype of cores:
+   torch.Size([1, 100, 71])
+   torch.float32
+   torch.Size([71, 72, 305])
+   torch.float32
+   torch.Size([305, 128, 32])
+   torch.float32
+   torch.Size([32, 128, 3])
+   torch.float32
+   torch.Size([3, 3, 1])
+   torch.float32
+shape and dtype of factors (if any):
+performing reconstruction manually
+shape of manually reconstructed tensor: torch.Size([100, 72, 128, 128, 3])
+relative error (manual vs. tntorch): tensor(6.5316e-07)
+opt_einsum contraction path:
+([(1, 2), (0, 3), (0, 1), (0, 1)],   Complete contraction:  af,fbg,gch,hdi,ie->abcde
+         Naive scaling:  9
+     Optimized scaling:  6
+      Naive FLOP count:  3.679e+15
+  Optimized FLOP count:  3.961e+10
+   Theoretical speedup:  9.287e+4
+  Largest intermediate:  3.539e+8 elements
+--------------------------------------------------------------------------------
+scaling        BLAS                current                             remaining
+--------------------------------------------------------------------------------
+   5           GEMM          gch,fbg->chfb                 af,hdi,ie,chfb->abcde
+   5           TDOT          chfb,af->chba                    hdi,ie,chba->abcde
+   4           GEMM            ie,hdi->ehd                       chba,ehd->abcde
+   6           TDOT        ehd,chba->abcde                          abcde->abcde)

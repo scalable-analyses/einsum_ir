@@ -26,27 +26,88 @@ class einsum_ir::frontend::EinsumExpressionAscii {
                               std::vector< std::string >       & o_output );
 
     /**
-     * Extracts the tensors from an einsum expression.
-     * The einsum expression is expected to be in the following format:
+     * Converts an single-character input expression string to standardized format.
+     *
+     * The input expression string is expected to be in the following format:
      *   "tensor1,tensor2,...,tensorN->tensorN+1"
+     * where the dimension ids are single characters.
+     *
+     * The output expression string will be in the following format:
+     *   "[tensor1],[tensor2],...,[tensorN]->[tensorN+1]"
+     * where the dimension ids are single characters separated by commas.
+     *
      * Example:
-     *   "iae,bf,dcba,cg,dh->hgfei"
+     *  "iae,bf,dcba,cg,dh->hgfei"
+     * will be converted to:
+     *  "[i,a,e],[b,f],[d,c,b,a],[c,g],[d,h]->[h,g,f,e,i]".
+     *
+     * @param i_expr_string input expression string.
+     * @param o_expr_string will be set to standardized expression string.
+     **/
+    static void schar_to_standard( std::string const & i_expr_string,
+                                   std::string       & o_expr_string );
+
+    /**
+     * Converts a standardized expression string to single-character format.
+     *
+     * The input expression string is expected to be in the following format:
+     *   "[tensor1],[tensor2],...,[tensorN]->[tensorN+1]"
+     * where the dimension ids are separated by commas.
+     *
+     * The output expression string will be in the following format:
+     *   "tensor1,tensor2,...,tensorN->tensorN+1"
+     * where the dimension ids are single characters.
+     *
+     * Example:
+     *   "[i,a,e],[b,f],[d,c,b,a],[c,g],[d,h]->[h,g,f,e,i]"
+     * will be converted to:
+     *   "IAE,BF,DCBA,CG,DH->HGFEI"
+     *
+     * @param i_expr_string input expression string.
+     * @param o_expr_string will be set to single-character expression string.
+     **/
+    static void standard_to_schar( std::string const & i_expr_string,
+                                   std::string       & o_expr_string );
+
+    /**
+     * Extracts the tensors from an einsum expression.
+     *
+     * The dimension sizes string is expected to be in one in the following format:
+     *   "[tensor1],[tensor2],...,[tensorN]->[tensorN+1]"
+     * where the dimension ids are separated by commas.
+     *
+     * Example #1:
+     *   "[i,a,e],[b,f],[d,c,b,a],[c,g],[d,h]->[h,g,f,e,i]"
+     * will be parsed to:
+     *   ["i,a,e", "b,f", "d,c,b,a", "c,g", "d,h", "h,g,f,e,i"]
+     *
+     * Example #2:
+     *
+     *    a = 5, b = 6, c = 7
+     *    d = 8, e = 9, f = 10,
+     *    g = 11, h = 12, i = 13
+     *
+     *    "[13,5,9],[6,10],[8,7,6,5],[7,11],[8,12]->[12,11,10,9,13]"
+     * will be parsed to:
+     *  ["13,5,9", "6,10", "8,7,6,5", "7,11", "8,12", "12,11,10,9,13"]
      *
      * @param i_expr_string einsum expression.
-     * @param o_tensors will be set to extracted tensors 
+     * @param o_tensors will be set to extracted tensors
      */
     static void parse_tensors( std::string                const & i_expr_string,
                                std::vector< std::string >       & o_tensors );
 
-
     /**
      * Extracts the dimension sizes from the dimension sizes string.
+     *
      * The dimension sizes string is expected to be in the following format:
      *  "size1,size2,...,sizeN"
      * where the dimension of tensor with id i has the size size_i.
+     *
      * Example:
-     *  "32,8,4,2,16,64,8,8,8"
-     * where tensor 1 has dimension size 32, tensor 2 has dimension size 8, etc.
+     *   "32,8,4,2,16,64,8,8,8"
+     * will be parsed to:
+     *  [32, 8, 4, 2, 16, 64, 8, 8, 8]
      *
      * @param i_dim_sizes_string dimension sizes string.
      * @param o_dim_sizes will be set to extracted dimension sizes.
@@ -56,6 +117,7 @@ class einsum_ir::frontend::EinsumExpressionAscii {
 
     /**
      * Extracts the contraction path for an einsum expression.
+     *
      * The path is expected to be in the following format:
      *   "(tensor1,tensor2),(tensor2,tensor3),...",
      * where tensor1 and tensor2 are the tensors to be contracted first,
@@ -63,6 +125,8 @@ class einsum_ir::frontend::EinsumExpressionAscii {
      *
      * Example:
      *   "(1,2),(2,3),(0,1),(0,1)"
+     * will be parsed to:
+     *  [1, 2, 2, 3, 0, 1, 0, 1]
      *
      * @param i_expr_string einsum expression.
      * @param o_path will be set to extracted path.
@@ -90,8 +154,8 @@ class einsum_ir::frontend::EinsumExpressionAscii {
      * @param i_expr_string einsum expression.
      * @param o_map_dim_name_to_id will be set to extracted dimension ids.
      **/
-    static void parse_dim_ids( std::string               const & i_expr_string,
-                               std::map< char, int64_t >       & o_map_dim_name_to_id );
+    static void parse_dim_ids( std::string                      const & i_expr_string,
+                               std::map< std::string, int64_t >       & o_map_dim_name_to_id );
 
     /**
      * Extracts the data type from a string.

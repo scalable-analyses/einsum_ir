@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <set>
+#include <codecvt>
+#include <locale>
 
 void einsum_ir::frontend::EinsumExpressionAscii::split_string( std::string                const & i_input,
                                                                std::string                const & i_separation,
@@ -20,11 +22,175 @@ void einsum_ir::frontend::EinsumExpressionAscii::split_string( std::string      
   }
 }
 
+void einsum_ir::frontend::EinsumExpressionAscii::schar_to_standard( std::string const & i_expr_string,
+                                                                    std::string       & o_expr_string ) {
+  o_expr_string.clear();
+
+  std::string l_expr = i_expr_string;
+
+  l_expr.erase( std::remove( l_expr.begin(),
+                             l_expr.end(),
+                             ' '),
+                l_expr.end());
+
+  std::vector< std::string > l_tensors;
+  split_string( l_expr,
+                std::string("->"),
+                l_tensors );
+
+  std::vector< std::string > l_input_tensors;
+  split_string( l_tensors[0],
+                std::string(","),
+                l_input_tensors );
+
+  for( std::size_t l_te = 0; l_te < l_input_tensors.size(); l_te++ ) {
+    std::string l_tensor = l_input_tensors[l_te];
+    o_expr_string += "[";
+    for( std::size_t l_di = 0; l_di < l_tensor.size(); l_di++ ) {
+      o_expr_string += l_tensor[l_di];
+      if( l_di < l_tensor.size() - 1 ) {
+        o_expr_string += ",";
+      }
+    }
+    o_expr_string += "]";
+    if( l_te < l_input_tensors.size() - 1 ) {
+      o_expr_string += ",";
+    }
+  }
+
+  o_expr_string += "->[";
+
+  for( std::size_t l_di = 0; l_di < l_tensors[1].size(); l_di++ ) {
+    o_expr_string += l_tensors[1][l_di];
+    if( l_di < l_tensors[1].size() - 1 ) {
+      o_expr_string += ",";
+    }
+  }
+
+  o_expr_string += "]";
+}
+
+void einsum_ir::frontend::EinsumExpressionAscii::standard_to_schar( std::string const & i_expr_string,
+                                                                    std::string       & o_expr_string ) {
+  o_expr_string.clear();
+
+  std::string l_expr = i_expr_string;
+
+  l_expr.erase( std::remove( l_expr.begin(),
+                             l_expr.end(),
+                             ' '),
+                l_expr.end());
+
+  l_expr.erase( 0, 1 );
+  l_expr.erase( l_expr.size() - 1, 1 );
+
+  std::vector< std::string > l_tensors;
+  split_string( l_expr,
+                std::string("]->["),
+                l_tensors );
+  
+  if( l_tensors.size() == 1 ) {
+    l_tensors.push_back( "" );
+  }
+
+  std::vector< std::string > l_input_tensors;
+  split_string( l_tensors[0],
+                std::string("],["),
+                l_input_tensors );
+
+  // map: dimension name -> dimension id
+  std::map< std::string, int64_t > l_map_dim_name_to_id;
+
+  for( std::size_t l_te = 0; l_te < l_input_tensors.size(); l_te++ ) {
+    std::string l_tensor = l_input_tensors[l_te];
+
+    std::vector< std::string > l_tensor_dim_names;
+    split_string( l_tensor,
+                  std::string(","),
+                  l_tensor_dim_names );
+
+    for( std::size_t l_di = 0; l_di < l_tensor_dim_names.size(); l_di++ ) {
+      l_map_dim_name_to_id.insert( { l_tensor_dim_names[l_di], 0 } );
+    }
+  }
+
+  std::vector< std::string > l_dim_names;
+  for( std::map< std::string, int64_t >::iterator l_di = l_map_dim_name_to_id.begin(); l_di != l_map_dim_name_to_id.end(); l_di++ ) {
+    l_dim_names.push_back( l_di->first );
+  }
+  std::sort( l_dim_names.begin(),
+             l_dim_names.end(),
+             []( std::string const & a, std::string const & b ) {
+               try {
+                 return std::stoi( a ) < std::stoi( b );
+               } catch( ... ) {
+                 return a < b;
+               }
+             } );
+
+  int64_t l_dim_id = 0;
+  for( std::size_t l_di = 0; l_di < l_dim_names.size(); l_di++ ) {
+    l_map_dim_name_to_id[ l_dim_names[l_di] ] = l_dim_id;
+    l_dim_id++;
+  }
+
+  // map: dimension name -> ascii or utf8 character
+  std::map< std::string, std::string > l_map_dim_name_to_char;
+  for( std::map< std::string, int64_t >::iterator l_di = l_map_dim_name_to_id.begin(); l_di != l_map_dim_name_to_id.end(); l_di++ ) {
+    std::string l_dim_name = l_di->first;
+    l_dim_id = l_di->second;
+
+    if( l_map_dim_name_to_id.size() <= 52 ) {
+      if( l_dim_id < 26 ) {
+        l_map_dim_name_to_char.insert( { l_dim_name, std::string(1, l_dim_id+65) } );
+      }
+      else {
+        l_map_dim_name_to_char.insert( { l_dim_name, std::string(1, l_dim_id+97-26) } );
+      }
+    }
+    else {
+      std::wstring_convert< std::codecvt_utf8<char32_t>, char32_t > l_conv;
+      std::string u8str = l_conv.to_bytes( l_dim_id+161 );
+      l_map_dim_name_to_char.insert( { l_dim_name, u8str } );
+    }
+  }
+
+  // assemble the output expression
+  for( std::size_t l_te = 0; l_te < l_input_tensors.size(); l_te++ ) {
+    std::string l_tensor = l_input_tensors[l_te];
+
+    std::vector< std::string > l_tensor_dim_names;
+    split_string( l_tensor,
+                  std::string(","),
+                  l_tensor_dim_names );
+
+    for( std::size_t l_di = 0; l_di < l_tensor_dim_names.size(); l_di++ ) {
+      o_expr_string += l_map_dim_name_to_char[ l_tensor_dim_names[l_di] ];
+    }
+    if( l_te < l_input_tensors.size() - 1 ) {
+      o_expr_string += ",";
+    }
+  }
+  o_expr_string += "->";
+
+
+  std::vector< std::string > l_output_tensor;
+  split_string( l_tensors[1],
+                std::string(","),
+                l_output_tensor );
+  for( std::size_t l_di = 0; l_di < l_output_tensor.size(); l_di++ ) {
+    o_expr_string += l_map_dim_name_to_char[ l_output_tensor[l_di] ];
+  }
+}
+
 void einsum_ir::frontend::EinsumExpressionAscii::parse_tensors( std::string                const & i_expr_string,
-                                                                std::vector< std::string >       & o_tensors ) {
+                                                                    std::vector< std::string >       & o_tensors ) {
   o_tensors.clear();
 
   std::string l_expr = i_expr_string;
+
+  l_expr.erase( 0, 1 );
+  l_expr.erase( l_expr.size() - 1, 1 );
 
   l_expr.erase( std::remove( l_expr.begin(),
                              l_expr.end(),
@@ -33,11 +199,15 @@ void einsum_ir::frontend::EinsumExpressionAscii::parse_tensors( std::string     
   std::vector< std::string > l_tensors_tmp;
 
   split_string( l_expr,
-                std::string("->"),
+                std::string("]->["),
                 l_tensors_tmp );
 
+  if( l_tensors_tmp.size() == 1 ) {
+    l_tensors_tmp.push_back( "" );
+  }
+
   split_string( l_tensors_tmp[0],
-                std::string(","),
+                std::string("],["),
                 o_tensors );
   o_tensors.push_back( l_tensors_tmp[1] );
 }
@@ -94,24 +264,38 @@ void einsum_ir::frontend::EinsumExpressionAscii::parse_path( std::string        
   }
 }
 
-void einsum_ir::frontend::EinsumExpressionAscii::parse_dim_ids( std::string               const & i_expr_string,
-                                                                std::map< char, int64_t >       & o_map_dim_name_to_id ) {
+void einsum_ir::frontend::EinsumExpressionAscii::parse_dim_ids( std::string                      const & i_expr_string,
+                                                                std::map< std::string, int64_t >       & o_map_dim_name_to_id ) {
   o_map_dim_name_to_id.clear();
 
   std::vector< std::string > l_tensors;
   parse_tensors( i_expr_string, l_tensors );
   int64_t l_num_tensors = l_tensors.size();
 
-  std::set< char > l_dim_names_set;
+  std::set< std::string > l_dim_names_set;
   for( int64_t l_te = 0; l_te < l_num_tensors; l_te++ ) {
     std::string l_tensor = l_tensors[l_te];
 
-    for( std::size_t l_ch = 0; l_ch < l_tensor.size(); l_ch++ ) {
-      l_dim_names_set.insert( l_tensor[l_ch] );
+    std::vector< std::string > l_tensor_dim_names;
+    split_string( l_tensor,
+                  std::string(","),
+                  l_tensor_dim_names );
+
+    for( std::size_t l_di = 0; l_di < l_tensor_dim_names.size(); l_di++ ) {
+      l_dim_names_set.insert( l_tensor_dim_names[l_di] );
     }
   }
-  std::vector< char > l_dim_names( l_dim_names_set.begin(),
-                                   l_dim_names_set.end() );
+  std::vector< std::string > l_dim_names( l_dim_names_set.begin(),
+                                          l_dim_names_set.end() );
+  std::sort( l_dim_names.begin(),
+             l_dim_names.end(),
+             []( std::string const & a, std::string const & b ) {
+               try {
+                 return std::stoi( a ) < std::stoi( b );
+               } catch( ... ) {
+                 return a < b;
+               }
+             } );
 
   for( std::size_t l_di = 0; l_di < l_dim_names.size(); l_di++ ) {
     o_map_dim_name_to_id.insert( { l_dim_names[l_di], l_di } );

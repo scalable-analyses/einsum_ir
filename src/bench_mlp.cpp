@@ -66,7 +66,7 @@ int main( int     i_argc,
   /*
    * performance data structures
    */
-  at::Tensor l_data = at::randn( { 1344, 784 } );
+  at::Tensor l_data = at::randn( { 1152, 784 } );
 
   std::chrono::steady_clock::time_point l_tp0, l_tp1;
   std::chrono::duration< double > l_dur;
@@ -84,10 +84,10 @@ int main( int     i_argc,
   einsum_ir::err_t l_err = einsum_ir::err_t::UNDEFINED_ERROR;
 
   // init einsum ir
-  at::Tensor l_out = at::rand( { 1344, 10 } );
+  at::Tensor l_out = at::rand( { 1152, 10 } );
 
   std::map< int64_t, int64_t > l_dim_sizes;
-  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  0, 21 ) ); // batch 0
+  l_dim_sizes.insert( std::pair< int64_t, int64_t >(  0, 18 ) ); // batch 0
   l_dim_sizes.insert( std::pair< int64_t, int64_t >(  1, 64 ) ); // batch 1
 
   l_dim_sizes.insert( std::pair< int64_t, int64_t >(  2,  8 ) ); // features 00
@@ -341,6 +341,15 @@ int main( int     i_argc,
   std::cout << "  time (eval):    " << l_time_eval    << std::endl;
   std::cout << "  gflops (eval):  " << l_gflops_eval  << std::endl;
   std::cout << "  gflops (total): " << l_gflops_total << std::endl;
+  std::cout << "CSV_DATA: "
+            << "einsum_ir,"
+            << "\"" << l_model_path << "\","
+            << l_num_flops << ","
+            << l_time_compile << ","
+            << l_time_eval << ","
+            << l_gflops_eval << ","
+            << l_gflops_total
+            << std::endl;
 
   /*
    * torchscript model
@@ -372,6 +381,15 @@ int main( int     i_argc,
   std::cout << "  time (eval):    " << l_time_eval    << std::endl;
   std::cout << "  gflops (eval):  " << l_gflops_eval  << std::endl;
   std::cout << "  gflops (total): " << l_gflops_total << std::endl;
+  std::cout << "CSV_DATA: "
+            << "torch::jit::script,"
+            << "\"" << l_model_path << "\","
+            << l_num_flops << ","
+            << l_time_compile << ","
+            << l_time_eval << ","
+            << l_gflops_eval << ","
+            << l_gflops_total
+            << std::endl;
 
   /*
    * compare solutions
