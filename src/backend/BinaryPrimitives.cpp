@@ -1785,17 +1785,17 @@ void einsum_ir::backend::BinaryPrimitives::compileLoopOrder( std::map< int64_t, 
       l_dim_ids_bc.push_back( i_dim_ids_c[l_di] );
     }
   }
-  for( size_t l_di = 0; l_di < i_dim_ids_mb.size(); l_di++ ) {
+  for( size_t l_di = 0; l_di < i_dim_ids_m.size(); l_di++ ) {
     if( std::find( i_dim_ids_mb.begin(), i_dim_ids_mb.end(), i_dim_ids_m[l_di] ) == i_dim_ids_mb.end() ) {
       l_dim_ids_bm.push_back( i_dim_ids_m[l_di] );
     }
   }
-  for( size_t l_di = 0; l_di < i_dim_ids_nb.size(); l_di++ ) {
+  for( size_t l_di = 0; l_di < i_dim_ids_n.size(); l_di++ ) {
     if( std::find( i_dim_ids_nb.begin(), i_dim_ids_nb.end(), i_dim_ids_n[l_di] ) == i_dim_ids_nb.end() ) {
       l_dim_ids_bn.push_back( i_dim_ids_n[l_di] );
     }
   }
-  for( size_t l_di = 0; l_di < i_dim_ids_kb.size(); l_di++ ) {
+  for( size_t l_di = 0; l_di < i_dim_ids_k.size(); l_di++ ) {
     if( std::find( i_dim_ids_kb.begin(), i_dim_ids_kb.end(), i_dim_ids_k[l_di] ) == i_dim_ids_kb.end() ) {
       l_dim_ids_bk.push_back( i_dim_ids_k[l_di] );
     }
