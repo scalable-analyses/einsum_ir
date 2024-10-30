@@ -340,9 +340,9 @@ void einsum_ir::frontend::EinsumExpressionAscii::parse_ctype( std::string const 
     }
 }
 
-void einsum_ir::frontend::EinsumExpressionAscii::parse_loop_order( std::string               const & i_loop_string,
-                                                                   std::map< char, int64_t > const & i_map_dim_name_to_id,
-                                                                   std::vector< int64_t >          & o_loop_order ){
+void einsum_ir::frontend::EinsumExpressionAscii::parse_loop_order( std::string                      const & i_loop_string,
+                                                                   std::map< std::string, int64_t > const & i_map_dim_name_to_id,
+                                                                   std::vector< int64_t >                 & o_loop_order ){
 
   o_loop_order.clear();
 
@@ -360,6 +360,6 @@ void einsum_ir::frontend::EinsumExpressionAscii::parse_loop_order( std::string  
   
   o_loop_order.reserve( l_loop_dims_tmp.size() );
   for( std::size_t l_di = 0; l_di < l_loop_dims_tmp.size(); l_di++ ) {
-    o_loop_order.push_back( i_map_dim_name_to_id.at( l_loop_dims_tmp[l_di][0] ) );
+    o_loop_order.push_back( i_map_dim_name_to_id.at( l_loop_dims_tmp[l_di] ) );
   }
 }

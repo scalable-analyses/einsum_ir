@@ -268,13 +268,13 @@ int main( int     i_argc,
   /*
    * create mapping from dimension name to id
    */
-  std::map< char, int64_t > m_map_dim_name_to_id;
+  std::map< std::string, int64_t > m_map_dim_name_to_id;
   einsum_ir::frontend::EinsumExpressionAscii::parse_dim_ids( l_expression_string,
                                                              m_map_dim_name_to_id );
   
   std::cout << "parsed dimension ids:" << std::endl;
-  for( std::map< char, int64_t >::iterator l_di = m_map_dim_name_to_id.begin(); l_di != m_map_dim_name_to_id.end(); l_di++ ) {
-    char l_dim_name = l_di->first;
+  for( std::map< std::string, int64_t >::iterator l_di = m_map_dim_name_to_id.begin(); l_di != m_map_dim_name_to_id.end(); l_di++ ) {
+    std::string l_dim_name = l_di->first;
     int64_t l_dim_id = l_di->second;
 
     std::cout << "  " << l_dim_name << ": " <<  l_dim_id << std::endl;
@@ -290,8 +290,8 @@ int main( int     i_argc,
 
   std::cout << "parsed dimension sizes:" << std::endl;
   // iterate over keys of map dim name to id
-  for( std::map< char, int64_t >::iterator l_di = m_map_dim_name_to_id.begin(); l_di != m_map_dim_name_to_id.end(); l_di++ ) {
-    char l_dim_name = l_di->first;
+  for( std::map< std::string, int64_t >::iterator l_di = m_map_dim_name_to_id.begin(); l_di != m_map_dim_name_to_id.end(); l_di++ ) {
+    std::string l_dim_name = l_di->first;
     int64_t l_dim_id = l_di->second;
     int64_t l_dim_size = l_dim_sizes_vec[ l_dim_id ];
 
@@ -350,7 +350,7 @@ int main( int     i_argc,
    * convert dim_sizes vector to map
    */
   std::map< int64_t, int64_t > l_dim_sizes_map;
-  for( std::map< char, int64_t >::iterator l_di = m_map_dim_name_to_id.begin(); l_di != m_map_dim_name_to_id.end(); l_di++ ) {
+  for( std::map< std::string, int64_t >::iterator l_di = m_map_dim_name_to_id.begin(); l_di != m_map_dim_name_to_id.end(); l_di++ ) {
     int64_t l_dim_id = l_di->second;
     int64_t l_dim_size = l_dim_sizes_vec[ l_dim_id ];
     l_dim_sizes_map.insert( std::pair< int64_t, int64_t >( l_dim_id, l_dim_size ) );
@@ -363,20 +363,35 @@ int main( int     i_argc,
   std::vector< int64_t> l_dim_ids_in_right;
   std::vector< int64_t> l_dim_ids_out;
 
+  std::vector< std::string > l_tensor_dim_names_left;
+  std::vector< std::string > l_tensor_dim_names_right;
+  std::vector< std::string > l_tensor_dim_names_out;
 
-  std::string l_tensor = l_tensors[0];
-  for( std::size_t l_ch = 0; l_ch < l_tensor.size(); l_ch++ ) {
-    int64_t l_dim_id = m_map_dim_name_to_id[ l_tensor[l_ch] ];
+  einsum_ir::frontend::EinsumExpressionAscii::split_string( l_tensors[0],
+                                                            std::string(","),
+                                                            l_tensor_dim_names_left );
+
+  for( std::size_t l_na = 0; l_na < l_tensor_dim_names_left.size(); l_na++ ) {
+    std::string l_dim_name = l_tensor_dim_names_left[l_na];
+    int64_t l_dim_id = m_map_dim_name_to_id[ l_dim_name ];
     l_dim_ids_in_left.push_back( l_dim_id );
   }
-  l_tensor = l_tensors[1];
-  for( std::size_t l_ch = 0; l_ch < l_tensor.size(); l_ch++ ) {
-    int64_t l_dim_id = m_map_dim_name_to_id[ l_tensor[l_ch] ];
+  einsum_ir::frontend::EinsumExpressionAscii::split_string( l_tensors[1],
+                                                            std::string(","),
+                                                            l_tensor_dim_names_right );
+
+  for( std::size_t l_na = 0; l_na < l_tensor_dim_names_right.size(); l_na++ ) {
+    std::string l_dim_name = l_tensor_dim_names_right[l_na];
+    int64_t l_dim_id = m_map_dim_name_to_id[ l_dim_name ];
     l_dim_ids_in_right.push_back( l_dim_id );
   }
-  l_tensor = l_tensors[2];
-  for( std::size_t l_ch = 0; l_ch < l_tensor.size(); l_ch++ ) {
-    int64_t l_dim_id = m_map_dim_name_to_id[ l_tensor[l_ch] ];
+  einsum_ir::frontend::EinsumExpressionAscii::split_string( l_tensors[2],
+                                                            std::string(","),
+                                                            l_tensor_dim_names_out );
+
+  for( std::size_t l_na = 0; l_na < l_tensor_dim_names_out.size(); l_na++ ) {
+    std::string l_dim_name = l_tensor_dim_names_out[l_na];
+    int64_t l_dim_id = m_map_dim_name_to_id[ l_dim_name ];
     l_dim_ids_out.push_back( l_dim_id );
   }
 
