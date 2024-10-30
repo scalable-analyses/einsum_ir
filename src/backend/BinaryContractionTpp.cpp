@@ -52,57 +52,6 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     return l_err;
   }
 
-  // derive IDs of non-blocked dimensions
-  std::vector< int64_t > l_dim_ids_bc;
-  std::vector< int64_t > l_dim_ids_bm;
-  std::vector< int64_t > l_dim_ids_bn;
-  std::vector< int64_t > l_dim_ids_bk;
-
-  for( int64_t l_di = 0; l_di < m_num_dims_c; l_di++ ) {
-    if( std::find( l_dim_ids_cb.begin(), l_dim_ids_cb.end(), m_dim_ids_c[l_di] ) == l_dim_ids_cb.end() ) {
-      l_dim_ids_bc.push_back( m_dim_ids_c[l_di] );
-    }
-  }
-  for( int64_t l_di = 0; l_di < m_num_dims_m; l_di++ ) {
-    if( std::find( l_dim_ids_mb.begin(), l_dim_ids_mb.end(), m_dim_ids_m[l_di] ) == l_dim_ids_mb.end() ) {
-      l_dim_ids_bm.push_back( m_dim_ids_m[l_di] );
-    }
-  }
-  for( int64_t l_di = 0; l_di < m_num_dims_n; l_di++ ) {
-    if( std::find( l_dim_ids_nb.begin(), l_dim_ids_nb.end(), m_dim_ids_n[l_di] ) == l_dim_ids_nb.end() ) {
-      l_dim_ids_bn.push_back( m_dim_ids_n[l_di] );
-    }
-  }
-  for( int64_t l_di = 0; l_di < m_num_dims_k; l_di++ ) {
-    if( std::find( l_dim_ids_kb.begin(), l_dim_ids_kb.end(), m_dim_ids_k[l_di] ) == l_dim_ids_kb.end() ) {
-      l_dim_ids_bk.push_back( m_dim_ids_k[l_di] );
-    }
-  }
-
-  //determine loop execution order
-  if( m_loop_ids_ext == nullptr ){
-    m_loop_ids_int.clear();
-    m_loop_ids_int.reserve( l_dim_ids_bc.size() + l_dim_ids_bm.size() + l_dim_ids_bn.size() + l_dim_ids_bk.size() );
-    m_loop_ids_int.insert( m_loop_ids_int.end(), l_dim_ids_bc.begin(), l_dim_ids_bc.end() );
-    m_loop_ids_int.insert( m_loop_ids_int.end(), l_dim_ids_bn.begin(), l_dim_ids_bn.end() );
-    m_loop_ids_int.insert( m_loop_ids_int.end(), l_dim_ids_bm.begin(), l_dim_ids_bm.end() );
-    m_loop_ids_int.insert( m_loop_ids_int.end(), l_dim_ids_bk.begin(), l_dim_ids_bk.end() );
-  }
-  else{
-    std::vector< int64_t > l_dim_ids_kernel;
-    l_dim_ids_kernel.reserve( l_dim_ids_cb.size() + l_dim_ids_mb.size() + l_dim_ids_nb.size() + l_dim_ids_kb.size() );
-    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_cb.begin(), l_dim_ids_cb.end() );
-    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_nb.begin(), l_dim_ids_nb.end() );
-    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_mb.begin(), l_dim_ids_mb.end() );
-    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
-    for( std::size_t l_di = 0; l_di < l_dim_ids_kernel.size(); l_di++){
-      auto l_found = std::find( m_loop_ids_int.begin(), m_loop_ids_int.end(), l_dim_ids_kernel[l_di] );
-      if( l_found != m_loop_ids_int.end() ) {
-        m_loop_ids_int.erase(l_found);
-      }
-    }
-  }
-
   // derive strides
   std::map< int64_t, int64_t > l_strides_left;
   std::map< int64_t, int64_t > l_strides_right;
@@ -135,8 +84,38 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   }
 
   std::map < int64_t, int64_t > l_dim_sizes;
-  l_dim_sizes.insert( m_dim_sizes_inner->begin(), m_dim_sizes_inner->end()); 
-  l_bin_prim.compileLoopOrder(l_dim_sizes,l_strides_left,l_strides_right, l_strides_out,l_dim_ids_bc,l_dim_ids_bm,l_dim_ids_bn,l_dim_ids_bk);
+  l_dim_sizes.insert( m_dim_sizes_inner->begin(), m_dim_sizes_inner->end());
+  //determine loop execution order
+  if( m_loop_ids_ext == nullptr ){
+    l_bin_prim.compileLoopOrder(m_dim_types,
+                                l_dim_sizes,
+                                l_strides_left,
+                                l_strides_right,
+                                l_strides_out,
+                                m_dim_ids_c,
+                                m_dim_ids_m,
+                                m_dim_ids_n,
+                                m_dim_ids_k,
+                                l_dim_ids_cb,
+                                l_dim_ids_mb,
+                                l_dim_ids_nb,
+                                l_dim_ids_kb,
+                                m_loop_ids_int);
+  }
+  else{
+    std::vector< int64_t > l_dim_ids_kernel;
+    l_dim_ids_kernel.reserve( l_dim_ids_cb.size() + l_dim_ids_mb.size() + l_dim_ids_nb.size() + l_dim_ids_kb.size() );
+    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_cb.begin(), l_dim_ids_cb.end() );
+    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_nb.begin(), l_dim_ids_nb.end() );
+    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_mb.begin(), l_dim_ids_mb.end() );
+    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
+    for( std::size_t l_di = 0; l_di < l_dim_ids_kernel.size(); l_di++){
+      auto l_found = std::find( m_loop_ids_int.begin(), m_loop_ids_int.end(), l_dim_ids_kernel[l_di] );
+      if( l_found != m_loop_ids_int.end() ) {
+        m_loop_ids_int.erase(l_found);
+      }
+    }
+  }
 
   std::vector< int64_t > l_dim_ids_packed_left;
   std::vector< int64_t > l_dim_ids_packed_right;
@@ -160,7 +139,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
     l_packing = new ContractionPackingTpp;
     l_packing->init( m_num_dims_left,
                     m_num_dims_right,
-                    m_dim_sizes_inner,
+                    &l_dim_sizes,
                     &l_strides_left,
                     &l_strides_right,
                     &m_dim_types,
@@ -209,19 +188,19 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
 
   for( std::size_t l_cb = 0; l_cb < l_dim_ids_cb.size(); l_cb++ ) {
     int64_t l_dim_id = l_dim_ids_cb[l_cb];
-    l_r *= m_dim_sizes_inner->at( l_dim_id );
+    l_r *= l_dim_sizes.at( l_dim_id );
   }
   for( std::size_t l_mb = 0; l_mb < l_dim_ids_mb.size(); l_mb++ ) {
     int64_t l_dim_id = l_dim_ids_mb[l_mb];
-    l_m *= m_dim_sizes_inner->at( l_dim_id );
+    l_m *= l_dim_sizes.at( l_dim_id );
   }
   for( std::size_t l_nb = 0; l_nb < l_dim_ids_nb.size(); l_nb++ ) {
     int64_t l_dim_id = l_dim_ids_nb[l_nb];
-    l_n *= m_dim_sizes_inner->at( l_dim_id );
+    l_n *= l_dim_sizes.at( l_dim_id );
   }
   for( std::size_t l_kb = 0; l_kb < l_dim_ids_kb.size(); l_kb++ ) {
     int64_t l_dim_id = l_dim_ids_kb[l_kb];
-    l_k *= m_dim_sizes_inner->at( l_dim_id );
+    l_k *= l_dim_sizes.at( l_dim_id );
   }
 
   // set leading dimensions
@@ -412,7 +391,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   }
 
   // contraction loop interface
-  m_cont_loops.init( m_dim_sizes_inner,
+  m_cont_loops.init( &l_dim_sizes,
                      &l_strides_left,
                      &l_strides_right,
                      &l_strides_out_aux,

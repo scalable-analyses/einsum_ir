@@ -1753,36 +1753,56 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::reorder( backend_t       
   return l_err;
 }
 
-void einsum_ir::backend::BinaryPrimitives::compileLoopOrder( std::map< int64_t, int64_t > & io_dim_sizes,
+void einsum_ir::backend::BinaryPrimitives::compileLoopOrder( std::map< int64_t, dim_t >   & io_dim_types,
+                                                             std::map< int64_t, int64_t > & io_dim_sizes,
                                                              std::map< int64_t, int64_t > & io_strides_left,
                                                              std::map< int64_t, int64_t > & io_strides_right,
                                                              std::map< int64_t, int64_t > & io_strides_out,
-                                                             //std::map< int64_t, int64_t > & i_strides_out_aux,
-                                                             std::vector< int64_t > & io_dim_ids_bc,
-                                                             std::vector< int64_t > & io_dim_ids_bm,
-                                                             std::vector< int64_t > & io_dim_ids_bn,
-                                                             std::vector< int64_t > & io_dim_ids_bk
-                                                             //std::vector< int64_t > & o_loop_order 
+                                                             std::vector< int64_t > const & i_dim_ids_c,
+                                                             std::vector< int64_t > const & i_dim_ids_m,
+                                                             std::vector< int64_t > const & i_dim_ids_n,
+                                                             std::vector< int64_t > const & i_dim_ids_k,
+                                                             std::vector< int64_t > const & i_dim_ids_cb,
+                                                             std::vector< int64_t > const & i_dim_ids_mb,
+                                                             std::vector< int64_t > const & i_dim_ids_nb,
+                                                             std::vector< int64_t > const & i_dim_ids_kb,
+                                                             std::vector< int64_t >       & o_loop_order 
                                                              ){
-  //copy vectors into new local vectors
+
+  // derive IDs of non-blocked dimensions
   std::vector< int64_t > l_dim_ids_bc;
   std::vector< int64_t > l_dim_ids_bm;
   std::vector< int64_t > l_dim_ids_bn;
   std::vector< int64_t > l_dim_ids_bk;
+    
+  l_dim_ids_bc.reserve( i_dim_ids_c.size() - i_dim_ids_cb.size() );
+  l_dim_ids_bm.reserve( i_dim_ids_m.size() - i_dim_ids_mb.size() );
+  l_dim_ids_bn.reserve( i_dim_ids_n.size() - i_dim_ids_nb.size() );
+  l_dim_ids_bk.reserve( i_dim_ids_k.size() - i_dim_ids_kb.size() );
 
-  l_dim_ids_bc.reserve(io_dim_ids_bc.size());
-  l_dim_ids_bm.reserve(io_dim_ids_bm.size());
-  l_dim_ids_bn.reserve(io_dim_ids_bn.size());
-  l_dim_ids_bk.reserve(io_dim_ids_bk.size());
+  for( size_t l_di = 0; l_di < i_dim_ids_c.size(); l_di++ ) {
+    if( std::find( i_dim_ids_cb.begin(), i_dim_ids_cb.end(), i_dim_ids_c[l_di] ) == i_dim_ids_cb.end() ) {
+      l_dim_ids_bc.push_back( i_dim_ids_c[l_di] );
+    }
+  }
+  for( size_t l_di = 0; l_di < i_dim_ids_mb.size(); l_di++ ) {
+    if( std::find( i_dim_ids_mb.begin(), i_dim_ids_mb.end(), i_dim_ids_m[l_di] ) == i_dim_ids_mb.end() ) {
+      l_dim_ids_bm.push_back( i_dim_ids_m[l_di] );
+    }
+  }
+  for( size_t l_di = 0; l_di < i_dim_ids_nb.size(); l_di++ ) {
+    if( std::find( i_dim_ids_nb.begin(), i_dim_ids_nb.end(), i_dim_ids_n[l_di] ) == i_dim_ids_nb.end() ) {
+      l_dim_ids_bn.push_back( i_dim_ids_n[l_di] );
+    }
+  }
+  for( size_t l_di = 0; l_di < i_dim_ids_kb.size(); l_di++ ) {
+    if( std::find( i_dim_ids_kb.begin(), i_dim_ids_kb.end(), i_dim_ids_k[l_di] ) == i_dim_ids_kb.end() ) {
+      l_dim_ids_bk.push_back( i_dim_ids_k[l_di] );
+    }
+  }
 
-  l_dim_ids_bc.insert( l_dim_ids_bc.end(), io_dim_ids_bc.begin(), io_dim_ids_bc.end());
-  l_dim_ids_bm.insert( l_dim_ids_bm.end(), io_dim_ids_bm.begin(), io_dim_ids_bm.end());
-  l_dim_ids_bn.insert( l_dim_ids_bn.end(), io_dim_ids_bn.begin(), io_dim_ids_bn.end());
-  l_dim_ids_bk.insert( l_dim_ids_bk.end(), io_dim_ids_bk.begin(), io_dim_ids_bk.end());
 
-
-
-  //sort dimension in vectors depending on strides Could use Strides of other tensors for better performance
+  //sort dimension depending on strides
   std::sort(l_dim_ids_bc.begin(), l_dim_ids_bc.end(), [&io_strides_out](int64_t a, int64_t b){ 
                                                         return io_strides_out[a] > io_strides_out[b]; 
                                                       });
@@ -1796,45 +1816,35 @@ void einsum_ir::backend::BinaryPrimitives::compileLoopOrder( std::map< int64_t, 
                                                         return io_strides_right[a] > io_strides_right[b]; 
                                                       });
 
-  //creat loop order
-  std::vector< int64_t > l_loop_order;
-  l_loop_order.reserve( 2 * ( io_dim_ids_bc.size() + io_dim_ids_bm.size() + io_dim_ids_bn.size() + io_dim_ids_bk.size() ));
+  o_loop_order.clear();
 
   //add K dimensions to loop order until target size is reached
   int64_t l_size_inner_k = 1;
   while(l_dim_ids_bk.size() > 0){
     int64_t l_dim_id = l_dim_ids_bk.back();
     int64_t l_dim_size = io_dim_sizes[l_dim_id];
-    l_loop_order.push_back(l_dim_id);
+    o_loop_order.push_back(l_dim_id);
     l_dim_ids_bk.pop_back();
 
     if(l_dim_size * l_size_inner_k < m_size_inner_k_loops){
       l_size_inner_k = l_dim_size;
     }
     else{
-      int64_t l_target = (double) m_size_inner_k_loops / (double) l_size_inner_k;
+      int64_t l_target = (float_t) m_size_inner_k_loops / (float_t) l_size_inner_k;
       int64_t l_new_size = splitDimension(l_dim_size, l_target);
       if(l_new_size != l_dim_size){
         int64_t l_size_other = l_dim_size / l_new_size;
         int64_t l_id_other = m_next_free_id++;
+        int64_t l_stride_left  = io_strides_left[l_dim_id]  * l_new_size;
+        int64_t l_stride_right = io_strides_right[l_dim_id] * l_new_size;
 
         //apply split
-        std::map<int64_t, int64_t>::iterator l_it = io_dim_sizes.find(l_dim_id);
-        if( l_it != io_dim_sizes.end() ){
-          l_it->second = l_new_size;
-        }
-        std::pair< int64_t, int64_t > l_pair( l_id_other, l_size_other );
-        io_dim_sizes.insert(std::pair< int64_t, int64_t >( l_id_other, l_size_other ));
-
-        int64_t l_stride  = io_strides_left[l_dim_id] * l_new_size;
-        io_strides_left.insert(std::pair< int64_t, int64_t >( l_id_other, l_stride ));
-        
-        l_stride = io_strides_right[l_dim_id] * l_new_size;
-        io_strides_right.insert(std::pair< int64_t, int64_t >( l_id_other, l_stride ));
-
+        io_dim_sizes.find(l_dim_id)->second = l_new_size;
+        io_dim_types.insert(     std::pair< int64_t, dim_t   >( l_id_other, einsum_ir::K   ));
+        io_dim_sizes.insert(     std::pair< int64_t, int64_t >( l_id_other, l_size_other   ));
+        io_strides_left.insert(  std::pair< int64_t, int64_t >( l_id_other, l_stride_left  ));
+        io_strides_right.insert( std::pair< int64_t, int64_t >( l_id_other, l_stride_right ));
         l_dim_ids_bk.push_back(l_id_other);
-        io_dim_ids_bk.push_back(l_id_other);
-
         break;
       }
     }
@@ -1842,37 +1852,32 @@ void einsum_ir::backend::BinaryPrimitives::compileLoopOrder( std::map< int64_t, 
   //add M and N dimensions with interleaved pattern
   std::map< int64_t, int64_t > * io_strides_in  = & io_strides_left;
   std::vector< int64_t >       * l_dim_ids_in  = & l_dim_ids_bm;
-  std::vector< int64_t >       * io_dim_ids_in = & io_dim_ids_bm;
+  int64_t m_size_inner_loops = m_size_inner_m_loops;
   bool l_m_dim_next = true;
+
   while( l_dim_ids_bm.size() && l_dim_ids_bn.size() ){
     int64_t l_dim_id = l_dim_ids_in->back();
     int64_t l_dim_size = io_dim_sizes[l_dim_id];
-    l_loop_order.push_back(l_dim_id);
+    o_loop_order.push_back(l_dim_id);
     l_dim_ids_in->pop_back();
     
-    //split dimension if needed
-    if( l_dim_size > m_size_inner_m_loops ){
-      int64_t l_new_size = splitDimension(l_dim_size, m_size_inner_m_loops);
+    //split dimension if required
+    if( l_dim_size > m_size_inner_loops ){
+      int64_t l_new_size = splitDimension(l_dim_size, m_size_inner_loops);
       if( l_new_size != l_dim_size ){
+        dim_t l_dim_type = io_dim_types[l_dim_id];
         int64_t l_size_other = l_dim_size / l_new_size;
         int64_t l_id_other = m_next_free_id++;
+        int64_t l_stride_in  = io_strides_in->at(l_dim_id) * l_new_size;
+        int64_t l_stride_out = io_strides_out[l_dim_id] * l_new_size;
 
         //apply split
-        std::map<int64_t, int64_t>::iterator l_it = io_dim_sizes.find(l_dim_id);
-        if( l_it != io_dim_sizes.end() ){
-          l_it->second = l_new_size;
-        }
-        std::pair< int64_t, int64_t > l_pair( l_id_other, l_size_other );
-        io_dim_sizes.insert(std::pair< int64_t, int64_t >( l_id_other, l_size_other ));
-
-        int64_t l_stride  = io_strides_in->at(l_dim_id) * l_new_size;
-        io_strides_in->insert(std::pair< int64_t, int64_t >( l_id_other, l_stride ));
-        
-        l_stride = io_strides_out[l_dim_id] * l_new_size;
-        io_strides_out.insert(std::pair< int64_t, int64_t >( l_id_other, l_stride ));
-
+        io_dim_sizes.find(l_dim_id)->second = l_new_size;
+        io_dim_types.insert(   std::pair< int64_t, dim_t >( l_id_other, l_dim_type ));
+        io_dim_sizes.insert(   std::pair< int64_t, int64_t >( l_id_other, l_size_other ));
+        io_strides_in->insert( std::pair< int64_t, int64_t >( l_id_other, l_stride_in ));
+        io_strides_out.insert( std::pair< int64_t, int64_t >( l_id_other, l_stride_out ));
         l_dim_ids_in->push_back(l_id_other);
-        io_dim_ids_in->push_back(l_id_other);
       }
     }
 
@@ -1881,49 +1886,39 @@ void einsum_ir::backend::BinaryPrimitives::compileLoopOrder( std::map< int64_t, 
       l_m_dim_next = false;
       io_strides_in = & io_strides_right;
       l_dim_ids_in  = & l_dim_ids_bn;
-      io_dim_ids_in = & io_dim_ids_bn;
+      m_size_inner_loops = m_size_inner_n_loops;
     }
     else{
       l_m_dim_next = true;
       io_strides_in = & io_strides_left;
       l_dim_ids_in  = & l_dim_ids_bm;
-      io_dim_ids_in = & io_dim_ids_bm;
+      m_size_inner_loops = m_size_inner_m_loops;
     }
   }
   
-  //add remaining m dimensions
+  //add remaining m, n, c, k dimensions
   while( l_dim_ids_bm.size() ){
     int64_t l_dim_id = l_dim_ids_bm.back();
-    l_loop_order.push_back(l_dim_id);
+    o_loop_order.push_back(l_dim_id);
     l_dim_ids_bm.pop_back();
   }
-
-  //add remaining n dimensions
   while( l_dim_ids_bn.size() ){
     int64_t l_dim_id = l_dim_ids_bn.back();
-    l_loop_order.push_back(l_dim_id);
+    o_loop_order.push_back(l_dim_id);
     l_dim_ids_bn.pop_back();
   }
-
-  //add remaining c dimensions
   while( l_dim_ids_bc.size() ){
     int64_t l_dim_id = l_dim_ids_bc.back();
-    l_loop_order.push_back(l_dim_id);
+    o_loop_order.push_back(l_dim_id);
     l_dim_ids_bc.pop_back();
   }
-
-  //add remaining k dimensions
   while( l_dim_ids_bk.size() ){
     int64_t l_dim_id = l_dim_ids_bk.back();
-    l_loop_order.push_back(l_dim_id);
+    o_loop_order.push_back(l_dim_id);
     l_dim_ids_bk.pop_back();
   }
-
-  /*
-  for(size_t l_id = 0; l_id < l_loop_order.size(); l_id++){
-      std::cout << l_loop_order[l_id] << std::endl;
-  }
-  */
+  
+  std::reverse(o_loop_order.begin(),o_loop_order.end());
 }
 
 int64_t einsum_ir::backend::BinaryPrimitives::splitDimension( int64_t i_dim_size,
