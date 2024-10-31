@@ -388,7 +388,7 @@ int64_t einsum_ir::frontend::EinsumExpression::num_ops() {
   }
 }
 
-std::string einsum_ir::frontend::EinsumExpression::to_string() const {
+std::string einsum_ir::frontend::EinsumExpression::to_string_render() const {
   if( m_compiled == false ) {
     return "Error: Expression not compiled.";
   }
@@ -501,15 +501,59 @@ std::string einsum_ir::frontend::EinsumExpression::to_string() const {
       l_result << l_nodes_str[l_no];
       l_po++;
     }
-    l_result << std::endl;
+    if( l_lvl < l_num_lvls-1 ) {
+      l_result << std::endl;
+    }
     l_lvl++;
   }
 
   return l_result.str();
 }
 
-std::ostream & einsum_ir::frontend::operator<<( std::ostream                                & io_stream,
-                                                einsum_ir::frontend::EinsumExpression const & i_expr ) {
-  io_stream << i_expr.to_string();
-  return io_stream;
+std::string to_string_exchange_format() {
+  return "";
+}
+
+std::string einsum_ir::frontend::EinsumExpression::to_string_exchange_format( backend::EinsumNode const * i_node ) const {
+  if( m_compiled == false ) {
+    return "Error: Expression not compiled.";
+  }
+
+  std::string l_str = "";
+
+  backend::EinsumNode const * l_node = i_node;
+  if( l_node == nullptr ) {
+    l_node = &m_nodes.back();
+  }
+
+  if(    l_node->m_children.size() == 0
+      && l_node->m_dim_ids_ext != nullptr ) {
+    l_str += "[";
+    for( int64_t l_di = 0; l_di < l_node->m_num_dims; l_di++ ) {
+      l_str += std::to_string( l_node->m_dim_ids_ext[l_di] );
+      if( l_di < l_node->m_num_dims-1 ) {
+        l_str += ",";
+      }
+    }
+    l_str += "]->";
+  }
+
+  if( l_node->m_children.size() == 2 ) {
+    l_str += "[";
+    l_str += to_string_exchange_format( l_node->m_children[0] );
+    l_str += "],[";
+    l_str += to_string_exchange_format( l_node->m_children[1] );
+    l_str += "]->";
+  }
+
+  l_str += "[";
+  for( int64_t l_di = 0; l_di < l_node->m_num_dims; l_di++ ) {
+    l_str += std::to_string( l_node->m_dim_ids_int[l_di] );
+    if( l_di < l_node->m_num_dims-1 ) {
+      l_str += ",";
+    }
+  }
+  l_str += "]";
+
+  return l_str;
 }
