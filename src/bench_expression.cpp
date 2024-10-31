@@ -303,10 +303,12 @@ int main( int     i_argc,
 
   // print einsum tree
   std::string l_tree = "";
-  if( l_print_tree < 3 ) {
+  if(    l_print_tree == 1
+      || l_print_tree == 2 ) {
     l_tree = l_einsum_exp.to_string_exchange_format();
   }
-  else {
+  if(    l_print_tree == 3
+      || l_print_tree == 4 ) {
     l_tree = l_einsum_exp.to_string_render();
   }
   if(    l_print_tree == 1

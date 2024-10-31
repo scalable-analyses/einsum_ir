@@ -526,19 +526,32 @@ std::string einsum_ir::frontend::EinsumExpression::to_string_exchange_format( ba
     l_node = &m_nodes.back();
   }
 
+  bool l_leaf = true;
+
   if(    l_node->m_children.size() == 0
       && l_node->m_dim_ids_ext != nullptr ) {
-    l_str += "[";
+
     for( int64_t l_di = 0; l_di < l_node->m_num_dims; l_di++ ) {
-      l_str += std::to_string( l_node->m_dim_ids_ext[l_di] );
-      if( l_di < l_node->m_num_dims-1 ) {
-        l_str += ",";
+      if( l_node->m_dim_ids_int[l_di] != l_node->m_dim_ids_ext[l_di] ) {
+        l_leaf = false;
+        break;
       }
     }
-    l_str += "]->";
+
+    if( l_leaf == false ) {
+      l_str += "[";
+      for( int64_t l_di = 0; l_di < l_node->m_num_dims; l_di++ ) {
+        l_str += std::to_string( l_node->m_dim_ids_ext[l_di] );
+        if( l_di < l_node->m_num_dims-1 ) {
+          l_str += ",";
+        }
+      }
+      l_str += "]->";
+    }
   }
 
   if( l_node->m_children.size() == 2 ) {
+    l_leaf = false;
     l_str += "[";
     l_str += to_string_exchange_format( l_node->m_children[0] );
     l_str += "],[";
@@ -546,14 +559,18 @@ std::string einsum_ir::frontend::EinsumExpression::to_string_exchange_format( ba
     l_str += "]->";
   }
 
-  l_str += "[";
+  if( l_leaf == false ) {
+    l_str += "[";
+  }
   for( int64_t l_di = 0; l_di < l_node->m_num_dims; l_di++ ) {
     l_str += std::to_string( l_node->m_dim_ids_int[l_di] );
     if( l_di < l_node->m_num_dims-1 ) {
       l_str += ",";
     }
   }
-  l_str += "]";
+  if( l_leaf == false ) {
+    l_str += "]";
+  }
 
   return l_str;
 }
