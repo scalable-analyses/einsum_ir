@@ -1,6 +1,15 @@
 Tensor Layers
 =====================
 
+Blocked Fully Connected Layer
+-----------------------------
+Blocked fully connected layer in https://doi.org/10.1109/IPDPS47924.2020.00032.
+The script ``fc.py`` was used to generate the configs in ``fc.cfg``.
+
+.. code-block:: bash
+
+   python fc.py > fc.cfg
+
 Tensor Ring Nets
 ----------------
 Tensor ring net (TRN) compression of a fully connected layer in https://doi.org/10.1109/CVPR.2018.00972 for the LeNet-300-100 network with R=50.
