@@ -78,7 +78,6 @@ def generate_tvm_expressions_placeholder(arr):
         dim_str = ", ".join(f"dim_{dim.strip()}" for dim in dims)
         input_tensor_names = "_".join(dims)
 
-        # Create the TVM expression using formatted strings
         print(f"  tensor_{input_tensor_names} = tvm.te.placeholder(({dim_str}), name='tensor_{input_tensor_names}', dtype=dtype)")
         resulting_inputs.append(f"tensor_{input_tensor_names}")
     return resulting_inputs
@@ -106,9 +105,7 @@ def find_missing_values(string1, string2_list):
 def generate_tvm_reduce_axis(input_einsum):
     root_string = input_einsum.split('->')[-1]
     input_string = input_einsum[:-len(root_string)-2]
-    # print(root_string)
-    # print(input_string)
-    # split the root string by commas and remove brackets
+
     root_dims = root_string.strip("[]").split(',')
     reduce_axis = find_missing_values(input_string, root_dims)
     for i in reduce_axis:
@@ -158,7 +155,7 @@ def extract_binary_contraction( einsum_str):
     for i in range(comma_location, -1, -1):
         if einsum_str[i] == '[':
             left_location_start = i
-            break  # Schleife
+            break
     left_side = "[" + einsum_str[left_location_start:comma_location].replace('[', '').replace(']', '') + "]"
     
     input_string = left_side + "," + right_side
@@ -224,6 +221,6 @@ def generate_tvm_compute(input_string, input_array):
     for i in tvm_instructions[::-1]:
         print(i)
     print()
-    print( f'  return [ ' +  ", ".join(input_array) + f', {tvm_instructions[0].split()[0] if tvm_instructions[0] else "ups"} ]')
+    print( f'  return [ ' +  ", ".join(input_array) + f', {tvm_instructions[0].split()[0] if tvm_instructions[0] else "error"} ]')
 
 
