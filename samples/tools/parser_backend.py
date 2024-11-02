@@ -224,3 +224,19 @@ def generate_tvm_compute(input_string, input_array):
     print( f'  return [ ' +  ", ".join(input_array) + f', {tvm_instructions[0].split()[0] if tvm_instructions[0] else "error"} ]')
 
 
+def remove_transposiontions(match):
+
+    left_array = match.group(1)
+    right_array = match.group(3)
+    
+    # Sort characters within arrays (removing commas and brackets for comparison)
+    left_sorted = sorted(left_array[1:-1].replace(',', ''))
+    right_sorted = sorted(right_array[1:-1].replace(',', ''))
+    
+    # If both arrays contain the same characters in any order, return only the inner content of the left array
+    if left_sorted == right_sorted:
+        return left_array[1:-1]  # Remove the outer brackets
+    else:
+        return match.group(0)  # Return the original match if they don't match
+
+    return re.sub(pattern, replace_permuted_arrays, text)
