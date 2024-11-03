@@ -1,4 +1,3 @@
-# from parser_num import *
 import re
 
 tvm_instructions = []
@@ -113,7 +112,7 @@ def generate_tvm_reduce_axis(input_einsum):
 
 
 
-def extract_binary_contraction( einsum_str):
+def extract_binary_contraction(einsum_str):
     root_string = einsum_str.split('->')[-1]
     einsum_str = einsum_str[:-len(root_string)-2]
 
@@ -224,7 +223,7 @@ def generate_tvm_compute(input_string, input_array):
     print( f'  return [ ' +  ", ".join(input_array) + f', {tvm_instructions[0].split()[0] if tvm_instructions[0] else "error"} ]')
 
 
-def remove_transposiontions(match):
+def remove_transpositions(match):
 
     left_array = match.group(1)
     right_array = match.group(3)
