@@ -130,7 +130,7 @@ def verify( func,
   # init input tensors
   tensors_in_np = []
   for ts in tensor_sizes[:-1]:
-    tensors_in_np.append( numpy.random.uniform( size=ts ).astype( dtype ) )
+    tensors_in_np.append( numpy.random.normal(size=ts).astype( dtype ) )
 
   # convert to torch tensors
   tensors_in_torch = []
