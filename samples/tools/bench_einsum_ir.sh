@@ -98,7 +98,7 @@ settings["tccg_blocked_reordered"]="tccg/settings_blocked_reordered.cfg"
 settings["tccg_blocked"]="tccg/settings_blocked.cfg"
 settings["fc"]="tensor_layers/fc.cfg"
 
-for key in $(echo "${!settings[@]}" | tr ' ' '\n' | sort)
+for key in $(echo "${!settings[@]}" | tr ' ' '\n')
 do
   settings[${key}]="einsum_ir/samples/${settings[${key}]}"
 done
