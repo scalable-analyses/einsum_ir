@@ -181,7 +181,7 @@ def bench( func,
 
   evaluator = func.time_evaluator( func.entry_name,
                                    dev,
-                                   min_repeat_ms=1000 )
+                                   min_repeat_ms=60000 )
 
   median = numpy.median( evaluator( *tensors_in_tvm, result_tvm ).results * 1000 )
 
