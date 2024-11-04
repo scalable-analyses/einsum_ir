@@ -182,7 +182,7 @@ int main( int     i_argc,
   if( i_argc > 6 ) {
     l_print_tree = std::stoi( i_argv[6] );
   }
-  if( l_print_tree < 0 || l_print_tree > 2 ) {
+  if( l_print_tree < 0 || l_print_tree > 4 ) {
     std::cerr << "error: invalid print_tree argument" << std::endl;
     return EXIT_FAILURE;
   }
@@ -303,13 +303,19 @@ int main( int     i_argc,
 
   // print einsum tree
   std::string l_tree = "";
-  if( l_print_tree != 0 ) {
-    l_tree = l_einsum_exp.to_string();
+  if(    l_print_tree == 1
+      || l_print_tree == 2 ) {
+    l_tree = l_einsum_exp.to_string_exchange_format();
   }
-  if( l_print_tree == 1 ) {
+  if(    l_print_tree == 3
+      || l_print_tree == 4 ) {
+    l_tree = l_einsum_exp.to_string_render();
+  }
+  if(    l_print_tree == 1
+      || l_print_tree == 3 ) {
     std::cout << l_tree;
   }
-  else if( l_print_tree == 2 ) {
+  else {
     // replace dimension ids with names (descending order)
     for( std::map< std::string, int64_t >::reverse_iterator l_di = m_map_dim_name_to_id.rbegin(); l_di != m_map_dim_name_to_id.rend(); l_di++ ) {
       std::string l_dim_name = l_di->first;
@@ -324,6 +330,7 @@ int main( int     i_argc,
     }
     std::cout << l_tree;
   }
+  std::cout << std::endl;
 
   // stage input tensors if requested
   if( l_store_and_lock ) {

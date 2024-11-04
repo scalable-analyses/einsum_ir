@@ -208,11 +208,31 @@ class einsum_ir::frontend::EinsumExpression {
     int64_t num_ops();
 
     /**
-     * Generates a string representation of the compiled einsum expression's tree.
+     * Generates a string representation of the compiled einsum tree.
+     * The string is rendered in a human readable form.
      *
      * @return string representation of the einsum tree.
      **/
-    std::string to_string() const;
+    std::string to_string_render() const;
+
+    /**
+     * Generates a string representation of the compiled einsum tree.
+     * The string is rendered in an machine readable form using the einsum tree exchange format.
+     *
+     * For example, assume the internal einsum tree:
+     *
+     *    0,1,2
+     *   /    \
+     *  0,3  1,2,3
+     *       /   \
+     *     3,2,4   4,2
+     *
+     * Than this string would be returned as:
+     *  [0,3],[[3,2,4],[4,2]->[1,2,3]]->[0,1,2]
+     *
+     * @return string representation of the einsum tree.
+     **/
+    std::string to_string_exchange_format( backend::EinsumNode const * i_node = nullptr ) const;
 };
 
 #endif
