@@ -247,11 +247,28 @@ int main( int     i_argc,
   }
 
   /**
+   * parse expression string
+   **/
+  std::string l_expression_string_arg( i_argv[1] );
+  std::string l_expression_string_std;
+  std::string l_expression_string_schar;
+
+  if( l_expression_string_arg[0] == '[' ) {
+    l_expression_string_std = l_expression_string_arg;
+    einsum_ir::frontend::EinsumExpressionAscii::standard_to_schar( l_expression_string_std,
+                                                                   l_expression_string_schar );
+  }
+  else {
+    l_expression_string_schar = l_expression_string_arg;
+    einsum_ir::frontend::EinsumExpressionAscii::schar_to_standard( l_expression_string_schar,
+                                                                   l_expression_string_std );
+  }
+
+  /**
    * parse input tensors and output tensors
    **/
-  std::string l_expression_string( i_argv[1] );
   std::vector< std::string > l_tensors;
-  einsum_ir::frontend::EinsumExpressionAscii::parse_tensors( l_expression_string,
+  einsum_ir::frontend::EinsumExpressionAscii::parse_tensors( l_expression_string_std,
                                                              l_tensors );
   int64_t l_num_tensors = l_tensors.size();
 
@@ -269,7 +286,7 @@ int main( int     i_argc,
    * create mapping from dimension name to id
    */
   std::map< std::string, int64_t > m_map_dim_name_to_id;
-  einsum_ir::frontend::EinsumExpressionAscii::parse_dim_ids( l_expression_string,
+  einsum_ir::frontend::EinsumExpressionAscii::parse_dim_ids( l_expression_string_std,
                                                              m_map_dim_name_to_id );
   
   std::cout << "parsed dimension ids:" << std::endl;
@@ -402,7 +419,7 @@ int main( int     i_argc,
                 l_loop_order_ptr,
                 l_dtype_at,
                 l_dtype_einsum_ir,
-                l_expression_string);
+                l_expression_string_schar);
 
   std::cout << "finished running bench_binary!" << std::endl;
   return EXIT_SUCCESS;
