@@ -149,12 +149,11 @@ def verify( func,
   result_tvm = tvm.nd.empty( tensor_sizes[-1], dtype=dtype, device=dev )
   func( *tensors_in_tvm, result_tvm )
 
-  # get max diff
-  max_diff = numpy.abs( result_torch.numpy() - result_tvm.asnumpy() )
-  max_diff = max_diff / numpy.abs( result_torch.numpy() )
-  max_diff = numpy.max( max_diff )
+  norm_diff = torch.norm( result_torch - result_tvm.asnumpy() ).item()
+  norm_torch = torch.norm( result_torch ).item()
+  rel_error = norm_diff / norm_torch
 
-  return max_diff
+  return rel_error
 
 def bench( func,
            einsum_str,
@@ -182,7 +181,7 @@ def bench( func,
 
   evaluator = func.time_evaluator( func.entry_name,
                                    dev,
-                                   min_repeat_ms=10000 )
+                                   min_repeat_ms=60000 )
 
   median = numpy.median( evaluator( *tensors_in_tvm, result_tvm ).results * 1000 )
 
@@ -212,11 +211,11 @@ def run_all( einsum_str,
   print("    optimization time:", optimization_time )
 
   print( "  verifying")
-  max_diff = verify( func_opt,
-                     einsum_str,
-                     sizes,
-                     dtype )
-  print( "    max_diff (relative):", max_diff )
+  rel_error = verify( func_opt,
+                      einsum_str,
+                      sizes,
+                      dtype )
+  print( "    error (relative):", rel_error )
 
   print( "  benchmarking")
   num_ops = count_ops( func,
