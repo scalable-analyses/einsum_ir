@@ -181,7 +181,7 @@ def bench( func,
 
   evaluator = func.time_evaluator( func.entry_name,
                                    dev,
-                                   min_repeat_ms=60000 )
+                                   min_repeat_ms=1000 )
 
   median = numpy.median( evaluator( *tensors_in_tvm, result_tvm ).results * 1000 )
 
@@ -232,3 +232,24 @@ def run_all( einsum_str,
   print( "    num_ops: ", num_ops )
   print( "    median:  ", median )
   print( "    gflops:  ", num_ops / (median * 1e9) )
+
+  sizes_str = ",".join( [str(s) for s in sizes] )
+  hardware_params_str = str(hardware_params).replace("\n", ",").rstrip(',')
+  hardware_params_str = "".join( hardware_params_str.split()[1:] )
+  einsum_str = f'"{einsum_str}"'
+  sizes_str = f'"{sizes_str}"'
+  hardware_params_str = f'"{hardware_params_str}"'
+  target_str = f'"{target}"'
+
+  print( "CSV_DATA:" + ",".join([ einsum_str,
+                                  sizes_str,
+                                  str(dtype),
+                                  hardware_params_str,
+                                  str(target_str),
+                                  str(num_measure_trials),
+                                  str(timeout),
+                                  str(optimization_time),
+                                  str(rel_error),
+                                  str(num_ops),
+                                  str(median),
+                                  str(num_ops / (median * 1e9)) ]) )
