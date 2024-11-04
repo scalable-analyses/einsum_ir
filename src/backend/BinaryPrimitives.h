@@ -31,6 +31,15 @@ class einsum_ir::backend::BinaryPrimitives {
     //! maximum size of the blocked K dimension.
     int64_t m_size_kb_max = 0;
 
+    // target size for inner k loops
+    int64_t m_size_inner_k_loops = 32;
+    // target size for m loops
+    int64_t m_size_inner_m_loops = 32;
+    // target size for n loops
+    int64_t m_size_inner_n_loops = 32;
+
+    int64_t m_next_free_id = 100000;
+
     /**
      * Derives the primitive blocking in the following format:
      *  Left tensor:   kb x mb cb
@@ -379,6 +388,54 @@ class einsum_ir::backend::BinaryPrimitives {
                    int64_t                            * io_dim_ids_left,
                    int64_t                            * io_dim_ids_right,
                    int64_t                            * io_dim_ids_out ) const;
+
+
+    /**
+     * Determines a loop execution strategy and split dimensions if necessary
+     * 
+     * @param io_dim_types map of dimension types.
+     * @param io_dim_sizes map of dimension sizes.
+     * @param io_strides_left  map of strides of left input
+     * @param io_strides_right map of strides of right input
+     * @param io_strides_out  map of  strides of output
+     * @param i_dim_ids_c array of dimension IDs with type c. 
+     * @param i_dim_ids_m array of dimension IDs with type m. 
+     * @param i_dim_ids_n array of dimension IDs with type n. 
+     * @param i_dim_ids_k array of dimension IDs with type k. 
+     * @param i_dim_ids_cb array of dimension IDs building the blocked C dimension.
+     * @param i_dim_ids_mb array of dimension IDs building the blocked M dimension.
+     * @param i_dim_ids_nb array of dimension IDs building the blocked N dimension.
+     * @param i_dim_ids_kb array of dimension IDs building the blocked K dimension.
+     * @param o_loop_order heuristic calculated loop execution strategy
+     **/
+    void compileLoopOrder( std::map< int64_t, dim_t >   & io_dim_types,
+                           std::map< int64_t, int64_t > & io_dim_sizes,
+                           std::map< int64_t, int64_t > & io_strides_left,
+                           std::map< int64_t, int64_t > & io_strides_right,
+                           std::map< int64_t, int64_t > & io_strides_out,
+                           std::vector< int64_t > const & i_dim_ids_c,
+                           std::vector< int64_t > const & i_dim_ids_m,
+                           std::vector< int64_t > const & i_dim_ids_n,
+                           std::vector< int64_t > const & i_dim_ids_k,
+                           std::vector< int64_t > const & i_dim_ids_cb,
+                           std::vector< int64_t > const & i_dim_ids_mb,
+                           std::vector< int64_t > const & i_dim_ids_nb,
+                           std::vector< int64_t > const & i_dim_ids_kb,
+                           std::vector< int64_t >       & o_loop_order 
+                          );
+
+    /**
+     * finds a divisor of an integer as close to target target integer
+     * 
+     * @param i_dim_size dimension that is split
+     * @param i_target_size a target integer
+     * 
+     * @return best found divisor
+     **/
+    int64_t splitDimension( int64_t i_dim_size,
+                            int64_t i_target_size
+                          );
+
 };
 
 #endif

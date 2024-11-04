@@ -72,6 +72,9 @@ class einsum_ir::backend::EinsumNode {
     //! true if dimension reordering is enabled
     bool m_reorder_dims = false;
 
+    //! true if packing is enabled
+    bool m_pack_inputs = false;
+
     //! backend types
     backend_t m_btype_unary  = backend_t::UNDEFINED_BACKEND;
     backend_t m_btype_binary = backend_t::UNDEFINED_BACKEND;
@@ -130,6 +133,7 @@ class einsum_ir::backend::EinsumNode {
      * @param i_dim_sizes_outer dimension id to outer size mapping. optional: use nullptr if not needed.
      * @param i_dtype datatype of the tensor.
      * @param i_data_ptr data pointer of the tensor.
+     * @param i_memory memory manager for efficient memory usage.
      **/
     void init( int64_t                              i_num_dims,
                int64_t                      const * i_dim_ids,
@@ -149,6 +153,7 @@ class einsum_ir::backend::EinsumNode {
      * @param i_dtype datatype of the node's tensor.
      * @param i_data_ptr data pointer of the tensor.
      * @param i_child child of the node.
+     * @param i_memory memory manager for efficient memory usage.
      **/
     void init( int64_t                              i_num_dims,
                int64_t                      const * i_dim_ids,
@@ -176,6 +181,7 @@ class einsum_ir::backend::EinsumNode {
      * @param i_ktype_last_touch type of the last touch kernel.
      * @param i_left left child.
      * @param i_right right child. 
+     * @param i_memory memory manager for efficient memory usage.
      **/
     void init( int64_t                              i_num_dims,
                int64_t                      const * i_dim_ids,
@@ -255,6 +261,13 @@ class einsum_ir::backend::EinsumNode {
      * compiles the effective memory usage depending on the execution order 
      **/
     void compile_memory_usage();
+
+    /**
+     * Determine if a permutation of Data is required for evalutation
+     * 
+     * @return true if the EinsumNode requires permutation of Data.
+     **/
+    bool requires_permutation();
 };
 
 #endif

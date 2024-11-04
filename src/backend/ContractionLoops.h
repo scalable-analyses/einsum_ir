@@ -3,8 +3,10 @@
 
 #include <cstdint>
 #include <vector>
+#include <map>
 #include "../constants.h"
 #include "IterationSpaces.h"
+#include "ContractionPackingTpp.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -14,51 +16,26 @@ namespace einsum_ir {
 
 class einsum_ir::backend::ContractionLoops {
   private:
-    //! number of C dimensions
-    int64_t m_num_dims_c = 0;
-    //! number of M dimensions
-    int64_t m_num_dims_m = 0;
-    //! number of N dimensions
-    int64_t m_num_dims_n = 0;
-    //! number of K dimensions
-    int64_t m_num_dims_k = 0;
+    //! vector of loop execution order
+    std::vector<int64_t> * m_loop_ids = nullptr;
 
-    //! sizes of the C dimensions
-    int64_t const * m_sizes_c = nullptr;
-    //! sizes of the M dimensions
-    int64_t const * m_sizes_m = nullptr;
-    //! sizes of the N dimensions
-    int64_t const * m_sizes_n = nullptr;
-    //! sizes of the K dimensions
-    int64_t const * m_sizes_k = nullptr;
+    //! mapping from dimension id to type
+    std::map< int64_t, dim_t > const * m_dim_type = nullptr;
 
-    //! C strides of the left input tensor
-    int64_t const * m_strides_in_left_c = nullptr;
-    //! M strides of the left input tensor
-    int64_t const * m_strides_in_left_m = nullptr;
-    //! K strides of the left input tensor
-    int64_t const * m_strides_in_left_k = nullptr;
+    //! sizes of dimensions
+    std::map< int64_t, int64_t > const * m_sizes = nullptr;
 
-    //! C strides of the right input tensor
-    int64_t const * m_strides_in_right_c = nullptr;
-    //! N strides of the right input tensor
-    int64_t const * m_strides_in_right_n = nullptr;
-    //! K strides of the right input tensor
-    int64_t const * m_strides_in_right_k = nullptr;
+    //! strides of the left input tensor
+    std::map< int64_t, int64_t > const * m_strides_left = nullptr;
 
-    //! C strides of the auxiliary output tensor
-    int64_t const * m_strides_out_aux_c = nullptr;
-    //! M strides of the auxiliary output tensor
-    int64_t const * m_strides_out_aux_m = nullptr;
-    //! N strides of the auxiliary output tensor
-    int64_t const * m_strides_out_aux_n = nullptr;
+    //! strides of the right input tensor
+    std::map< int64_t, int64_t > const * m_strides_right = nullptr;
 
-    //! C strides of the output tensor
-    int64_t const * m_strides_out_c = nullptr;
-    //! M strides of the output tensor
-    int64_t const * m_strides_out_m = nullptr;
-    //! N strides of the output tensor
-    int64_t const * m_strides_out_n = nullptr;
+    //! strides of the auxiliary output tensor
+    std::map< int64_t, int64_t > const * m_strides_out_aux = nullptr;
+
+    //! strides of the output tensor
+    std::map< int64_t, int64_t > const * m_strides_out = nullptr;
 
     //! number of bytes for a scalar of the left input tensor
     int64_t m_num_bytes_scalar_left = 0;
@@ -73,8 +50,23 @@ class einsum_ir::backend::ContractionLoops {
     //! number of tasks
     int64_t m_num_tasks = 0;
 
+    //! id of first parallel loop
+    int64_t m_id_first_parallel = 0;
+
     //! iteration spaces
     IterationSpaces m_iter_spaces;
+
+    //! id of packing loop for left input
+    int64_t m_id_loop_packing_left = 0;
+
+    //! id of packing loop for right input
+    int64_t m_id_loop_packing_right = 0;
+
+    //! id of first/last touch loop
+    int64_t m_id_loop_first_last_touch = 0;
+
+    //! packing kernel for contraction
+    ContractionPackingTpp * m_packing;
 
     //! true if the threading loops have to take care of fist/last touch ops
     bool m_threading_first_last_touch = false;
@@ -92,8 +84,6 @@ class einsum_ir::backend::ContractionLoops {
 
     //! number of loops
     int64_t m_num_loops = -1;
-    //! first/last touch type of the loops
-    std::vector< touch_t > m_loop_first_last_touch;
     //! dimension types of the loops (C, M, N or K)
     std::vector< dim_t >   m_loop_dim_type;
     //! sizes of the loops / number of iterations
@@ -169,59 +159,35 @@ class einsum_ir::backend::ContractionLoops {
      *   N: dimensions appear in right input and output.
      *   K: reduction dimensions which appear in both inputs,
      *
-     * @param i_num_dims_c number of C dimensions.
-     * @param i_num_dims_m number of M dimensions.
-     * @param i_num_dims_n number of N dimensions.
-     * @param i_num_dims_k number of K dimensions.
-     * @param i_sizes_c sizes of the C dimensions.
-     * @param i_sizes_m sizes of the M dimensions.
-     * @param i_sizes_n sizes of the N dimensions.
-     * @param i_sizes_k sizes of the K dimensions.
-     * @param i_strides_in_left_c C strides of the left input tensor.
-     * @param i_strides_in_left_m M strides of the left input tensor.
-     * @param i_strides_in_left_k K strides of the left input tensor.
-     * @param i_strides_in_right_c C strides of the right input tensor.
-     * @param i_strides_in_right_n N strides of the right input tensor.
-     * @param i_strides_in_right_k K strides of the right input tensor.
-     * @param i_strides_out_aux_c C strides of the auxiliary output tensor.
-     * @param i_strides_out_aux_m M strides of the auxiliary output tensor.
-     * @param i_strides_out_aux_n N strides of the auxiliary output tensor.
-     * @param i_strides_out_c C strides of the output tensor.
-     * @param i_strides_out_m M strides of the output tensor.
-     * @param i_strides_out_n N strides of the output tensor.
+     * @param i_sizes sizes of the dimensions
+     * @param i_strides_left strides of the left input tensor.
+     * @param i_strides_right strides of the right input tensor.
+     * @param i_strides_out_aux strides of the auxiliary output tensor.
+     * @param i_strides_out strides of the output tensor.
+     * @param i_dim_type types of the dimensions
+     * @param i_loop_ids the loop execution strategy
      * @param i_num_bytes_scalar_left number of bytes per scalar in the left tensor.
      * @param i_num_bytes_scalar_right number of bytes per scalar in the right tensor.
      * @param i_num_bytes_scalar_out number of bytes per scalar in the output tensor.
      * @param i_ktype_first_touch type of the first touch kernel.
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
+     * @param i_packing packing kernel for contraction
      **/
-    void init( int64_t         i_num_dims_c,
-               int64_t         i_num_dims_m,
-               int64_t         i_num_dims_n,
-               int64_t         i_num_dims_k,
-               int64_t const * i_sizes_c,
-               int64_t const * i_sizes_m,
-               int64_t const * i_sizes_n,
-               int64_t const * i_sizes_k,
-               int64_t const * i_strides_in_left_c,
-               int64_t const * i_strides_in_left_m,
-               int64_t const * i_strides_in_left_k,
-               int64_t const * i_strides_in_right_c,
-               int64_t const * i_strides_in_right_n,
-               int64_t const * i_strides_in_right_k,
-               int64_t const * i_strides_out_aux_c,
-               int64_t const * i_strides_out_aux_m,
-               int64_t const * i_strides_out_aux_n,
-               int64_t const * i_strides_out_c,
-               int64_t const * i_strides_out_m,
-               int64_t const * i_strides_out_n,
-               int64_t         i_num_bytes_scalar_left,
-               int64_t         i_num_bytes_scalar_right,
-               int64_t         i_num_bytes_scalar_out,
-               kernel_t        i_ktype_first_touch,
-               kernel_t        i_ktype_main,
-               kernel_t        i_ktype_last_touch );
+void init( std::map< int64_t, int64_t > const * i_sizes,
+           std::map< int64_t, int64_t > const * i_strides_left,
+           std::map< int64_t, int64_t > const * i_strides_right,
+           std::map< int64_t, int64_t > const * i_strides_out_aux,
+           std::map< int64_t, int64_t > const * i_strides_out,
+           std::map< int64_t, dim_t >   const * i_dim_type,
+           std::vector<int64_t>               * i_loop_ids,
+           int64_t                              i_num_bytes_scalar_left,
+           int64_t                              i_num_bytes_scalar_right,
+           int64_t                              i_num_bytes_scalar_out,
+           kernel_t                             i_ktype_first_touch,
+           kernel_t                             i_ktype_main,
+           kernel_t                             i_ktype_last_touch,
+           ContractionPackingTpp              * i_packing );
 
     /**
      * Compiles the contraction loop interface.
@@ -249,13 +215,38 @@ class einsum_ir::backend::ContractionLoops {
      * @param i_ptr_right pointer to the right tensor's data.
      * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
      * @param i_ptr_out pointer to the output tensor's data.
+     * @param i_first_access true if first time accessing this data
+     * @param i_last_access true if last time accessing this data
      **/
     void contract_iter( int64_t         i_id_task,
                         int64_t         i_id_loop,
                         void    const * i_ptr_left,
                         void    const * i_ptr_right,
                         void    const * i_ptr_out_aux,
-                        void          * i_ptr_out );
+                        void          * i_ptr_out,
+                        bool            i_first_access,
+                        bool            i_last_access );
+
+    /**
+     * General purpose loop implementation featuring first and last touch operations.
+     * Applies threading for inner loops
+     *
+     * @param i_id_task task id which is executing the loop.
+     * @param i_id_loop dimension id of the loop which is executed.
+     * @param i_ptr_left pointer to the left tensor's data.
+     * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
+     * @param i_ptr_out pointer to the output tensor's data.
+     * @param i_first_access true if first time accessing this data
+     * @param i_last_access true if last time accessing this data
+     **/
+    void contract_iter_non_parallel( int64_t         i_id_loop,
+                                     void    const * i_ptr_left,
+                                     void    const * i_ptr_right,
+                                     void    const * i_ptr_out_aux,
+                                     void          * i_ptr_out,
+                                     bool            i_first_access,
+                                     bool            i_last_access );
 
     /**
      * Contracts the two tensors.
@@ -269,6 +260,28 @@ class einsum_ir::backend::ContractionLoops {
                    void const * i_tensor_right,
                    void const * i_tensor_out_aux,
                    void       * io_tensor_out );
+
+
+    /**
+     * Helper function for map find with default value
+     *
+     * @param i_map map.
+     * @param i_key key.
+     * @param i_default default value.
+     *
+     * @param return value or default value.
+     **/
+    template <typename T>
+    T map_find_default( std::map< int64_t, T > const * i_map,
+                        int64_t                        i_key,
+                        T                              i_default){
+      if(auto search = i_map->find(i_key); search != i_map->end() ) {
+        return search->second;
+      }
+      else {
+        return i_default;
+      }
+    }
 };
 
 #endif

@@ -2,6 +2,7 @@
 #include "BinaryContraction.h"
 
 #include <algorithm>
+#include <math.h>
 
 void einsum_ir::backend::BinaryPrimitives::init( int64_t i_size_cb_min,
                                                  int64_t i_size_cb_max,
@@ -1750,4 +1751,194 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::reorder( backend_t       
                    io_dim_ids_out );
 
   return l_err;
+}
+
+void einsum_ir::backend::BinaryPrimitives::compileLoopOrder( std::map< int64_t, dim_t >   & io_dim_types,
+                                                             std::map< int64_t, int64_t > & io_dim_sizes,
+                                                             std::map< int64_t, int64_t > & io_strides_left,
+                                                             std::map< int64_t, int64_t > & io_strides_right,
+                                                             std::map< int64_t, int64_t > & io_strides_out,
+                                                             std::vector< int64_t > const & i_dim_ids_c,
+                                                             std::vector< int64_t > const & i_dim_ids_m,
+                                                             std::vector< int64_t > const & i_dim_ids_n,
+                                                             std::vector< int64_t > const & i_dim_ids_k,
+                                                             std::vector< int64_t > const & i_dim_ids_cb,
+                                                             std::vector< int64_t > const & i_dim_ids_mb,
+                                                             std::vector< int64_t > const & i_dim_ids_nb,
+                                                             std::vector< int64_t > const & i_dim_ids_kb,
+                                                             std::vector< int64_t >       & o_loop_order 
+                                                             ){
+
+  // derive IDs of non-blocked dimensions
+  std::vector< int64_t > l_dim_ids_bc;
+  std::vector< int64_t > l_dim_ids_bm;
+  std::vector< int64_t > l_dim_ids_bn;
+  std::vector< int64_t > l_dim_ids_bk;
+    
+  l_dim_ids_bc.reserve( i_dim_ids_c.size() - i_dim_ids_cb.size() );
+  l_dim_ids_bm.reserve( i_dim_ids_m.size() - i_dim_ids_mb.size() );
+  l_dim_ids_bn.reserve( i_dim_ids_n.size() - i_dim_ids_nb.size() );
+  l_dim_ids_bk.reserve( i_dim_ids_k.size() - i_dim_ids_kb.size() );
+
+  for( size_t l_di = 0; l_di < i_dim_ids_c.size(); l_di++ ) {
+    if( std::find( i_dim_ids_cb.begin(), i_dim_ids_cb.end(), i_dim_ids_c[l_di] ) == i_dim_ids_cb.end() ) {
+      l_dim_ids_bc.push_back( i_dim_ids_c[l_di] );
+    }
+  }
+  for( size_t l_di = 0; l_di < i_dim_ids_m.size(); l_di++ ) {
+    if( std::find( i_dim_ids_mb.begin(), i_dim_ids_mb.end(), i_dim_ids_m[l_di] ) == i_dim_ids_mb.end() ) {
+      l_dim_ids_bm.push_back( i_dim_ids_m[l_di] );
+    }
+  }
+  for( size_t l_di = 0; l_di < i_dim_ids_n.size(); l_di++ ) {
+    if( std::find( i_dim_ids_nb.begin(), i_dim_ids_nb.end(), i_dim_ids_n[l_di] ) == i_dim_ids_nb.end() ) {
+      l_dim_ids_bn.push_back( i_dim_ids_n[l_di] );
+    }
+  }
+  for( size_t l_di = 0; l_di < i_dim_ids_k.size(); l_di++ ) {
+    if( std::find( i_dim_ids_kb.begin(), i_dim_ids_kb.end(), i_dim_ids_k[l_di] ) == i_dim_ids_kb.end() ) {
+      l_dim_ids_bk.push_back( i_dim_ids_k[l_di] );
+    }
+  }
+
+
+  //sort dimension depending on strides
+  std::sort(l_dim_ids_bc.begin(), l_dim_ids_bc.end(), [&io_strides_out](int64_t a, int64_t b){ 
+                                                        return io_strides_out[a] > io_strides_out[b]; 
+                                                      });
+  std::sort(l_dim_ids_bm.begin(), l_dim_ids_bm.end(), [&io_strides_out](int64_t a, int64_t b){ 
+                                                        return io_strides_out[a] > io_strides_out[b]; 
+                                                      });
+  std::sort(l_dim_ids_bn.begin(), l_dim_ids_bn.end(), [&io_strides_out](int64_t a, int64_t b){ 
+                                                        return io_strides_out[a] > io_strides_out[b]; 
+                                                      });
+  std::sort(l_dim_ids_bk.begin(), l_dim_ids_bk.end(), [&io_strides_right](int64_t a, int64_t b){ 
+                                                        return io_strides_right[a] > io_strides_right[b]; 
+                                                      });
+
+  o_loop_order.clear();
+
+  //add K dimensions to loop order until target size is reached
+  int64_t l_size_inner_k = 1;
+  while(l_dim_ids_bk.size() > 0){
+    int64_t l_dim_id = l_dim_ids_bk.back();
+    int64_t l_dim_size = io_dim_sizes[l_dim_id];
+    o_loop_order.push_back(l_dim_id);
+    l_dim_ids_bk.pop_back();
+
+    if(l_dim_size * l_size_inner_k < m_size_inner_k_loops){
+      l_size_inner_k = l_dim_size;
+    }
+    else{
+      int64_t l_target = (float_t) m_size_inner_k_loops / (float_t) l_size_inner_k;
+      int64_t l_new_size = splitDimension(l_dim_size, l_target);
+      if(l_new_size != l_dim_size){
+        int64_t l_size_other = l_dim_size / l_new_size;
+        int64_t l_id_other = m_next_free_id++;
+        int64_t l_stride_left  = io_strides_left[l_dim_id]  * l_new_size;
+        int64_t l_stride_right = io_strides_right[l_dim_id] * l_new_size;
+
+        //apply split
+        io_dim_sizes.find(l_dim_id)->second = l_new_size;
+        io_dim_types.insert(     std::pair< int64_t, dim_t   >( l_id_other, einsum_ir::K   ));
+        io_dim_sizes.insert(     std::pair< int64_t, int64_t >( l_id_other, l_size_other   ));
+        io_strides_left.insert(  std::pair< int64_t, int64_t >( l_id_other, l_stride_left  ));
+        io_strides_right.insert( std::pair< int64_t, int64_t >( l_id_other, l_stride_right ));
+        l_dim_ids_bk.push_back(l_id_other);
+        break;
+      }
+    }
+  }
+  //add M and N dimensions with interleaved pattern
+  std::map< int64_t, int64_t > * io_strides_in  = & io_strides_left;
+  std::vector< int64_t >       * l_dim_ids_in  = & l_dim_ids_bm;
+  int64_t m_size_inner_loops = m_size_inner_m_loops;
+  bool l_m_dim_next = true;
+
+  while( l_dim_ids_bm.size() && l_dim_ids_bn.size() ){
+    int64_t l_dim_id = l_dim_ids_in->back();
+    int64_t l_dim_size = io_dim_sizes[l_dim_id];
+    o_loop_order.push_back(l_dim_id);
+    l_dim_ids_in->pop_back();
+    
+    //split dimension if required
+    if( l_dim_size > m_size_inner_loops ){
+      int64_t l_new_size = splitDimension(l_dim_size, m_size_inner_loops);
+      if( l_new_size != l_dim_size ){
+        dim_t l_dim_type = io_dim_types[l_dim_id];
+        int64_t l_size_other = l_dim_size / l_new_size;
+        int64_t l_id_other = m_next_free_id++;
+        int64_t l_stride_in  = io_strides_in->at(l_dim_id) * l_new_size;
+        int64_t l_stride_out = io_strides_out[l_dim_id] * l_new_size;
+
+        //apply split
+        io_dim_sizes.find(l_dim_id)->second = l_new_size;
+        io_dim_types.insert(   std::pair< int64_t, dim_t >( l_id_other, l_dim_type ));
+        io_dim_sizes.insert(   std::pair< int64_t, int64_t >( l_id_other, l_size_other ));
+        io_strides_in->insert( std::pair< int64_t, int64_t >( l_id_other, l_stride_in ));
+        io_strides_out.insert( std::pair< int64_t, int64_t >( l_id_other, l_stride_out ));
+        l_dim_ids_in->push_back(l_id_other);
+      }
+    }
+
+    //swap m and n
+    if(l_m_dim_next){
+      l_m_dim_next = false;
+      io_strides_in = & io_strides_right;
+      l_dim_ids_in  = & l_dim_ids_bn;
+      m_size_inner_loops = m_size_inner_n_loops;
+    }
+    else{
+      l_m_dim_next = true;
+      io_strides_in = & io_strides_left;
+      l_dim_ids_in  = & l_dim_ids_bm;
+      m_size_inner_loops = m_size_inner_m_loops;
+    }
+  }
+  
+  //add remaining m, n, c, k dimensions
+  while( l_dim_ids_bm.size() ){
+    int64_t l_dim_id = l_dim_ids_bm.back();
+    o_loop_order.push_back(l_dim_id);
+    l_dim_ids_bm.pop_back();
+  }
+  while( l_dim_ids_bn.size() ){
+    int64_t l_dim_id = l_dim_ids_bn.back();
+    o_loop_order.push_back(l_dim_id);
+    l_dim_ids_bn.pop_back();
+  }
+  while( l_dim_ids_bc.size() ){
+    int64_t l_dim_id = l_dim_ids_bc.back();
+    o_loop_order.push_back(l_dim_id);
+    l_dim_ids_bc.pop_back();
+  }
+  while( l_dim_ids_bk.size() ){
+    int64_t l_dim_id = l_dim_ids_bk.back();
+    o_loop_order.push_back(l_dim_id);
+    l_dim_ids_bk.pop_back();
+  }
+  
+  std::reverse(o_loop_order.begin(),o_loop_order.end());
+}
+
+int64_t einsum_ir::backend::BinaryPrimitives::splitDimension( int64_t i_dim_size,
+                                                              int64_t i_target_size
+                                                            ){
+  //factorization of number
+  int64_t l_best_factor = i_dim_size;
+  double l_best_distance = abs(log((double)i_dim_size/i_target_size));
+
+  int64_t l_max_factor = 128;
+  l_max_factor = i_dim_size / 2 < l_max_factor ? i_dim_size / 2 : l_max_factor;
+  for(int64_t l_i = 2; l_i <= l_max_factor; l_i++){
+    if(i_dim_size % l_i == 0){
+      double l_distance_i = abs(log((double)l_i/i_target_size));
+      if(l_best_distance > l_distance_i){
+        l_best_factor = l_i;
+        l_best_distance = l_distance_i;
+      }
+    }
+  }
+  
+  return l_best_factor;
 }

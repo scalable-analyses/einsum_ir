@@ -1,6 +1,9 @@
 #include "catch.hpp"
 #include "ContractionLoopsSimple.h"
+#include "../constants.h"
 #include <cmath>
+#include <map>
+#include <vector>
 
 /**
  * Generic matrix multiplication C += AB.
@@ -138,26 +141,24 @@ void transpose( int64_t         i_num_dims,
 }
 
 TEST_CASE( "K dimension of the contraction loops.", "[contraction_loops_k]" ) {
+  int64_t l_id_k = 0;
+
+  std::vector<int64_t> l_loop_ids  = { l_id_k };
+
   // per-dimension sizes
-  int64_t l_sizes_c[1] = { 1 }; 
-  int64_t l_sizes_m[1] = { 1 };
-  int64_t l_sizes_n[1] = { 1 };
-  int64_t l_sizes_k[1] = { 5 };
+  std::map< int64_t, int64_t > l_dim_sizes{ { l_id_k, 5 } };
+
+  // mapping from id to dimension type
+  std::map< int64_t, einsum_ir::dim_t > l_dim_types{ { l_id_k, einsum_ir::K } };
 
   // strides of the left input tensor
-  int64_t l_strides_in_left_c[1] = { 1 };
-  int64_t l_strides_in_left_m[1] = { 0 };
-  int64_t l_strides_in_left_k[1] = { 1 };
+  std::map< int64_t, int64_t > l_strides_in_left{ { l_id_k, 1 } };
 
   // strides of the right input tensor
-  int64_t l_strides_in_right_c[1] = { 1 };
-  int64_t l_strides_in_right_n[1] = { 1 };
-  int64_t l_strides_in_right_k[1] = { 1 };
+  std::map< int64_t, int64_t > l_strides_in_right{ { l_id_k, 1 } };
 
   // strides of the output tensor
-  int64_t l_strides_out_c[1] = { 1 };
-  int64_t l_strides_out_m[1] = { 1 };
-  int64_t l_strides_out_n[1] = { 1 };
+  std::map< int64_t, int64_t > l_strides_out{ };
 
   // input tensors
   float l_a[5] = { 1, 2, 3, 4,  5 };
@@ -166,29 +167,15 @@ TEST_CASE( "K dimension of the contraction loops.", "[contraction_loops_k]" ) {
 
   // reference solution
   float l_ref = 1*6 + 2*7 + 3*8 + 4*9 + 5*10;
-
   // binary contraction loops
   einsum_ir::backend::ContractionLoopsSimple l_cont_loops;
-  l_cont_loops.init( 1,
-                     1,
-                     1,
-                     1,
-                     l_sizes_c,
-                     l_sizes_m,
-                     l_sizes_n,
-                     l_sizes_k,
-                     l_strides_in_left_c,
-                     l_strides_in_left_m,
-                     l_strides_in_left_k,
-                     l_strides_in_right_c,
-                     l_strides_in_right_n,
-                     l_strides_in_right_k,
-                     l_strides_out_c,
-                     l_strides_out_m,
-                     l_strides_out_n,
-                     l_strides_out_c,
-                     l_strides_out_m,
-                     l_strides_out_n,
+  l_cont_loops.init( &l_dim_sizes,
+                     &l_strides_in_left,
+                     &l_strides_in_right,
+                     &l_strides_out,
+                     &l_strides_out,
+                     &l_dim_types,
+                     &l_loop_ids,
                      4,
                      4,
                      4,
@@ -253,27 +240,34 @@ TEST_CASE( "Matmul with first and last touch.", "[contraction_loops]" ) {
   //    m    0      5
   //    n    1      7
   //    k    2      8
-  int64_t l_num_dims_c = 1;
-  int64_t l_num_dims_m = 1;
-  int64_t l_num_dims_n = 1;
-  int64_t l_num_dims_k = 1;
+  int64_t l_id_m = 0;
+  int64_t l_id_n = 1;
+  int64_t l_id_k = 2;
 
-  int64_t l_sizes_c[1] = { 1 }; 
-  int64_t l_sizes_m[1] = { 5 };
-  int64_t l_sizes_n[1] = { 7 };
-  int64_t l_sizes_k[1] = { 8 };
+  std::vector<int64_t> l_loop_ids  = { l_id_n, l_id_m, l_id_k };
 
-  int64_t l_strides_left_c[1] = { 1 };
-  int64_t l_strides_left_m[1] = { 1 };
-  int64_t l_strides_left_k[1] = { 5 };
+  // per-dimension sizes
+  std::map< int64_t, int64_t > l_dim_sizes{ { l_id_m, 5 },
+                                            { l_id_n, 7 },
+                                            { l_id_k, 8 } };
 
-  int64_t l_strides_right_c[1] = { 1 };
-  int64_t l_strides_right_n[1] = { 8 };
-  int64_t l_strides_right_k[1] = { 1 };
+  // mapping from id to dimension type
+  std::map< int64_t, einsum_ir::dim_t > l_dim_types{ { l_id_m, einsum_ir::M },
+                                                     { l_id_n, einsum_ir::N },
+                                                     { l_id_k, einsum_ir::K } };
 
-  int64_t l_strides_out_c[1] = { 1 };
-  int64_t l_strides_out_m[1] = { 1 };
-  int64_t l_strides_out_n[1] = { 5 };
+
+  // strides of the left input tensor
+  std::map< int64_t, int64_t > l_strides_in_left{ { l_id_m, 1 },
+                                                  { l_id_k, 5 } };
+
+  // strides of the right input tensor
+  std::map< int64_t, int64_t > l_strides_in_right{ { l_id_n, 8 },
+                                                   { l_id_k, 1 } };
+
+  // strides of the output tensor
+  std::map< int64_t, int64_t > l_strides_out{ { l_id_m, 1 },
+                                              { l_id_n, 5 } };
 
   constexpr int64_t l_m = 5;
   constexpr int64_t l_n = 7;
@@ -307,26 +301,13 @@ TEST_CASE( "Matmul with first and last touch.", "[contraction_loops]" ) {
   }
 
   einsum_ir::backend::ContractionLoopsSimple l_cont_loops;
-  l_cont_loops.init( l_num_dims_c,
-                     l_num_dims_m,
-                     l_num_dims_n,
-                     l_num_dims_k,
-                     l_sizes_c,
-                     l_sizes_m,
-                     l_sizes_n,
-                     l_sizes_k,
-                     l_strides_left_c,
-                     l_strides_left_m,
-                     l_strides_left_k,
-                     l_strides_right_c,
-                     l_strides_right_n,
-                     l_strides_right_k,
-                     l_strides_out_c,
-                     l_strides_out_m,
-                     l_strides_out_n,
-                     l_strides_out_c,
-                     l_strides_out_m,
-                     l_strides_out_n,
+  l_cont_loops.init( &l_dim_sizes,
+                     &l_strides_in_left,
+                     &l_strides_in_right,
+                     &l_strides_out,
+                     &l_strides_out,
+                     &l_dim_types,
+                     &l_loop_ids,
                      4,
                      4,
                      4,
@@ -379,37 +360,61 @@ TEST_CASE( "Nested loops used in binary contractions using a scalar kernel.", "[
   //     g: 6 (m2)
   //     f: 5 (n0)
   //     h: 4 (n1)
-  int64_t l_num_dims_c = 1;
-  int64_t l_num_dims_m = 3;
-  int64_t l_num_dims_n = 2;
-  int64_t l_num_dims_k = 2;
 
-  int64_t l_sizes_c[1] = { 1 }; 
-  int64_t l_sizes_m[3] = { 6, 8, 3 };
-  int64_t l_sizes_n[2] = { 4, 5 };
-  int64_t l_sizes_k[2] = { 7, 2 };
+  int64_t l_id_i = 0;
+  int64_t l_id_e = 1;
+  int64_t l_id_g = 2;
+  int64_t l_id_f = 3;
+  int64_t l_id_h = 4;
+  int64_t l_id_a = 5;
+  int64_t l_id_c = 6;
+
+  std::vector<int64_t> l_loop_ids  = { l_id_h, l_id_f , l_id_g, l_id_e, l_id_i, l_id_c, l_id_a };
+
+  // per-dimension sizes
+  std::map< int64_t, int64_t > l_dim_sizes{ { l_id_i, 3 },
+                                            { l_id_e, 8 },
+                                            { l_id_a, 2 },
+                                            { l_id_c, 7 },
+                                            { l_id_g, 6 },
+                                            { l_id_f, 5 },
+                                            { l_id_h, 4 } };
+
+  // mapping from id to dimension type
+  std::map< int64_t, einsum_ir::dim_t > l_dim_types{ { l_id_i, einsum_ir::M },
+                                                     { l_id_e, einsum_ir::M },
+                                                     { l_id_g, einsum_ir::M },
+                                                     { l_id_f, einsum_ir::N },
+                                                     { l_id_h, einsum_ir::N },
+                                                     { l_id_a, einsum_ir::K },
+                                                     { l_id_c, einsum_ir::K } };
 
 
   // in left:
   //   sizes:         6 (g), 7 (c), 2 (a), 8 (e), 3 (i)
   //   strides: 2016,   336,    48,    24,     3,     1
-  int64_t l_strides_in_left_c[1] = { 1 };
-  int64_t l_strides_in_left_m[3] = { 336, 3, 1 };
-  int64_t l_strides_in_left_k[2] = { 48, 24 };
+  std::map< int64_t, int64_t > l_strides_in_left{ { l_id_g, 336 },
+                                                  { l_id_c, 48  },
+                                                  { l_id_a, 24  },
+                                                  { l_id_e, 3   },
+                                                  { l_id_i, 1   } };
 
   // in right:
   //   sizes:        4 (h), 7 (c), 5 (f), 2 (a)
   //   strides: 280,    70,    10,     2,     1
-  int64_t l_strides_in_right_c[1] = { 1 };
-  int64_t l_strides_in_right_n[2] = { 70, 2 };
-  int64_t l_strides_in_right_k[2] = { 10, 1 };
+  std::map< int64_t, int64_t > l_strides_in_right{ { l_id_h, 70 },
+                                                   { l_id_c, 10 },
+                                                   { l_id_f, 2  },
+                                                   { l_id_a, 1  } };
 
   // out:
   //   sizes:           4 (h), 6 (g), 5 (f), 8 (e), 3 (i)
   //   strides:   2880,   720,   120,    24,     3,     1
-  int64_t l_strides_out_c[1] = { 1 };
-  int64_t l_strides_out_m[3] = { 120, 3, 1 };
-  int64_t l_strides_out_n[2] = { 720, 24 };
+  std::map< int64_t, int64_t > l_strides_out{ { l_id_h, 720 },
+                                              { l_id_g, 120 },
+                                              { l_id_f, 24  },
+                                              { l_id_e, 3   },
+                                              { l_id_i, 1   } };
 
   // column-major matrix representation of the tensors
   constexpr int64_t l_m = 3*8*6;
@@ -515,26 +520,13 @@ TEST_CASE( "Nested loops used in binary contractions using a scalar kernel.", "[
              l_c_ten );
 
   einsum_ir::backend::ContractionLoopsSimple l_cont_loops;
-  l_cont_loops.init( l_num_dims_c,
-                     l_num_dims_m,
-                     l_num_dims_n,
-                     l_num_dims_k,
-                     l_sizes_c,
-                     l_sizes_m,
-                     l_sizes_n,
-                     l_sizes_k,
-                     l_strides_in_left_c,
-                     l_strides_in_left_m,
-                     l_strides_in_left_k,
-                     l_strides_in_right_c,
-                     l_strides_in_right_n,
-                     l_strides_in_right_k,
-                     l_strides_out_c,
-                     l_strides_out_m,
-                     l_strides_out_n,
-                     l_strides_out_c,
-                     l_strides_out_m,
-                     l_strides_out_n,
+  l_cont_loops.init( &l_dim_sizes,
+                     &l_strides_in_left,
+                     &l_strides_in_right,
+                     &l_strides_out,
+                     &l_strides_out,
+                     &l_dim_types,
+                     &l_loop_ids,
                      4,
                      4,
                      4,
@@ -597,36 +589,73 @@ TEST_CASE( "Nested loops used in binary contractions using a matrix kernel.", "[
   //     m: gei
   //     n: hf
   //     k: ca
-  int64_t l_num_dims_c = 2;
-  int64_t l_num_dims_m = 3;
-  int64_t l_num_dims_n = 2;
-  int64_t l_num_dims_k = 2;
 
-  int64_t l_sizes_c[2] = { 4, 3 }; 
-  int64_t l_sizes_m[3] = { 6, 8, 3 };
-  int64_t l_sizes_n[2] = { 4, 5 };
-  int64_t l_sizes_k[2] = { 7, 2 };
+
+  int64_t l_id_i = 0;
+  int64_t l_id_e = 1;
+  int64_t l_id_a = 2;
+  int64_t l_id_c = 3;
+  int64_t l_id_g = 4;
+  int64_t l_id_f = 5;
+  int64_t l_id_h = 6;
+  int64_t l_id_x = 7;
+  int64_t l_id_y = 8;
+
+  std::vector<int64_t> l_loop_ids  = { l_id_y, l_id_x, l_id_h, l_id_g, l_id_c };
+
+  // mapping from id to dimension size
+  std::map< int64_t, int64_t > l_dim_sizes{ { l_id_i, 3 },
+                                            { l_id_e, 8 },
+                                            { l_id_a, 2 },
+                                            { l_id_c, 7 },
+                                            { l_id_g, 6 },
+                                            { l_id_f, 5 },
+                                            { l_id_h, 4 },
+                                            { l_id_x, 3 },
+                                            { l_id_y, 4 } };
+
+  // mapping from id to dimension type
+  std::map< int64_t, einsum_ir::dim_t > l_dim_types{ { l_id_i, einsum_ir::M },
+                                                     { l_id_e, einsum_ir::M },
+                                                     { l_id_g, einsum_ir::M },
+                                                     { l_id_f, einsum_ir::N },
+                                                     { l_id_h, einsum_ir::N },
+                                                     { l_id_a, einsum_ir::K },
+                                                     { l_id_c, einsum_ir::K },
+                                                     { l_id_x, einsum_ir::C },
+                                                     { l_id_y, einsum_ir::C } };
 
   // in left:
   //   sizes:       4 (y), 6 (g), 7 (c), 3 (x), 2 (a), 8 (e), 3 (i)
   //   strides:      6048,  1008,   144,    48,    24,    3,     1
-  int64_t l_strides_in_left_c[2] = { 6048, 48 };
-  int64_t l_strides_in_left_m[3] = { 1008, 3, 1 };
-  int64_t l_strides_in_left_k[2] = { 144, 24 };
+  std::map< int64_t, int64_t > l_strides_in_left{ { l_id_y, 6048 },
+                                                  { l_id_g, 1008 },
+                                                  { l_id_c, 144  },
+                                                  { l_id_x, 48   },
+                                                  { l_id_a, 24   },
+                                                  { l_id_e, 3    },
+                                                  { l_id_i, 1    } };
 
   // in right:
   //   sizes:       4 (y), 4 (h), 7 (c), 3 (x), 5 (f), 2 (a)
   //   strides:       840,   210,    30,    10,     2,     1
-  int64_t l_strides_in_right_c[2] = { 840, 10 };
-  int64_t l_strides_in_right_n[2] = { 210, 2 };
-  int64_t l_strides_in_right_k[2] = { 30, 1 };
+  std::map< int64_t, int64_t > l_strides_in_right{ { l_id_y, 840 },
+                                                   { l_id_h, 210 },
+                                                   { l_id_c, 30  },
+                                                   { l_id_x, 10  },
+                                                   { l_id_f, 2   },
+                                                   { l_id_a, 1   } };
 
   // out:
   //   sizes:        4 (y), 4 (h), 6 (g), 5 (f), 3 (x), 8 (e), 3 (i)
   //   strides:       8640,  2160,   360,    72,    24,     3,     1
-  int64_t l_strides_out_c[2] = { 8640, 24 };
-  int64_t l_strides_out_m[3] = { 360, 3, 1 };
-  int64_t l_strides_out_n[2] = { 2160, 72 };
+  std::map< int64_t, int64_t > l_strides_out{ { l_id_y, 8640 },
+                                              { l_id_h, 2160 },
+                                              { l_id_g, 360  },
+                                              { l_id_f, 72   },
+                                              { l_id_x, 24   },
+                                              { l_id_e, 3    },
+                                              { l_id_i, 1    } };
 
   // column-major matrix representation of the tensors
   constexpr int64_t l_c = 3*4;
@@ -731,26 +760,13 @@ TEST_CASE( "Nested loops used in binary contractions using a matrix kernel.", "[
              l_c_ten );
 
   einsum_ir::backend::ContractionLoopsSimple l_cont_loops;
-  l_cont_loops.init( l_num_dims_c,
-                     l_num_dims_m-2,
-                     l_num_dims_n-1,
-                     l_num_dims_k-1,
-                     l_sizes_c,
-                     l_sizes_m,
-                     l_sizes_n,
-                     l_sizes_k,
-                     l_strides_in_left_c,
-                     l_strides_in_left_m,
-                     l_strides_in_left_k,
-                     l_strides_in_right_c,
-                     l_strides_in_right_n,
-                     l_strides_in_right_k,
-                     l_strides_out_c,
-                     l_strides_out_m,
-                     l_strides_out_n,
-                     l_strides_out_c,
-                     l_strides_out_m,
-                     l_strides_out_n,
+  l_cont_loops.init( &l_dim_sizes,
+                     &l_strides_in_left,
+                     &l_strides_in_right,
+                     &l_strides_out,
+                     &l_strides_out,
+                     &l_dim_types,
+                     &l_loop_ids,
                      4,
                      4,
                      4,

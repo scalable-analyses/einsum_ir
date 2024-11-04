@@ -114,30 +114,28 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
     }
   }
 
-  // derive sizes of non-blocked dimensions
-  m_sizes_bc.clear();
-  m_sizes_bm.clear();
-  m_sizes_bn.clear();
-  m_sizes_bk.clear();
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bc.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bc[l_di];
-    m_sizes_bc.push_back( m_dim_sizes_inner->at( l_dim_id ) );
+  //determine loop execution order
+  if( m_loop_ids_ext == nullptr ){
+    m_loop_ids_int.clear();
+    m_loop_ids_int.reserve( l_dim_ids_bc.size() + l_dim_ids_bm.size() + l_dim_ids_bn.size() + l_dim_ids_bk.size() );
+    m_loop_ids_int.insert( m_loop_ids_int.end(), l_dim_ids_bc.begin(), l_dim_ids_bc.end() );
+    m_loop_ids_int.insert( m_loop_ids_int.end(), l_dim_ids_bn.begin(), l_dim_ids_bn.end() );
+    m_loop_ids_int.insert( m_loop_ids_int.end(), l_dim_ids_bm.begin(), l_dim_ids_bm.end() );
+    m_loop_ids_int.insert( m_loop_ids_int.end(), l_dim_ids_bk.begin(), l_dim_ids_bk.end() );
   }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bm.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bm[l_di];
-    m_sizes_bm.push_back( m_dim_sizes_inner->at( l_dim_id ) );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bn.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bn[l_di];
-    m_sizes_bn.push_back( m_dim_sizes_inner->at( l_dim_id ) );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bk.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bk[l_di];
-    m_sizes_bk.push_back( m_dim_sizes_inner->at( l_dim_id ) );
+  else{
+    std::vector< int64_t > l_dim_ids_kernel;
+    l_dim_ids_kernel.reserve( l_dim_ids_cb.size() + l_dim_ids_mb.size() + l_dim_ids_nb.size() + l_dim_ids_kb.size() );
+    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_cb.begin(), l_dim_ids_cb.end() );
+    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_nb.begin(), l_dim_ids_nb.end() );
+    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_mb.begin(), l_dim_ids_mb.end() );
+    l_dim_ids_kernel.insert( l_dim_ids_kernel.end(), l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
+    for( std::size_t l_di = 0; l_di < l_dim_ids_kernel.size(); l_di++){
+      auto l_found = std::find( m_loop_ids_int.begin(), m_loop_ids_int.end(), l_dim_ids_kernel[l_di] );
+      if( l_found != m_loop_ids_int.end() ) {
+        m_loop_ids_int.erase(l_found);
+      }
+    }
   }
 
   // derive strides
@@ -159,32 +157,6 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
            m_dim_ids_out,
            m_dim_sizes_inner,
            &l_strides_out );
-
-  // derive strides of non-blocked dimensions
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bc.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bc[l_di];
-    m_strides_left_bc.push_back(  l_strides_left[  l_dim_id ] );
-    m_strides_right_bc.push_back( l_strides_right[ l_dim_id ] );
-    m_strides_out_bc.push_back(   l_strides_out[   l_dim_id ] );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bm.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bm[l_di];
-    m_strides_left_bm.push_back(  l_strides_left[ l_dim_id ] );
-    m_strides_out_bm.push_back(   l_strides_out[  l_dim_id ] );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bn.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bn[l_di];
-    m_strides_right_bn.push_back( l_strides_right[ l_dim_id ] );
-    m_strides_out_bn.push_back(   l_strides_out[   l_dim_id ] );
-  }
-
-  for( std::size_t l_di = 0; l_di < l_dim_ids_bk.size(); l_di++ ) {
-    int64_t l_dim_id = l_dim_ids_bk[l_di];
-    m_strides_left_bk.push_back(  l_strides_left[  l_dim_id ] );
-    m_strides_right_bk.push_back( l_strides_right[ l_dim_id ] );
-  }
 
   // check that no I or J dimensions are present
   if( m_num_dims_i > 0 || m_num_dims_j > 0 ) {
@@ -241,26 +213,13 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
   }
 
   // init contraction loops
-  m_cont_loops.init( l_dim_ids_bc.size(),
-                     l_dim_ids_bm.size(),
-                     l_dim_ids_bn.size(),
-                     l_dim_ids_bk.size(),
-                     m_sizes_bc.data(),
-                     m_sizes_bm.data(),
-                     m_sizes_bn.data(),
-                     m_sizes_bk.data(),
-                     m_strides_left_bc.data(),
-                     m_strides_left_bm.data(),
-                     m_strides_left_bk.data(),
-                     m_strides_right_bc.data(),
-                     m_strides_right_bn.data(),
-                     m_strides_right_bk.data(),
-                     m_strides_out_bc.data(),
-                     m_strides_out_bm.data(),
-                     m_strides_out_bn.data(),
-                     m_strides_out_bc.data(),
-                     m_strides_out_bm.data(),
-                     m_strides_out_bn.data(),
+  m_cont_loops.init( m_dim_sizes_inner,
+                     &l_strides_left,
+                     &l_strides_right,
+                     &l_strides_out,
+                     &l_strides_out,
+                     &m_dim_types,
+                     &m_loop_ids_int,
                      m_dtype_comp,
                      false,
                      false,

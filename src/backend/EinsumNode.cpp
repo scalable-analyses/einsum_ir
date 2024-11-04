@@ -90,6 +90,21 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
     }
   }
 
+  m_pack_inputs = false;
+  char * l_pack_inputs = std::getenv( "EINSUM_IR_PACK_INPUTS" );
+  if( l_pack_inputs != nullptr ) {
+    if( strcmp( l_pack_inputs, "1" ) == 0 ) {
+      m_pack_inputs = true;
+    }
+    else if( strcmp( l_pack_inputs, "true" ) == 0 ) {
+      m_pack_inputs = true;
+    }
+    else {
+      m_pack_inputs = false;
+    }
+  }
+
+
   m_unary               = nullptr;
   m_cont                = nullptr;
 
@@ -225,6 +240,8 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
     }
 
     // reorder dimensions of input tensors for the primitives
+    std::vector<int64_t> l_packing_left;
+    std::vector<int64_t> l_packing_right;
     if( m_reorder_dims ) {
       BinaryPrimitives l_bin_prims;
       l_bin_prims.init( m_dtype,
@@ -241,6 +258,22 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
       if( l_err != einsum_ir::SUCCESS ) {
         return l_err;
       }
+
+      //packing is only supported for TPP
+      if( m_btype_binary == backend_t::TPP && m_pack_inputs ){
+        if( m_children[0]->requires_permutation() ){
+          l_packing_left = m_children[0]->m_dim_ids_int;
+          std::copy(  m_children[0]->m_dim_ids_ext,
+                      m_children[0]->m_dim_ids_ext + m_children[0]->m_num_dims,
+                      m_children[0]->m_dim_ids_int.begin() );
+        }
+        if( m_children[1]->requires_permutation() ){
+          l_packing_right = m_children[1]->m_dim_ids_int;
+          std::copy(  m_children[1]->m_dim_ids_ext,
+                      m_children[1]->m_dim_ids_ext + m_children[1]->m_num_dims,
+                      m_children[1]->m_dim_ids_int.begin() );
+        }
+      }
     }
 
     m_cont = BinaryContractionFactory::create( m_btype_binary );
@@ -252,9 +285,13 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
                   m_children[1]->m_dim_sizes_outer,
                   m_dim_sizes_aux_outer,
                   m_dim_sizes_outer,
+                  nullptr,
                   m_children[0]->m_dim_ids_int.data(),
                   m_children[1]->m_dim_ids_int.data(),
                   m_dim_ids_int.data(),
+                  l_packing_left.data(),
+                  l_packing_right.data(),
+                  m_memory,
                   m_children[0]->m_dtype,
                   m_children[1]->m_dtype,
                   m_dtype,
@@ -266,18 +303,6 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
     l_err = m_cont->compile();
     if( l_err != einsum_ir::SUCCESS ) {
       return l_err;
-    }
-  }
-
-  // check if a permutation of the inputs is required
-  bool l_permute_inputs = false;
-  if(    m_dim_ids_ext != m_dim_ids_int.data()
-      && m_data_ptr_ext != nullptr ) {
-    for( int64_t l_di = 0; l_di < m_num_dims; l_di++ ) {
-      if( m_dim_ids_ext[l_di] != m_dim_ids_int.data()[l_di] ) {
-        l_permute_inputs = true;
-        break;
-      }
     }
   }
 
@@ -346,7 +371,7 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
   }
 
   // set required memory
-  if( m_data_ptr_ext == nullptr || l_permute_inputs ) {
+  if( m_data_ptr_ext == nullptr || requires_permutation() ) {
     m_req_mem = m_size;
   }
   else{
@@ -540,4 +565,19 @@ void einsum_ir::backend::EinsumNode::compile_memory_usage(){
     m_children[l_ch]->cancel_memory_reservation();
   }
 
+}
+
+bool einsum_ir::backend::EinsumNode::requires_permutation(){
+  bool l_permute_inputs = false;
+  if(    m_dim_ids_ext != m_dim_ids_int.data()
+      && m_data_ptr_ext != nullptr ) {
+    for( int64_t l_di = 0; l_di < m_num_dims; l_di++ ) {
+      if( m_dim_ids_ext[l_di] != m_dim_ids_int.data()[l_di] ) {
+        l_permute_inputs = true;
+        break;
+      }
+    }
+  }
+
+  return l_permute_inputs;
 }
