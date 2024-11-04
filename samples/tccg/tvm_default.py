@@ -1,6 +1,6 @@
 import tvm.te
 import tvm.auto_scheduler
-import os
+import tvm_helper
 
 # default 1. "efbad,cf->abcde" "48,36,24,36,48,36" "(0,1)"
 @tvm.auto_scheduler.register_workload
@@ -345,337 +345,49 @@ def einsum_aebf_dfce_abcd( A, B, C, D, E, F, dtype ):
   return [AEBF, DFCE, abcd]
 
 if __name__=="__main__":
-  # parse command line arguments
-  import argparse
-  parser = argparse.ArgumentParser()
-  parser.add_argument( "--target", type=str,
-                      choices=["zen4", "grace"],
-                      help="target architecture: zen4 or grace" )
-  parser.add_argument( "--dtype", type=str,
-                        default="float32",
-                        help="data type: float32 or float64" )
-  parser.add_argument( "--num_measure_trials", type=int,
-                        default=1000,
-                        help="number of measurement trials" )
-  parser.add_argument( "--timeout", type=int,
-                        default=60,
-                        help="timeout in seconds" )
-  parser.add_argument( "--num_generated_code_execs", type=int,
-                        default=10,
-                        help="number of times to run the generated code for taking average. " )
-  args = parser.parse_args()
+    args = tvm_helper.parse_args()
+    target = tvm.target.Target(tvm_helper.cpu_to_llvm(args.cpu))
+    hardware_params = tvm.auto_scheduler.HardwareParams(target=target)
 
-  # target architecture
-  if args.target == "zen4":
-    target = tvm.target.Target("llvm -mcpu=znver4")
-  elif args.target == "grace":
-    target = tvm.target.Target("llvm -device=arm_cpu -mtriple=aarch64-linux-gnu -mcpu=neoverse-v2")
-  else:
-    # show help message
-    parser.print_help()
-    exit()
+    # Define benchmarks
+    benchmarks = [
+        ("efbad,cf->abcde", einsum_efbad_cf_abcde, (48, 36, 24, 36, 48, 36)),
+        ("efcad,bf->abcde", einsum_efcad_bf_abcde, (48, 24, 36, 36, 48, 36)),
+        ("dbea,ec->abcd", einsum_dbea_ec_abcd, (96, 84, 24, 96, 96)),
+        ("ecbfa,fd->abcde", einsum_ecbfa_fd_abcde, (48, 36, 36, 24, 48, 48)),
+        ("deca,be->abcd", einsum_deca_be_abcd, (96, 24, 84, 96, 84)),
+        ("bda,dc->abc", einsum_bda_dc_abc, (384, 384, 24, 384)),
+        ("ebad,ce->abcd", einsum_ebad_ce_abcd, (96, 84, 24, 84, 96)),
+        ("dega,gfbc->abcdef", einsum_dega_gfbc_abcdef, (24, 20, 20, 24, 20, 20, 24)),
+        ("dfgb,geac->abcdef", einsum_dfgb_geac_abcdef, (24, 20, 20, 24, 20, 20, 24)),
+        ("degb,gfac->abcdef", einsum_degb_gfac_abcdef, (24, 20, 20, 24, 20, 20, 24)),
+        ("degc,gfab->abcdef", einsum_degc_gfab_abcdef, (24, 20, 20, 24, 20, 20, 24)),
+        ("dca,bd->abc", einsum_dca_bd_abc, (384, 24, 376, 384)),
+        ("ea,ebcd->abcd", einsum_ea_ebcd_abcd, (96, 84, 84, 84, 96)),
+        ("eb,aecd->abcd", einsum_eb_aecd_abcd, (96, 84, 84, 84, 96)),
+        ("ec,abed->abcd", einsum_ec_abed_abcd, (96, 84, 84, 84, 96)),
+        ("adec,ebd->abc", einsum_adec_ebd_abc, (96, 84, 84, 84, 96)),
+        ("cad,dcb->ab", einsum_cad_dcb_ab, (384, 376, 384, 384)),
+        ("acd,dbc->ab", einsum_acd_dbc_ab, (384, 376, 376, 384)),
+        ("acd,db->abc", einsum_acd_db_abc, (384, 376, 376, 384)),
+        ("adc,bd->abc", einsum_adc_bd_abc, (384, 384, 376, 376)),
+        ("ac,cb->ab", einsum_ac_cb_ab, (7248, 7240, 7248)),
+        ("aebf,fdec->abcd", einsum_aebf_fdec_abcd, (96, 84, 84, 84, 84, 96)),
+        ("eafd,fbec->abcd", einsum_eafd_fbec_abcd, (96, 84, 84, 84, 96, 96)),
+        ("aebf,dfce->abcd", einsum_aebf_dfce_abcd, (96, 84, 84, 96, 84, 84))
+    ]
 
-  runner = tvm.auto_scheduler.LocalRunner( timeout = args.timeout,
-                                           number  = args.num_generated_code_execs )
-  tune_option = tvm.auto_scheduler.TuningOptions(
-    num_measure_trials = args.num_measure_trials,
-    verbose = 2,
-    runner = runner
-  )
-
-  print( "*** running bechmarks ***" )
-  print( "parameters:" )
-  print( "  target:", target )
-  print( "  dtype:", args.dtype )
-  print( "  num_measure_trials:", args.num_measure_trials )
-  print( "  timeout:", args.timeout )
-  print( "  num_generated_code_execs:", args.num_generated_code_execs )
-
-  # 1. default efbad,cf->abcde
-  print( "************************************" )
-  print( "*** benchmark 1: efbad,cf->abcde ***" )
-  print( "************************************" )
-  func = einsum_efbad_cf_abcde
-  sizes = (48, 36, 24, 36, 48, 36)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-
-  # 2. default efcad,bf->abcde
-  print( "************************************" )
-  print( "*** benchmark 2: efcad,bf->abcde ***" )
-  print( "************************************" )
-  func = einsum_efcad_bf_abcde
-  sizes = (48, 24, 36, 36, 48, 36)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 3. default dbea,ec->abcd
-  print( "***********************************" )
-  print( "*** benchmark 3: dbea,ec->abcd ***" )
-  print( "***********************************" )
-  func = einsum_dbea_ec_abcd
-  sizes = (96, 84, 24, 96, 96)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 4. default ecbfa,fd->abcde
-  print( "************************************" )
-  print( "*** benchmark 4: ecbfa,fd->abcde ***" )
-  print( "************************************" )
-  func = einsum_ecbfa_fd_abcde
-  sizes = (48, 36, 36, 24, 48, 48)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 5. default deca,be->abcd
-  print( "***********************************" )
-  print( "*** benchmark 5: deca,be->abcd ***" )
-  print( "***********************************" )
-  func = einsum_deca_be_abcd
-  sizes = (96, 24, 84, 96, 84)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 6. default bda,dc->abc
-  print( "********************************" )
-  print( "*** benchmark 6: bda,dc->abc ***" )
-  print( "********************************" )
-  func = einsum_bda_dc_abc
-  sizes = (384, 384, 24, 384)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 7. default ebad,ce->abcd
-  print( "**********************************" )
-  print( "*** benchmark 7: ebad,ce->abcd ***" )
-  print( "**********************************" )
-  func = einsum_ebad_ce_abcd
-  sizes = (96, 84, 24, 84, 96)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 8. default dega,gfbc->abcdef
-  print( "**************************************" )
-  print( "*** benchmark 8: dega,gfbc->abcdef ***" )
-  print( "**************************************" )
-  func = einsum_dega_gfbc_abcdef
-  sizes = (24, 20, 20, 24, 20, 20, 24)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 9. default dfgb,geac->abcdef
-  print( "**************************************" )
-  print( "*** benchmark 9: dfgb,geac->abcdef ***" )
-  print( "**************************************" )
-  func = einsum_dfgb_geac_abcdef
-  sizes = (24, 20, 20, 24, 20, 20, 24)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 10. default degb,gfac->abcdef
-  print( "***************************************" )
-  print( "*** benchmark 10: degb,gfac->abcdef ***" )
-  print( "***************************************" )
-  func = einsum_degb_gfac_abcdef
-  sizes = (24, 20, 20, 24, 20, 20, 24)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 11. default degc,gfab->abcdef
-  print( "***************************************" )
-  print( "*** benchmark 11: degc,gfab->abcdef ***" )
-  print( "***************************************" )
-  func = einsum_degc_gfab_abcdef
-  sizes = (24, 20, 20, 24, 20, 20, 24)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 12. default dca,bd->abc
-  print( "*********************************" )
-  print( "*** benchmark 12: dca,bd->abc ***" )
-  print( "*********************************" )
-  func = einsum_dca_bd_abc
-  sizes = (384, 24, 376, 384)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 13. default ea,ebcd->abcd
-  print( "***********************************" )
-  print( "*** benchmark 13: ea,ebcd->abcd ***" )
-  print( "***********************************" )
-  func = einsum_ea_ebcd_abcd
-  sizes = (96, 84, 84, 84, 96)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 14. default eb,aecd->abcd
-  print( "***********************************" )
-  print( "*** benchmark 14: eb,aecd->abcd ***" )
-  print( "***********************************" )
-  func = einsum_eb_aecd_abcd
-  sizes = (96, 84, 84, 84, 96)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 15. default ec,abed->abcd
-  print( "***********************************" )
-  print( "*** benchmark 15: ec,abed->abcd ***" )
-  print( "***********************************" )
-  func = einsum_ec_abed_abcd
-  sizes = (96, 84, 84, 84, 96)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 16. default adec,ebd->abc
-  print( "***********************************" )
-  print( "*** benchmark 16: adec,ebd->abc ***" )
-  print( "***********************************" )
-  func = einsum_adec_ebd_abc
-  sizes = (96, 84, 84, 84, 96)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 17. default cad,dcb->ab
-  print( "*********************************" )
-  print( "*** benchmark 17: cad,dcb->ab ***" )
-  print( "*********************************" )
-  func = einsum_cad_dcb_ab
-  sizes = (384, 376, 384, 384)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 18. default acd,dbc->ab
-  print( "*********************************" )
-  print( "*** benchmark 18: acd,dbc->ab ***" )
-  print( "*********************************" )
-  func = einsum_acd_dbc_ab
-  sizes = (384, 376, 376, 384)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 19. default acd,db->abc
-  print( "*********************************" )
-  print( "*** benchmark 19: acd,db->abc ***" )
-  print( "*********************************" )
-  func = einsum_acd_db_abc
-  sizes = (384, 376, 376, 384)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 20. default adc,bd->abc
-  print( "*********************************" )
-  print( "*** benchmark 20: adc,bd->abc ***" )
-  print( "*********************************" )
-  func = einsum_adc_bd_abc
-  sizes = (384, 384, 376, 376)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 21. default ac,cb->ab
-  print( "*******************************" )
-  print( "*** benchmark 21: ac,cb->ab ***" )
-  print( "*******************************" )
-  func = einsum_ac_cb_ab
-  sizes = (7248, 7240, 7248)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 22. default aebf,fdec->abcd
-  print( "*************************************" )
-  print( "*** benchmark 22: aebf,fdec->abcd ***" )
-  print( "*************************************" )
-  func = einsum_aebf_fdec_abcd
-  sizes = (96, 84, 84, 84, 84, 96)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 23. default eafd,fbec->abcd
-  print( "*************************************" )
-  print( "*** benchmark 23: eafd,fbec->abcd ***" )
-  print( "*************************************" )
-  func = einsum_eafd_fbec_abcd
-  sizes = (96, 84, 84, 84, 96, 96)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
-
-  # 24. default aebf,dfce->abcd
-  print( "*************************************" )
-  print( "*** benchmark 24: aebf,dfce->abcd ***" )
-  print( "*************************************" )
-  func = einsum_aebf_dfce_abcd
-  sizes = (96, 84, 84, 96, 84, 84)
-
-  task = tvm.auto_scheduler.SearchTask( func = func,
-                                        args = (*sizes, args.dtype),
-                                        target = target )
-  task.tune( tune_option )
+    for i, (einsum_str, func, sizes) in enumerate(benchmarks, 1):
+        middle_line = f"*** benchmark {i}: {einsum_str} ***"
+        print('*' * len(middle_line))
+        print(middle_line)
+        print('*' * len(middle_line))
+        tvm_helper.run_all(einsum_str,
+                          func, 
+                          sizes,
+                          args.dtype,
+                          hardware_params,
+                          target,
+                          args.num_measure_trials,
+                          args.timeout,
+                          args.log_file)
