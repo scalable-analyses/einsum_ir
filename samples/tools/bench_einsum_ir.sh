@@ -1,8 +1,7 @@
 #!/bin/bash
 # parse command line arguments
-while getopts 'c:pe:l:r:b:d:k:h' flag; do
+while getopts 'pe:l:r:b:d:k:h' flag; do
   case "${flag}" in
-    c) num_cores="${OPTARG}" ;;
     p) enable_ht=1 ;;
     e) einsum_ir_exe="${OPTARG}" ;;
     l) log_dir="${OPTARG}" ;;
@@ -10,9 +9,8 @@ while getopts 'c:pe:l:r:b:d:k:h' flag; do
     b) backend="${OPTARG}" ;;
     d) reorder_dims="${OPTARG}" ;;
     k) selected_keys="${OPTARG}" ;;
-    h) echo "Usage: $0 [-c num_cores] [-p enable_hyperthreading] [-e einsum_ir_executable] [-l log_directory] [-r num_repetitions] [-b backend] [-d reorder_dims] [-k benchmark_keys]"
+    h) echo "Usage: $0 [-p enable_hyperthreading] [-e einsum_ir_executable] [-l log_directory] [-r num_repetitions] [-b backend] [-d reorder_dims] [-k benchmark_keys]"
        echo "Optional arguments:"
-       echo "  -c: Number of cores to use (default: number of processors)"
        echo "  -p: Enable hyperthreading"
        echo "  -e: Path to einsum executable"
        echo "  -l: Log directory"
@@ -21,7 +19,7 @@ while getopts 'c:pe:l:r:b:d:k:h' flag; do
        echo "  -d: Reorder dimensions (default: 1)"
        echo "  -k: Benchmark keys to run (default: all, options: syn,tt,fctn,tw,getd,trn,mera,tnlm,tccg_blocked,tccg_blocked_reordered,fc)"; exit 0 ;;
     *) echo "Unexpected option ${flag}"
-       echo "Usage: $0 [-c num_cores] [-p enable_hyperthreading] [-e einsum_ir_executable] [-l log_directory] [-r num_repetitions] [-b backend] [-d reorder_dims] [-k benchmark_keys]"
+       echo "Usage: $0 [-p enable_hyperthreading] [-e einsum_ir_executable] [-l log_directory] [-r num_repetitions] [-b backend] [-d reorder_dims] [-k benchmark_keys]"
        exit 1 ;;
   esac
 done
@@ -155,5 +153,5 @@ do
   echo ""
 done
 
-echo "Done"
 date
+echo "Done"
