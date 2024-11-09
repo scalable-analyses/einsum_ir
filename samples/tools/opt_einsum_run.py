@@ -165,11 +165,21 @@ if __name__ == '__main__':
     gflops_total = num_ops / (time_eval + time_compile)
     gflops_total *= 1e-9
 
-    print( '  #flops:         %d' % num_ops )
-    print( '  time (eval):    %f' % time_eval )
-    print( '  time (compile): %f' % time_compile )
-    print( '  gflops (eval):  %.2f' % gflops_eval )
-    print( '  gflops (total): %.2f' % gflops_total )
+    # determine arithmetic intensity (flops / (bytes of input tensors)
+    bytes_per_element = 4 if dtype == torch.float32 else 8
+    num_bytes = sum([tensor.numel() for tensor in tensors]) * bytes_per_element
+    output_shape = [dim_size_map[char] for char in output_subscript]
+    num_bytes += torch.tensor(output_shape).prod().item() * bytes_per_element
+    arithmetic_intensity = num_ops / num_bytes
+
+    # print results
+    print( '  #flops :          %d' % num_ops )
+    print( '  #bytes :          %d' % num_bytes )
+    print( '  arith. intensity: %.2f' % arithmetic_intensity )
+    print( '  time (eval):      %f' % time_eval )
+    print( '  time (compile):   %f' % time_compile )
+    print( '  gflops (eval):    %.2f' % gflops_eval )
+    print( '  gflops (total):   %.2f' % gflops_total )
 
     print( 'CSV_DATA: ' + ','.join([ "opt_einsum",
                                      args.backend,
@@ -178,6 +188,7 @@ if __name__ == '__main__':
                                      '"' + args.cont_path + '"',
                                      args.dtype,
                                      str(num_ops),
+                                     str(arithmetic_intensity),
                                      str(time_compile),
                                      str(time_eval),
                                      str(gflops_eval),
