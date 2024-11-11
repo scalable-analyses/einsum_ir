@@ -18,9 +18,9 @@ parser = argparse.ArgumentParser(description='Generate blocked linear layers.')
 parser.add_argument('--M', type=int, default=2048, help='M dimension size')
 parser.add_argument('--N', type=int, default=2048, help='N dimension size')
 parser.add_argument('--K', type=int, default=2048, help='K dimension size')
-parser.add_argument('--choices-m1', type=int, nargs='+', default=[16, 32, 64, 128],      help='Choices for m1')
-parser.add_argument('--choices-n1', type=int, nargs='+', default=[16, 32, 64, 128],      help='Choices for n1')
-parser.add_argument('--choices-k1', type=int, nargs='+', default=[16, 32, 64, 128, 256], help='Choices for k1')
+parser.add_argument('--choices-m1', type=int, nargs='+', default=[16, 32, 64, 128, 256],            help='Choices for m1')
+parser.add_argument('--choices-n1', type=int, nargs='+', default=[16, 32, 64, 128, 256],            help='Choices for n1')
+parser.add_argument('--choices-k1', type=int, nargs='+', default=[16, 32, 64, 128, 256, 512, 1024], help='Choices for k1')
 args = parser.parse_args()
 
 str_expr = "[m2,k2,k1,m1],[n2,k2,n1,k1]->[n2,m2,n1,m1]"
