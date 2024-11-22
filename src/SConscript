@@ -44,7 +44,9 @@ l_sources = [ 'backend/Tensor.cpp',
               'backend/MemoryManager.cpp',
               'backend/EinsumNode.cpp',
               'frontend/EinsumExpression.cpp',
-              'frontend/EinsumExpressionAscii.cpp' ]
+              'frontend/EinsumExpressionAscii.cpp',
+              'frontend/EinsumTree.cpp',
+              'frontend/EinsumTreeAscii.cpp' ]
 
 if g_env['libxsmm'] != False:
   l_sources += [ 'backend/UnaryLoopsTpp.cpp',
@@ -70,7 +72,8 @@ if g_env['libtorch'] != False:
                'backend/UnaryScalar.test.torch.cpp',
                'backend/BinaryContractionScalar.test.torch.cpp',
                'backend/EinsumNode.test.torch.cpp',
-               'frontend/EinsumExpression.test.torch.cpp' ]
+               'frontend/EinsumExpression.test.torch.cpp',
+               'frontend/EinsumTree.test.torch.cpp' ]
 
 if g_env['libxsmm'] != False and g_env['libtorch'] != False:
   l_tests += [ 'backend/UnaryTpp.test.torch.cpp',
@@ -95,5 +98,6 @@ if g_env['libxsmm'] != False and g_env['libtorch'] != False:
   g_env.exe['bench_binary']     = g_env.Object( 'bench_binary.cpp' )
   g_env.exe['bench_expression'] = g_env.Object( 'bench_expression.cpp' )
   g_env.exe['bench_mlp']        = g_env.Object( 'bench_mlp.cpp' )
+  g_env.exe['bench_tree']       = g_env.Object( 'bench_tree.cpp' )
 
 Export('g_env')

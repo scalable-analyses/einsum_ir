@@ -186,10 +186,13 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
 einsum_ir::err_t einsum_ir::backend::EinsumNode::compile(){
   err_t l_err = err_t::UNDEFINED_ERROR;
   l_err = compile_recursive();
+  if( l_err != einsum_ir::SUCCESS ){
+    return l_err;
+  }
   compile_memory_usage();
   m_memory->alloc_all_memory();
 
-  return l_err;
+  return einsum_ir::SUCCESS;
 }
 
 einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
@@ -509,7 +512,7 @@ void einsum_ir::backend::EinsumNode::eval() {
   }
   else {
     m_unary->eval( m_children[0]->m_data_ptr_active,
-                   m_data_ptr_ext );
+                   m_data_ptr_active );
   }
 
   if( m_children.size() == 2 ) {
