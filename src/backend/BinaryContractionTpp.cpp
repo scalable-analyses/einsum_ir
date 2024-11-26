@@ -15,6 +15,12 @@ libxsmm_datatype einsum_ir::backend::BinaryContractionTpp::dtype_to_libxsmm( dat
   return libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED;
 }
 
+einsum_ir::backend::BinaryContractionTpp::~BinaryContractionTpp() {
+  if( m_packing != nullptr ) {
+    delete m_packing;
+  }
+}
+
 einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   BinaryContraction::compile_base();
   err_t l_err = err_t::UNDEFINED_ERROR;
@@ -119,7 +125,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
 
   std::vector< int64_t > l_dim_ids_packed_left;
   std::vector< int64_t > l_dim_ids_packed_right;
-  ContractionPackingTpp * l_packing = nullptr;
+
   if( m_dim_ids_permute_left != nullptr ){
     l_dim_ids_packed_left.reserve( l_dim_ids_cb.size() + l_dim_ids_mb.size() + l_dim_ids_kb.size() );
     l_dim_ids_packed_left.insert( l_dim_ids_packed_left.end(), l_dim_ids_kb.begin(), l_dim_ids_kb.end() );
@@ -136,28 +142,28 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
 
   if( m_dim_ids_permute_left != nullptr || m_dim_ids_permute_right != nullptr ) {
     //compile packing
-    l_packing = new ContractionPackingTpp;
-    l_packing->init( m_num_dims_left,
-                    m_num_dims_right,
-                    &l_dim_sizes,
-                    &l_strides_left,
-                    &l_strides_right,
-                    &m_dim_types,
-                    m_dim_ids_left,
-                    m_dim_ids_right,
-                    &l_dim_ids_packed_left,
-                    &l_dim_ids_packed_right,
-                    &m_loop_ids_int,
-                    m_dtype_left,
-                    m_dtype_out,
-                    m_memory );
-    l_packing->compile();
+    m_packing = new ContractionPackingTpp;
+    m_packing->init( m_num_dims_left,
+                     m_num_dims_right,
+                     &l_dim_sizes,
+                     &l_strides_left,
+                     &l_strides_right,
+                     &m_dim_types,
+                     m_dim_ids_left,
+                     m_dim_ids_right,
+                     &l_dim_ids_packed_left,
+                     &l_dim_ids_packed_right,
+                     &m_loop_ids_int,
+                     m_dtype_left,
+                     m_dtype_out,
+                     m_memory );
+    m_packing->compile();
 
     //update strides
-    for( auto const& elem : l_packing->m_strides_packed_left ) {
+    for( auto const& elem : m_packing->m_strides_packed_left ) {
       l_strides_left.insert_or_assign(elem.first, elem.second);
     }
-    for( auto const& elem : l_packing->m_strides_packed_right ) {
+    for( auto const& elem : m_packing->m_strides_packed_right ) {
       l_strides_right.insert_or_assign(elem.first, elem.second);
     }
   }
@@ -409,7 +415,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                      m_xmm_kernel_main.gemm,
                      m_xmm_kernel_last_touch_unary,
                      m_xmm_kernel_last_touch_binary,
-                     l_packing );
+                     m_packing );
 
   l_err = m_cont_loops.compile();
   if( l_err != einsum_ir::SUCCESS ) {
