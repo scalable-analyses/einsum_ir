@@ -27,11 +27,6 @@ jobs:
           sudo dnf install -y python3.10
           sudo dnf install -y scons
 
-      - name: Change Shell
-        run: |
-          sudo chsh -s /bin/bash $(whoami)
-          echo $SHELL
-
       - name: Install PyTorch
         run: |
           python3.10 -m venv venv_pytorch
@@ -41,11 +36,9 @@ jobs:
 
       - name: Install LIBXSMM
         run: |
-          echo $SHELL
-          bash
-          echo $SHELL
           git clone https://github.com/libxsmm/libxsmm.git
           cd libxsmm
           git log | head -n 25
+          sed -i '1s/^/SHELL := \/bin\/bash\n/' Makefile
           make BLAS=0 -j
           cd ..
