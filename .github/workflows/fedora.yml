@@ -42,3 +42,12 @@ jobs:
           git log | head -n 25
           make BLAS=0 -j
           cd ..
+
+      - name: Install OpenBLAS
+        run: |
+          wget https://github.com/OpenMathLib/OpenBLAS/archive/refs/tags/v0.3.28.tar.gz
+          tar -xvf v0.3.28.tar.gz
+          cd OpenBLAS-0.3.28
+          make -j
+          make PREFIX=$(pwd)/../openblas install
+          cd ..
