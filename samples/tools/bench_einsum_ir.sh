@@ -1,6 +1,6 @@
 #!/bin/bash
 # parse command line arguments
-while getopts 'pe:l:r:b:d:k:h' flag; do
+while getopts 'pe:l:r:b:d:k:hv' flag; do
   case "${flag}" in
     p) enable_ht=1 ;;
     e) einsum_ir_exe="${OPTARG}" ;;
@@ -9,7 +9,8 @@ while getopts 'pe:l:r:b:d:k:h' flag; do
     b) backend="${OPTARG}" ;;
     d) reorder_dims="${OPTARG}" ;;
     k) selected_keys="${OPTARG}" ;;
-    h) echo "Usage: $0 [-p enable_hyperthreading] [-e einsum_ir_executable] [-l log_directory] [-r num_repetitions] [-b backend] [-d reorder_dims] [-k benchmark_keys]"
+    v) verbose=1 ;;
+    h) echo "Usage: $0 [-p enable_hyperthreading] [-e einsum_ir_executable] [-l log_directory] [-r num_repetitions] [-b backend] [-d reorder_dims] [-k benchmark_keys] [-v verbose]"
        echo "Optional arguments:"
        echo "  -p: Enable hyperthreading"
        echo "  -e: Path to einsum executable"
@@ -17,7 +18,8 @@ while getopts 'pe:l:r:b:d:k:h' flag; do
        echo "  -r: Number of einsum_ir repetitions"
        echo "  -b: Backend to use (default: tpp)"
        echo "  -d: Reorder dimensions (default: 1)"
-       echo "  -k: Benchmark keys to run (default: all, options: syn,tt,fctn,tw,getd,trn,mera,tnlm,tccg_blocked,tccg_blocked_reordered,fc)"; exit 0 ;;
+       echo "  -k: Benchmark keys to run (default: all, options: syn,tt,fctn,tw,getd,trn,mera,tnlm,tccg_blocked,tccg_blocked_reordered,fc)"
+       echo "  -v: Verbose output (default: off)"; exit 0 ;;
     *) echo "Unexpected option ${flag}"
        echo "Usage: $0 [-p enable_hyperthreading] [-e einsum_ir_executable] [-l log_directory] [-r num_repetitions] [-b backend] [-d reorder_dims] [-k benchmark_keys]"
        exit 1 ;;
@@ -142,10 +144,13 @@ do
     ((current_setting++))
     echo -n "  Processing setting ${current_setting}/${total_settings}"
     command="${einsum_ir_exe} ${setting} FP32 0 1"
-
     for rep in $(seq 1 ${num_reps})
     do
-      EINSUM_IR_BACKEND=${backend^^} EINSUM_IR_REORDER_DIMS=${reorder_dims} OMP_NUM_THREADS=${num_threads} KMP_AFFINITY=${kmp_affinity} eval ${command} >> ${log_file} 2>&1
+      if [ "${verbose}" -gt 0 ]; then
+        EINSUM_IR_BACKEND=${backend^^} EINSUM_IR_REORDER_DIMS=${reorder_dims} OMP_NUM_THREADS=${num_threads} KMP_AFFINITY=${kmp_affinity} eval ${command} | tee -a ${log_file}
+      else
+        EINSUM_IR_BACKEND=${backend^^} EINSUM_IR_REORDER_DIMS=${reorder_dims} OMP_NUM_THREADS=${num_threads} KMP_AFFINITY=${kmp_affinity} eval ${command} >> ${log_file} 2>&1
+      fi
       echo -n "."
     done
     echo ""
