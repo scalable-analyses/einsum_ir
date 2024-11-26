@@ -127,7 +127,7 @@ void einsum_ir::backend::MemoryManager::alloc_all_memory(){
 #ifdef _OPENMP
       l_thread_id = omp_get_thread_num();
 #endif
-      for(int l_mem_id; l_mem_id <= m_req_thread_mem; l_mem_id++){
+      for( int64_t l_mem_id; l_mem_id <= m_req_thread_mem; l_mem_id++ ){
         m_aligned_thread_memory[l_thread_id][l_mem_id] = 0;
       }
     }
