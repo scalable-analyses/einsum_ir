@@ -82,10 +82,10 @@ jobs:
 
           wget https://github.com/catchorg/Catch2/releases/download/v2.13.10/catch.hpp
 
-          CXX=g++-13 CC=g++-13 scons libtorch=../venv_pytorch/lib/python3.10/site-packages/torch blas=$(pwd)/../openblas tblis=$(pwd)/../tblis libxsmm=$(pwd)/../libxsmm -j8
+          CXX=g++-13 CC=g++-13 scons libtorch=$(pwd)/../venv_pytorch/lib/python3.10/site-packages/torch blas=$(pwd)/../openblas tblis=$(pwd)/../tblis libxsmm=$(pwd)/../libxsmm -j
           mv build build_gcc
 
-          CXX=clang++ CC=clang scons libtorch=../venv_pytorch/lib/python3.10/site-packages/torch blas=$(pwd)/../openblas tblis=$(pwd)/../tblis libxsmm=$(pwd)/../libxsmm -j8
+          CXX=clang++ CC=clang scons libtorch=$(pwd)/../venv_pytorch/lib/python3.10/site-packages/torch blas=$(pwd)/../openblas tblis=$(pwd)/../tblis libxsmm=$(pwd)/../libxsmm -j
           mv build build_llvm
           cd ..
 
