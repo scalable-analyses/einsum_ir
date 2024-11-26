@@ -29,7 +29,7 @@ jobs:
 
       - name: Change Shell
         run: |
-          sudo chsh -s /bin/bash
+          sudo chsh -s /bin/bash $(whoami)
           echo $SHELL
 
       - name: Install PyTorch
@@ -41,6 +41,9 @@ jobs:
 
       - name: Install LIBXSMM
         run: |
+          echo $SHELL
+          bash
+          echo $SHELL
           git clone https://github.com/libxsmm/libxsmm.git
           cd libxsmm
           git log | head -n 25
