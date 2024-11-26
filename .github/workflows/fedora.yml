@@ -1,0 +1,17 @@
+jobs:
+  tests:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install System Packages
+        run: |
+          sudo dnf install -y gfortran
+          sudo dnf install -y clang
+          sudo dnf install -y g++
+          sudo dnf install -y wget
+          sudo dnf install -y git
+          sudo dnf install -y cmake
+          sudo dnf install -y python3.10
+          sudo dnf install -y scons
