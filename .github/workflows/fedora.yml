@@ -1,4 +1,4 @@
-name: Unit Tests (Fedora)
+name: Unit Tests and Benchmarks (Fedora)
 
 on:
   push:
@@ -94,3 +94,10 @@ jobs:
           cd einsum_ir
           ./build_gcc/tests
           ./build_llvm/tests
+
+      - name: Run expression benchmarks
+        run: |
+          cd einsum_ir
+          bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_llvm/bench_expression -l logs -r 1 -b tpp -d 1 -k
+
+          bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_gcc/bench_expression -l logs -r 1 -b tpp -d 1 -k
