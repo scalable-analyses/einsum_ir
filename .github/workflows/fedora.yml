@@ -18,6 +18,7 @@ jobs:
       - name: Install System Packages
         run: |
           sudo dnf install -y util-linux-user
+          sudo dnf install -y which
           sudo dnf install -y gfortran
           sudo dnf install -y clang
           sudo dnf install -y g++
