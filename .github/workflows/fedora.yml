@@ -1,3 +1,13 @@
+name: Unit Tests (Fedora)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: 0 0 * * *
+
 jobs:
   tests:
     runs-on: self-hosted
