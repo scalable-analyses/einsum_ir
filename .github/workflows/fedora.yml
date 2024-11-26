@@ -51,3 +51,25 @@ jobs:
           make -j
           make PREFIX=$(pwd)/../openblas install
           cd ..
+
+      - name: Install TBLIS
+        run: |
+          git clone https://github.com/devinamatthews/tblis.git tblis_src
+          cd tblis_src
+          git checkout 2cbdd21
+          git log | head -n 25
+          ./configure --prefix=$(pwd)/../tblis --enable-thread-model=openmp
+          sed -i '971d' Makefile
+          make -j
+          make install
+          cd ..
+          rm -rf tblis_src
+
+          for dir_type in indexed_dpd indexed dpd fwd
+          do
+          mkdir -p tblis/include/tblis/external/marray/marray/${dir_type}
+          mv tblis/include/tblis/external/marray/marray/*${dir_type}*.hpp tblis/include/tblis/external/marray/marray/${dir_type}
+          done
+
+          mkdir -p tblis/include/tblis/external/marray/marray/detail
+          mv tblis/include/tblis/external/marray/marray/utility* tblis/include/tblis/external/marray/marray/detail
