@@ -28,6 +28,7 @@ jobs:
           sudo dnf install -y scons
 
       - name: Change Shell
+        run: |
           chsh -s /bin/bash
           echo $SHELL
 
