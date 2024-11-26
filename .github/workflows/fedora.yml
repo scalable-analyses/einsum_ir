@@ -88,3 +88,9 @@ jobs:
           CXX=clang++ CC=clang scons libtorch=../venv_pytorch/lib/python3.10/site-packages/torch blas=$(pwd)/../openblas tblis=$(pwd)/../tblis libxsmm=$(pwd)/../libxsmm -j8
           mv build build_llvm
           cd ..
+
+      - name: Run unit tests
+        run: |
+          cd einsum_ir
+          ./build_gcc/tests
+          ./build_llvm/tests
