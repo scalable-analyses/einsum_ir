@@ -39,6 +39,5 @@ jobs:
           git clone https://github.com/libxsmm/libxsmm.git
           cd libxsmm
           git log | head -n 25
-          sed -i '1s/^/SHELL := \/bin\/bash\n/' Makefile
           make BLAS=0 -j
           cd ..
