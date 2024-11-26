@@ -17,7 +17,7 @@ jobs:
 
       - name: Install System Packages
         run: |
-          sudo dnf install -y bash
+          sudo dnf install -y util-linux-user
           sudo dnf install -y gfortran
           sudo dnf install -y clang
           sudo dnf install -y g++
@@ -26,6 +26,10 @@ jobs:
           sudo dnf install -y cmake
           sudo dnf install -y python3.10
           sudo dnf install -y scons
+
+      - name: Change Shell
+          chsh -s /bin/bash
+          echo $SHELL
 
       - name: Install PyTorch
         run: |
