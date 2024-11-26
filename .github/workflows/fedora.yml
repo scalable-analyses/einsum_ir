@@ -32,3 +32,11 @@ jobs:
           source venv_pytorch/bin/activate
           pip3 install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
           python -c "import torch; print(torch.__config__.show()); print(torch.__config__.parallel_info());"
+
+      - name: Install LIBXSMM
+        run: |
+          git clone https://github.com/libxsmm/libxsmm.git
+          cd libxsmm
+          git log | head -n 25
+          make BLAS=0 -j
+          cd ..
