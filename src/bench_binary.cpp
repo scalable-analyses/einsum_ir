@@ -23,8 +23,8 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
   std::chrono::steady_clock::time_point l_tp0, l_tp1;
   std::chrono::duration< double > l_dur;
   int64_t l_n_flops = 0;
-  int64_t l_repitions = 1;
-  int64_t l_repitions_warm_up = 1;
+  int64_t l_repetitions = 1;
+  int64_t l_repetitions_warm_up = 1;
   std::vector< int64_t > l_dim_ids_permute_left;
   std::vector< int64_t > l_dim_ids_permute_right;
   double l_time_compile = 0;
@@ -65,25 +65,25 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
   // warm up
   at::Tensor l_ten_out_torch;
   l_tp0 = std::chrono::steady_clock::now();
-  for( int64_t l_rep = 0; l_rep < l_repitions_warm_up; l_rep++ ){
+  for( int64_t l_rep = 0; l_rep < l_repetitions_warm_up; l_rep++ ){
     l_ten_out_torch = at::einsum( i_einsum_string,
                                   {l_ten_left, l_ten_right},
                                   { {0,1} } );
   }
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
-  l_repitions = l_repitions_warm_up / l_dur.count() + 1;
+  l_repetitions = l_repetitions_warm_up / l_dur.count() + 1;
 
   // run with repititions
   l_tp0 = std::chrono::steady_clock::now();
-  for( int64_t l_rep = 0; l_rep < l_repitions; l_rep++ ){
+  for( int64_t l_rep = 0; l_rep < l_repetitions; l_rep++ ){
     l_ten_out_torch = at::einsum( i_einsum_string,
                                   {l_ten_left, l_ten_right},
                                   { {0,1} } );
   }
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
-  l_time = l_dur.count() / l_repitions;
+  l_time = l_dur.count() / l_repetitions;
   l_gflops = 1.0E-9 * l_n_flops / l_time;
 
   std::cout << "  time (contract): " << l_time << std::endl;
@@ -136,24 +136,24 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
 
   // warm up
   l_tp0 = std::chrono::steady_clock::now();
-  for( int64_t l_rep = 0; l_rep < l_repitions_warm_up; l_rep++ ){
+  for( int64_t l_rep = 0; l_rep < l_repetitions_warm_up; l_rep++ ){
     l_bin_cont.contract( l_ten_left.data_ptr(),
                         l_ten_right.data_ptr(),
                         l_ten_out.data_ptr() );
   }
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
-  l_repitions = l_repitions_warm_up / l_dur.count() + 1;
+  l_repetitions = l_repetitions_warm_up / l_dur.count() + 1;
 
   l_tp0 = std::chrono::steady_clock::now();
-  for( int64_t l_rep = 0; l_rep < l_repitions; l_rep++ ){
+  for( int64_t l_rep = 0; l_rep < l_repetitions; l_rep++ ){
     l_bin_cont.contract( l_ten_left.data_ptr(),
                         l_ten_right.data_ptr(),
                         l_ten_out.data_ptr() );
   }
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
-  l_time = l_dur.count() / l_repitions;
+  l_time = l_dur.count() / l_repetitions;
   l_gflops = 1.0E-9 * l_n_flops / l_time;
 
   std::cout << "  time (compile): " << l_time_compile << std::endl;
@@ -196,21 +196,21 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
 
   // warm up
   l_tp0 = std::chrono::steady_clock::now();
-  for( int64_t l_rep = 0; l_rep < l_repitions_warm_up; l_rep++ ){
+  for( int64_t l_rep = 0; l_rep < l_repetitions_warm_up; l_rep++ ){
     l_out_matmul = at::matmul( l_mat_b, l_mat_a );
   }
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
-  l_repitions = l_repitions_warm_up / l_dur.count() + 1;
+  l_repetitions = l_repetitions_warm_up / l_dur.count() + 1;
 
   // run with repititions
   l_tp0 = std::chrono::steady_clock::now();
-  for( int64_t l_rep = 0; l_rep < l_repitions; l_rep++ ){
+  for( int64_t l_rep = 0; l_rep < l_repetitions; l_rep++ ){
     l_out_matmul = at::matmul( l_mat_b, l_mat_a );
   }
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
-  l_time = l_dur.count() / l_repitions;
+  l_time = l_dur.count() / l_repetitions;
   l_gflops = 1.0E-9 * l_n_flops / l_time;
 
   std::cout << "  time:   " << l_time << std::endl;
