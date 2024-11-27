@@ -95,6 +95,29 @@ jobs:
           ./build_gcc/tests
           ./build_llvm/tests
 
+      - name: Run unary tests
+        run: |
+          cd einsum_ir
+          ./build_gcc/bench_unary "abcde->abcde" "8,16,24,32,48" "FP32"
+          ./build_gcc/bench_unary "abcde->abced" "8,16,24,32,48" "FP32"
+          ./build_gcc/bench_unary "abcde->abecd" "8,16,24,32,48" "FP32"
+          ./build_gcc/bench_unary "abcde->aebcd" "8,16,24,32,48" "FP32"
+          ./build_gcc/bench_unary "abcde->eabcd" "8,16,24,32,48" "FP32"
+
+          ./build_gcc/bench_unary "abcde->badce" "8,16,24,32,48" "FP32"
+          ./build_gcc/bench_unary "abcde->dbeac" "8,16,24,32,48" "FP32"
+          ./build_gcc/bench_unary "abcde->cabed" "8,16,24,32,48" "FP32"
+
+          ./build_llvm/bench_unary "abcde->abcde" "8,16,24,32,48" "FP32"
+          ./build_llvm/bench_unary "abcde->abced" "8,16,24,32,48" "FP32"
+          ./build_llvm/bench_unary "abcde->abecd" "8,16,24,32,48" "FP32"
+          ./build_llvm/bench_unary "abcde->aebcd" "8,16,24,32,48" "FP32"
+          ./build_llvm/bench_unary "abcde->eabcd" "8,16,24,32,48" "FP32"
+
+          ./build_llvm/bench_unary "abcde->badce" "8,16,24,32,48" "FP32"
+          ./build_llvm/bench_unary "abcde->dbeac" "8,16,24,32,48" "FP32"
+          ./build_llvm/bench_unary "abcde->cabed" "8,16,24,32,48" "FP32"
+
       - name: Run binary tests
         run: |
           cd einsum_ir
