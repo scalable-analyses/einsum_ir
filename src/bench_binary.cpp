@@ -45,13 +45,13 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
   std::vector< int64_t > l_sizes_left;
   std::vector< int64_t > l_sizes_right;
   std::vector< int64_t > l_sizes_out;
-  for( int64_t l_di = 0; l_di < i_dim_ids_in_left.size(); l_di++ ){
+  for( std::size_t l_di = 0; l_di < i_dim_ids_in_left.size(); l_di++ ){
     l_sizes_left.push_back( i_dim_sizes_map[i_dim_ids_in_left[l_di]] );
   }
-  for( int64_t l_di = 0; l_di < i_dim_ids_in_right.size(); l_di++ ){
+  for( std::size_t l_di = 0; l_di < i_dim_ids_in_right.size(); l_di++ ){
     l_sizes_right.push_back( i_dim_sizes_map[i_dim_ids_in_right[l_di]] );
   }
-  for( int64_t l_di = 0; l_di < i_dim_ids_out.size(); l_di++ ){
+  for( std::size_t l_di = 0; l_di < i_dim_ids_out.size(); l_di++ ){
     l_sizes_out.push_back( i_dim_sizes_map[i_dim_ids_out[l_di]] );
   }
 
