@@ -28,6 +28,9 @@ class einsum_ir::backend::BinaryContractionTpp: public BinaryContraction {
     //! LIBXSMM-based binary last-touch TPP
     libxsmm_meltwfunction_binary m_xmm_kernel_last_touch_binary = nullptr;
 
+    //! packing
+    ContractionPackingTpp * m_packing = nullptr;
+
     //! contraction loop interface
     ContractionLoopsTpp m_cont_loops;
 
@@ -81,6 +84,11 @@ class einsum_ir::backend::BinaryContractionTpp: public BinaryContraction {
     static libxsmm_datatype dtype_to_libxsmm( data_t i_dtype );
 
   public:
+    /**
+     * Destructor
+     **/
+    ~BinaryContractionTpp();
+
     /**
      * Compiles the binary contraction.
      **/

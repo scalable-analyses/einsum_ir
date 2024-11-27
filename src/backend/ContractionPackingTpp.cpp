@@ -5,6 +5,15 @@
 #include <omp.h>
 #endif
 
+einsum_ir::backend::ContractionPackingTpp::~ContractionPackingTpp() {
+  if( m_unary_left != nullptr ) {
+    delete m_unary_left;
+  }
+  if( m_unary_right != nullptr ) {
+    delete m_unary_right;
+  }
+}
+
 void einsum_ir::backend::ContractionPackingTpp::init( int64_t                              i_num_dims_left,
                                                       int64_t                              i_num_dims_right,
                                                       std::map< int64_t, int64_t > const * i_dim_sizes,
@@ -41,8 +50,6 @@ void einsum_ir::backend::ContractionPackingTpp::init( int64_t                   
 
   m_memory = i_memory;
 }
-
-
 
 einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::compile() {
   err_t l_err = err_t::UNDEFINED_ERROR;
@@ -146,7 +153,6 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::compile() {
 
   return l_err;
 }
-
 
 einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::create_kernel( int64_t                              i_num_dims,
                                                                            int64_t                      const * i_dim_ids_original,

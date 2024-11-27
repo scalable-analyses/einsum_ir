@@ -80,6 +80,11 @@ class einsum_ir::backend::ContractionPackingTpp {
     char ** m_memory_packing;
 
     /**
+     * Destructor
+     **/
+    ~ContractionPackingTpp();
+
+    /**
      * Initializes the packing class
      *
      * @param i_num_dims_left number of tensor dimensions of left tensor.

@@ -1,0 +1,102 @@
+name: Unit Tests and Benchmarks (Fedora)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: 0 0 * * *
+
+jobs:
+  tests:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install System Packages
+        run: |
+          sudo dnf install -y util-linux-user
+          sudo dnf install -y which
+          sudo dnf install -y gfortran
+          sudo dnf install -y clang
+          sudo dnf install -y g++-13
+          sudo dnf install -y wget
+          sudo dnf install -y git
+          sudo dnf install -y cmake
+          sudo dnf install -y python3.10
+          sudo dnf install -y scons
+
+      - name: Install PyTorch
+        run: |
+          python3.10 -m venv venv_pytorch
+          source venv_pytorch/bin/activate
+          pip3 install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+          python -c "import torch; print(torch.__config__.show()); print(torch.__config__.parallel_info());"
+
+      - name: Install LIBXSMM
+        run: |
+          git clone https://github.com/libxsmm/libxsmm.git
+          cd libxsmm
+          git log | head -n 25
+          make BLAS=0 -j
+          cd ..
+
+      - name: Install OpenBLAS
+        run: |
+          wget https://github.com/OpenMathLib/OpenBLAS/archive/refs/tags/v0.3.28.tar.gz
+          tar -xvf v0.3.28.tar.gz
+          cd OpenBLAS-0.3.28
+          make -j
+          make PREFIX=$(pwd)/../openblas install
+          cd ..
+
+      - name: Install TBLIS
+        run: |
+          git clone https://github.com/devinamatthews/tblis.git tblis_src
+          cd tblis_src
+          git checkout 2cbdd21
+          git log | head -n 25
+          ./configure --prefix=$(pwd)/../tblis --enable-thread-model=openmp
+          sed -i '971d' Makefile
+          make -j
+          make install
+          cd ..
+          rm -rf tblis_src
+
+          for dir_type in indexed_dpd indexed dpd fwd
+          do
+          mkdir -p tblis/include/tblis/external/marray/marray/${dir_type}
+          mv tblis/include/tblis/external/marray/marray/*${dir_type}*.hpp tblis/include/tblis/external/marray/marray/${dir_type}
+          done
+
+          mkdir -p tblis/include/tblis/external/marray/marray/detail
+          mv tblis/include/tblis/external/marray/marray/utility* tblis/include/tblis/external/marray/marray/detail
+
+      - name: Install einsum_ir
+        run: |
+          git clone https://github.com/scalable-analyses/einsum_ir.git
+          cd einsum_ir
+          git log | head -n 25
+
+          wget https://github.com/catchorg/Catch2/releases/download/v2.13.10/catch.hpp
+
+          CXX=g++-13 CC=g++-13 scons libtorch=$(pwd)/../venv_pytorch/lib/python3.10/site-packages/torch blas=$(pwd)/../openblas tblis=$(pwd)/../tblis libxsmm=$(pwd)/../libxsmm -j8
+          mv build build_gcc
+
+          CXX=clang++ CC=clang scons libtorch=$(pwd)/../venv_pytorch/lib/python3.10/site-packages/torch blas=$(pwd)/../openblas tblis=$(pwd)/../tblis libxsmm=$(pwd)/../libxsmm -j8
+          mv build build_llvm
+          cd ..
+
+      - name: Run unit tests
+        run: |
+          cd einsum_ir
+          ./build_gcc/tests
+          ./build_llvm/tests
+
+      - name: Run expression benchmarks
+        run: |
+          bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_llvm/bench_expression -l logs -r 1 -b tpp -d 1 -v
+
+          bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_gcc/bench_expression -l logs -r 1 -b tpp -d 1 -v
