@@ -336,6 +336,7 @@ int main( int     i_argc,
     std::cerr << "******************************************************" << std::endl;
     std::cerr << "* warning: aten solution is different from einsum_ir *" << std::endl;
     std::cerr << "******************************************************" << std::endl;
+    return EXIT_FAILURE;
   }
 
   return EXIT_SUCCESS;
