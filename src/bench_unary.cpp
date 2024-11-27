@@ -285,9 +285,13 @@ int main( int     i_argc,
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time_compile = l_dur.count();
 
+  // warm up
+  l_unary_tpp.eval( l_data_ptrs[0],
+                    l_data_ptrs[1] );
+
   l_tp0 = std::chrono::steady_clock::now();
   l_unary_tpp.eval( l_data_ptrs[0],
-                       l_data_ptrs[1] );
+                    l_data_ptrs[1] );
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time_eval = l_dur.count();
