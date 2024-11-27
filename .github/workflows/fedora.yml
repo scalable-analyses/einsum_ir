@@ -134,3 +134,12 @@ jobs:
           bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_gcc/bench_expression -l logs -r 1 -b tpp -d 1 -v
 
           bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_llvm/bench_expression -l logs -r 1 -b tpp -d 1 -v
+
+      - name: Run MLP benchmark
+        run: |
+          wget https://gist.github.com/breuera/06894bc6353d75d13f6369b420174e0e/raw/7eb509e411b5ec04d4e2295b51225bdd90bd7285/model_mlp.pt
+          ./build_gcc/bench_mlp model_mlp.pt 0
+          ./build_gcc/bench_mlp model_mlp.pt 1
+
+          ./build_llvm/bench_mlp model_mlp.pt 0
+          ./build_llvm/bench_mlp model_mlp.pt 1
