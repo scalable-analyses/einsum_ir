@@ -20,10 +20,6 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
                    at::ScalarType                 i_dtype_at,
                    einsum_ir::data_t              i_dtype_einsum_ir,
                    std::string                    i_einsum_string) {
-  std::cout << "*******************************" << std::endl;
-  std::cout << "*** blocked matmul testcase ***" << std::endl;
-  std::cout << "*******************************" << std::endl;
-
   std::chrono::steady_clock::time_point l_tp0, l_tp1;
   std::chrono::duration< double > l_dur;
   int64_t l_n_flops = 0;
@@ -34,12 +30,6 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
   double l_time_compile = 0;
   double l_time = 0;
   double l_gflops = 0;
-  
-  //binary contraction parameter
-  std::vector< int64_t > l_sizes_c = {512};
-  std::vector< int64_t > l_sizes_m = {4, 16};
-  std::vector< int64_t > l_sizes_n = {64};
-  std::vector< int64_t > l_sizes_k = {2, 32};
 
   // create vectors of sizes and einsum string
   std::vector< int64_t > l_sizes_left;
