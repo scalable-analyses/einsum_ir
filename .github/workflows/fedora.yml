@@ -95,8 +95,19 @@ jobs:
           ./build_gcc/tests
           ./build_llvm/tests
 
+      - name: Run binary tests
+        run: |
+          cd einsum_ir
+          ./build_gcc/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,256" FP32 "a,b,c,d,e,f"
+          ./build_gcc/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,256" FP32 "a,b,c,d,f,e"
+          ./build_gcc/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,256" FP32 "a,b,c,f,d,e"
+
+          ./build_llvm/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,256" FP32 "a,b,c,d,e,f"
+          ./build_llvm/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,256" FP32 "a,b,c,d,f,e"
+          ./build_llvm/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,256" FP32 "a,b,c,f,d,e"
+
       - name: Run expression benchmarks
         run: |
-          bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_llvm/bench_expression -l logs -r 1 -b tpp -d 1 -v
-
           bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_gcc/bench_expression -l logs -r 1 -b tpp -d 1 -v
+
+          bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_llvm/bench_expression -l logs -r 1 -b tpp -d 1 -v
