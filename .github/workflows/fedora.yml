@@ -38,6 +38,15 @@ jobs:
           pip3 install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
           python -c "import torch; print(torch.__config__.show()); print(torch.__config__.parallel_info());"
 
+          # get Python version and create symlinks if needed
+          PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+          TORCH_LIBS_DIR="venv_pytorch/lib64/python${PYTHON_VERSION}/site-packages/torch.libs"
+          TORCH_LIB_DIR="venv_pytorch/lib64/python${PYTHON_VERSION}/site-packages/torch/lib"
+          if [ -d "$TORCH_LIBS_DIR" ]; then
+            mkdir -p "$TORCH_LIB_DIR"
+            ln -s $(pwd)/${TORCH_LIBS_DIR}/* ${TORCH_LIB_DIR}/
+          fi
+
       - name: Install LIBXSMM
         run: |
           git clone https://github.com/libxsmm/libxsmm.git
