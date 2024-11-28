@@ -11,6 +11,9 @@ on:
 jobs:
   tests:
     runs-on: self-hosted
+    strategy:
+      matrix:
+        architecture: [x64, arm64]
 
     steps:
       - uses: actions/checkout@v4
