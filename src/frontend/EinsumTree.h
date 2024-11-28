@@ -41,7 +41,7 @@ class einsum_ir::frontend::EinsumTree {
      * @param i_children vector of all tensors with their children
      * @param i_map_dim_sizes map of dimension ids to dimension sizes
      * @param i_dtype datatype of all tensors.
-     * @param i_data_ptr pointers to the tensor's data. nullptr if the tensor does not have extrenal data
+     * @param i_data_ptrs pointers to the tensor's data. nullptr if the tensor does not have extrenal data
      **/
     void init( std::vector< std::vector< int64_t > >         * i_dim_ids,
                std::vector< std::vector< int64_t > >         * i_children,
