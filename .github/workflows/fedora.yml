@@ -137,6 +137,7 @@ jobs:
 
       - name: Run MLP benchmark
         run: |
+          cd einsum_ir
           wget https://gist.github.com/breuera/06894bc6353d75d13f6369b420174e0e/raw/7eb509e411b5ec04d4e2295b51225bdd90bd7285/model_mlp.pt
           ./build_gcc/bench_mlp model_mlp.pt 0
           ./build_gcc/bench_mlp model_mlp.pt 1
