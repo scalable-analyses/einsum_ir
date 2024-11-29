@@ -69,9 +69,9 @@ int main( int     i_argc,
    */
   at::ScalarType l_dtype_at = at::ScalarType::Float;
   einsum_ir::data_t l_dtype_einsum_ir = einsum_ir::FP32;
-  if( i_argc > 2 ) {
-    std::string l_dim_types_arg( i_argv[3] );
-    if( l_dim_types_arg == "FP64"){
+  if( i_argc > 3 ) {
+    std::string l_dtype_arg( i_argv[3] );
+    if( l_dtype_arg == "FP64"){
       l_dtype_at = at::ScalarType::Double;
       l_dtype_einsum_ir = einsum_ir::FP64;
     }
