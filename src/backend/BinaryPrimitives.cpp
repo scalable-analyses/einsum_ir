@@ -278,7 +278,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::blocking_left_kb_x_mb_cb_
     l_potential_K = i_dim_ids_right[ l_di_right ];
   }
 
-  // seek the first K dimension after M in left tensor
+  // seek the first K dimension that matches the potential K dimension in left tensor
   while( l_di_left >= 0 ) {
     int64_t l_dim_size = i_dim_sizes->at( i_dim_ids_left[ l_di_left ] );
 
@@ -356,7 +356,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::blocking_left_kb_x_mb_cb_
     l_potential_N = i_dim_ids_out[ l_di_out ];
   }
 
-  // seek first N dimension after K in right tensor
+  // seek first N dimension that matches the potential N dimnesion in right tensor
   while( l_di_right >= 0 ) {
     int64_t l_dim_size = i_dim_sizes->at( i_dim_ids_right[ l_di_right ] );
 
