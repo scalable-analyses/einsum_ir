@@ -272,11 +272,18 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::blocking_left_kb_x_mb_cb_
     }
   }
 
+  //find id of potential K dimension 
+  int64_t l_potential_K = 0;
+  if( l_di_right >= 0 ) {
+    l_potential_K = i_dim_ids_right[ l_di_right ];
+  }
+
   // seek the first K dimension after M in left tensor
   while( l_di_left >= 0 ) {
     int64_t l_dim_size = i_dim_sizes->at( i_dim_ids_left[ l_di_left ] );
 
-    if( l_dim_types_left[l_di_left] == einsum_ir::dim_t::K ) {
+    if( l_dim_types_left[l_di_left] == einsum_ir::dim_t::K &&
+        i_dim_ids_left[  l_di_left] == l_potential_K ) {
       break;
     }
     else {
@@ -291,7 +298,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::blocking_left_kb_x_mb_cb_
   }
 
   // determine K blocking
-  while( l_di_left >= 0 ) {
+  while( l_di_left >= 0 && l_di_right >= 0 ) {
     if( l_dim_types_left[l_di_left] == einsum_ir::dim_t::K ) {
       int64_t l_dim_id_left  = i_dim_ids_left[ l_di_left ];
       int64_t l_dim_id_right = i_dim_ids_right[ l_di_right ];
@@ -343,11 +350,18 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::blocking_left_kb_x_mb_cb_
     }
   }
 
+  //find id of potential N dimension 
+  int64_t l_potential_N = 0;
+  if( l_di_out >= 0 ) {
+    l_potential_N = i_dim_ids_out[ l_di_out ];
+  }
+
   // seek first N dimension after K in right tensor
   while( l_di_right >= 0 ) {
     int64_t l_dim_size = i_dim_sizes->at( i_dim_ids_right[ l_di_right ] );
 
-    if( l_dim_types_right[l_di_right] == einsum_ir::dim_t::N ) {
+    if( l_dim_types_right[l_di_right] == einsum_ir::dim_t::N &&
+        i_dim_ids_right[  l_di_right] == l_potential_N ) {
       break;
     }
     else {
@@ -365,7 +379,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryPrimitives::blocking_left_kb_x_mb_cb_
   }
 
   // determine N blocking
-  while( l_di_out >= 0 ) {
+  while( l_di_out >= 0 && l_di_right >= 0 ) {
     if( l_dim_types_out[l_di_out] == einsum_ir::dim_t::N ) {
       int64_t l_dim_id_out   = i_dim_ids_out[  l_di_out ];
       int64_t l_dim_id_right = i_dim_ids_right[ l_di_right ];
