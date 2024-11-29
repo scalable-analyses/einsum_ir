@@ -1,5 +1,8 @@
 #include "EinsumTree.h"
 #include "EinsumTreeAscii.h"
+#ifdef _OPENMP
+#include "omp.h"
+#endif
 
 void einsum_ir::frontend::EinsumTree::init( std::vector< std::vector< int64_t > >         * i_dim_ids,
                                             std::vector< std::vector< int64_t > >         * i_children,
@@ -80,6 +83,19 @@ einsum_ir::err_t einsum_ir::frontend::EinsumTree::compile() {
   if( l_err != einsum_ir::SUCCESS ) {
     return l_err;
   }
+
+#ifdef _OPENMP
+  // four times overload
+  int64_t l_num_tasks = omp_get_max_threads() * 4;
+
+  for( std::size_t l_node_id = 0; l_node_id < m_nodes.size(); l_node_id++ ) {
+    // magic number: 64^3
+    if(    m_nodes[l_node_id].m_num_ops_node == 0
+        || m_nodes[l_node_id].m_num_ops_node >= 262144 ) {
+      m_nodes[l_node_id].threading_intra_op( l_num_tasks );
+    }
+  }
+#endif
 
   return einsum_ir::SUCCESS;
 }
