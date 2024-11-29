@@ -147,6 +147,7 @@ jobs:
           bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_llvm/bench_expression -l logs -r 1 -b tpp -d 1 -v
 
       - name: Run Einsum Tree Benchnarks
+        run: |
           bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_gcc/bench_expression -l logs -r 1 -b tpp -d 2 -v
           bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_llvm/bench_expression -l logs -r 1 -b tpp -d 2 -v
 
