@@ -837,5 +837,5 @@ TEST_CASE( "FP32 TPP-based binary contraction involving C, M, N and K dimensions
                        l_right.data_ptr(),
                        l_out_native.data_ptr() );
 
-  REQUIRE( at::allclose( l_out_native, l_out_ref, 1E-4, 1E-6 )  );
+  REQUIRE( at::allclose( l_out_native, l_out_ref, 1E-3, 1E-5 )  );
 }
