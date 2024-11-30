@@ -165,6 +165,9 @@ do
   while IFS= read -r setting || [ -n "$setting" ]; do
     ((current_setting++))
     echo -n "  Processing setting ${current_setting}/${total_settings}"
+    if [ "${verbose}" -gt 0 ]; then
+      echo ""
+    fi
     if [ "${mode}" = "0" ] || [ "${mode}" = "1" ]; then
       command="${einsum_ir_exe} ${setting} FP32 0 1"
     else
