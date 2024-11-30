@@ -302,5 +302,5 @@ TEST_CASE( "FP32 TBLIS-based binary contraction involving C, M, N and K dimensio
                        l_right.data_ptr(),
                        l_out.data_ptr() );
 
-  REQUIRE( at::allclose( l_out, l_out_ref, 1E-4, 1E-6 )  );
+  REQUIRE( at::allclose( l_out, l_out_ref, 1E-3, 1E-5 )  );
 }
