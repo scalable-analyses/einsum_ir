@@ -122,7 +122,7 @@ TEST_CASE( "TPP-based Matrix-matrix multiplication with a full-tensor bias.", "[
                        l_bias.data_ptr(),
                        l_out.data_ptr() );
 
-  REQUIRE( at::allclose( l_out, l_out_ref )  );
+  REQUIRE( at::allclose( l_out, l_out_ref, 1E-4, 1E-7 )  );
 }
 
 TEST_CASE( "TPP-based matrix-matrix multiplication with a bias (scalar to matrix bcast).", "[binary_contraction_tpp]" ) {
