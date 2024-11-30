@@ -145,7 +145,9 @@ else
     done
 fi
 
-# iterate over the settings and print key and value
+# error tracking variable
+any_errors=0
+
 for key in "${keys_to_process[@]}"
 do
   date
@@ -177,8 +179,16 @@ do
     do
       if [ "${verbose}" -gt 0 ]; then
         EINSUM_IR_BACKEND=${backend^^} EINSUM_IR_REORDER_DIMS=${mode} OMP_NUM_THREADS=${num_threads} KMP_AFFINITY=${kmp_affinity} eval ${command} | tee -a ${log_file}
+        if [ ${PIPESTATUS[0]} -ne 0 ]; then
+          echo "Warning: Command failed: ${command}"
+          any_errors=1
+        fi
       else
         EINSUM_IR_BACKEND=${backend^^} EINSUM_IR_REORDER_DIMS=${mode} OMP_NUM_THREADS=${num_threads} KMP_AFFINITY=${kmp_affinity} eval ${command} >> ${log_file} 2>&1
+        if [ $? -ne 0 ]; then
+          echo "Warning: Command failed: ${command}"
+          any_errors=1
+        fi
         echo -n "."
       fi
     done
@@ -189,3 +199,5 @@ done
 
 date
 echo "Done"
+
+exit $any_errors
