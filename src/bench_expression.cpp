@@ -521,8 +521,23 @@ int main( int     i_argc,
     std::cout << "  maximum absolute entry in ATen solution:      " << at::max( at::abs( l_out_aten ) ).item() << std::endl;
     std::cout << "  maximum absolute entry in einsum_ir solution: " << at::max( at::abs( l_data.back() ) ).item() << std::endl;
     std::cout << "  maximum element-wise difference:              " << at::max( at::abs( l_out_aten - l_data.back() ) ).item() << std::endl;
-    if( !at::allclose( l_out_aten, l_data.back() ) ) {
-      std::cerr << "warning: einsum_ir solution is not close to at:einsum!" << std::endl;
+
+    // compute frobenius norm of reference and diff
+    // see also: https://www.netlib.org/lapack/lug/node75.html
+    double l_frob_aten = at::norm( l_out_aten.to(at::ScalarType::Double),                   2 ).item().toDouble();
+    double l_frob      = at::norm( l_data.back().to(at::ScalarType::Double),                2 ).item().toDouble();
+    double l_frob_diff = at::norm( (l_out_aten - l_data.back()).to(at::ScalarType::Double), 2 ).item().toDouble();
+    double l_err = l_frob_diff / l_frob_aten;
+
+    std::cout << "  frobenius norm of ATen solution:              " << l_frob_aten << std::endl;
+    std::cout << "  frobenius norm of einsum_ir solution:         " << l_frob << std::endl;
+    std::cout << "  frobenius norm of difference:                 " << l_frob_diff << std::endl;
+    std::cout << "  relative error:                               " << l_err << std::endl;
+
+    double l_tol = (l_dtype_einsum_ir == einsum_ir::FP32) ? 1.0E-5 : 1.0E-12;
+
+    if( l_err > l_tol ) {
+      std::cerr << "warning: relative error is large!" << std::endl;
       return EXIT_FAILURE;
     }
   }
