@@ -288,7 +288,7 @@ TEST_CASE( "FP32 TBLIS-based binary contraction involving C, M, N and K dimensio
   //                               y  h  c  x  f  a
   at::Tensor l_right = at::randn( {4, 4, 7, 3, 5, 2} );
   //                                h  g  f  x  e  i  y
-  at::Tensor l_out_ref = at::rand( {4, 6, 5, 3, 8, 3, 4} );
+  at::Tensor l_out_ref = at::randn( {4, 6, 5, 3, 8, 3, 4} );
   at::Tensor l_out = l_out_ref.clone();
 
   // reference
