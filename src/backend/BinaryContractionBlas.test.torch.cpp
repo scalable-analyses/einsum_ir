@@ -43,9 +43,9 @@ TEST_CASE( "FP32 BLAS-based binary contraction executing a matmul.", "[binary_co
                    einsum_ir::UNDEFINED_KTYPE );
 
   // data
-  at::Tensor l_in_left  = at::rand( {4, 2} );
-  at::Tensor l_in_right = at::rand( {3, 4} );
-  at::Tensor l_out_ref  = at::rand( {3, 2} );
+  at::Tensor l_in_left  = at::randn( {4, 2} );
+  at::Tensor l_in_right = at::randn( {3, 4} );
+  at::Tensor l_out_ref  = at::randn( {3, 2} );
   at::Tensor l_out_native = l_out_ref.clone();
 
   // reference
@@ -569,7 +569,7 @@ TEST_CASE( "FP32 BLAS-based binary contraction involving C, M, N and K dimension
   //                               y  x  h  f  c  a
   at::Tensor l_right = at::randn( {4, 3, 4, 5, 7, 2} );
   //                                y  h  g  f  x  e  i
-  at::Tensor l_out_ref = at::rand( {4, 4, 6, 5, 3, 8, 3} );
+  at::Tensor l_out_ref = at::randn( {4, 4, 6, 5, 3, 8, 3} );
   at::Tensor l_out_native = l_out_ref.clone();
 
   // reference
@@ -664,7 +664,7 @@ TEST_CASE( "Complex FP32 BLAS-based binary contraction involving C, M, N and K d
   //                               z  y  x  h  f  c  a
   at::Tensor l_right = at::randn( {2, 4, 3, 4, 5, 7, 2} );
   //                                z  y  h  g  f  x  e  i
-  at::Tensor l_out_ref = at::rand( {2, 4, 4, 6, 5, 3, 8, 3} );
+  at::Tensor l_out_ref = at::randn( {2, 4, 4, 6, 5, 3, 8, 3} );
   at::Tensor l_out = l_out_ref.clone();
 
   at::Tensor l_left_aos    = at::view_as_complex( l_left.permute(  { 1, 2, 3, 4, 5, 6, 7, 0 } ).contiguous() );
@@ -763,7 +763,7 @@ TEST_CASE( "FP32 BLAS-based binary contraction involving C, M, N and K dimension
   //                               x  h  y  f  c  a
   at::Tensor l_right = at::randn( {3, 4, 4, 5, 7, 2} );
   //                                h  g  f  x  e  i  y
-  at::Tensor l_out_ref = at::rand( {4, 6, 5, 3, 8, 3, 4} );
+  at::Tensor l_out_ref = at::randn( {4, 6, 5, 3, 8, 3, 4} );
   at::Tensor l_out_native = l_out_ref.clone();
 
   // reference
@@ -859,7 +859,7 @@ TEST_CASE( "Complex FP32 BLAS-based binary contraction involving C, M, N and K d
   //                               z  x  h  y  f  c  a
   at::Tensor l_right = at::randn( {2, 3, 4, 4, 5, 7, 2} );
   //                                z  h  g  f  x  e  i  y
-  at::Tensor l_out_ref = at::rand( {2, 4, 6, 5, 3, 8, 3, 4} );
+  at::Tensor l_out_ref = at::randn( {2, 4, 6, 5, 3, 8, 3, 4} );
   at::Tensor l_out = l_out_ref.clone();
 
   at::Tensor l_left_aos    = at::view_as_complex( l_left.permute(  { 1, 2, 3, 4, 5, 6, 7, 0 } ).contiguous() );
