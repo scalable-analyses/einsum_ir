@@ -30,6 +30,7 @@ jobs:
           sudo dnf install -y cmake
           sudo dnf install -y python3.10
           sudo dnf install -y scons
+          sudo dnf install -y diffutils
 
       - name: Install PyTorch
         run: |
