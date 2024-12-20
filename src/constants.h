@@ -15,6 +15,15 @@ namespace einsum_ir {
   } dim_t;
 
   typedef enum {
+    OMP =  0, // OMP parallelized dim
+    SEQ =  1, // Sequential dimension
+    SFC =  2, // SFC dimnesion (always is also omp parallelized)
+    PRIM = 3, // Primitive dimension 
+    PRIM_BR = 4, // Batch reduce dimension 
+    UNDEFINED_EXEC = 99
+  } exec_t;
+
+  typedef enum {
     LEFT_NATIVE_RIGHT_NATIVE_OUT_NATIVE                             = 0,
     LEFT_BC_BM_BK_BI_KB_MB_RIGHT_BC_BN_BK_BJ_NB_KB_OUT_NATIVE       = 1,
     LEFT_BC_BM_BK_BI_KB_MB_CB_RIGHT_BC_BN_BK_BJ_NB_KB_CB_OUT_NATIVE = 2,
