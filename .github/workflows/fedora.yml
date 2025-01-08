@@ -10,11 +10,10 @@ on:
 
 jobs:
   tests:
-    runs-on: self-hosted
     strategy:
       matrix:
         runner: [lechuck, stan, haggis]
-      runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - uses: actions/checkout@v4
