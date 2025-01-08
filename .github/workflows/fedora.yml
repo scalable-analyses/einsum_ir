@@ -12,8 +12,8 @@ jobs:
   tests:
     strategy:
       matrix:
-        runner: [lechuck, stan, haggis]
-    runs-on: [self-hosted, "${{ matrix.runner }}"]
+        arch: [raptor-lake, grace, m4]
+    runs-on: ["${{ matrix.arch }}"]
 
     steps:
       - uses: actions/checkout@v4
