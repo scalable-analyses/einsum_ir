@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         runner: [lechuck, stan, haggis]
-    runs-on: ${{ matrix.runner }}
+    runs-on: [self-hosted, "${{ matrix.runner }}"]
 
     steps:
       - uses: actions/checkout@v4
