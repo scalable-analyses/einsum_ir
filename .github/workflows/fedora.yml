@@ -134,13 +134,13 @@ jobs:
       - name: Run binary tests
         run: |
           cd einsum_ir
-          ./build_gcc/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,256" FP32 "a,b,c,d,e,f"
-          ./build_gcc/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,256" FP32 "a,b,c,d,f,e"
-          ./build_gcc/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,256" FP32 "a,b,c,f,d,e"
+          ./build_gcc/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,128" FP32 "a,b,c,d,e,f"
+          ./build_gcc/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,128" FP32 "a,b,c,d,f,e"
+          ./build_gcc/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,128" FP32 "a,b,c,f,d,e"
 
-          ./build_llvm/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,256" FP32 "a,b,c,d,e,f"
-          ./build_llvm/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,256" FP32 "a,b,c,d,f,e"
-          ./build_llvm/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,256" FP32 "a,b,c,f,d,e"
+          ./build_llvm/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,128" FP32 "a,b,c,d,e,f"
+          ./build_llvm/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,128" FP32 "a,b,c,d,f,e"
+          ./build_llvm/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,128" FP32 "a,b,c,f,d,e"
 
       - name: Run expression benchmarks
         run: |
