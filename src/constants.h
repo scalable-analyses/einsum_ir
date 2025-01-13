@@ -19,7 +19,6 @@ namespace einsum_ir {
     SEQ =  1, // Sequential dimension
     SFC =  2, // SFC dimnesion (always is also omp parallelized)
     PRIM = 3, // Primitive dimension 
-    PRIM_BR = 4, // Batch reduce dimension 
     UNDEFINED_EXEC = 99
   } exec_t;
 
@@ -78,6 +77,7 @@ namespace einsum_ir {
     CPX_COPY        = 9,
     CPX_INT_HIGH    = 10, // internal use only
     CUSTOM_KTYPE    = 11,
+    BR_MADD         = 12,
     UNDEFINED_KTYPE = 99
   } kernel_t;
 

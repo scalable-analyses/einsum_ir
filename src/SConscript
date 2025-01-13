@@ -32,11 +32,13 @@ if g_env['blas'] != False:
 # default files
 l_sources = [ 'backend/Tensor.cpp',
               'backend/IterationSpaces.cpp',
+              'backend/IterationSpacesSfc.cpp',
               'backend/UnaryLoops.cpp',
               'backend/UnaryLoopsSimple.cpp',
               'backend/Unary.cpp',
               'backend/UnaryScalar.cpp',
               'backend/ContractionLoops.cpp',
+              'backend/ContractionBackend.cpp',
               'backend/ContractionLoopsSimple.cpp',
               'backend/BinaryContraction.cpp',
               'backend/BinaryContractionScalar.cpp',
@@ -51,6 +53,7 @@ l_sources = [ 'backend/Tensor.cpp',
 if g_env['libxsmm'] != False:
   l_sources += [ 'backend/UnaryLoopsTpp.cpp',
                  'backend/UnaryTpp.cpp',
+                 'backend/ContractionBackendTpp.cpp',
                  'backend/ContractionLoopsTpp.cpp',
                  'backend/BinaryContractionTpp.cpp',
                  'backend/ContractionPackingTpp.cpp', ]
@@ -60,6 +63,7 @@ if g_env['tblis'] != False:
 
 l_tests = [ 'tests.cpp',
             'backend/IterationSpaces.test.cpp',
+            #'backend/IterationSpacesSfc.test.cpp',
             'backend/Unary.test.cpp',
             'backend/ContractionLoopsSimple.test.cpp',
             'backend/BinaryContraction.test.cpp',
@@ -77,6 +81,7 @@ if g_env['libtorch'] != False:
 
 if g_env['libxsmm'] != False and g_env['libtorch'] != False:
   l_tests += [ 'backend/UnaryTpp.test.torch.cpp',
+               'backend/ContractionBackendTpp.test.torch.cpp',
                'backend/BinaryContractionTpp.test.torch.cpp' ]
 
 if g_env['blas'] != False and g_env['libtorch'] != False:
