@@ -1,6 +1,6 @@
 #!/bin/bash
 # parse command line arguments
-while getopts 'pe:l:r:b:d:k:hv' flag; do
+while getopts 'pe:l:r:b:d:k:n:hv' flag; do
   case "${flag}" in
     p) enable_ht=1 ;;
     e) einsum_ir_exe="${OPTARG}" ;;
@@ -9,8 +9,9 @@ while getopts 'pe:l:r:b:d:k:hv' flag; do
     b) backend="${OPTARG}" ;;
     d) mode="${OPTARG}" ;;
     k) selected_keys="${OPTARG}" ;;
+    n) num_cores="${OPTARG}" ;;
     v) verbose=1 ;;
-    h) echo "Usage: $0 [-p enable_hyperthreading] [-e einsum_ir_executable] [-l log_directory] [-r num_repetitions] [-b backend] [-d mode] [-k benchmark_keys] [-v verbose]"
+    h) echo "Usage: $0 [-p enable_hyperthreading] [-e einsum_ir_executable] [-l log_directory] [-r num_repetitions] [-b backend] [-d mode] [-k benchmark_keys] [-n num_cores] [-v verbose]"
        echo "Optional arguments:"
        echo "  -p: Enable hyperthreading"
        echo "  -e: Path to einsum_ir executable"
@@ -22,9 +23,10 @@ while getopts 'pe:l:r:b:d:k:hv' flag; do
        echo "      1: Use expr + contraction path, do     reorder dimensions."
        echo "      2: Use pre-optimized einsum tree."
        echo "  -k: Benchmark keys to run (default: all, options: syn,tt,fctn,tw,getd,trn,mera,tnlm,tccg_blocked,tccg_blocked_reordered,fc)"
+       echo "  -n: Number of cores to use (default: detected from system)"
        echo "  -v: Verbose output (default: off)"; exit 0 ;;
     *) echo "Unexpected option ${flag}"
-       echo "Usage: $0 [-p enable_hyperthreading] [-e einsum_ir_executable] [-l log_directory] [-r num_repetitions] [-b backend] [-d mode] [-k benchmark_keys]"
+       echo "Usage: $0 [-p enable_hyperthreading] [-e einsum_ir_executable] [-l log_directory] [-r num_repetitions] [-b backend] [-d mode] [-k benchmark_keys] [-n num_cores]"
        exit 1 ;;
   esac
 done
