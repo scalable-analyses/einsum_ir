@@ -1,6 +1,6 @@
 #include "catch.hpp"
 #include "IterationSpacesSfc.h"
-#include "../constants.h"
+#include "../../constants.h"
 
 
 TEST_CASE( "Threading test for Iteration Space with SFC+OMP and 3 threads.", "[iter_space_sfc]" ) {

@@ -3,7 +3,8 @@
 
 #include <vector>
 #include <map>
-#include "../constants.h"
+#include "../../constants.h"
+#include "constants_local.h"
 #include "IterationSpacesSfc.h"
 
 
@@ -35,16 +36,17 @@ class einsum_ir::backend::ContractionBackend {
 
   protected:
     //! datatype of the left input
-    data_t m_dtype_left = UNDEFINED_DTYPE;
+    data_t m_dtype_left;
 
     //! datatype of the right input
-    data_t m_dtype_right = UNDEFINED_DTYPE;
+    data_t m_dtype_right;
+
+    //! datatype of the output
+    data_t m_dtype_out;
+
 
     //! datatype used during the computations
     data_t m_dtype_comp = UNDEFINED_DTYPE;
-
-    //! datatype of the output
-    data_t m_dtype_out = UNDEFINED_DTYPE;
 
     //TODO 
     std::vector< dim_t >   m_loop_dim_type;
@@ -79,6 +81,16 @@ class einsum_ir::backend::ContractionBackend {
                kernel_t                       i_ktype_main,
                kernel_t                       i_ktype_last_touch );
 
+
+    //TODO
+    void init( std::vector< loop_property > const & i_loops,
+               data_t                         i_dtype_left,
+               data_t                         i_dtype_right,
+               data_t                         i_dtype_comp,
+               data_t                         i_dtype_out,
+               kernel_t                       i_ktype_first_touch,
+               kernel_t                       i_ktype_main,
+               kernel_t                       i_ktype_last_touch );
 
     /**
      * Compiles the contraction loop interface.
@@ -116,10 +128,10 @@ class einsum_ir::backend::ContractionBackend {
      **/
     void contract_iter( int64_t         i_thread_id,
                         int64_t         i_id_loop,
-                        void    const * i_ptr_left,
-                        void    const * i_ptr_right,
-                        void    const * i_ptr_out_aux,
-                        void          * i_ptr_out,
+                        char    const * i_ptr_left,
+                        char    const * i_ptr_right,
+                        char    const * i_ptr_out_aux,
+                        char          * i_ptr_out,
                         bool            i_first_access,
                         bool            i_last_access );
 

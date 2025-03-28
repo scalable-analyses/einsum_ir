@@ -1,0 +1,79 @@
+#ifndef EINSUM_IR_BACKEND_BINARY_CONTRACTION_SFC_TPP
+#define EINSUM_IR_BACKEND_BINARY_CONTRACTION_SFC_TPP
+
+#include <libxsmm.h>
+#include "BinaryContraction.h"
+#include "binaryContraction/ContractionBackendTpp.h"
+
+namespace einsum_ir {
+  namespace backend {
+    class BinaryContractionSfcTpp;
+  }
+}
+
+class einsum_ir::backend::BinaryContractionSfcTpp: public BinaryContraction {
+  private:
+    //TODO
+    ContractionBackendTpp m_backend;
+
+    /**
+     * Helper function for map find with default value
+     *
+     * @param i_map map.
+     * @param i_key key.
+     * @param i_default default value.
+     *
+     * @param return value or default value.
+     **/
+    template <typename T>
+    T map_find_default( std::map< int64_t, T > const * i_map,
+                        int64_t                        i_key,
+                        T                              i_default){
+      if(auto search = i_map->find(i_key); search != i_map->end() ) {
+        return search->second;
+      }
+      else {
+        return i_default;
+      }
+    }
+
+  public:
+
+    /**
+     * Compiles the binary contraction.
+     **/
+    err_t compile();
+
+    /**
+     * Initializes the threading configuration of the contraction.
+     *
+     * @param i_num_tasks_target number of targeted tasks.
+     **/
+    void threading( int64_t i_num_tasks_target  );
+
+    /**
+     * Performs a contraction on the given input data.
+     *
+     * @param i_tensor_left left input tensor.
+     * @param i_tensor_right right input tensor.
+     * @param io_tensor_out output tensor.
+     **/
+    void contract( void const * i_tensor_left,
+                   void const * i_tensor_right,
+                   void       * io_tensor_out );
+
+    /**
+     * Performs a contraction on the given input data.
+     *
+     * @param i_tensor_left left input tensor.
+     * @param i_tensor_right right input tensor.
+     * @param i_tensor_out_aux auxiliary data w.r.t. output tensor.
+     * @param io_tensor_out output tensor. 
+     **/
+    void contract( void const * i_tensor_left,
+                   void const * i_tensor_right,
+                   void const * i_tensor_out_aux,
+                   void       * io_tensor_out );
+};
+
+#endif

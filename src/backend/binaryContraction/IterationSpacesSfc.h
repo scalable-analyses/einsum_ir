@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <map>
-#include "../constants.h"
+#include "../../constants.h"
 
 
 namespace einsum_ir {
@@ -19,31 +19,32 @@ class einsum_ir::backend::IterationSpacesSfc {
       int64_t end = 0;
     };
 
-    typedef enum {
-      LEFT = 0, // left input
-      RIGHT = 1, // right input
-      OUT = 2, // output
-      MAX_NUM_INPUTS = 3 //
-    } input_t;
-
     //TODO 
     std::vector< dim_t >   const * m_loop_dim_type;
     std::vector< exec_t >  const * m_loop_exec_type;
     std::vector< int64_t > const * m_loop_sizes;
     std::vector< std::vector< int64_t > const * > m_loop_strides;
 
-    //std::vector< int64_t > const * m_loop_strides_left;
-    //std::vector< int64_t > const * m_loop_strides_right;
-    //std::vector< int64_t > const * m_loop_strides_out;
+    int64_t m_sfc_tasks_m = 1;
+    int64_t m_sfc_tasks_n = 1;
+    int64_t m_sfc_tasks_k = 1;
 
+    range_t m_parallel_loops; 
+
+    range_t m_omp_loops;
+    range_t m_sfc_loops_m;
+    range_t m_sfc_loops_n;
+    range_t m_sfc_loops_k;
+
+    std::vector< range_t > m_thread_work_space;
 
     //! vector of movements accessed by thread_id and movement_id
     std::vector< std::vector< uint8_t > > m_dim_movements;
     
-    //! vector of movement offsets accessed by input_t and a movement
+    //! vector of movement offsets accessed by ioparam_t and a movement
     std::vector< std::vector< int64_t > > m_movement_offsets;
 
-    //! vector of initial offsets accessed by thread_id and input_t
+    //! vector of initial offsets accessed by thread_id and ioparam_t
     std::vector< std::vector< int64_t > > m_initial_offsets;
 
     //! number of parallel loops
@@ -57,35 +58,40 @@ class einsum_ir::backend::IterationSpacesSfc {
 
 
     //TODO
-    void convertStridesToOffsets( range_t i_omp_loops,
-                                  range_t i_sfc_loops_m,
-                                  range_t i_sfc_loops_n,
-                                  bool    i_sfc_m_large,
+    void convertStridesToOffsets( dim_t   i_sfc_primary,
                                   std::vector< int64_t > const & i_strides,
                                   std::vector< int64_t >       & io_offsets );
     
     //TODO
-    int64_t calculateInitialOffsets( range_t i_omp_loops,
-                                     range_t i_sfc_loops_m,
-                                     range_t i_sfc_loops_n,
-                                     int64_t i_id_omp,
-                                     int64_t i_id_sfc_m,
-                                     int64_t i_id_sfc_n,
-                                     std::vector< int64_t > const & i_strides );
+    int64_t calculateInitialOffset( int64_t i_id_omp,
+                                    int64_t i_id_sfc_m,
+                                    int64_t i_id_sfc_n,
+                                    int64_t i_id_sfc_k,
+                                    std::vector< int64_t > const & i_strides );
 
     //TODO
     uint8_t getMaxDimJump( range_t i_dim_loops,
                            int64_t i_id_new,
-                           int64_t i_id_old,
-                           int64_t i_offset );
+                           int64_t i_id_old );
 
+    void SfcOracle3d( int64_t *i_m, 
+                      int64_t *i_n, 
+                      int64_t *i_k,
+                      int64_t *i_omp, 
+                      int64_t  i_idx,
+                      range_t  i_thread_range );
+    
+    void SfcOracle2d( int64_t *i_m, 
+                      int64_t *i_n, 
+                      int64_t *i_omp, 
+                      int64_t  i_idx );
+    
     //TODO
-    int gilbert_d3xy(int *x, 
+    int gilbert_d2xy( int *x, 
                       int *y, 
-                      int *z, 
-                      int idx, 
-                      int w, 
-                      int h );
+                      int  idx,
+                      int  w,
+                      int  h );
 
 
   public:
@@ -106,6 +112,7 @@ class einsum_ir::backend::IterationSpacesSfc {
                std::vector< int64_t > const * i_loop_sizes,
                std::vector< int64_t > const * i_loop_strides_left,
                std::vector< int64_t > const * i_loop_strides_right,
+               std::vector< int64_t > const * i_loop_strides_out_aux,
                std::vector< int64_t > const * i_loop_strides_out,
                int64_t                        i_num_threads);
 
@@ -134,17 +141,17 @@ class einsum_ir::backend::IterationSpacesSfc {
      **/
     void addMovementOffsets( int64_t    i_thread_id, 
                              int64_t    i_task_id,
-                             char    ** io_offset_left,
-                             char    ** io_offset_right,
-                             char    ** io_offset_out );
+                             char    const ** io_offset_left,
+                             char    const ** io_offset_right,
+                             char          ** io_offset_out );
     
     /**
      * TODO
      **/
     void addInitialOffsets( int64_t    i_thread_id,
-                            char    ** io_offset_left,
-                            char    ** io_offset_right,
-                            char    ** io_offset_out );
+                            char    const ** io_offset_left,
+                            char    const ** io_offset_right,
+                            char          ** io_offset_out );
 };
 
 #endif

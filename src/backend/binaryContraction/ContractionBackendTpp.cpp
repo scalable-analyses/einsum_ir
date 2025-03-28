@@ -46,10 +46,10 @@ void einsum_ir::backend::ContractionBackendTpp::kernel_main( void const * i_left
 einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
 
   // libxsmm data types
-  libxsmm_datatype l_xmm_dtype_left  = dtype_to_libxsmm( m_dtype_left );
+  libxsmm_datatype l_xmm_dtype_left  = dtype_to_libxsmm( m_dtype_left  );
   libxsmm_datatype l_xmm_dtype_right = dtype_to_libxsmm( m_dtype_right );
+  libxsmm_datatype l_xmm_dtype_out   = dtype_to_libxsmm( m_dtype_out   );
   libxsmm_datatype l_xmm_dtype_comp  = dtype_to_libxsmm( m_dtype_comp );
-  libxsmm_datatype l_xmm_dtype_out   = dtype_to_libxsmm( m_dtype_out );
 
   if(    l_xmm_dtype_left  == libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED
       || l_xmm_dtype_right == libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED
@@ -63,12 +63,9 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
   libxsmm_blasint l_n = m_loop_sizes[l_num_loops-2];
   libxsmm_blasint l_k = m_loop_sizes[l_num_loops-1];
 
-  libxsmm_blasint l_lda = m_loop_strides_left[ l_num_loops-1];
+  libxsmm_blasint l_lda = m_loop_strides_left[l_num_loops-1];
   libxsmm_blasint l_ldb = m_loop_strides_right[l_num_loops-2];
-  libxsmm_blasint l_ldc = m_loop_strides_out[  l_num_loops-2];
-
-  std::cout << l_m << " " << l_n <<" " << l_k << std::endl; 
-  std::cout << l_lda << " " << l_ldb <<" " << l_ldc << std::endl; 
+  libxsmm_blasint l_ldc = m_loop_strides_out[l_num_loops-2];
 
   // first-touch and last-touch shape
   libxsmm_meltw_unary_shape l_shape_single_touch = libxsmm_create_meltw_unary_shape( l_m,
@@ -107,7 +104,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
   if( m_ktype_main == kernel_t::BR_MADD ){
     m_br = m_loop_sizes[l_num_loops-4]; //can't use class variable because of poor performance. False sharing?
     l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
-    l_brconfig.br_stride_a_hint = m_loop_strides_left[ l_num_loops-4] * ce_n_bytes(m_dtype_left);
+    l_brconfig.br_stride_a_hint = m_loop_strides_left[l_num_loops-4]  * ce_n_bytes(m_dtype_left);
     l_brconfig.br_stride_b_hint = m_loop_strides_right[l_num_loops-4] * ce_n_bytes(m_dtype_right);
     l_brconfig.br_unroll_hint = 0; //TODO could remove unroll hint to improve performance
   }

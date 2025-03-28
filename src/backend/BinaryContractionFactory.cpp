@@ -4,6 +4,7 @@
 
 #ifdef PP_EINSUM_IR_HAS_LIBXSMM
 #include "BinaryContractionTpp.h"
+#include "BinaryContractionSfcTpp.h"
 #endif
 
 #ifdef PP_EINSUM_IR_HAS_BLAS
@@ -47,7 +48,7 @@ einsum_ir::backend::BinaryContraction * einsum_ir::backend::BinaryContractionFac
 
 #ifdef PP_EINSUM_IR_HAS_LIBXSMM
   if( i_backend == einsum_ir::backend_t::TPP ) {
-    return new BinaryContractionTpp();
+    return new BinaryContractionSfcTpp();
   }
 #endif
 
