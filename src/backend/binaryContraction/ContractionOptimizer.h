@@ -23,10 +23,7 @@ class einsum_ir::backend::ContractionOptimizer {
     int64_t m_target_n  = 64;
     int64_t m_target_k  = 256;
 
-    int64_t m_target_k_inner = 256;
-    int64_t m_target_sfc_m = 256;
-    int64_t m_target_sfc_n = 256;
-    int64_t m_target_parallel = 4096;
+    int64_t m_target_parallel = 16384;
 
     int64_t m_num_tasks = 72;
 
@@ -49,8 +46,11 @@ class einsum_ir::backend::ContractionOptimizer {
     int64_t add_loops_until( std::vector<loop_property> * i_source_loops,
                              std::vector<loop_property> * i_dest_loops,
                              int64_t i_target_size,
-                             bool    i_split_last_loop,
-                             exec_t  i_new_exec_t );    
+                             exec_t  i_new_exec_t );
+    
+    int64_t add_all_loops( std::vector<loop_property> * i_source_loops,
+                           std::vector<loop_property> * i_dest_loops,
+                           exec_t  i_new_exec_t );  
             
 
     int64_t findSplit( int64_t i_dim_size,

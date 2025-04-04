@@ -63,7 +63,6 @@ void einsum_ir::backend::ContractionOptimizer::fuseLoops(){
 }
 
 void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
-  std::cout << "optimzing contraction" << std::endl;
   //add unoptimized loops to internal data structures
   std::vector< std::vector< loop_property > > l_free_loops;
   std::vector< loop_property >                l_reordered_loops;
@@ -122,18 +121,22 @@ void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
 
   //adapt all kernel target sizes depending on what is possible e.g. small k kernel -> choose bigger m target
   int64_t l_kernel_targets[] = {1, m_target_m, m_target_n, m_target_k};
-  while( l_potential_kernel_size[0] * l_potential_kernel_size[3] < l_kernel_targets[3] / 2){
+  while( l_potential_kernel_size[3] <= l_kernel_targets[3] / 2 ){
     l_kernel_targets[3] /= 2;
+    l_kernel_targets[0] *= 2;
+  }
+  while( l_potential_kernel_size[0] <= l_kernel_targets[0] / 2 ){
+    l_kernel_targets[0] /= 2;
     l_kernel_targets[1] *= 2;
   }
-  while(l_potential_kernel_size[1] < l_kernel_targets[1] / 2){
+  while( l_potential_kernel_size[1] <= l_kernel_targets[1] / 2 ){
     l_kernel_targets[1] /= 2;
     l_kernel_targets[2] *= 2;
   }
-  l_kernel_targets[0] = l_kernel_targets[3]/l_potential_kernel_size[3];
 
   //reduce kernel size when parallelism is low
-  while(l_possible_parallelism / (l_kernel_targets[1] * l_kernel_targets[2]) < m_num_tasks ){
+  while(l_possible_parallelism / (l_kernel_targets[1] * l_kernel_targets[2]) < m_num_tasks &&
+        l_kernel_targets[1] * l_kernel_targets[2] > 1 ){
     if(l_kernel_targets[1] < l_kernel_targets[2]){
       l_kernel_targets[2] /= 2;
     }
@@ -141,8 +144,7 @@ void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
       l_kernel_targets[1] /= 2;
     }
   }
-  std::cout <<"\tkernel targets: " << l_kernel_targets[0] << " " << l_kernel_targets[1] << " " << l_kernel_targets[2] << " " << l_kernel_targets[3] <<std::endl;
-  
+ 
   //create kernel from potential kernel dimensions
   int64_t l_kernel_sizes[] = {1, 1, 1, 1};
   l_kernel_sizes[3] = splitLoop( l_potential_kernel_loop[3],
@@ -159,43 +161,32 @@ void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
                                  einsum_ir::PRIM );
   l_kernel_sizes[1] = splitLoop( l_potential_kernel_loop[1],
                                  &l_free_loops[einsum_ir::M],
-                                 m_loops,
+                                 m_loops,\
                                  l_kernel_targets[1],
                                  0,
                                  einsum_ir::PRIM );
-  l_kernel_sizes[0] = splitLoop( l_potential_kernel_loop[0],
-                                 &l_free_loops[einsum_ir::K],
-                                 m_loops,
-                                 l_kernel_targets[0],
-                                 0,
-                                 einsum_ir::PRIM );
-  std::cout <<"\tkernel sizes: " << l_kernel_sizes[0] << " " << l_kernel_sizes[1] << " " << l_kernel_sizes[2] << " " << l_kernel_sizes[3] <<std::endl;
-  if(l_kernel_sizes[0] > 1){
+  //TODO remove false when seg fault is fixed
+  if( l_kernel_targets[0] > 1 ){
     *m_ktype_main = einsum_ir::BR_MADD;
-    std::cout << "using BR_GEMM" << std::endl;
+    l_kernel_sizes[0] = splitLoop( l_potential_kernel_loop[0],
+                                  &l_free_loops[einsum_ir::K],
+                                  m_loops,
+                                  l_kernel_targets[0],
+                                  0,
+                                  einsum_ir::PRIM );
   }
 
-  //add inner k loops
-  int64_t l_target_k_inner = m_target_k_inner / (l_kernel_sizes[0] * l_kernel_sizes[3]);
-  add_loops_until(&l_free_loops[einsum_ir::K], 
-                  m_loops,
-                  l_target_k_inner,
-                  false,
-                  einsum_ir::SEQ);
-  
   //add sfc n dimension
   int64_t l_size_sfc = 1;
   l_size_sfc *= add_loops_until(&l_free_loops[einsum_ir::N],
                                 m_loops, 
-                                m_target_sfc_n,
-                                false,
+                                sqrt(m_target_parallel),
                                 einsum_ir::SFC);
 
   //add sfc m dimension
   l_size_sfc *= add_loops_until(&l_free_loops[einsum_ir::M],
                                 m_loops, 
-                                m_target_sfc_m,
-                                false,
+                                sqrt(m_target_parallel),
                                 einsum_ir::SFC);
 
 
@@ -204,61 +195,63 @@ void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
   int64_t l_target_parallel = m_target_parallel / l_size_sfc;
 
   //add remaining dimensions
-  add_loops_until(&l_free_loops[einsum_ir::C], 
-                  m_loops,
-                  0,
-                  false,
-                  einsum_ir::SEQ);
+  add_all_loops( &l_free_loops[einsum_ir::K],
+                 m_loops,
+                 einsum_ir::SEQ );
 
-  add_loops_until(&l_free_loops[einsum_ir::M],
-                  m_loops,
-                  0,
-                  false,
-                  einsum_ir::SEQ);
+  add_all_loops( &l_free_loops[einsum_ir::M],
+                 m_loops,
+                 einsum_ir::SEQ );
 
-  add_loops_until(&l_free_loops[einsum_ir::N],
-                  m_loops,
-                  0,
-                  false,
-                  einsum_ir::SEQ);
+  add_all_loops( &l_free_loops[einsum_ir::N],
+                 m_loops,
+                 einsum_ir::SEQ );
 
-  add_loops_until(&l_free_loops[einsum_ir::K],
+  add_all_loops( &l_free_loops[einsum_ir::C], 
                   m_loops,
-                  0,
-                  false,
-                  einsum_ir::SEQ);
+                  einsum_ir::SEQ );
 }
 
 //TODO should have a bug for split last loop (while loop not ending)
 int64_t einsum_ir::backend::ContractionOptimizer::add_loops_until( std::vector<loop_property> * i_source_loops,
                                                                    std::vector<loop_property> * i_dest_loops,
                                                                    int64_t i_target_size,
-                                                                   bool    i_split_last_loop,
                                                                    exec_t  i_new_exec_t ){
   int64_t l_size_all = 1;
   int64_t l_target_size = i_target_size;
   while( i_source_loops->size() > 0 && 
-         (l_target_size > 1 || l_target_size == 0 )  ){
+         l_target_size > 1 ){
     std::vector<loop_property>::iterator l_it = i_source_loops->end() - 1;
-    if(i_split_last_loop){
-      l_size_all *= splitLoop( l_it,
-                               i_source_loops,
-                               i_dest_loops,
-                               l_target_size,
-                               0,
-                               i_new_exec_t );
-    }
-    else{
-      l_size_all *= addLoop( l_it,
-                             i_source_loops,
-                             i_dest_loops,
-                             0,
-                             i_new_exec_t );
-    }
-    l_target_size = i_target_size / l_size_all;
+    int64_t l_size_loop  = l_it->size;
+    int64_t l_size_split = splitLoop( l_it,
+                                      i_source_loops,
+                                      i_dest_loops,
+                                      l_target_size,
+                                      0,
+                                      i_new_exec_t );
 
+    l_size_all *= l_size_loop;
+    l_target_size = i_target_size / l_size_all;
+    if( l_size_split < l_size_loop ){
+      l_target_size = 0;
+    }
   }
 
+  return l_size_all;
+}
+
+int64_t einsum_ir::backend::ContractionOptimizer::add_all_loops( std::vector<loop_property> * i_source_loops,
+                                                                 std::vector<loop_property> * i_dest_loops,
+                                                                 exec_t  i_new_exec_t ){
+  int64_t l_size_all = 1;
+  while( i_source_loops->size() > 0 ){
+    std::vector<loop_property>::iterator l_it = i_source_loops->end() - 1;
+    l_size_all *= addLoop( l_it,
+                           i_source_loops,
+                           i_dest_loops,
+                           0,
+                           i_new_exec_t );
+  }
   return l_size_all;
 }
 
@@ -269,31 +262,38 @@ int64_t einsum_ir::backend::ContractionOptimizer::splitLoop( std::vector<loop_pr
                                                              int64_t i_new_loop_pos, 
                                                              exec_t  i_new_exec_t ){
 
-//TODO could remove i_target_size > 1
-  if( i_target_size > 1 ){ 
-    if( i_source_loops->end() > i_loop ){  
-      int64_t l_split = findSplit(i_loop->size, i_target_size );
 
-      i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, *i_loop );
-      i_dest_loops->at(i_new_loop_pos).exec_type = i_new_exec_t;
-      i_dest_loops->at(0).size = l_split;
+  if( i_source_loops->end() > i_loop ){  
+    int64_t l_split = findSplit(i_loop->size, i_target_size );
 
-      i_loop->size           /= l_split;
-      i_loop->stride_left    *= l_split;
-      i_loop->stride_right   *= l_split;
-      i_loop->stride_out_aux *= l_split;
-      i_loop->stride_out     *= l_split;
+    i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, *i_loop );
+    i_dest_loops->at(i_new_loop_pos).exec_type = i_new_exec_t;
+    i_dest_loops->at(0).size = l_split;
 
-      if( i_loop->size == 1 ){
-          i_source_loops->erase( i_loop );
-      }
-      return l_split;
+    i_loop->size           /= l_split;
+    i_loop->stride_left    *= l_split;
+    i_loop->stride_right   *= l_split;
+    i_loop->stride_out_aux *= l_split;
+    i_loop->stride_out     *= l_split;
+
+    if( i_loop->size == 1 ){
+        i_source_loops->erase( i_loop );
     }
-    else{
-      std::cout << "\nWARNING: did not find loop, adding size 1 loop\n”"<< std::endl;
-      //TODO add empty loops for empty dimesions
-    }
+    return l_split;
   }
+  
+  std::cout << "WARNING: did not find loop, adding size 1 loop"<< std::endl;
+  //add empty loops for empty dimesions
+  loop_property l_empty_loop;
+  l_empty_loop.dim_type = dim_t::UNDEFINED_DIM;
+  l_empty_loop.exec_type = exec_t::PRIM;
+  l_empty_loop.size = 1;
+  l_empty_loop.stride_left = 0;
+  l_empty_loop.stride_right = 0;
+  l_empty_loop.stride_out = 0;
+  l_empty_loop.stride_out_aux = 0;
+
+  i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, l_empty_loop );
   return 1;                                                         
 }
 
@@ -313,6 +313,7 @@ int64_t einsum_ir::backend::ContractionOptimizer::addLoop( std::vector<loop_prop
   return 1;                                                         
 }
 
+//TODO optimize. This does not find good kernels bigger than 1024
 int64_t einsum_ir::backend::ContractionOptimizer::findSplit( int64_t i_dim_size,
                                                              int64_t i_target_size
                                                            ){
@@ -320,7 +321,7 @@ int64_t einsum_ir::backend::ContractionOptimizer::findSplit( int64_t i_dim_size,
   int64_t l_best_factor = i_dim_size;
   double l_best_distance = abs(log((double)i_dim_size/i_target_size));
 
-  int64_t l_max_factor = 512;
+  int64_t l_max_factor = 1024;
   l_max_factor = i_dim_size / 2 < l_max_factor ? i_dim_size / 2 : l_max_factor;
   for(int64_t l_i = 2; l_i <= l_max_factor; l_i++){
     if(i_dim_size % l_i == 0){

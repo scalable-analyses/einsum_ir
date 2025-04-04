@@ -102,7 +102,8 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
       return err_t::COMPILATION_FAILED;
     }
   }
- 
+  std::cout << m_num_tasks << " " << m_sfc_tasks_m << " " << m_sfc_tasks_n << std::endl; 
+
   //convert strides to offsets
   int64_t l_num_tensors = m_loop_strides.size();
   m_movement_offsets.resize(l_num_tensors );
@@ -113,11 +114,11 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
                              *m_loop_strides.at(l_io_tensor),
                              m_movement_offsets[l_io_tensor] );
   } 
-  //TODO addapt for k
-  //allocate memory for iteration space
-  m_dim_movements.resize(   m_num_threads );
-  m_initial_offsets.resize( m_num_threads );
 
+
+  //allocate memory for iteration space
+  m_dim_movements.resize(     m_num_threads );
+  m_initial_offsets.resize(   m_num_threads );
   m_thread_work_space.resize( m_num_threads );
   int64_t l_tasks_per_thread = m_num_tasks / m_num_threads + (m_num_tasks % m_num_threads != 0);
   
@@ -140,9 +141,9 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
   }
 
 //create 1D Map of task
-//#ifdef _OPENMP
-//pragma omp parallel for
-//#endif
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
   for( int64_t l_thread_id = 0; l_thread_id < m_num_threads; l_thread_id++ ){
     int64_t l_begin = m_thread_work_space[l_thread_id].begin;
     int64_t l_end   = m_thread_work_space[l_thread_id].end;
@@ -338,14 +339,16 @@ void einsum_ir::backend::IterationSpacesSfc::SfcOracle3d( int64_t *i_m,
                                                           int64_t  i_idx,
                                                           range_t  i_thread_range ){
   
-  int l_w = m_sfc_tasks_k;
-  int l_offset = i_thread_range.begin;
-  int l_h = ( i_thread_range.end - l_offset ) / l_w;
-  int l_idx_k, l_idx_sfc2;
-  gilbert_d2xy(&l_idx_k, &l_idx_sfc2, i_idx-l_offset, l_w, l_h);
-  *i_k = l_idx_k;
-  l_idx_sfc2 += l_offset / l_w;
-
+  int l_idx_sfc2 = i_idx;
+  if( m_sfc_tasks_k > 1 ){
+    int l_w = m_sfc_tasks_k;
+    int l_offset = i_thread_range.begin;
+    int l_h = ( i_thread_range.end - l_offset ) / l_w;
+    int l_idx_k;
+    gilbert_d2xy(&l_idx_k, &l_idx_sfc2, i_idx-l_offset, l_w, l_h);
+    *i_k = l_idx_k;
+    l_idx_sfc2 += l_offset / l_w;
+  }
   SfcOracle2d(i_m, i_n, i_omp, l_idx_sfc2);
 }
 
@@ -356,7 +359,6 @@ void einsum_ir::backend::IterationSpacesSfc::SfcOracle2d( int64_t *i_m,
   
   int l_w = m_sfc_tasks_m;
   int l_h = m_sfc_tasks_n;
-  //std::cout << i_idx << std::endl;
   *i_omp = i_idx / (l_w*l_h);
   i_idx = i_idx % (l_w*l_h);
 

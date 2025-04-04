@@ -1,19 +1,8 @@
 #include "ContractionBackend.h"
-#include <iostream>
 
 #ifdef _OPENMP
 #include <omp.h>
 #endif
-
-  //TODO remove
-  typedef enum {
-    LEFT = 0, // left input
-    RIGHT = 1, // right input
-    OUT = 2, // output
-    OUT_AUX = 3,
-    MAX_NUM_IOPARAMS = 4, //maximal number of parameter
-    UNDEFINED_IOPARAM = 99
-  } iotensor_t;
 
 void einsum_ir::backend::ContractionBackend::init( std::vector< dim_t >   const & i_loop_dim_type,
                                                    std::vector< exec_t >  const & i_loop_exec_type,
@@ -258,7 +247,6 @@ void einsum_ir::backend::ContractionBackend::contract_iter( int64_t         i_th
       m_iter.addMovementOffsets(i_thread_id, l_it, &i_ptr_left, &i_ptr_right, &i_ptr_out );
     }
     else{
-      //TODO could use c array pointers instead
       i_ptr_left    += m_loop_strides_left[ i_id_loop ];
       i_ptr_right   += m_loop_strides_right[ i_id_loop ];
       i_ptr_out_aux += m_loop_strides_out_aux[ i_id_loop ];
