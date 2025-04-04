@@ -102,7 +102,6 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
       return err_t::COMPILATION_FAILED;
     }
   }
-  std::cout << m_num_tasks << " " << m_sfc_tasks_m << " " << m_sfc_tasks_n << std::endl; 
 
   //convert strides to offsets
   int64_t l_num_tensors = m_loop_strides.size();
@@ -316,8 +315,7 @@ void einsum_ir::backend::IterationSpacesSfc::addMovementOffsets( int64_t        
   uint8_t l_move =  m_dim_movements[i_thread_id][i_task_id];
   int64_t l_direction = l_move >> 7 ? -1 : 1;
   l_move = l_direction == 1 ? l_move : 256-l_move;
-  //std::cout << l_move * l_direction << std::endl;
-  //TODO could use c arrays instead 
+
   *io_offset_left  += l_direction * m_movement_offsets[0][l_move];
   *io_offset_right += l_direction * m_movement_offsets[1][l_move];
   *io_offset_out   += l_direction * m_movement_offsets[2][l_move];

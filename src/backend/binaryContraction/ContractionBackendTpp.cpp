@@ -64,7 +64,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
   //get K size
   libxsmm_blasint l_k = 1;
   libxsmm_blasint l_lda = m_loop_strides_left[l_loop_id];
-  while( m_loop_dim_type[ l_loop_id] == dim_t::K    && 
+  while( m_loop_dim_type[ l_loop_id] == dim_t::K     && 
          m_loop_exec_type[l_loop_id] == exec_t::PRIM && 
          l_loop_id >= 0 ){
     l_k *= m_loop_sizes[l_loop_id];
@@ -74,7 +74,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
   libxsmm_blasint l_n = 1;
   libxsmm_blasint l_ldb = m_loop_strides_right[l_loop_id];
   libxsmm_blasint l_ldc = m_loop_strides_out[l_loop_id];
-  while( m_loop_dim_type[ l_loop_id] == dim_t::N    && 
+  while( m_loop_dim_type[ l_loop_id] == dim_t::N     && 
          m_loop_exec_type[l_loop_id] == exec_t::PRIM && 
          l_loop_id >= 0 ){
     l_n *= m_loop_sizes[l_loop_id];
@@ -82,7 +82,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
   }
   //get m size
   libxsmm_blasint l_m = 1;
-  while( m_loop_dim_type[ l_loop_id] == dim_t::M    && 
+  while( m_loop_dim_type[ l_loop_id] == dim_t::M     && 
          m_loop_exec_type[l_loop_id] == exec_t::PRIM && 
          l_loop_id >= 0 ){
     l_m *= m_loop_sizes[l_loop_id];
@@ -95,7 +95,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
   if( m_ktype_main == kernel_t::BR_MADD ){
     l_br_stride_a = m_loop_strides_left[l_loop_id] * ce_n_bytes(m_dtype_left);
     l_br_stride_b = m_loop_strides_right[l_loop_id] * ce_n_bytes(m_dtype_right);
-    while( m_loop_dim_type[ l_loop_id] == dim_t::K    && 
+    while( m_loop_dim_type[ l_loop_id] == dim_t::K     && 
            m_loop_exec_type[l_loop_id] == exec_t::PRIM && 
            l_loop_id >= 0 ){
       m_br *= m_loop_sizes[l_loop_id];
@@ -104,7 +104,6 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
     l_br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
   }
 
-  //std::cout << l_m << " " << l_n << " " << l_ldc << std::endl;
 
   // first-touch and last-touch shape
   libxsmm_meltw_unary_shape l_shape_single_touch = libxsmm_create_meltw_unary_shape( l_m,

@@ -67,13 +67,17 @@ void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
   std::vector< std::vector< loop_property > > l_free_loops;
   std::vector< loop_property >                l_reordered_loops;
 
-  int64_t l_possible_parallelism = 1;
+  int64_t l_size_all_m = 1;
+  int64_t l_size_all_n = 1;
   l_free_loops.resize(4);
   std::vector<loop_property>::iterator l_it = m_loops->begin();
   while( l_it < m_loops->end() ){
     if( l_it->exec_type == einsum_ir::SEQ ){
-      if( l_it->dim_type == einsum_ir::M || l_it->dim_type == einsum_ir::N ){
-        l_possible_parallelism *= l_it->size;
+      if( l_it->dim_type == einsum_ir::M ){
+        l_size_all_m *= l_it->size;
+      }
+      if( l_it->dim_type == einsum_ir::N ){
+        l_size_all_n *= l_it->size;
       }
       l_free_loops[l_it->dim_type].push_back(*l_it);
       m_loops->erase(l_it);
@@ -135,6 +139,7 @@ void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
   }
 
   //reduce kernel size when parallelism is low
+  int64_t l_possible_parallelism = l_size_all_m * l_size_all_n;
   while(l_possible_parallelism / (l_kernel_targets[1] * l_kernel_targets[2]) < m_num_tasks &&
         l_kernel_targets[1] * l_kernel_targets[2] > 1 ){
     if(l_kernel_targets[1] < l_kernel_targets[2]){
@@ -165,7 +170,6 @@ void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
                                  l_kernel_targets[1],
                                  0,
                                  einsum_ir::PRIM );
-  //TODO remove false when seg fault is fixed
   if( l_kernel_targets[0] > 1 ){
     *m_ktype_main = einsum_ir::BR_MADD;
     l_kernel_sizes[0] = splitLoop( l_potential_kernel_loop[0],
@@ -176,40 +180,53 @@ void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
                                   einsum_ir::PRIM );
   }
 
-  //add sfc n dimension
-  int64_t l_size_sfc = 1;
-  l_size_sfc *= add_loops_until(&l_free_loops[einsum_ir::N],
-                                m_loops, 
-                                sqrt(m_target_parallel),
-                                einsum_ir::SFC);
+  //determine parallel targets similarly to kernel targets
+  int64_t l_target_parallel_m = sqrt(m_target_parallel);
+  int64_t l_target_parallel_n = sqrt(m_target_parallel);
+  int64_t l_target_parallel_c = 1;
 
-  //add sfc m dimension
-  l_size_sfc *= add_loops_until(&l_free_loops[einsum_ir::M],
-                                m_loops, 
-                                sqrt(m_target_parallel),
-                                einsum_ir::SFC);
+  while( l_size_all_m <= l_target_parallel_m / 2 ){
+    l_target_parallel_m /= 2;
+    l_target_parallel_n *= 2;
+  }
+  while( l_size_all_n <= l_target_parallel_n / 2 ){
+    l_target_parallel_n /= 2;
+    l_target_parallel_m *= 2;
+  }
+  while( l_size_all_m <= l_target_parallel_m / 2 ){
+    l_target_parallel_m /= 2;
+    l_target_parallel_c *= 2;
+  }
 
+  //add parallel dimension
+  int64_t l_size_parallel = 1;
+  l_size_parallel *= add_loops_until(&l_free_loops[einsum_ir::N],
+                                     m_loops, 
+                                     l_target_parallel_n,
+                                     einsum_ir::SFC);
+  l_size_parallel *= add_loops_until(&l_free_loops[einsum_ir::M],
+                                     m_loops, 
+                                     l_target_parallel_m,
+                                     einsum_ir::SFC);
+  l_size_parallel *= add_loops_until(&l_free_loops[einsum_ir::C],
+                                     m_loops, 
+                                     l_target_parallel_c,
+                                     einsum_ir::OMP);
 
-
-  //TODO: add omp dimensions
-  int64_t l_target_parallel = m_target_parallel / l_size_sfc;
 
   //add remaining dimensions
   add_all_loops( &l_free_loops[einsum_ir::K],
                  m_loops,
                  einsum_ir::SEQ );
-
   add_all_loops( &l_free_loops[einsum_ir::M],
                  m_loops,
                  einsum_ir::SEQ );
-
   add_all_loops( &l_free_loops[einsum_ir::N],
                  m_loops,
                  einsum_ir::SEQ );
-
   add_all_loops( &l_free_loops[einsum_ir::C], 
-                  m_loops,
-                  einsum_ir::SEQ );
+                 m_loops,
+                 einsum_ir::SEQ );
 }
 
 //TODO should have a bug for split last loop (while loop not ending)
@@ -281,8 +298,8 @@ int64_t einsum_ir::backend::ContractionOptimizer::splitLoop( std::vector<loop_pr
     }
     return l_split;
   }
-  
-  std::cout << "WARNING: did not find loop, adding size 1 loop"<< std::endl;
+  //std::cout << "WARNING: did not find loop, adding size 1 loop"<< std::endl;
+
   //add empty loops for empty dimesions
   loop_property l_empty_loop;
   l_empty_loop.dim_type = dim_t::UNDEFINED_DIM;
