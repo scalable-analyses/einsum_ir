@@ -48,13 +48,25 @@ class einsum_ir::backend::ContractionBackend {
     //! datatype used during the computations
     data_t m_dtype_comp = UNDEFINED_DTYPE;
 
-    //TODO 
+    //! vector with dimension types of all loops
     std::vector< dim_t >   m_loop_dim_type;
+
+    //! vector with execution types of all loops
     std::vector< exec_t >  m_loop_exec_type;
+
+    //! vector with sizes of all loops
     std::vector< int64_t > m_loop_sizes;
+
+    //! vector with the strides of the left input tensor
     std::vector< int64_t > m_loop_strides_left;
+
+    //! vector with the strides of the right input tensor
     std::vector< int64_t > m_loop_strides_right;
+
+    //! vector with the strides of the auxiliary tensor
     std::vector< int64_t > m_loop_strides_out_aux;
+
+    //! vector with the strides of the output tensor
     std::vector< int64_t > m_loop_strides_out;
 
     //! type of the first touch kernel
@@ -65,7 +77,24 @@ class einsum_ir::backend::ContractionBackend {
     kernel_t m_ktype_last_touch = UNDEFINED_KTYPE;
     
   public:
-    //TODO
+    /**
+     * Initializes the class.
+     *
+     * @param i_loop_dim_type dimension type of the loops.
+     * @param i_loop_exec_type execution type of the loops.
+     * @param i_loop_sizes sizes of the loops.
+     * @param i_loop_strides_left strides in the left input tensor.
+     * @param i_loop_strides_right strides in the right input tensor.
+     * @param i_loop_strides_out_aux strides in the auxiliary output tensor.
+     * @param i_loop_strides_out strides in the output tensor.
+     * @param i_dtype_left datatype of left input tensor.
+     * @param i_dtype_right datatype of right input tensor.
+     * @param i_dtype_comp datatype of computation.
+     * @param i_dtype_out datatype of output tensor.
+     * @param i_ktype_first_touch type of the first touch kernel.
+     * @param i_ktype_main type of the main kernel.
+     * @param i_ktype_last_touch type of the last touch kernel.
+     **/
     void init( std::vector< dim_t >   const & i_loop_dim_type,
                std::vector< exec_t >  const & i_loop_exec_type,
                std::vector< int64_t > const & i_loop_sizes,

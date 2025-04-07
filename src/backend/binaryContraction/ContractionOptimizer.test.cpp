@@ -17,7 +17,7 @@ TEST_CASE( "Simple test for Contractoin Optimizer", "[contraction_optimizer]" ) 
   backend::ContractionOptimizer l_opt;
 
   kernel_t l_kernel_main = kernel_t::BR_MADD;
-  l_opt.init( &l_loops, &l_kernel_main );  
+  l_opt.init( &l_loops, &l_kernel_main, 1);  
 
   l_opt.optimize();
 
@@ -39,7 +39,7 @@ TEST_CASE( "Simple matmul test for Contractoin Optimizer", "[contraction_optimiz
   backend::ContractionOptimizer l_opt;
 
   kernel_t l_kernel_main = kernel_t::BR_MADD;
-  l_opt.init( &l_loops, &l_kernel_main );   
+  l_opt.init( &l_loops, &l_kernel_main, 1);   
 
   l_opt.optimize();
 

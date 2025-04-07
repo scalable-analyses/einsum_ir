@@ -76,7 +76,8 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionSfcTpp::compile() {
   ContractionOptimizer l_optim;
 
   l_optim.init(&l_loops,
-               &m_ktype_main);
+               &m_ktype_main,
+               72);
   l_optim.optimize();
 
   /*

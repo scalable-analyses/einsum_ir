@@ -9,9 +9,11 @@
 #endif
 
 void einsum_ir::backend::ContractionOptimizer::init( std::vector< loop_property > * i_loops,
-                                                     kernel_t                     * i_ktype_main ){
+                                                     kernel_t                     * i_ktype_main,
+                                                     int64_t                        i_num_threads ){
   m_loops = i_loops;
   m_ktype_main = i_ktype_main;
+  m_num_threads = i_num_threads;
 }
 
 void einsum_ir::backend::ContractionOptimizer::optimize(){
@@ -21,6 +23,7 @@ void einsum_ir::backend::ContractionOptimizer::optimize(){
   // fuse loops if possible
   fuseLoops();
 
+  //reodere loops and determin kernel dimensions and parallel dimensions
   reorderLoops();
 }
 
@@ -63,6 +66,7 @@ void einsum_ir::backend::ContractionOptimizer::fuseLoops(){
 }
 
 void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
+
   //add unoptimized loops to internal data structures
   std::vector< std::vector< loop_property > > l_free_loops;
   std::vector< loop_property >                l_reordered_loops;
@@ -140,7 +144,7 @@ void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
 
   //reduce kernel size when parallelism is low
   int64_t l_possible_parallelism = l_size_all_m * l_size_all_n;
-  while(l_possible_parallelism / (l_kernel_targets[1] * l_kernel_targets[2]) < m_num_tasks &&
+  while(l_possible_parallelism / (l_kernel_targets[1] * l_kernel_targets[2]) < m_num_threads &&
         l_kernel_targets[1] * l_kernel_targets[2] > 1 ){
     if(l_kernel_targets[1] < l_kernel_targets[2]){
       l_kernel_targets[2] /= 2;
@@ -173,11 +177,11 @@ void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
   if( l_kernel_targets[0] > 1 ){
     *m_ktype_main = einsum_ir::BR_MADD;
     l_kernel_sizes[0] = splitLoop( l_potential_kernel_loop[0],
-                                  &l_free_loops[einsum_ir::K],
-                                  m_loops,
-                                  l_kernel_targets[0],
-                                  0,
-                                  einsum_ir::PRIM );
+                                   &l_free_loops[einsum_ir::K],
+                                   m_loops,
+                                   l_kernel_targets[0],
+                                   0,
+                                   einsum_ir::PRIM );
   }
 
   //determine parallel targets similarly to kernel targets
@@ -229,7 +233,6 @@ void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
                  einsum_ir::SEQ );
 }
 
-//TODO should have a bug for split last loop (while loop not ending)
 int64_t einsum_ir::backend::ContractionOptimizer::add_loops_until( std::vector<loop_property> * i_source_loops,
                                                                    std::vector<loop_property> * i_dest_loops,
                                                                    int64_t i_target_size,
