@@ -51,14 +51,6 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
   }
 
   //assigns parallel dimensions to three types omp, sfc_n, sfc_m
-  //restrictions:
-  //  all parallel dims must be consecutive
-  //  first omp dims can be of type m,n or c
-  //  second sfc dims of type m
-  //  third sfc dims of type n
-  // example: 
-  //  dim_t : ...  c1,  m1,  n1,  m2,  n2,  n3,  k1,  k2, ...
-  //  exec_t: ... omp, omp, omp, sfc, sfc, sfc, sfc, sfc, ...
   int64_t l_last_found_type = 0;
   for( int64_t l_id = m_parallel_loops.begin; l_id < m_parallel_loops.end ; l_id++ ){
     if( m_loop_exec_type->at(l_id) == einsum_ir::OMP &&
@@ -89,15 +81,6 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
       m_sfc_loops_n.end = l_id + 1;
       l_last_found_type = 3;
     }
-    else if( m_loop_exec_type->at(l_id) == einsum_ir::SFC &&
-             m_loop_dim_type->at(l_id)  == einsum_ir::K ){
-      m_sfc_tasks_k *= m_loop_sizes->at(l_id);
-      if( l_last_found_type <= 4 ){
-        m_sfc_loops_k.begin = l_id;
-      }
-      m_sfc_loops_k.end = l_id + 1;
-      l_last_found_type = 4;
-    }
     else{
       return err_t::COMPILATION_FAILED;
     }
@@ -107,10 +90,7 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
   int64_t l_num_tensors = m_loop_strides.size();
   m_movement_offsets.resize(l_num_tensors );
   for(int64_t l_io_tensor = 0; l_io_tensor < l_num_tensors ; l_io_tensor++){
-    //TODO fix
-    dim_t l_sfc_primary = m_sfc_tasks_m > m_sfc_tasks_n ? dim_t::M : dim_t::N;
-    convertStridesToOffsets( l_sfc_primary,
-                             *m_loop_strides.at(l_io_tensor),
+    convertStridesToOffsets( *m_loop_strides.at(l_io_tensor),
                              m_movement_offsets[l_io_tensor] );
   } 
 
@@ -129,8 +109,6 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
     int64_t l_end   = l_begin     + l_tasks_per_thread;
     l_begin = l_begin < m_num_tasks ? l_begin : m_num_tasks;
     l_end   = l_end   < m_num_tasks ? l_end   : m_num_tasks;
-    l_begin *= m_sfc_tasks_k;
-    l_end   *= m_sfc_tasks_k;
 
     m_thread_work_space[l_thread_id].begin = l_begin;
     m_thread_work_space[l_thread_id].end   = l_end;
@@ -147,22 +125,22 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
     int64_t l_begin = m_thread_work_space[l_thread_id].begin;
     int64_t l_end   = m_thread_work_space[l_thread_id].end;
 
-    int64_t l_id_sfc_m_old, l_id_sfc_n_old, l_id_sfc_k_old, l_id_omp_old;
-    SfcOracle3d(&l_id_sfc_m_old, &l_id_sfc_n_old, &l_id_sfc_k_old, &l_id_omp_old, l_begin, m_thread_work_space[l_thread_id] );
+    int64_t l_id_sfc_m_old, l_id_sfc_n_old, l_id_omp_old;
+    SfcOracle2d( &l_id_sfc_m_old, &l_id_sfc_n_old, &l_id_omp_old, l_begin );
+
     //calculate initial thread offsets
     for(int64_t l_io_tensor = 0; l_io_tensor < l_num_tensors; l_io_tensor++){
-      int64_t l_offset = calculateInitialOffset( l_id_omp_old,
-                                                 l_id_sfc_m_old,
-                                                 l_id_sfc_n_old,
-                                                 0,
-                                                 *m_loop_strides.at(l_io_tensor) );
+      int64_t l_offset = calculateOffset( l_id_omp_old,
+                                          l_id_sfc_m_old,
+                                          l_id_sfc_n_old,
+                                          *m_loop_strides.at(l_io_tensor) );
       m_initial_offsets[l_thread_id][l_io_tensor] = l_offset;
     }
 
     //calculate movements
     for( int64_t l_id = l_begin; l_id < l_end; l_id++ ){
-      int64_t l_id_sfc_m_new, l_id_sfc_n_new, l_id_sfc_k_new, l_id_omp_new; 
-      SfcOracle3d(&l_id_sfc_m_new, &l_id_sfc_n_new, &l_id_sfc_k_new, &l_id_omp_new, l_id+1, m_thread_work_space[l_thread_id] );
+      int64_t l_id_sfc_m_new, l_id_sfc_n_new, l_id_omp_new; 
+      SfcOracle2d( &l_id_sfc_m_new, &l_id_sfc_n_new, &l_id_omp_new, l_id+1 );
 
       if( l_id_omp_new != l_id_omp_old ){
         uint8_t l_move = getMaxDimJump( m_omp_loops, l_id_omp_new, l_id_omp_old );
@@ -176,13 +154,9 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
         uint8_t l_move = getMaxDimJump( m_sfc_loops_n, l_id_sfc_n_new, l_id_sfc_n_old );
         m_dim_movements[l_thread_id][l_id-l_begin] = l_move;
       }
-      else if( l_id_sfc_k_new != l_id_sfc_k_old ){
-        uint8_t l_move = getMaxDimJump( m_sfc_loops_k, l_id_sfc_k_new, l_id_sfc_k_old );
-        m_dim_movements[l_thread_id][l_id-l_begin] = l_move;
-      }
+
       l_id_sfc_m_old = l_id_sfc_m_new;
       l_id_sfc_n_old = l_id_sfc_n_new;
-      l_id_sfc_k_old = l_id_sfc_k_new;
       l_id_omp_old = l_id_omp_new;
     }
   }
@@ -190,11 +164,10 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
   return err_t::SUCCESS;
 }
 
-int64_t einsum_ir::backend::IterationSpacesSfc::calculateInitialOffset( int64_t i_id_omp,
-                                                                        int64_t i_id_sfc_m,
-                                                                        int64_t i_id_sfc_n,
-                                                                        int64_t i_id_sfc_k,
-                                                                        std::vector< int64_t > const & i_strides ) {
+int64_t einsum_ir::backend::IterationSpacesSfc::calculateOffset( int64_t i_id_omp,
+                                                                 int64_t i_id_sfc_m,
+                                                                 int64_t i_id_sfc_n,
+                                                                 std::vector< int64_t > const & i_strides ) {
 
   int64_t l_offset = 0;
   for (int64_t l_id = m_sfc_loops_m.end - 1; l_id >= m_sfc_loops_m.begin; l_id--) {
@@ -211,13 +184,6 @@ int64_t einsum_ir::backend::IterationSpacesSfc::calculateInitialOffset( int64_t 
     l_offset += (i_id_sfc_n % l_size) * l_stride;
     i_id_sfc_n /= l_size;
   }
-  for (int64_t l_id = m_sfc_loops_k.end - 1; l_id >= m_sfc_loops_k.begin; l_id--) {
-    int64_t l_size   = m_loop_sizes->at(l_id);
-    int64_t l_stride = i_strides[l_id];
-
-    l_offset += (i_id_sfc_k % l_size) * l_stride;
-    i_id_sfc_k /= l_size;
-  }
   for (int64_t l_id = m_omp_loops.end - 1; l_id >= m_omp_loops.begin; l_id--) {
     int64_t l_size   = m_loop_sizes->at(l_id);
     int64_t l_stride = i_strides[l_id];
@@ -231,14 +197,10 @@ int64_t einsum_ir::backend::IterationSpacesSfc::calculateInitialOffset( int64_t 
 
 
 
-
-void einsum_ir::backend::IterationSpacesSfc::convertStridesToOffsets( dim_t   i_sfc_primary,
-                                                                      std::vector< int64_t > const & i_strides,
+void einsum_ir::backend::IterationSpacesSfc::convertStridesToOffsets( std::vector< int64_t > const & i_strides,
                                                                       std::vector< int64_t >       & io_offsets ) {
-  // id 0 is always set to 0
-  // last id can be used for diagonal jumps
-  io_offsets.resize( m_num_parallel_loops + 1); 
-  int64_t l_first = m_parallel_loops.begin - 1;
+  io_offsets.resize( m_num_parallel_loops ); 
+  int64_t l_first = m_parallel_loops.begin;
 
   int64_t l_all_offsets_sfc_m = 0;
   for (int64_t l_id = m_sfc_loops_m.end - 1; l_id >= m_sfc_loops_m.begin; l_id--) {
@@ -258,22 +220,12 @@ void einsum_ir::backend::IterationSpacesSfc::convertStridesToOffsets( dim_t   i_
     l_all_offsets_sfc_n += (l_size - 1) * l_stride;
   }
 
-  int64_t l_all_offsets_sfc_k = 0;
-  for (int64_t l_id = m_sfc_loops_k.end - 1; l_id >= m_sfc_loops_k.begin; l_id--) {
-    int64_t l_size   = m_loop_sizes->at(l_id);
-    int64_t l_stride = i_strides[l_id];
-
-    io_offsets[ l_id - l_first] = l_stride - l_all_offsets_sfc_k;
-    l_all_offsets_sfc_k += (l_size - 1) * l_stride;
-  }
-
   int64_t l_id_sfc_m, l_id_sfc_n, l_id_omp;
   SfcOracle2d(&l_id_sfc_m, &l_id_sfc_n, &l_id_omp, m_sfc_tasks_m*m_sfc_tasks_n-1);
-  int64_t l_all_offsets_omp = calculateInitialOffset( l_id_omp,
-                                                      l_id_sfc_m,
-                                                      l_id_sfc_n,
-                                                      0,
-                                                      i_strides );
+  int64_t l_all_offsets_omp = calculateOffset( l_id_omp,
+                                               l_id_sfc_m,
+                                               l_id_sfc_n,
+                                               i_strides );
 
   for (int64_t l_id = m_omp_loops.end - 1; l_id >= m_omp_loops.begin; l_id--) {
     int64_t l_size   = m_loop_sizes->at(l_id);
@@ -288,12 +240,12 @@ uint8_t einsum_ir::backend::IterationSpacesSfc::getMaxDimJump( range_t i_dim_loo
                                                                int64_t i_id_new,
                                                                int64_t i_id_old ){
 
-  int64_t l_dif = i_id_new - i_id_old;
+  int64_t l_direction = (( i_id_old - i_id_new ) + 1) / 2;
   int64_t l_max_id = i_id_new > i_id_old ? i_id_new : i_id_old;
   for( int64_t l_di = i_dim_loops.end-1; l_di >= i_dim_loops.begin; l_di-- ){
     int64_t l_size = m_loop_sizes->at(l_di);
     if(l_max_id % l_size != 0){
-      return (l_di - m_parallel_loops.begin + 1) * l_dif;
+      return (l_di - m_parallel_loops.begin) * 2 + l_direction;
     }
     else{
       l_max_id /= l_size;
@@ -313,11 +265,8 @@ void einsum_ir::backend::IterationSpacesSfc::addMovementOffsets( int64_t        
                                                                  char    const ** io_ptr_right,
                                                                  char          ** io_ptr_out){
   uint8_t l_move =  m_dim_movements[i_thread_id][i_task_id];
-
-  //l_direction = 1 - 2 = - 1 if first bit == 1 and 1 - 0 = 1 if first bit == 0 
-  int64_t l_direction = 1 - ((l_move >> 7) << 1); 
-  l_move = l_direction == 1 ? l_move : 256-l_move; //TODO
-
+  int8_t l_direction = 1 - ((l_move & 1) << 1); 
+  l_move = l_move >> 1;
 
   *io_ptr_left  += l_direction * m_movement_offsets[0][l_move];
   *io_ptr_right += l_direction * m_movement_offsets[1][l_move];
@@ -331,26 +280,6 @@ void einsum_ir::backend::IterationSpacesSfc::addInitialOffsets( int64_t         
   *io_ptr_left  += m_initial_offsets[i_thread_id][0];
   *io_ptr_right += m_initial_offsets[i_thread_id][1];
   *io_ptr_out   += m_initial_offsets[i_thread_id][2];
-}
-
-void einsum_ir::backend::IterationSpacesSfc::SfcOracle3d( int64_t *i_m, 
-                                                          int64_t *i_n, 
-                                                          int64_t *i_k,
-                                                          int64_t *i_omp, 
-                                                          int64_t  i_idx,
-                                                          range_t  i_thread_range ){
-  
-  int l_idx_sfc2 = i_idx;
-  if( m_sfc_tasks_k > 1 ){
-    int l_w = m_sfc_tasks_k;
-    int l_offset = i_thread_range.begin;
-    int l_h = ( i_thread_range.end - l_offset ) / l_w;
-    int l_idx_k;
-    gilbert_d2xy(&l_idx_k, &l_idx_sfc2, i_idx-l_offset, l_w, l_h);
-    *i_k = l_idx_k;
-    l_idx_sfc2 += l_offset / l_w;
-  }
-  SfcOracle2d(i_m, i_n, i_omp, l_idx_sfc2);
 }
 
 void einsum_ir::backend::IterationSpacesSfc::SfcOracle2d( int64_t *i_m, 
@@ -472,7 +401,7 @@ int gilbert_d2xy_r( int dst_idx, int cur_idx,
                         -(ax-ax2), -(ay-ay2));
 }
 
-int einsum_ir::backend::IterationSpacesSfc::gilbert_d2xy( int *x, 
+void einsum_ir::backend::IterationSpacesSfc::gilbert_d2xy( int *x, 
                                                           int *y, 
                                                           int  idx,
                                                           int  w,
@@ -485,7 +414,9 @@ int einsum_ir::backend::IterationSpacesSfc::gilbert_d2xy( int *x,
   bool move_h_possible = w % 2 == 1 || h % 2 == 0;
 
   if ( (w >= h && move_w_possible) || !move_h_possible ) {
-    return gilbert_d2xy_r(idx,0, x,y, w,0, 0,h);
+    gilbert_d2xy_r(idx,0, x,y, w,0, 0,h);
   }
-  return gilbert_d2xy_r(idx,0, x,y, 0,h, w,0);
+  else{
+    gilbert_d2xy_r(idx,0, x,y, 0,h, w,0);
+  }
 }

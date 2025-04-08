@@ -13,7 +13,7 @@ namespace einsum_ir {
 
 class einsum_ir::backend::BinaryContractionSfcTpp: public BinaryContraction {
   private:
-    //TODO
+    //! contraction backend
     ContractionBackendTpp m_backend;
 
     /**

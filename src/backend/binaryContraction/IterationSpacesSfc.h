@@ -19,23 +19,30 @@ class einsum_ir::backend::IterationSpacesSfc {
       int64_t end = 0;
     };
 
-    //TODO 
+    //! vector with the loop dimension types
     std::vector< dim_t >   const * m_loop_dim_type;
+    //! vector with the loop execution types
     std::vector< exec_t >  const * m_loop_exec_type;
+    //! vector with the loop sizes
     std::vector< int64_t > const * m_loop_sizes;
+    //! vector with vectors for all strides
     std::vector< std::vector< int64_t > const * > m_loop_strides;
 
+    //! number of sfc tasks m tasks
     int64_t m_sfc_tasks_m = 1;
+    //! number of sfc tasks n tasks
     int64_t m_sfc_tasks_n = 1;
-    int64_t m_sfc_tasks_k = 1;
 
+    //! range of all parallel loops
     range_t m_parallel_loops; 
-
+    //! range of omp loops
     range_t m_omp_loops;
+    //! range of sfc m loops
     range_t m_sfc_loops_m;
+    //! range of sfc n loops
     range_t m_sfc_loops_n;
-    range_t m_sfc_loops_k;
 
+    //! sfc tasks range each thread processes
     std::vector< range_t > m_thread_work_space;
 
     //! vector of movements accessed by thread_id and movement_id
@@ -57,46 +64,75 @@ class einsum_ir::backend::IterationSpacesSfc {
     int64_t m_num_tasks = 0;
 
 
-    //TODO
-    void convertStridesToOffsets( dim_t   i_sfc_primary,
-                                  std::vector< int64_t > const & i_strides,
+    /**
+     * Converts strides into offsets from previous dimension.
+     * i.e. creates a data structure that encodes jumps corresponding to different movements through tensor
+     *
+     * @param i_strides vector with strides.
+     * @param io_offsets vector with calculated offsets.
+     **/
+    void convertStridesToOffsets( std::vector< int64_t > const & i_strides,
                                   std::vector< int64_t >       & io_offsets );
     
-    //TODO
-    int64_t calculateInitialOffset( int64_t i_id_omp,
-                                    int64_t i_id_sfc_m,
-                                    int64_t i_id_sfc_n,
-                                    int64_t i_id_sfc_k,
-                                    std::vector< int64_t > const & i_strides );
+    /**
+     * Calculates the offset to access an element specified by the ids.
+     *
+     * @param i_id_omp omp id.
+     * @param i_id_sfc_m sfc m id.
+     * @param i_id_sfc_n sfc n id.
+     *
+     * @return the calculated offset.
+     **/
+    int64_t calculateOffset( int64_t i_id_omp,
+                             int64_t i_id_sfc_m,
+                             int64_t i_id_sfc_n,
+                             std::vector< int64_t > const & i_strides );
 
-    //TODO
+    /**
+     * Calculates the movement direction for a tensor contraction from old and new id.
+     *
+     * @param i_dim_loops loops that correspond to id change e.g. range of sfc_m loops.
+     * @param i_id_new new id.
+     * @param i_id_old old id.
+     *
+     * @return the movement.
+     **/
     uint8_t getMaxDimJump( range_t i_dim_loops,
                            int64_t i_id_new,
                            int64_t i_id_old );
-
-    void SfcOracle3d( int64_t *i_m, 
-                      int64_t *i_n, 
-                      int64_t *i_k,
-                      int64_t *i_omp, 
-                      int64_t  i_idx,
-                      range_t  i_thread_range );
     
+    /**
+     * Calculates the SFC and OMP position at the id.
+     *
+     * @param i_m sfc m id.
+     * @param i_n sfc n id.
+     * @param i_omp omp id.
+     * @param i_idx task id.
+     **/
     void SfcOracle2d( int64_t *i_m, 
                       int64_t *i_n, 
                       int64_t *i_omp, 
                       int64_t  i_idx );
     
-    //TODO
-    int gilbert_d2xy( int *x, 
-                      int *y, 
-                      int  idx,
-                      int  w,
-                      int  h );
+    /**
+     * calculates gilbert curve
+     *
+     * @param x calculated x id.
+     * @param y calculated y id.
+     * @param idx sfc id.
+     * @param w sfc width.
+     * @param h sfc height
+     **/
+    void gilbert_d2xy( int *x, 
+                       int *y, 
+                       int  idx,
+                       int  w,
+                       int  h );
 
 
   public:
     /**
-     * Initializes the class
+     * Initializes the class.
      * restrictions:
      *    - all parallel dims must be consecutive
      *    - first omp dims can be of type m,n or c
@@ -142,13 +178,13 @@ class einsum_ir::backend::IterationSpacesSfc {
     int64_t getNumTasks( int64_t i_thread_id );
 
     /**
-     * adds the initial offset to all datapointer
+     * Adds the Movement at the task id to all datapointer.
      *
      * @param i_thread_id id of thread.
-     * @param i_task_id id of task
-     * @param io_ptr_left pointer to pointer of left tensor
-     * @param io_ptr_right pointer to pointer of right tensor
-     * @param io_ptr_out pointer to pointer of output tensor
+     * @param i_task_id id of task.
+     * @param io_ptr_left pointer to pointer of left tensor.
+     * @param io_ptr_right pointer to pointer of right tensor.
+     * @param io_ptr_out pointer to pointer of output tensor.
      **/
     void addMovementOffsets( int64_t          i_thread_id, 
                              int64_t          i_task_id,
@@ -157,12 +193,12 @@ class einsum_ir::backend::IterationSpacesSfc {
                              char          ** io_ptr_out );
     
     /**
-     * adds the initial offset to all datapointer
+     * Adds the initial offsets to all datapointer.
      *
      * @param i_thread_id id of thread.
-     * @param io_ptr_left pointer to pointer of left tensor
-     * @param io_ptr_right pointer to pointer of right tensor
-     * @param io_ptr_out pointer to pointer of output tensor
+     * @param io_ptr_left pointer to pointer of left tensor.
+     * @param io_ptr_right pointer to pointer of right tensor.
+     * @param io_ptr_out pointer to pointer of output tensor.
      **/
     void addInitialOffsets( int64_t          i_thread_id,
                             char    const ** io_ptr_left,

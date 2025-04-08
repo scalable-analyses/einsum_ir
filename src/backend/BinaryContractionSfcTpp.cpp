@@ -59,19 +59,6 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionSfcTpp::compile() {
     l_loops[l_id].stride_out     = map_find_default<int64_t>(&l_strides_out,     l_dim_id, 0);
   }
 
-  /*
-  std::cout << "before" << std::endl;
-  for(size_t l_id = 0; l_id < l_loops.size(); l_id++){
-    std::cout << "dtype: "<< l_loops[l_id].dim_type 
-              << " etype: " << l_loops[l_id].exec_type 
-              << " size: " << l_loops[l_id].size
-              << "\tstride_l: " << l_loops[l_id].stride_left
-              << "\tstride_r: " << l_loops[l_id].stride_right
-              << "\tstride_o: " << l_loops[l_id].stride_out
-              << std::endl;
-  }
-  */
-
   //optimize loops
   ContractionOptimizer l_optim;
 
