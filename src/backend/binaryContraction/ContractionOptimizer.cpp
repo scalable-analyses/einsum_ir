@@ -17,13 +17,19 @@ void einsum_ir::backend::ContractionOptimizer::init( std::vector< loop_property 
 }
 
 void einsum_ir::backend::ContractionOptimizer::optimize(){
-  //sort loops depeding on strides, exec_types and dim_types
+  // sort loops depeding on strides, exec_types and dim_types
   sortLoops();
 
   // fuse loops if possible
   fuseLoops();
 
-  //reodere loops and determin kernel dimensions and parallel dimensions
+  // move loops to internal data structure
+  moveLoopsToInternal();
+
+  // find and add the Kernel
+  addKernel();
+
+  // reodere loops and determine parallel loops
   reorderLoops();
 }
 
@@ -65,25 +71,20 @@ void einsum_ir::backend::ContractionOptimizer::fuseLoops(){
   }
 }
 
-void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
-
-  //add unoptimized loops to internal data structures
-  std::vector< std::vector< loop_property > > l_free_loops;
-  std::vector< loop_property >                l_reordered_loops;
-
-  int64_t l_size_all_m = 1;
-  int64_t l_size_all_n = 1;
-  l_free_loops.resize(4);
+void einsum_ir::backend::ContractionOptimizer::moveLoopsToInternal(){
+  m_size_all_m = 1;
+  m_size_all_n = 1;
+  m_free_loops.resize(4);
   std::vector<loop_property>::iterator l_it = m_loops->begin();
   while( l_it < m_loops->end() ){
     if( l_it->exec_type == einsum_ir::SEQ ){
-      if( l_it->dim_type == einsum_ir::M ){
-        l_size_all_m *= l_it->size;
+      if( l_it->dim_type == dim_t::M ){
+        m_size_all_m *= l_it->size;
       }
-      if( l_it->dim_type == einsum_ir::N ){
-        l_size_all_n *= l_it->size;
+      if( l_it->dim_type == dim_t::N ){
+        m_size_all_n *= l_it->size;
       }
-      l_free_loops[l_it->dim_type].push_back(*l_it);
+      m_free_loops[l_it->dim_type].push_back(*l_it);
       m_loops->erase(l_it);
     }
     else{
@@ -91,144 +92,175 @@ void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
     }
   }
   //TODO should determine the stage of optimization to support partially optimized input
+}
+
+void einsum_ir::backend::ContractionOptimizer::addKernel(){
+  typedef enum {
+    PRIM_BR = 0,
+    PRIM_M  = 1,
+    PRIM_N  = 2,
+    PRIM_K  = 3
+  } gemm_prim_t;
 
   //find possible kernel dimensions
-  std::vector<loop_property>::iterator l_potential_kernel_loop[] = { l_free_loops[ einsum_ir::K ].end(),
-                                                                     l_free_loops[ einsum_ir::M ].end(),
-                                                                     l_free_loops[ einsum_ir::N ].end(),
-                                                                     l_free_loops[ einsum_ir::K ].end() };  
   int64_t l_potential_kernel_size[] = {1,1,1,1};
-  if( l_free_loops[ einsum_ir::M ].size() > 0 ){
-    loop_property l_loop = l_free_loops[ einsum_ir::M ].back();
-    if( l_loop.stride_left == 1 && 
-        l_loop.stride_out  == 1 ){
-      l_potential_kernel_loop[1]--;
-      l_potential_kernel_size[1] *= l_potential_kernel_loop[1]->size;
-    }
+  std::vector<loop_property>::iterator l_potential_kernel_loop[] = { m_free_loops[ dim_t::K ].end(),
+                                                                     m_free_loops[ dim_t::M ].end(),
+                                                                     m_free_loops[ dim_t::N ].end(),
+                                                                     m_free_loops[ dim_t::K ].end() };  
+  //find possible M kernel dimension
+  std::vector<loop_property>::iterator l_loop;
+  l_loop = m_free_loops[ dim_t::M ].end() - 1;
+  if( m_free_loops[ dim_t::M ].size() > 0 &&
+      l_loop->stride_left == 1 && 
+      l_loop->stride_out  == 1 ){
+    l_potential_kernel_loop[ PRIM_M ] = l_loop;
+    l_potential_kernel_size[ PRIM_M ] = l_loop->size;
   }
-  if( l_free_loops[ einsum_ir::N ].size() > 0 ){
-    l_potential_kernel_loop[2]--;
-    l_potential_kernel_size[2] *= l_potential_kernel_loop[2]->size;
+  else{
+    push_empty_loop( &m_free_loops[ dim_t::M ], dim_t::M );
+    l_potential_kernel_loop [PRIM_M ] = m_free_loops[ dim_t::M ].end() - 1;
   }
-  if( l_free_loops[ einsum_ir::K ].size() > 0 ){
-    loop_property l_loop = l_free_loops[ einsum_ir::K ].back();
-    if( l_loop.stride_right == 1 ){
-      l_potential_kernel_loop[3]--;
-      l_potential_kernel_size[3] *= l_potential_kernel_loop[3]->size;
-      if( l_free_loops[ einsum_ir::K ].size() > 1 ){
-        l_potential_kernel_loop[0] -= 2;
-        l_potential_kernel_size[0] *= l_potential_kernel_loop[0]->size;
-      }
-    }
-    else{
-      l_potential_kernel_loop[0]--;
-      l_potential_kernel_size[0] *= l_potential_kernel_loop[0]->size;
-    }     
+
+  //find possible N kernel dimension
+  l_loop = m_free_loops[ dim_t::N ].end() - 1;
+  if( m_free_loops[ dim_t::N ].size() > 0 ){
+    l_potential_kernel_loop[ PRIM_N ] = l_loop;
+    l_potential_kernel_size[ PRIM_N ] = l_loop->size;
+  }
+  else{
+    push_empty_loop( &m_free_loops[ dim_t::N ], dim_t::N );
+    l_potential_kernel_loop[ PRIM_N ] = m_free_loops[ dim_t::N ].end() - 1;
+  }
+
+  //find possible K kernel dimension
+  l_loop = m_free_loops[ dim_t::K ].end() - 1;
+  if( m_free_loops[ dim_t::K ].size() > 0 && 
+      l_loop->stride_right == 1 ){
+    l_potential_kernel_loop[ PRIM_K ] = l_loop;
+    l_potential_kernel_size[ PRIM_K ] = l_loop->size; 
+  }
+  else{
+    push_empty_loop( &m_free_loops[ dim_t::K ], dim_t::K );
+    l_potential_kernel_loop[ PRIM_K ] = m_free_loops[ dim_t::K ].end() - 1;
+  }
+
+  //find possible BR kernel dimension
+  l_loop = m_free_loops[ dim_t::K ].end() - 2;
+  if( m_free_loops[ dim_t::K ].size() > 1 ){
+    l_potential_kernel_loop[ PRIM_BR ] = l_loop;
+    l_potential_kernel_size[ PRIM_BR ] = l_loop->size;
   }
 
 
   //adapt all kernel target sizes depending on what is possible e.g. small k kernel -> choose bigger m target
   int64_t l_kernel_targets[] = {1, m_target_m, m_target_n, m_target_k};
-  while( l_potential_kernel_size[3] <= l_kernel_targets[3] / 2 ){
-    l_kernel_targets[3] /= 2;
-    l_kernel_targets[0] *= 2;
+  if( l_potential_kernel_size[ PRIM_K ] < l_kernel_targets[ PRIM_K ] ){
+    l_kernel_targets[ PRIM_BR ] *= l_kernel_targets[ PRIM_K ] / l_potential_kernel_size[ PRIM_K ];
+    l_kernel_targets[ PRIM_K  ]  = l_potential_kernel_size[ PRIM_K ];
   }
-  while( l_potential_kernel_size[0] <= l_kernel_targets[0] / 2 ){
-    l_kernel_targets[0] /= 2;
-    l_kernel_targets[1] *= 2;
+  if( l_potential_kernel_size[ PRIM_BR ] < l_kernel_targets[ PRIM_BR ] ){
+    l_kernel_targets[ PRIM_M  ] *= l_kernel_targets[ PRIM_BR ] / l_potential_kernel_size[ PRIM_BR ];
+    l_kernel_targets[ PRIM_BR ]  = l_potential_kernel_size[ PRIM_BR ];
   }
-  while( l_potential_kernel_size[1] <= l_kernel_targets[1] / 2 ){
-    l_kernel_targets[1] /= 2;
-    l_kernel_targets[2] *= 2;
+  if( l_potential_kernel_size[PRIM_M] < l_kernel_targets[ PRIM_M ] ){
+    l_kernel_targets[ PRIM_N ] *= l_kernel_targets[ PRIM_M ] / l_potential_kernel_size[ PRIM_M ];
+    l_kernel_targets[ PRIM_M ]  = l_potential_kernel_size[ PRIM_M ];
   }
 
-  //reduce kernel size when parallelism is low
-  int64_t l_possible_parallelism = l_size_all_m * l_size_all_n;
-  while(l_possible_parallelism / (l_kernel_targets[1] * l_kernel_targets[2]) < m_num_threads &&
-        l_kernel_targets[1] * l_kernel_targets[2] > 1 ){
-    if(l_kernel_targets[1] < l_kernel_targets[2]){
-      l_kernel_targets[2] /= 2;
+
+  //reduce kernel targets when parallelism is low
+  int64_t l_possible_parallelism = m_size_all_m * m_size_all_n;
+  while( l_possible_parallelism / (l_kernel_targets[PRIM_M] * l_kernel_targets[PRIM_N]) < m_num_threads &&
+         l_kernel_targets[PRIM_M] * l_kernel_targets[PRIM_N] > 1 ){
+    if(l_kernel_targets[PRIM_M] < l_kernel_targets[PRIM_N]){
+      l_kernel_targets[PRIM_N] /= 2;
     }
     else{
-      l_kernel_targets[1] /= 2;
+      l_kernel_targets[PRIM_M] /= 2;
     }
   }
  
   //create kernel from potential kernel dimensions
   int64_t l_kernel_sizes[] = {1, 1, 1, 1};
-  l_kernel_sizes[3] = splitLoop( l_potential_kernel_loop[3],
-                                 &l_free_loops[einsum_ir::K],
-                                 m_loops,
-                                 l_kernel_targets[3],
-                                 0,
-                                 einsum_ir::PRIM );
-  l_kernel_sizes[2] = splitLoop( l_potential_kernel_loop[2],
-                                 &l_free_loops[einsum_ir::N],
-                                 m_loops,
-                                 l_kernel_targets[2],
-                                 0,
-                                 einsum_ir::PRIM );
-  l_kernel_sizes[1] = splitLoop( l_potential_kernel_loop[1],
-                                 &l_free_loops[einsum_ir::M],
-                                 m_loops,\
-                                 l_kernel_targets[1],
-                                 0,
-                                 einsum_ir::PRIM );
-  if( l_kernel_targets[0] > 1 ){
-    *m_ktype_main = einsum_ir::BR_MADD;
-    l_kernel_sizes[0] = splitLoop( l_potential_kernel_loop[0],
-                                   &l_free_loops[einsum_ir::K],
-                                   m_loops,
-                                   l_kernel_targets[0],
-                                   0,
-                                   einsum_ir::PRIM );
-  }
+  l_kernel_sizes[PRIM_K] = splitLoop( l_potential_kernel_loop[PRIM_K],
+                                      &m_free_loops[dim_t::K],
+                                      m_loops,
+                                      l_kernel_targets[PRIM_K],
+                                      0,
+                                      einsum_ir::PRIM );
+  l_kernel_sizes[PRIM_N] = splitLoop( l_potential_kernel_loop[PRIM_N],
+                                      &m_free_loops[dim_t::N],
+                                      m_loops,
+                                      l_kernel_targets[PRIM_N],
+                                      0,
+                                      einsum_ir::PRIM );
+  l_kernel_sizes[PRIM_M] = splitLoop( l_potential_kernel_loop[PRIM_M],
+                                      &m_free_loops[dim_t::M],
+                                      m_loops,
+                                      l_kernel_targets[PRIM_M],
+                                      0,
+                                      einsum_ir::PRIM );
+  if( l_kernel_targets[PRIM_BR] > 1 ){
+      *m_ktype_main = einsum_ir::BR_MADD;
+      l_kernel_sizes[PRIM_BR] = splitLoop( l_potential_kernel_loop[PRIM_BR],
+                                           &m_free_loops[dim_t::K],
+                                           m_loops,
+                                           l_kernel_targets[PRIM_BR],
+                                           0,
+                                           einsum_ir::PRIM );
+    }
+  m_size_all_m /= l_kernel_sizes[PRIM_M];
+  m_size_all_n /= l_kernel_sizes[PRIM_N];
+}
+
+void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
 
   //determine parallel targets similarly to kernel targets
   int64_t l_target_parallel_m = sqrt(m_target_parallel);
   int64_t l_target_parallel_n = sqrt(m_target_parallel);
   int64_t l_target_parallel_c = 1;
 
-  while( l_size_all_m <= l_target_parallel_m / 2 ){
+  while( m_size_all_m <= l_target_parallel_m / 2 ){
     l_target_parallel_m /= 2;
     l_target_parallel_n *= 2;
   }
-  while( l_size_all_n <= l_target_parallel_n / 2 ){
+  while( m_size_all_n <= l_target_parallel_n / 2 ){
     l_target_parallel_n /= 2;
     l_target_parallel_m *= 2;
   }
-  while( l_size_all_m <= l_target_parallel_m / 2 ){
+  while( m_size_all_m <= l_target_parallel_m / 2 ){
     l_target_parallel_m /= 2;
     l_target_parallel_c *= 2;
   }
 
   //add parallel dimension
   int64_t l_size_parallel = 1;
-  l_size_parallel *= add_loops_until(&l_free_loops[einsum_ir::N],
+  l_size_parallel *= add_loops_until(&m_free_loops[dim_t::N],
                                      m_loops, 
                                      l_target_parallel_n,
                                      einsum_ir::SFC);
-  l_size_parallel *= add_loops_until(&l_free_loops[einsum_ir::M],
+  l_size_parallel *= add_loops_until(&m_free_loops[dim_t::M],
                                      m_loops, 
                                      l_target_parallel_m,
                                      einsum_ir::SFC);
-  l_size_parallel *= add_loops_until(&l_free_loops[einsum_ir::C],
+  l_size_parallel *= add_loops_until(&m_free_loops[dim_t::C],
                                      m_loops, 
                                      l_target_parallel_c,
                                      einsum_ir::OMP);
 
 
   //add remaining dimensions
-  add_all_loops( &l_free_loops[einsum_ir::K],
+  add_all_loops( &m_free_loops[dim_t::K],
                  m_loops,
                  einsum_ir::SEQ );
-  add_all_loops( &l_free_loops[einsum_ir::M],
+  add_all_loops( &m_free_loops[dim_t::M],
                  m_loops,
                  einsum_ir::SEQ );
-  add_all_loops( &l_free_loops[einsum_ir::N],
+  add_all_loops( &m_free_loops[dim_t::N],
                  m_loops,
                  einsum_ir::SEQ );
-  add_all_loops( &l_free_loops[einsum_ir::C], 
+  add_all_loops( &m_free_loops[dim_t::C], 
                  m_loops,
                  einsum_ir::SEQ );
 }
@@ -282,39 +314,38 @@ int64_t einsum_ir::backend::ContractionOptimizer::splitLoop( std::vector<loop_pr
                                                              int64_t i_new_loop_pos, 
                                                              exec_t  i_new_exec_t ){
 
+  int64_t l_split = findSplit(i_loop->size, i_target_size );
 
-  if( i_source_loops->end() > i_loop ){  
-    int64_t l_split = findSplit(i_loop->size, i_target_size );
+  i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, *i_loop );
+  i_dest_loops->at(i_new_loop_pos).exec_type = i_new_exec_t;
+  i_dest_loops->at(0).size = l_split;
 
-    i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, *i_loop );
-    i_dest_loops->at(i_new_loop_pos).exec_type = i_new_exec_t;
-    i_dest_loops->at(0).size = l_split;
+  i_loop->size           /= l_split;
+  i_loop->stride_left    *= l_split;
+  i_loop->stride_right   *= l_split;
+  i_loop->stride_out_aux *= l_split;
+  i_loop->stride_out     *= l_split;
 
-    i_loop->size           /= l_split;
-    i_loop->stride_left    *= l_split;
-    i_loop->stride_right   *= l_split;
-    i_loop->stride_out_aux *= l_split;
-    i_loop->stride_out     *= l_split;
-
-    if( i_loop->size == 1 ){
-        i_source_loops->erase( i_loop );
-    }
-    return l_split;
+  if( i_loop->size == 1 ){
+      i_source_loops->erase( i_loop );
   }
-  //std::cout << "WARNING: did not find loop, adding size 1 loop"<< std::endl;
+  return l_split;                                                         
+}
 
-  //add empty loops for empty dimesions
+void einsum_ir::backend::ContractionOptimizer::push_empty_loop( std::vector<loop_property> * i_dest_loops,
+                                                                dim_t                        i_new_dim_t ){
+
   loop_property l_empty_loop;
-  l_empty_loop.dim_type = dim_t::UNDEFINED_DIM;
-  l_empty_loop.exec_type = exec_t::PRIM;
+
+  l_empty_loop.dim_type = i_new_dim_t;
+  l_empty_loop.exec_type = exec_t::SEQ;
   l_empty_loop.size = 1;
   l_empty_loop.stride_left = 0;
   l_empty_loop.stride_right = 0;
   l_empty_loop.stride_out = 0;
   l_empty_loop.stride_out_aux = 0;
 
-  i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, l_empty_loop );
-  return 1;                                                         
+  i_dest_loops->push_back( l_empty_loop );                                                       
 }
 
 int64_t einsum_ir::backend::ContractionOptimizer::addLoop( std::vector<loop_property>::iterator i_loop,
@@ -322,13 +353,12 @@ int64_t einsum_ir::backend::ContractionOptimizer::addLoop( std::vector<loop_prop
                                                            std::vector<loop_property> *         i_dest_loops,
                                                            int64_t i_new_loop_pos, 
                                                            exec_t  i_new_exec_t ){
-  if( i_source_loops->end() >= i_loop ){  
-    i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, *i_loop );
-    i_dest_loops->at(i_new_loop_pos).exec_type = i_new_exec_t;
-    i_source_loops->erase( i_loop );
+  
+  i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, *i_loop );
+  i_dest_loops->at(i_new_loop_pos).exec_type = i_new_exec_t;
+  i_source_loops->erase( i_loop );
     
-    return  i_loop->size;
-  }
+  return  i_loop->size;
 
   return 1;                                                         
 }

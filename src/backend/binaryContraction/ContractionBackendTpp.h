@@ -21,7 +21,11 @@ class einsum_ir::backend::ContractionBackendTpp: public ContractionBackend {
     //! LIBXSMM-based main TPP
     libxsmm_gemmfunction m_xmm_kernel_main = nullptr;
 
-    //TODO
+    /**
+     * coverts internal datatypes to libxsmm datatypes
+     *
+     * @return libxsmm datatype.
+     **/
     libxsmm_datatype dtype_to_libxsmm( data_t i_dtype );
     
   public:

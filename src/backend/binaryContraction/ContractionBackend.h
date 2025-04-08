@@ -111,7 +111,18 @@ class einsum_ir::backend::ContractionBackend {
                kernel_t                       i_ktype_last_touch );
 
 
-    //TODO
+    /**
+     * Initializes the class with a vector of loop_propertys.
+     *
+     * @param i_loops vector of loop_propertys.
+     * @param i_dtype_left datatype of left input tensor.
+     * @param i_dtype_right datatype of right input tensor.
+     * @param i_dtype_comp datatype of computation.
+     * @param i_dtype_out datatype of output tensor.
+     * @param i_ktype_first_touch type of the first touch kernel.
+     * @param i_ktype_main type of the main kernel.
+     * @param i_ktype_last_touch type of the last touch kernel.
+     **/
     void init( std::vector< loop_property > const & i_loops,
                data_t                         i_dtype_left,
                data_t                         i_dtype_right,

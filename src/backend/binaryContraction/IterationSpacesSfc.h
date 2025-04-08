@@ -96,16 +96,24 @@ class einsum_ir::backend::IterationSpacesSfc {
 
   public:
     /**
-     * TODO
-     * assigns parallel dimensions to three types omp, sfc_n, sfc_m
+     * Initializes the class
      * restrictions:
-     *   all parallel dims must be consecutive
-     *  first omp dims can be of type m,n or c
-     *  second sfc dims of type n
-     *  third sfc dims of type m
+     *    - all parallel dims must be consecutive
+     *    - first omp dims can be of type m,n or c
+     *    - second sfc dims of type n
+     *    - third sfc dims of type m
      * example: 
-     *  dim_t : ...  c1,  m1,  n1,  n2,  m2,  m3, ...
-     *  exec_t: ... omp, omp, omp, sfc, sfc, sfc, ...
+     *    dim_t : ...  c1,  m1,  n1,  n2,  m2,  m3, ...
+     *    exec_t: ... omp, omp, omp, sfc, sfc, sfc, ...
+     *
+     * @param i_loop_dim_type dimension type of the loops.
+     * @param i_loop_exec_type execution type of the loops.
+     * @param i_loop_sizes sizes of the loops.
+     * @param i_loop_strides_left strides in the left input tensor.
+     * @param i_loop_strides_right strides in the right input tensor.
+     * @param i_loop_strides_out_aux strides in the auxiliary output tensor.
+     * @param i_loop_strides_out strides in the output tensor.
+     * @param i_num_threads number of threads for contraction.
     **/
     void init( std::vector< dim_t >   const * i_loop_dim_type,
                std::vector< exec_t >  const * i_loop_exec_type,
@@ -125,33 +133,41 @@ class einsum_ir::backend::IterationSpacesSfc {
     err_t compile();
 
     /**
-     * Gets the number of tasks.
+     * Gets the number of tasks for a specified thread.
      *
-     * @return number of tasks
-     **/
-    int64_t num_tasks();
-
-    /**
-     * TODO
+     * @param i_thread_id id of thread.
+     *
+     * @return number of tasks.
      **/
     int64_t getNumTasks( int64_t i_thread_id );
 
     /**
-     * TODO
+     * adds the initial offset to all datapointer
+     *
+     * @param i_thread_id id of thread.
+     * @param i_task_id id of task
+     * @param io_ptr_left pointer to pointer of left tensor
+     * @param io_ptr_right pointer to pointer of right tensor
+     * @param io_ptr_out pointer to pointer of output tensor
      **/
-    void addMovementOffsets( int64_t    i_thread_id, 
-                             int64_t    i_task_id,
-                             char    const ** io_offset_left,
-                             char    const ** io_offset_right,
-                             char          ** io_offset_out );
+    void addMovementOffsets( int64_t          i_thread_id, 
+                             int64_t          i_task_id,
+                             char    const ** io_ptr_left,
+                             char    const ** io_ptr_right,
+                             char          ** io_ptr_out );
     
     /**
-     * TODO
+     * adds the initial offset to all datapointer
+     *
+     * @param i_thread_id id of thread.
+     * @param io_ptr_left pointer to pointer of left tensor
+     * @param io_ptr_right pointer to pointer of right tensor
+     * @param io_ptr_out pointer to pointer of output tensor
      **/
-    void addInitialOffsets( int64_t    i_thread_id,
-                            char    const ** io_offset_left,
-                            char    const ** io_offset_right,
-                            char          ** io_offset_out );
+    void addInitialOffsets( int64_t          i_thread_id,
+                            char    const ** io_ptr_left,
+                            char    const ** io_ptr_right,
+                            char          ** io_ptr_out );
 };
 
 #endif

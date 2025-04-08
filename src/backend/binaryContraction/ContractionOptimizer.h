@@ -16,8 +16,16 @@ namespace einsum_ir {
 
 class einsum_ir::backend::ContractionOptimizer {
   private:
-    //! vector with loop information 
+    //! external vector with all loops 
     std::vector< loop_property > * m_loops;
+
+    //! internal data structur with all loops
+    std::vector< std::vector< loop_property > > m_free_loops;
+
+    //! store the combined size off all m dimension
+    int64_t m_size_all_m;
+    //! store the combined size off all n dimension
+    int64_t m_size_all_n;
 
     //! targeted size for kernel m dimension
     int64_t m_target_m  = 16;
@@ -26,10 +34,10 @@ class einsum_ir::backend::ContractionOptimizer {
     //! targeted size for kernel k dimension
     int64_t m_target_k  = 256;
     //! targeted number of tasks
-    int64_t m_target_parallel = 65536;
+    int64_t m_target_parallel = 16384;
 
     //! number of threads
-    int64_t m_num_threads = 1;
+    int64_t m_num_threads;
 
     //! type of the main kernel
     kernel_t * m_ktype_main;
@@ -53,6 +61,15 @@ class einsum_ir::backend::ContractionOptimizer {
                        int64_t i_new_loop_pos, 
                        exec_t  i_new_exec_t );
   
+    /**
+     * push an empty loop to the back of a destination vector.
+     *
+     * @param i_dest_loops destination vector.
+     * @param i_new_dim_t dimension type of empty loop
+     **/
+    void push_empty_loop( std::vector<loop_property> * i_dest_loops,
+                          dim_t                        i_new_dim_t );
+
     /**
      * adds a loop from the source vector to the destination vector.
      *
@@ -129,17 +146,28 @@ class einsum_ir::backend::ContractionOptimizer {
     void optimize();
 
     /**
-     * sorts all loops depending on stride, dimension type and execution type.
+     * sorts all external loops depending on stride, dimension type and execution type.
      **/
     void sortLoops();
 
     /**
-     * fuses all loops with the same dimension type, execution type and contiguous storage.
+     * fuses all external loops with the same dimension type, execution type and contiguous storage.
      **/
     void fuseLoops();
 
     /**
-     * reorders loops, splits loops and changes the execution type.
+     * moves all unoptimized external loops to internal data structure.
+     **/
+    void moveLoopsToInternal();
+
+
+    /**
+     * finds and adds a kernel to the optimized loops.
+     **/
+    void addKernel();
+
+    /**
+     * reorders loops, splits loops and determines parallel loops.
      **/
     void reorderLoops();
 };

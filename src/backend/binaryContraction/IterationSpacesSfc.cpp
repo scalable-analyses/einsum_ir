@@ -307,27 +307,30 @@ int64_t einsum_ir::backend::IterationSpacesSfc::getNumTasks( int64_t i_thread_id
   return m_dim_movements[i_thread_id].size();
 }
 
-void einsum_ir::backend::IterationSpacesSfc::addMovementOffsets( int64_t           i_thread_id, 
-                                                                 int64_t           i_task_id,
-                                                                 char    const ** io_offset_left,
-                                                                 char    const ** io_offset_right,
-                                                                 char          ** io_offset_out){
+void einsum_ir::backend::IterationSpacesSfc::addMovementOffsets( int64_t          i_thread_id, 
+                                                                 int64_t          i_task_id,
+                                                                 char    const ** io_ptr_left,
+                                                                 char    const ** io_ptr_right,
+                                                                 char          ** io_ptr_out){
   uint8_t l_move =  m_dim_movements[i_thread_id][i_task_id];
-  int64_t l_direction = l_move >> 7 ? -1 : 1;
-  l_move = l_direction == 1 ? l_move : 256-l_move;
 
-  *io_offset_left  += l_direction * m_movement_offsets[0][l_move];
-  *io_offset_right += l_direction * m_movement_offsets[1][l_move];
-  *io_offset_out   += l_direction * m_movement_offsets[2][l_move];
+  //l_direction = 1 - 2 = - 1 if first bit == 1 and 1 - 0 = 1 if first bit == 0 
+  int64_t l_direction = 1 - ((l_move >> 7) << 1); 
+  l_move = l_direction == 1 ? l_move : 256-l_move; //TODO
+
+
+  *io_ptr_left  += l_direction * m_movement_offsets[0][l_move];
+  *io_ptr_right += l_direction * m_movement_offsets[1][l_move];
+  *io_ptr_out   += l_direction * m_movement_offsets[2][l_move];
 }
 
-void einsum_ir::backend::IterationSpacesSfc::addInitialOffsets( int64_t    i_thread_id,
-                                                                char    const ** io_offset_left,
-                                                                char    const ** io_offset_right,
-                                                                char          ** io_offset_out) {
-  *io_offset_left  += m_initial_offsets[i_thread_id][0];
-  *io_offset_right += m_initial_offsets[i_thread_id][1];
-  *io_offset_out   += m_initial_offsets[i_thread_id][2];
+void einsum_ir::backend::IterationSpacesSfc::addInitialOffsets( int64_t          i_thread_id,
+                                                                char    const ** io_ptr_left,
+                                                                char    const ** io_ptr_right,
+                                                                char          ** io_ptr_out) {
+  *io_ptr_left  += m_initial_offsets[i_thread_id][0];
+  *io_ptr_right += m_initial_offsets[i_thread_id][1];
+  *io_ptr_out   += m_initial_offsets[i_thread_id][2];
 }
 
 void einsum_ir::backend::IterationSpacesSfc::SfcOracle3d( int64_t *i_m, 
@@ -485,9 +488,4 @@ int einsum_ir::backend::IterationSpacesSfc::gilbert_d2xy( int *x,
     return gilbert_d2xy_r(idx,0, x,y, w,0, 0,h);
   }
   return gilbert_d2xy_r(idx,0, x,y, 0,h, w,0);
-}
-
-
-int64_t einsum_ir::backend::IterationSpacesSfc::num_tasks( ){
-  return m_num_tasks;
 }
