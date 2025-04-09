@@ -42,27 +42,17 @@ class einsum_ir::backend::IterationSpacesSfc {
     //! range of sfc n loops
     range_t m_sfc_loops_n;
 
-    //! sfc tasks range each thread processes
-    std::vector< range_t > m_thread_work_space;
-
-    //! vector of movements accessed by thread_id and movement_id
+    //! matrix of movements accessed by thread_id and task_id
     std::vector< std::vector< uint8_t > > m_dim_movements;
     
-    //! vector of movement offsets accessed by ioparam_t and a movement
+    //! matrix of movement offsets accessed by io_id and movement_id
     std::vector< std::vector< int64_t > > m_movement_offsets;
 
-    //! vector of initial offsets accessed by thread_id and ioparam_t
+    //! matrix of initial offsets accessed by thread_id and io_id
     std::vector< std::vector< int64_t > > m_initial_offsets;
-
-    //! number of parallel loops
-    int64_t m_num_parallel_loops;
     
     //! number of threads
     int64_t m_num_threads = 0;
-
-    //! number of tasks
-    int64_t m_num_tasks = 0;
-
 
     /**
      * Converts strides into offsets from previous dimension.
@@ -193,17 +183,17 @@ class einsum_ir::backend::IterationSpacesSfc {
                              char          ** io_ptr_out );
     
     /**
-     * Adds the initial offsets to all datapointer.
+     * Gets the initial offsets for all datapointer.
      *
      * @param i_thread_id id of thread.
      * @param io_ptr_left pointer to pointer of left tensor.
      * @param io_ptr_right pointer to pointer of right tensor.
      * @param io_ptr_out pointer to pointer of output tensor.
      **/
-    void addInitialOffsets( int64_t          i_thread_id,
-                            char    const ** io_ptr_left,
-                            char    const ** io_ptr_right,
-                            char          ** io_ptr_out );
+    void getInitialOffsets( int64_t   i_thread_id,
+                            int64_t & io_off_left,
+                            int64_t & io_off_right,
+                            int64_t & io_off_out );
 };
 
 #endif

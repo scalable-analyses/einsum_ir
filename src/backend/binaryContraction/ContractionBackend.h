@@ -28,6 +28,9 @@ class einsum_ir::backend::ContractionBackend {
     //! number of parallel loops
     int64_t m_num_parallel_loops = 0;
 
+    //! number of threads used for execution
+    int64_t m_num_threads;
+
     //! indicates existance of first touch kernel
     bool m_has_first_touch = false;
 

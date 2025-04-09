@@ -110,9 +110,9 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
                                                                                      l_n,
                                                                                      l_ldc,
                                                                                      l_ldc,
-                                                                                     libxsmm_datatype::LIBXSMM_DATATYPE_F32,
-                                                                                     libxsmm_datatype::LIBXSMM_DATATYPE_F32,
-                                                                                     libxsmm_datatype::LIBXSMM_DATATYPE_F32 );
+                                                                                     l_xmm_dtype_out,
+                                                                                     l_xmm_dtype_out,
+                                                                                     l_xmm_dtype_out );
 
   //create first touch kernel
   if( m_ktype_first_touch == kernel_t::ZERO ) {

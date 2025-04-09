@@ -65,7 +65,7 @@ if g_env['tblis'] != False:
 
 l_tests = [ 'tests.cpp',
             'backend/IterationSpaces.test.cpp',
-            #'backend/binaryContraction/IterationSpacesSfc.test.cpp',
+            'backend/binaryContraction/IterationSpacesSfc.test.cpp',
             'backend/binaryContraction/ContractionOptimizer.test.cpp',
             'backend/Unary.test.cpp',
             'backend/ContractionLoopsSimple.test.cpp',

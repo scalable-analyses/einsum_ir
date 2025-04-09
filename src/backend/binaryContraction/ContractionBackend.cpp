@@ -4,6 +4,8 @@
 #include <omp.h>
 #endif
 
+#include <iostream>
+
 void einsum_ir::backend::ContractionBackend::init( std::vector< dim_t >   const & i_loop_dim_type,
                                                    std::vector< exec_t >  const & i_loop_exec_type,
                                                    std::vector< int64_t > const & i_loop_sizes,
@@ -85,6 +87,12 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::compile(){
     return l_err;
   }
 
+  // get number of threads for contraction
+  m_num_threads = 1;
+#ifdef _OPENMP
+  m_num_threads = omp_get_max_threads(); 
+#endif
+
   //check if at least one non Primitive loop exists
   if( m_loop_exec_type.at(0) == einsum_ir::PRIM ){
     m_loop_dim_type.insert(m_loop_dim_type.begin(), einsum_ir::UNDEFINED_DIM);
@@ -133,11 +141,6 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::compile(){
   
 
   // init iteration spaces
-  int64_t l_num_threads = 1;
-#ifdef _OPENMP
-  l_num_threads = omp_get_max_threads(); 
-#endif
-
   m_iter.init( &m_loop_dim_type,
                &m_loop_exec_type,
                &m_loop_sizes,
@@ -145,7 +148,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::compile(){
                &m_loop_strides_right,
                &m_loop_strides_out_aux,
                &m_loop_strides_out,
-               l_num_threads );
+               m_num_threads );
 
   // compile iteration spaces
   l_err = m_iter.compile();
@@ -161,17 +164,19 @@ void einsum_ir::backend::ContractionBackend::contract( void const * i_tensor_lef
                                                        void const * i_tensor_out_aux,
                                                        void       * io_tensor_out ) {
   //only execute in parallel if there are parallel loops
-  if( m_id_first_parallel_loop >= 0 ){
+  if( m_id_first_parallel_loop >= 0 && m_num_threads > 1 ){
 #ifdef _OPENMP
 #pragma omp parallel
     {
       int64_t l_thread_id = omp_get_thread_num();
+      int64_t l_offset_left, l_offset_right, l_offset_out;
+      m_iter.getInitialOffsets( l_thread_id, l_offset_left, l_offset_right, l_offset_out ); //could move to contract function
       contract_iter( l_thread_id,
                      0,
-                     (char *) i_tensor_left,
-                     (char *) i_tensor_right,
+                     (char *) i_tensor_left + l_offset_left,
+                     (char *) i_tensor_right + l_offset_right,
                      (char *) i_tensor_out_aux,
-                     (char *) io_tensor_out,
+                     (char *) io_tensor_out + l_offset_out,
                      m_has_first_touch,
                      m_has_last_touch );
     }
@@ -204,17 +209,15 @@ void einsum_ir::backend::ContractionBackend::contract_iter( int64_t         i_th
 
   int64_t l_size  = m_loop_sizes[i_id_loop];
   if( i_id_loop == m_id_first_parallel_loop ){
-    m_iter.addInitialOffsets( i_thread_id, &i_ptr_left, &i_ptr_right, &i_ptr_out );
     i_id_loop += m_num_parallel_loops - 1;
     l_size = m_iter.getNumTasks( i_thread_id );
   }
 
   // issue loop iterations
   for( int64_t l_it = 0; l_it < l_size; l_it++ ) {
-    if(m_loop_dim_type[i_id_loop] == einsum_ir::K){
-      l_first_access = i_first_access && l_it == 0 ;
-      l_last_access  = i_last_access  && l_it == m_loop_sizes[i_id_loop]-1 ;
-    }
+    bool l_non_k_loop = m_loop_dim_type[i_id_loop] != einsum_ir::K;
+    l_first_access = i_first_access && ( l_non_k_loop || l_it == 0 );
+    l_last_access  = i_last_access  && ( l_non_k_loop || l_it == m_loop_sizes[i_id_loop] - 1 );
 
     if( i_id_loop + 1 < m_id_first_primitive_loop ) {
       contract_iter( i_thread_id,
