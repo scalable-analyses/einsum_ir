@@ -40,7 +40,7 @@ class einsum_ir::backend::ContractionOptimizer {
     int64_t m_num_threads;
 
     //! type of the main kernel
-    kernel_t * m_ktype_main;
+    kernel_main_t * m_ktype_main;
 
     /**
      * splits a loop from the source vector and adds it to the destination vector.
@@ -137,7 +137,7 @@ class einsum_ir::backend::ContractionOptimizer {
      * @param i_num_threads number of participating threads in contraction.
      **/
     void init( std::vector< loop_property > * i_loops,
-               kernel_t                     * i_ktype_main,
+               kernel_main_t                * i_ktype_main,
                int64_t                        i_num_threads );    
   
     /**

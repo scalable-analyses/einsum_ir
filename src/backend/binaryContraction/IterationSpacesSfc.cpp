@@ -34,12 +34,12 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
   int64_t l_num_tasks = 1;
   int64_t l_num_parallel_loops = 0;
   for( size_t l_id = 0; l_id < m_loop_dim_type->size(); l_id++ ){
-    if( m_loop_exec_type->at(l_id) == einsum_ir::OMP ||
-        m_loop_exec_type->at(l_id) == einsum_ir::SFC    ){
+    if( m_loop_exec_type->at(l_id) == exec_t::OMP ||
+        m_loop_exec_type->at(l_id) == exec_t::SFC    ){
       if( !l_num_parallel_loops ){
         m_parallel_loops.begin = l_id;
       }
-      if( m_loop_dim_type->at(l_id) != einsum_ir::K ){
+      if( m_loop_dim_type->at(l_id) != dim_t::K ){
         l_num_tasks *= m_loop_sizes->at(l_id);
       }
       l_num_parallel_loops += 1;
@@ -53,7 +53,7 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
   //assigns parallel dimensions to three types omp, sfc_n, sfc_m
   int64_t l_last_found_type = 0;
   for( int64_t l_id = m_parallel_loops.begin; l_id < m_parallel_loops.end ; l_id++ ){
-    if( m_loop_exec_type->at(l_id) == einsum_ir::OMP &&
+    if( m_loop_exec_type->at(l_id) == exec_t::OMP &&
         l_last_found_type      <= 1 ){
       if( l_last_found_type == 0 ){
         m_omp_loops.begin = l_id;
@@ -61,8 +61,8 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
       m_omp_loops.end = l_id + 1;
       l_last_found_type = 1;
     }
-    else if( m_loop_exec_type->at(l_id) == einsum_ir::SFC &&
-             m_loop_dim_type->at(l_id)  == einsum_ir::M &&
+    else if( m_loop_exec_type->at(l_id) == exec_t::SFC &&
+             m_loop_dim_type->at(l_id)  == dim_t::M &&
              l_last_found_type <= 2){
       m_sfc_tasks_m *= m_loop_sizes->at(l_id);
       if( l_last_found_type <= 1 ){
@@ -71,8 +71,8 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
       m_sfc_loops_m.end = l_id + 1;
       l_last_found_type = 2;
     }
-    else if( m_loop_exec_type->at(l_id) == einsum_ir::SFC &&
-             m_loop_dim_type->at(l_id)  == einsum_ir::N   &&
+    else if( m_loop_exec_type->at(l_id) == exec_t::SFC &&
+             m_loop_dim_type->at(l_id)  == dim_t::N   &&
              l_last_found_type <= 3 ){
       m_sfc_tasks_n *= m_loop_sizes->at(l_id);
       if( l_last_found_type <= 2 ){

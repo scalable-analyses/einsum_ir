@@ -9,7 +9,7 @@
 #endif
 
 void einsum_ir::backend::ContractionOptimizer::init( std::vector< loop_property > * i_loops,
-                                                     kernel_t                     * i_ktype_main,
+                                                     kernel_main_t                * i_ktype_main,
                                                      int64_t                        i_num_threads ){
   m_loops = i_loops;
   m_ktype_main = i_ktype_main;
@@ -77,7 +77,7 @@ void einsum_ir::backend::ContractionOptimizer::moveLoopsToInternal(){
   m_free_loops.resize(4);
   std::vector<loop_property>::iterator l_it = m_loops->begin();
   while( l_it < m_loops->end() ){
-    if( l_it->exec_type == einsum_ir::SEQ ){
+    if( l_it->exec_type == exec_t::SEQ ){
       if( l_it->dim_type == dim_t::M ){
         m_size_all_m *= l_it->size;
       }
@@ -91,7 +91,6 @@ void einsum_ir::backend::ContractionOptimizer::moveLoopsToInternal(){
       l_it++;
     }
   }
-  //TODO should determine the stage of optimization to support partially optimized input
 }
 
 void einsum_ir::backend::ContractionOptimizer::addKernel(){
@@ -188,27 +187,27 @@ void einsum_ir::backend::ContractionOptimizer::addKernel(){
                                       m_loops,
                                       l_kernel_targets[PRIM_K],
                                       0,
-                                      einsum_ir::PRIM );
+                                      exec_t::PRIM );
   l_kernel_sizes[PRIM_N] = splitLoop( l_potential_kernel_loop[PRIM_N],
                                       &m_free_loops[dim_t::N],
                                       m_loops,
                                       l_kernel_targets[PRIM_N],
                                       0,
-                                      einsum_ir::PRIM );
+                                      exec_t::PRIM );
   l_kernel_sizes[PRIM_M] = splitLoop( l_potential_kernel_loop[PRIM_M],
                                       &m_free_loops[dim_t::M],
                                       m_loops,
                                       l_kernel_targets[PRIM_M],
                                       0,
-                                      einsum_ir::PRIM );
+                                      exec_t::PRIM );
   if( l_kernel_targets[PRIM_BR] > 1 ){
-      *m_ktype_main = einsum_ir::BR_MADD;
+      *m_ktype_main = kernel_main_t::BR_MADD;
       l_kernel_sizes[PRIM_BR] = splitLoop( l_potential_kernel_loop[PRIM_BR],
                                            &m_free_loops[dim_t::K],
                                            m_loops,
                                            l_kernel_targets[PRIM_BR],
                                            0,
-                                           einsum_ir::PRIM );
+                                           exec_t::PRIM );
     }
   m_size_all_m /= l_kernel_sizes[PRIM_M];
   m_size_all_n /= l_kernel_sizes[PRIM_N];
@@ -239,36 +238,36 @@ void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
   l_size_parallel *= add_loops_until(&m_free_loops[dim_t::N],
                                      m_loops, 
                                      l_target_parallel_n,
-                                     einsum_ir::SFC);
+                                     exec_t::SFC);
   l_size_parallel *= add_loops_until(&m_free_loops[dim_t::M],
                                      m_loops, 
                                      l_target_parallel_m,
-                                     einsum_ir::SFC);
+                                     exec_t::SFC);
   l_size_parallel *= add_loops_until(&m_free_loops[dim_t::C],
                                      m_loops, 
                                      l_target_parallel_c,
-                                     einsum_ir::OMP);
+                                     exec_t::OMP);
 
 
   //add remaining dimensions
   add_all_loops( &m_free_loops[dim_t::K],
                  m_loops,
-                 einsum_ir::SEQ );
+                 exec_t::SEQ );
   add_all_loops( &m_free_loops[dim_t::M],
                  m_loops,
-                 einsum_ir::SEQ );
+                 exec_t::SEQ );
   add_all_loops( &m_free_loops[dim_t::N],
                  m_loops,
-                 einsum_ir::SEQ );
+                 exec_t::SEQ );
   add_all_loops( &m_free_loops[dim_t::C], 
                  m_loops,
-                 einsum_ir::SEQ );
+                 exec_t::SEQ );
 }
 
 int64_t einsum_ir::backend::ContractionOptimizer::add_loops_until( std::vector<loop_property> * i_source_loops,
                                                                    std::vector<loop_property> * i_dest_loops,
-                                                                   int64_t i_target_size,
-                                                                   exec_t  i_new_exec_t ){
+                                                                   int64_t                      i_target_size,
+                                                                   exec_t                       i_new_exec_t ){
   int64_t l_size_all = 1;
   int64_t l_target_size = i_target_size;
   while( i_source_loops->size() > 0 && 
@@ -294,7 +293,7 @@ int64_t einsum_ir::backend::ContractionOptimizer::add_loops_until( std::vector<l
 
 int64_t einsum_ir::backend::ContractionOptimizer::add_all_loops( std::vector<loop_property> * i_source_loops,
                                                                  std::vector<loop_property> * i_dest_loops,
-                                                                 exec_t  i_new_exec_t ){
+                                                                 exec_t                       i_new_exec_t ){
   int64_t l_size_all = 1;
   while( i_source_loops->size() > 0 ){
     std::vector<loop_property>::iterator l_it = i_source_loops->end() - 1;
@@ -310,9 +309,9 @@ int64_t einsum_ir::backend::ContractionOptimizer::add_all_loops( std::vector<loo
 int64_t einsum_ir::backend::ContractionOptimizer::splitLoop( std::vector<loop_property>::iterator i_loop,
                                                              std::vector<loop_property> *         i_source_loops,
                                                              std::vector<loop_property> *         i_dest_loops,
-                                                             int64_t i_target_size,
-                                                             int64_t i_new_loop_pos, 
-                                                             exec_t  i_new_exec_t ){
+                                                             int64_t                              i_target_size,
+                                                             int64_t                              i_new_loop_pos, 
+                                                             exec_t                               i_new_exec_t ){
 
   int64_t l_split = findSplit(i_loop->size, i_target_size );
 

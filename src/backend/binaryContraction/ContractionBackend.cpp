@@ -17,9 +17,9 @@ void einsum_ir::backend::ContractionBackend::init( std::vector< dim_t >   const 
                                                    data_t                               i_dtype_right,
                                                    data_t                               i_dtype_comp,
                                                    data_t                               i_dtype_out,
-                                                   kernel_t                             i_ktype_first_touch,
-                                                   kernel_t                             i_ktype_main,
-                                                   kernel_t                             i_ktype_last_touch ){
+                                                   kernel_sub_t                         i_ktype_first_touch,
+                                                   kernel_main_t                        i_ktype_main,
+                                                   kernel_sub_t                         i_ktype_last_touch ){
 
   //copy to local variables
   m_loop_dim_type        = i_loop_dim_type;
@@ -45,9 +45,9 @@ void einsum_ir::backend::ContractionBackend::init( std::vector< loop_property > 
                                                    data_t                               i_dtype_right,
                                                    data_t                               i_dtype_comp,
                                                    data_t                               i_dtype_out,
-                                                   kernel_t                             i_ktype_first_touch,
-                                                   kernel_t                             i_ktype_main,
-                                                   kernel_t                             i_ktype_last_touch ){
+                                                   kernel_sub_t                         i_ktype_first_touch,
+                                                   kernel_main_t                        i_ktype_main,
+                                                   kernel_sub_t                         i_ktype_last_touch ){
 
   int64_t l_num_loops = i_loops.size();
   m_loop_dim_type.resize(l_num_loops);
@@ -81,6 +81,12 @@ void einsum_ir::backend::ContractionBackend::init( std::vector< loop_property > 
 einsum_ir::err_t einsum_ir::backend::ContractionBackend::compile(){
   err_t l_err = err_t::UNDEFINED_ERROR;
 
+  // get kernel shape
+  l_err = get_kernel_shape();
+  if( l_err != err_t::SUCCESS ) {
+    return l_err;
+  }
+
   // compile kernel
   l_err = compile_kernels();
   if( l_err != err_t::SUCCESS ) {
@@ -93,10 +99,10 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::compile(){
   m_num_threads = omp_get_max_threads(); 
 #endif
 
-  //check if at least one non Primitive loop exists
-  if( m_loop_exec_type.at(0) == einsum_ir::PRIM ){
-    m_loop_dim_type.insert(m_loop_dim_type.begin(), einsum_ir::UNDEFINED_DIM);
-    m_loop_exec_type.insert(m_loop_exec_type.begin(), einsum_ir::SEQ);
+  //create at least one non Primitive loop
+  if( m_loop_exec_type.at(0) == exec_t::PRIM ){
+    m_loop_dim_type.insert( m_loop_dim_type.begin(),  dim_t::UNDEFINED_DIM);
+    m_loop_exec_type.insert(m_loop_exec_type.begin(), exec_t::SEQ);
     m_loop_sizes.insert(m_loop_sizes.begin(), 1);
     m_loop_strides_left.insert(   m_loop_strides_left.begin(),    0); 
     m_loop_strides_right.insert(  m_loop_strides_right.begin(),   0); 
@@ -110,24 +116,24 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::compile(){
   m_num_parallel_loops = 0;
   int64_t l_num_loops = m_loop_dim_type.size();
   for(int64_t l_id = 0; l_id < l_num_loops; l_id++){
-    if( m_loop_exec_type.at(l_id) == einsum_ir::OMP ||
-        m_loop_exec_type.at(l_id) == einsum_ir::SFC    ){
+    if( m_loop_exec_type.at(l_id) == exec_t::OMP ||
+        m_loop_exec_type.at(l_id) == exec_t::SFC    ){
       if( m_id_first_parallel_loop == -1 ){
         m_id_first_parallel_loop = l_id;
       }
       m_num_parallel_loops++;
     }
-    if( m_loop_exec_type.at(l_id) == einsum_ir::PRIM ){
+    if( m_loop_exec_type.at(l_id) == exec_t::PRIM ){
       m_id_first_primitive_loop = l_id;
       break;
     }
   }
 
   //check if first and last touch exists
-  if( m_ktype_first_touch != einsum_ir::UNDEFINED_KTYPE ){
+  if( m_ktype_first_touch != kernel_sub_t::UNDEFINED_SUB_KTYPE ){
     m_has_first_touch = true;
   }
-  if( m_ktype_last_touch != einsum_ir::UNDEFINED_KTYPE ){
+  if( m_ktype_last_touch != kernel_sub_t::UNDEFINED_SUB_KTYPE ){
     m_has_last_touch = true;
   }
 
@@ -215,7 +221,7 @@ void einsum_ir::backend::ContractionBackend::contract_iter( int64_t         i_th
 
   // issue loop iterations
   for( int64_t l_it = 0; l_it < l_size; l_it++ ) {
-    bool l_non_k_loop = m_loop_dim_type[i_id_loop] != einsum_ir::K;
+    bool l_non_k_loop = m_loop_dim_type[i_id_loop] != dim_t::K;
     l_first_access = i_first_access && ( l_non_k_loop || l_it == 0 );
     l_last_access  = i_last_access  && ( l_non_k_loop || l_it == m_loop_sizes[i_id_loop] - 1 );
 
@@ -256,4 +262,81 @@ void einsum_ir::backend::ContractionBackend::contract_iter( int64_t         i_th
       i_ptr_out     += m_loop_strides_out[ i_id_loop ];
     }  
   }
+}
+
+einsum_ir::err_t einsum_ir::backend::ContractionBackend::get_kernel_shape( ){
+  err_t l_err = err_t::UNDEFINED_ERROR;
+
+  //check that there are enough primitive dimensions
+  int64_t l_size = m_loop_sizes.size();
+  int64_t l_num_prims = 0;
+  for( int64_t l_id = l_size - 1; l_id >= 0; l_id-- ){
+    if( m_loop_exec_type[l_id] != exec_t::PRIM ){
+      break;
+    }
+    l_num_prims++;
+  }
+  if( (m_ktype_main == kernel_main_t::MADD        && l_num_prims != 3) ||
+      (m_ktype_main == kernel_main_t::BR_MADD     && l_num_prims != 4) ||
+      (m_ktype_main == kernel_main_t::PACKED_MADD && l_num_prims != 4)    ){
+    return err_t::COMPILATION_FAILED; 
+  }
+
+  //set m, n, k
+  m_m  = m_loop_sizes[l_size-3];
+  m_n  = m_loop_sizes[l_size-2];
+  m_k  = m_loop_sizes[l_size-1];
+
+  //set lda
+  if(m_loop_strides_left[l_size-1] == 1 &&
+     m_loop_strides_left[l_size-3]  > 1    ){
+    m_trans_a = true;
+    m_lda = m_loop_strides_left[l_size-3];
+  }
+  else{
+    m_trans_a = false;
+    m_lda = m_loop_strides_left[l_size-1];
+  }
+
+  //set ldb
+  if(m_loop_strides_right[l_size-2] == 1 &&
+     m_loop_strides_right[l_size-1]  > 1    ){
+    m_trans_b = true;
+    m_ldb = m_loop_strides_right[l_size-1];
+  }
+  else{
+    m_trans_b = false;
+    m_ldb = m_loop_strides_right[l_size-2];
+  }
+
+  //set ldc and ld_out_aux
+  m_ldc = m_loop_strides_out[l_size-2];
+  m_ld_out_aux = m_loop_strides_out_aux[l_size-2];
+
+  //set br parameter
+  m_br = 1;
+  m_br_stride_a = 0;
+  m_br_stride_b = 0;
+  if( m_ktype_main == kernel_main_t::BR_MADD ){
+    m_br = m_loop_sizes[l_size-4];
+    m_br_stride_a = m_loop_strides_left[l_size-4];
+    m_br_stride_b = m_loop_strides_right[l_size-4];
+  }
+
+  //set packed parameter
+  m_r = 1;
+  if( m_ktype_main == kernel_main_t::PACKED_MADD ){
+    m_r = m_loop_sizes[l_size-4];
+  }
+
+  //fix leading dimensions for size 1 loops
+  if( m_k == 1 ){
+    m_lda = m_m;
+  }
+  if( m_n == 1 ){
+    m_ldb = m_k;
+    m_ldc = m_m;
+  }
+
+  return err_t::SUCCESS;
 }

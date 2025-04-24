@@ -12,14 +12,21 @@ namespace einsum_ir {
 
 class einsum_ir::backend::ContractionBackendTpp: public ContractionBackend {
   private:
-    //size of batch reduce dimension
-    unsigned long long m_br = 0; 
 
     //! LIBXSMM-based unary first-touch TPP
     libxsmm_meltwfunction_unary m_xmm_kernel_first_touch_unary = nullptr;
 
+    //! LIBXSMM-based binary first-touch TPP
+    libxsmm_meltwfunction_binary m_xmm_kernel_first_touch_binary = nullptr;
+
     //! LIBXSMM-based main TPP
     libxsmm_gemmfunction m_xmm_kernel_main = nullptr;
+
+    //! LIBXSMM-based unary last-touch TPP
+    libxsmm_meltwfunction_unary m_xmm_kernel_last_touch_unary = nullptr;
+
+    //! LIBXSMM-based binary last-touch TPP
+    libxsmm_meltwfunction_binary m_xmm_kernel_last_touch_binary = nullptr;
 
     /**
      * coverts internal datatypes to libxsmm datatypes

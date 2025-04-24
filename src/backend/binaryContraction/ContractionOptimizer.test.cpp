@@ -5,15 +5,17 @@
 
 TEST_CASE( "Simple test for Contractoin Optimizer", "[contraction_optimizer]" ) {
   using namespace einsum_ir;
-  std::vector< backend::loop_property > l_loops = { {dim_t::M, exec_t::SEQ,  32,   8,  0, 0,   8},
-                                                    {dim_t::K, exec_t::SEQ,  64, 256,  1, 0,   0},
-                                                    {dim_t::M, exec_t::SEQ,   2,   1,  0, 0,   1},
-                                                    {dim_t::N, exec_t::SEQ, 128,   0, 64, 0, 256},
-                                                    {dim_t::M, exec_t::SEQ,   4,   2,  0, 0,   2}};
+  using namespace einsum_ir::backend;
+
+  std::vector< loop_property > l_loops = { {dim_t::M, exec_t::SEQ,  32,   8,  0, 0,   8},
+                                           {dim_t::K, exec_t::SEQ,  64, 256,  1, 0,   0},
+                                           {dim_t::M, exec_t::SEQ,   2,   1,  0, 0,   1},
+                                           {dim_t::N, exec_t::SEQ, 128,   0, 64, 0, 256},
+                                           {dim_t::M, exec_t::SEQ,   4,   2,  0, 0,   2}};
 
 
-  backend::ContractionOptimizer l_opt;
-  kernel_t l_kernel_main = kernel_t::MADD;
+  ContractionOptimizer l_opt;
+  kernel_main_t l_kernel_main = kernel_main_t::MADD;
 
   int64_t l_size_before[] = {1,1,1,1};
   for( int64_t l_id = 0; l_id < l_loops.size(); l_id++ ){
@@ -67,13 +69,15 @@ TEST_CASE( "Simple test for Contractoin Optimizer", "[contraction_optimizer]" ) 
 
 TEST_CASE( "Simple matmul test for Contractoin Optimizer", "[contraction_optimizer]" ) {
   using namespace einsum_ir;
-  std::vector< backend::loop_property > l_loops = { {dim_t::N, exec_t::SEQ, 2048,    0, 2048, 0, 2048},
-                                                    {dim_t::K, exec_t::SEQ, 2048, 2048,    1, 0,    0},
-                                                    {dim_t::M, exec_t::SEQ, 2048,    1,    0, 0,    1}};
+  using namespace einsum_ir::backend;
+
+  std::vector< loop_property > l_loops = { {dim_t::N, exec_t::SEQ, 2048,    0, 2048, 0, 2048},
+                                           {dim_t::K, exec_t::SEQ, 2048, 2048,    1, 0,    0},
+                                           {dim_t::M, exec_t::SEQ, 2048,    1,    0, 0,    1}};
 
 
-  backend::ContractionOptimizer l_opt;
-  kernel_t l_kernel_main = kernel_t::MADD;
+  ContractionOptimizer l_opt;
+  kernel_main_t l_kernel_main = kernel_main_t::MADD;
 
   int64_t l_size_before[] = {1,1,1,1};
   for( int64_t l_id = 0; l_id < l_loops.size(); l_id++ ){

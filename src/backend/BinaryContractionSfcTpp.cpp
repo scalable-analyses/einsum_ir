@@ -51,7 +51,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionSfcTpp::compile() {
   for(size_t l_id = 0; l_id < l_all_dim_ids.size(); l_id++){
     int64_t l_dim_id = l_all_dim_ids[l_id];
     l_loops[l_id].dim_type       = m_dim_types[      l_dim_id];
-    l_loops[l_id].exec_type      = einsum_ir::SEQ;
+    l_loops[l_id].exec_type      = exec_t::SEQ;
     l_loops[l_id].size           = m_dim_sizes_inner->at(l_dim_id);
     l_loops[l_id].stride_left    = map_find_default<int64_t>(&l_strides_left,    l_dim_id, 0);
     l_loops[l_id].stride_right   = map_find_default<int64_t>(&l_strides_right,   l_dim_id, 0);
@@ -59,11 +59,16 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionSfcTpp::compile() {
     l_loops[l_id].stride_out     = map_find_default<int64_t>(&l_strides_out,     l_dim_id, 0);
   }
 
+  kernel_main_t l_ktype_main = m_ktype_main == kernel_t::MADD ? kernel_main_t::MADD : kernel_main_t::UNDEFINED_MAIN_KTYPE;
+
+  kernel_sub_t l_ktype_first_touch = (kernel_sub_t)m_ktype_first_touch;
+  kernel_sub_t l_ktype_last_touch  = (kernel_sub_t)m_ktype_last_touch;
+
   //optimize loops
   ContractionOptimizer l_optim;
 
   l_optim.init(&l_loops,
-               &m_ktype_main,
+               &l_ktype_main,
                72);
   l_optim.optimize();
 
@@ -86,9 +91,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionSfcTpp::compile() {
                   m_dtype_right,
                   m_dtype_comp,
                   m_dtype_out,
-                  m_ktype_first_touch,
-                  m_ktype_main,
-                  m_ktype_last_touch);
+                  l_ktype_first_touch,
+                  l_ktype_main,
+                  l_ktype_last_touch);
   
   l_err = m_backend.compile();
   if( l_err != err_t::SUCCESS ) {

@@ -73,11 +73,42 @@ class einsum_ir::backend::ContractionBackend {
     std::vector< int64_t > m_loop_strides_out;
 
     //! type of the first touch kernel
-    kernel_t m_ktype_first_touch = UNDEFINED_KTYPE;
+    kernel_sub_t m_ktype_first_touch = UNDEFINED_SUB_KTYPE;
     //! type of the main kernel
-    kernel_t m_ktype_main = UNDEFINED_KTYPE;
+    kernel_main_t  m_ktype_main = UNDEFINED_MAIN_KTYPE;
     //! type of the last touch kernel
-    kernel_t m_ktype_last_touch = UNDEFINED_KTYPE;
+    kernel_sub_t m_ktype_last_touch = UNDEFINED_SUB_KTYPE;
+
+    //! kernel br size
+    uint64_t m_br;
+    //! kernel m size
+    uint64_t m_m;
+    //! kernel n size
+    uint64_t m_n;
+    //! kernel k size
+    uint64_t m_k;
+    //! kernel r size
+    uint64_t m_r;
+
+
+    //! kernel leading dimension A
+    uint64_t m_lda;
+    //! kernel leading dimension B
+    uint64_t m_ldb;
+    //! kernel leading dimension C
+    uint64_t m_ldc;
+    //! kernel leading dimension of auxiliary tensor
+    uint64_t m_ld_out_aux;
+
+    //! kernel br stride a
+    uint64_t m_br_stride_a;
+    //! kernel br stride b
+    uint64_t m_br_stride_b;
+
+    //! indicates if kernel should transpose A
+    bool m_trans_a;
+    //! indicates if kernel should transpose B
+    bool m_trans_b;
     
   public:
     /**
@@ -109,9 +140,9 @@ class einsum_ir::backend::ContractionBackend {
                data_t                         i_dtype_right,
                data_t                         i_dtype_comp,
                data_t                         i_dtype_out,
-               kernel_t                       i_ktype_first_touch,
-               kernel_t                       i_ktype_main,
-               kernel_t                       i_ktype_last_touch );
+               kernel_sub_t                   i_ktype_first_touch,
+               kernel_main_t                  i_ktype_main,
+               kernel_sub_t                   i_ktype_last_touch );
 
 
     /**
@@ -127,13 +158,13 @@ class einsum_ir::backend::ContractionBackend {
      * @param i_ktype_last_touch type of the last touch kernel.
      **/
     void init( std::vector< loop_property > const & i_loops,
-               data_t                         i_dtype_left,
-               data_t                         i_dtype_right,
-               data_t                         i_dtype_comp,
-               data_t                         i_dtype_out,
-               kernel_t                       i_ktype_first_touch,
-               kernel_t                       i_ktype_main,
-               kernel_t                       i_ktype_last_touch );
+               data_t                               i_dtype_left,
+               data_t                               i_dtype_right,
+               data_t                               i_dtype_comp,
+               data_t                               i_dtype_out,
+               kernel_sub_t                         i_ktype_first_touch,
+               kernel_main_t                        i_ktype_main,
+               kernel_sub_t                         i_ktype_last_touch );
 
     /**
      * Compiles the contraction loop interface.
@@ -178,6 +209,12 @@ class einsum_ir::backend::ContractionBackend {
                         bool            i_first_access,
                         bool            i_last_access );
 
+    /**
+     * calculates the shape of the kernel i.e. m, n, k, lda, ldb, ldc, ...
+     *
+     * @return SUCCESS if the compilation was successful, otherwise an appropiate error code.
+     **/
+    err_t get_kernel_shape( );
 
     /**
      * Kernel applied to the output tensor before the contraction.

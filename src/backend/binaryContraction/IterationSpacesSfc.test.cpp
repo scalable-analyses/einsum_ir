@@ -7,20 +7,23 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP and 3 threads.", "[i
   //example: [c1,m2,k2,k1,m1],[c1,n2,k2,n1,k1]->[c1,n2,m2,n1,m1]
   //sizes:   [ 2, 3, 5, 2, 2],[ 2, 4, 5, 2, 2]->[ 2, 4, 3, 2, 2]
   //strides: [60,20, 4, 2, 1],[80,20, 4, 2, 1]->[48,12, 4, 2, 1]
-  std::vector< einsum_ir::dim_t >  l_loop_dim_type  = { einsum_ir::dim_t::C, 
-                                                        einsum_ir::dim_t::M, 
-                                                        einsum_ir::dim_t::N, 
-                                                        einsum_ir::dim_t::K, 
-                                                        einsum_ir::dim_t::M, 
-                                                        einsum_ir::dim_t::N, 
-                                                        einsum_ir::dim_t::K };
-  std::vector< einsum_ir::exec_t > l_loop_exec_type = { einsum_ir::exec_t::OMP, 
-                                                        einsum_ir::exec_t::SFC, 
-                                                        einsum_ir::exec_t::SFC, 
-                                                        einsum_ir::exec_t::SEQ, 
-                                                        einsum_ir::exec_t::PRIM, 
-                                                        einsum_ir::exec_t::PRIM, 
-                                                        einsum_ir::exec_t::PRIM };
+  using namespace einsum_ir;
+  using namespace einsum_ir::backend;
+
+  std::vector< dim_t >  l_loop_dim_type  = { dim_t::C, 
+                                             dim_t::M, 
+                                             dim_t::N, 
+                                             dim_t::K, 
+                                             dim_t::M, 
+                                             dim_t::N, 
+                                             dim_t::K };
+  std::vector< exec_t > l_loop_exec_type = { exec_t::OMP, 
+                                             exec_t::SFC, 
+                                             exec_t::SFC, 
+                                             exec_t::SEQ, 
+                                             exec_t::PRIM, 
+                                             exec_t::PRIM, 
+                                             exec_t::PRIM };
 
   //                                                c1 n2,m2,k2,m1,n1,k1
   std::vector< int64_t > l_loop_sizes           = {  2, 3, 4, 5, 2, 2, 2};
@@ -29,7 +32,7 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP and 3 threads.", "[i
   std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0, 0, 0, 0};
   std::vector< int64_t > l_loop_strides_out     = { 48, 4,12, 0, 2, 1, 0};
 
-  einsum_ir::backend::IterationSpacesSfc l_iter;
+  IterationSpacesSfc l_iter;
 
   int64_t l_num_threads = 3;
 
@@ -42,8 +45,8 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP and 3 threads.", "[i
                &l_loop_strides_out,
                l_num_threads );     
                 
-  einsum_ir::err_t l_err = l_iter.compile();
-  REQUIRE( l_err == einsum_ir::err_t::SUCCESS );
+  err_t l_err = l_iter.compile();
+  REQUIRE( l_err == err_t::SUCCESS );
 
   //check that all task are distributed
   int64_t l_num_tasks = 0;
@@ -85,20 +88,23 @@ TEST_CASE( "Threading test for OMP only Iteration Space and 5 threads.", "[iter_
   //example: [c1,m2,k2,k1,m1],[c1,n2,k2,n1,k1]->[c1,n2,m2,n1,m1]
   //sizes:   [ 2, 3, 5, 2, 2],[ 2, 4, 5, 2, 2]->[ 2, 4, 3, 2, 2]
   //strides: [60,20, 4, 2, 1],[80,20, 4, 2, 1]->[48,12, 4, 2, 1]
-  std::vector< einsum_ir::dim_t >  l_loop_dim_type  = { einsum_ir::dim_t::C, 
-                                                        einsum_ir::dim_t::M, 
-                                                        einsum_ir::dim_t::N, 
-                                                        einsum_ir::dim_t::K, 
-                                                        einsum_ir::dim_t::M, 
-                                                        einsum_ir::dim_t::N, 
-                                                        einsum_ir::dim_t::K };
-  std::vector< einsum_ir::exec_t > l_loop_exec_type = { einsum_ir::exec_t::OMP, 
-                                                        einsum_ir::exec_t::OMP, 
-                                                        einsum_ir::exec_t::OMP, 
-                                                        einsum_ir::exec_t::SEQ, 
-                                                        einsum_ir::exec_t::PRIM, 
-                                                        einsum_ir::exec_t::PRIM, 
-                                                        einsum_ir::exec_t::PRIM };
+  using namespace einsum_ir;
+  using namespace einsum_ir::backend;
+
+  std::vector< dim_t >  l_loop_dim_type  = { dim_t::C, 
+                                             dim_t::M, 
+                                             dim_t::N, 
+                                             dim_t::K, 
+                                             dim_t::M, 
+                                             dim_t::N, 
+                                             dim_t::K };
+  std::vector< exec_t > l_loop_exec_type = { exec_t::OMP, 
+                                             exec_t::OMP, 
+                                             exec_t::OMP, 
+                                             exec_t::SEQ, 
+                                             exec_t::PRIM, 
+                                             exec_t::PRIM, 
+                                             exec_t::PRIM };
 
   //                                                c1 m2,n2,k2,m1,n1,k1
   std::vector< int64_t > l_loop_sizes           = {  2, 3, 4, 5, 2, 2, 2};
@@ -107,7 +113,7 @@ TEST_CASE( "Threading test for OMP only Iteration Space and 5 threads.", "[iter_
   std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0, 0, 0, 0};
   std::vector< int64_t > l_loop_strides_out     = { 48, 4,12, 0, 2, 1, 0};
 
-  einsum_ir::backend::IterationSpacesSfc l_iter;
+  IterationSpacesSfc l_iter;
 
   int64_t l_num_threads = 5;
 
@@ -120,8 +126,8 @@ TEST_CASE( "Threading test for OMP only Iteration Space and 5 threads.", "[iter_
                &l_loop_strides_out,
                5 );     
                 
-  einsum_ir::err_t l_err = l_iter.compile();
-  REQUIRE( l_err == einsum_ir::err_t::SUCCESS );
+  err_t l_err = l_iter.compile();
+  REQUIRE( l_err == err_t::SUCCESS );
 
   //check that all task are distributed
   int64_t l_num_tasks = 0;
@@ -163,20 +169,23 @@ TEST_CASE( "Threading test for SFC only Iteration Space with 1 threads.", "[iter
   //example: [m2,k2,k1,m1],[n3,n2,k2,n1,k1]->[n3,n2,m2,n1,m1]
   //sizes:   [ 3, 5, 2, 2],[ 2, 4, 5, 2, 2]->[ 2, 4, 3, 2, 2]
   //strides: [20, 4, 2, 1],[80,20, 4, 2, 1]->[48,12, 4, 2, 1]
-  std::vector< einsum_ir::dim_t >  l_loop_dim_type  = { einsum_ir::dim_t::M, 
-                                                        einsum_ir::dim_t::N, 
-                                                        einsum_ir::dim_t::N, 
-                                                        einsum_ir::dim_t::K, 
-                                                        einsum_ir::dim_t::M, 
-                                                        einsum_ir::dim_t::N, 
-                                                        einsum_ir::dim_t::K };
-  std::vector< einsum_ir::exec_t > l_loop_exec_type = { einsum_ir::exec_t::SFC, 
-                                                        einsum_ir::exec_t::SFC, 
-                                                        einsum_ir::exec_t::SFC, 
-                                                        einsum_ir::exec_t::SEQ, 
-                                                        einsum_ir::exec_t::PRIM, 
-                                                        einsum_ir::exec_t::PRIM, 
-                                                        einsum_ir::exec_t::PRIM };
+  using namespace einsum_ir;
+  using namespace einsum_ir::backend;
+
+  std::vector< dim_t >  l_loop_dim_type  = { dim_t::M, 
+                                             dim_t::N, 
+                                             dim_t::N, 
+                                             dim_t::K, 
+                                             dim_t::M, 
+                                             dim_t::N, 
+                                             dim_t::K };
+  std::vector< exec_t > l_loop_exec_type = { exec_t::SFC, 
+                                             exec_t::SFC, 
+                                             exec_t::SFC, 
+                                             exec_t::SEQ, 
+                                             exec_t::PRIM, 
+                                             exec_t::PRIM, 
+                                             exec_t::PRIM };
 
   //                                                m2,n3 n2,k2,m1,n1,k1
   std::vector< int64_t > l_loop_sizes           = {  3, 2, 4, 5, 2, 2, 2};
@@ -185,7 +194,7 @@ TEST_CASE( "Threading test for SFC only Iteration Space with 1 threads.", "[iter
   std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0, 0, 0, 0};
   std::vector< int64_t > l_loop_strides_out     = {  4,48,12, 0, 2, 1, 0};
 
-  einsum_ir::backend::IterationSpacesSfc l_iter;
+  IterationSpacesSfc l_iter;
 
   int64_t l_num_threads = 1;
 
@@ -198,8 +207,8 @@ TEST_CASE( "Threading test for SFC only Iteration Space with 1 threads.", "[iter
                &l_loop_strides_out,
                l_num_threads );     
                 
-  einsum_ir::err_t l_err = l_iter.compile();
-  REQUIRE( l_err == einsum_ir::err_t::SUCCESS );
+  err_t l_err = l_iter.compile();
+  REQUIRE( l_err == err_t::SUCCESS );
 
   //check that all task are distributed
   int64_t l_num_tasks = 0;
