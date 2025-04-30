@@ -1,9 +1,10 @@
+//TODO change inlude guard
 #ifndef EINSUM_IR_BACKEND_CONTRACTION_LOOPS_SFC
 #define EINSUM_IR_BACKEND_CONTRACTION_LOOPS_SFC
 
 #include <vector>
 #include <map>
-#include "../../constants.h"
+
 #include "constants_local.h"
 #include "IterationSpacesSfc.h"
 
@@ -39,17 +40,17 @@ class einsum_ir::backend::ContractionBackend {
 
   protected:
     //! datatype of the left input
-    data_t m_dtype_left;
+    data_t m_dtype_left = UNDEFINED_DTYPE;
 
     //! datatype of the right input
-    data_t m_dtype_right;
+    data_t m_dtype_right = UNDEFINED_DTYPE;
 
     //! datatype of the output
-    data_t m_dtype_out;
-
+    data_t m_dtype_out = UNDEFINED_DTYPE;
 
     //! datatype used during the computations
     data_t m_dtype_comp = UNDEFINED_DTYPE;
+
 
     //! vector with dimension types of all loops
     std::vector< dim_t >   m_loop_dim_type;
@@ -73,11 +74,11 @@ class einsum_ir::backend::ContractionBackend {
     std::vector< int64_t > m_loop_strides_out;
 
     //! type of the first touch kernel
-    kernel_sub_t m_ktype_first_touch = UNDEFINED_SUB_KTYPE;
+    kernel_t m_ktype_first_touch = UNDEFINED_KTYPE;
     //! type of the main kernel
-    kernel_main_t  m_ktype_main = UNDEFINED_MAIN_KTYPE;
+    kernel_t  m_ktype_main = UNDEFINED_KTYPE;
     //! type of the last touch kernel
-    kernel_sub_t m_ktype_last_touch = UNDEFINED_SUB_KTYPE;
+    kernel_t m_ktype_last_touch = UNDEFINED_KTYPE;
 
     //! kernel br size
     uint64_t m_br;
@@ -104,6 +105,15 @@ class einsum_ir::backend::ContractionBackend {
     uint64_t m_br_stride_a;
     //! kernel br stride b
     uint64_t m_br_stride_b;
+
+    //! complex stride of the left tensor
+    int64_t m_cpx_stride_in_left_bytes = 0;
+    //! complex stride of the right tensor
+    int64_t m_cpx_stride_in_right_bytes = 0;
+    //! complex stride of the auxiliary output tensor
+    int64_t m_cpx_stride_out_aux_bytes = 0;
+    //! complex stride of the output tensor
+    int64_t m_cpx_stride_out_bytes = 0;
 
     //! indicates if kernel should transpose A
     bool m_trans_a;
@@ -140,9 +150,9 @@ class einsum_ir::backend::ContractionBackend {
                data_t                         i_dtype_right,
                data_t                         i_dtype_comp,
                data_t                         i_dtype_out,
-               kernel_sub_t                   i_ktype_first_touch,
-               kernel_main_t                  i_ktype_main,
-               kernel_sub_t                   i_ktype_last_touch );
+               kernel_t                       i_ktype_first_touch,
+               kernel_t                       i_ktype_main,
+               kernel_t                       i_ktype_last_touch );
 
 
     /**
@@ -162,9 +172,9 @@ class einsum_ir::backend::ContractionBackend {
                data_t                               i_dtype_right,
                data_t                               i_dtype_comp,
                data_t                               i_dtype_out,
-               kernel_sub_t                         i_ktype_first_touch,
-               kernel_main_t                        i_ktype_main,
-               kernel_sub_t                         i_ktype_last_touch );
+               kernel_t                             i_ktype_first_touch,
+               kernel_t                             i_ktype_main,
+               kernel_t                             i_ktype_last_touch );
 
     /**
      * Compiles the contraction loop interface.

@@ -1,7 +1,7 @@
 #include "ATen/ATen.h"
 #include "catch.hpp"
 #include "ContractionBackendTpp.h"
-#include "../../constants.h"
+
 
 
 TEST_CASE( "Matmul with sequential batch dimension.", "[contraction_backend]" ) {
@@ -44,9 +44,9 @@ TEST_CASE( "Matmul with sequential batch dimension.", "[contraction_backend]" ) 
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
-               backend::kernel_sub_t::ZERO,
-               backend::kernel_main_t::MADD,
-               backend::kernel_sub_t::UNDEFINED_SUB_KTYPE );     
+               kernel_t::ZERO,
+               kernel_t::MADD,
+               kernel_t::UNDEFINED_KTYPE );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -104,9 +104,9 @@ TEST_CASE( "Packed Matmul with sequential M dimension.", "[contraction_backend]"
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
-               backend::kernel_sub_t::ZERO,
-               backend::kernel_main_t::PACKED_MADD,
-               backend::kernel_sub_t::UNDEFINED_SUB_KTYPE );     
+               kernel_t::ZERO,
+               kernel_t::PACKED_MADD,
+               kernel_t::UNDEFINED_KTYPE );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -161,9 +161,9 @@ TEST_CASE( "Matmul with sequential batch dimension and transposed B.", "[contrac
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
-               kernel_sub_t::ZERO,
-               kernel_main_t::MADD,
-               kernel_sub_t::UNDEFINED_SUB_KTYPE );     
+               kernel_t::ZERO,
+               kernel_t::MADD,
+               kernel_t::UNDEFINED_KTYPE );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -219,9 +219,9 @@ TEST_CASE( "Simple Matmul with sequential batch dimension and transposed A.", "[
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
-               kernel_sub_t::ZERO,
-               kernel_main_t::MADD,
-               kernel_sub_t::UNDEFINED_SUB_KTYPE );     
+               kernel_t::ZERO,
+               kernel_t::MADD,
+               kernel_t::UNDEFINED_KTYPE );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -278,9 +278,9 @@ TEST_CASE( "Single call of batch reduce matmul.", "[contraction_backend]" ) {
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
-               backend::kernel_sub_t::ZERO,
-               backend::kernel_main_t::BR_MADD,
-               backend::kernel_sub_t::UNDEFINED_SUB_KTYPE );     
+               kernel_t::ZERO,
+               kernel_t::BR_MADD,
+               kernel_t::UNDEFINED_KTYPE );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -337,9 +337,9 @@ TEST_CASE( "tensor contraction with omp parallelisation.", "[contraction_backend
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
-               backend::kernel_sub_t::ZERO,
-               backend::kernel_main_t::MADD,
-               backend::kernel_sub_t::UNDEFINED_SUB_KTYPE );     
+               kernel_t::ZERO,
+               kernel_t::MADD,
+               kernel_t::UNDEFINED_KTYPE );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -400,9 +400,9 @@ TEST_CASE( "blocked matmul with omp parallelisation.", "[contraction_backend]" )
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
-               backend::kernel_sub_t::ZERO,
-               backend::kernel_main_t::MADD,
-               backend::kernel_sub_t::UNDEFINED_SUB_KTYPE );     
+               kernel_t::ZERO,
+               kernel_t::MADD,
+               kernel_t::UNDEFINED_KTYPE );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -460,9 +460,9 @@ TEST_CASE( "tensor contraction with sfc parallelisation.", "[contraction_backend
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
-               backend::kernel_sub_t::ZERO,
-               backend::kernel_main_t::MADD,
-               backend::kernel_sub_t::UNDEFINED_SUB_KTYPE );     
+               kernel_t::ZERO,
+               kernel_t::MADD,
+               kernel_t::UNDEFINED_KTYPE );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -523,9 +523,9 @@ TEST_CASE( "tensor contraction with sfc and omp parallelisation.", "[contraction
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
-               backend::kernel_sub_t::ZERO,
-               backend::kernel_main_t::MADD,
-               backend::kernel_sub_t::UNDEFINED_SUB_KTYPE );     
+               kernel_t::ZERO,
+               kernel_t::MADD,
+               kernel_t::UNDEFINED_KTYPE );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );

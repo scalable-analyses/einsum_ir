@@ -1,5 +1,6 @@
-#ifndef EINSUM_IR_BACKEND_CONTRACTION_LOOPS_SFC_TPP
-#define EINSUM_IR_BACKEND_CONTRACTION_LOOPS_SFC_TPP
+//TODO change inlude guard
+#ifndef EINSUM_IR_BACKEND_CONTRACTION_SFC_TPP
+#define EINSUM_IR_BACKEND_CONTRACTION_SFC_TPP
 
 #include <libxsmm.h>
 #include "ContractionBackend.h"

@@ -70,6 +70,8 @@ namespace einsum_ir {
     CPX_INT_HIGH    = 10, // internal use only
     CUSTOM_KTYPE    = 11,
     BR_MADD         = 12,
+    PACKED_MADD     = 13,
+    CPX_PACKED_MADD = 14,
     UNDEFINED_KTYPE = 99
   } kernel_t;
 

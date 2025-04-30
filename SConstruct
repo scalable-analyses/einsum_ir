@@ -196,6 +196,7 @@ g_env.tests = []
 g_env.exe = {}
 
 Export('g_env')
+SConscript( g_env['build_dir']+'/src/backend/binaryContraction/SConscript' )
 SConscript( g_env['build_dir']+'/src/SConscript' )
 Import('g_env')
 
@@ -212,4 +213,4 @@ if( g_env['libxsmm'] and g_env['libtorch'] ):
                  source = g_env.sources + g_env.exe['bench_tree'] )
 
 g_env.Program( g_env['build_dir']+'/tests',
-               source = g_env.tests )
+               source = g_env.tests + g_env.sources )

@@ -110,37 +110,37 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
                                                                                                   l_xmm_dtype_out );
 
   //first touch kernel
-  if( m_ktype_first_touch == kernel_sub_t::ZERO ) {
+  if( m_ktype_first_touch == kernel_t::ZERO ) {
     m_xmm_kernel_first_touch_unary = libxsmm_dispatch_meltw_unary( LIBXSMM_MELTW_TYPE_UNARY_XOR,
                                                                    l_shape_single_touch,
                                                                    LIBXSMM_MELTW_FLAG_UNARY_NONE );
   }
-  else if( m_ktype_first_touch == kernel_sub_t::COPY ) {
+  else if( m_ktype_first_touch == kernel_t::COPY ) {
     m_xmm_kernel_first_touch_unary = libxsmm_dispatch_meltw_unary( LIBXSMM_MELTW_TYPE_UNARY_IDENTITY,
                                                                    l_shape_single_touch_aux_unary,
                                                                    l_flag_out_aux_unary );
   }
-  else if( m_ktype_first_touch == kernel_sub_t::ADD ) {
+  else if( m_ktype_first_touch == kernel_t::ADD ) {
     m_xmm_kernel_first_touch_binary = libxsmm_dispatch_meltw_binary( LIBXSMM_MELTW_TYPE_BINARY_ADD,
                                                                      l_shape_single_touch_aux_binary,
                                                                      l_flag_out_aux_binary );
   }
-  else if( m_ktype_first_touch != kernel_sub_t::UNDEFINED_SUB_KTYPE ) {
+  else if( m_ktype_first_touch != kernel_t::UNDEFINED_KTYPE ) {
     return err_t::COMPILATION_FAILED;
   }
 
   // last touch kernel
-  if( m_ktype_last_touch == kernel_sub_t::RELU ) {
+  if( m_ktype_last_touch == kernel_t::RELU ) {
     m_xmm_kernel_last_touch_unary = libxsmm_dispatch_meltw_unary( LIBXSMM_MELTW_TYPE_UNARY_RELU,
                                                                   l_shape_single_touch,
                                                                   LIBXSMM_MELTW_FLAG_UNARY_NONE );
   }
-  else if( m_ktype_last_touch == kernel_sub_t::ADD ) {
+  else if( m_ktype_last_touch == kernel_t::ADD ) {
     m_xmm_kernel_last_touch_binary = libxsmm_dispatch_meltw_binary( LIBXSMM_MELTW_TYPE_BINARY_ADD,
                                                                     l_shape_single_touch_aux_binary,
                                                                     l_flag_out_aux_binary );
   }
-  else if( m_ktype_last_touch != kernel_sub_t::UNDEFINED_SUB_KTYPE ) {
+  else if( m_ktype_last_touch != kernel_t::UNDEFINED_KTYPE ) {
     return err_t::COMPILATION_FAILED;
   }
 
@@ -170,7 +170,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
 
   //set br type and scale br strides
   libxsmm_gemm_batch_reduce_type l_br_type = LIBXSMM_GEMM_BATCH_REDUCE_NONE;
-  if( m_ktype_main == kernel_main_t::BR_MADD ){
+  if( m_ktype_main == kernel_t::BR_MADD ){
     l_br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
     m_br_stride_a *= ce_n_bytes(m_dtype_left);
     m_br_stride_b *= ce_n_bytes(m_dtype_right);
@@ -185,14 +185,14 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
   l_brconfig.br_unroll_hint = 0;
 
   //create main kernel
-  if( m_ktype_main == kernel_main_t::BR_MADD ||
-      m_ktype_main == kernel_main_t::MADD       ){
+  if( m_ktype_main == kernel_t::BR_MADD ||
+      m_ktype_main == kernel_t::MADD       ){
     m_xmm_kernel_main = libxsmm_dispatch_brgemm( l_shape_brgemm,
                                                  l_flags_brgemm,
                                                  l_prefetch_flags_brgemm,
                                                  l_brconfig );
   }
-  else if( m_ktype_main == kernel_main_t::PACKED_MADD ){
+  else if( m_ktype_main == kernel_t::PACKED_MADD ){
      m_xmm_kernel_main = libxsmm_create_packed_gemm( l_shape_brgemm,
                                                      l_flags_brgemm,
                                                      l_prefetch_flags_brgemm,

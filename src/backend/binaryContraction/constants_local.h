@@ -1,6 +1,9 @@
 #ifndef BINARY_BACKEND_CONSTANTS_LOCAL
 #define BINARY_BACKEND_CONSTANTS_LOCAL
 
+#include <cstdint>
+#include "../../constants.h"
+
 namespace einsum_ir {
   namespace backend{
     typedef enum {
@@ -11,21 +14,6 @@ namespace einsum_ir {
       UNDEFINED_EXECTYPE = 99
     } exec_t;
 
-    typedef enum {
-      MADD                 =  0,
-      BR_MADD              =  1,
-      PACKED_MADD          =  2,
-      UNDEFINED_MAIN_KTYPE = 99
-    } kernel_main_t;
-
-    typedef enum {
-      ZERO                =  0,
-      RELU                =  1,
-      ADD                 =  2,
-      COPY                =  3,
-      UNDEFINED_SUB_KTYPE = 99
-    } kernel_sub_t;
-    
     struct loop_property {
       dim_t  dim_type  = dim_t::UNDEFINED_DIM;
       exec_t exec_type = exec_t::SEQ;

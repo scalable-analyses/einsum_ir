@@ -17,9 +17,9 @@ void einsum_ir::backend::ContractionBackend::init( std::vector< dim_t >   const 
                                                    data_t                               i_dtype_right,
                                                    data_t                               i_dtype_comp,
                                                    data_t                               i_dtype_out,
-                                                   kernel_sub_t                         i_ktype_first_touch,
-                                                   kernel_main_t                        i_ktype_main,
-                                                   kernel_sub_t                         i_ktype_last_touch ){
+                                                   kernel_t                             i_ktype_first_touch,
+                                                   kernel_t                             i_ktype_main,
+                                                   kernel_t                             i_ktype_last_touch ){
 
   //copy to local variables
   m_loop_dim_type        = i_loop_dim_type;
@@ -45,9 +45,9 @@ void einsum_ir::backend::ContractionBackend::init( std::vector< loop_property > 
                                                    data_t                               i_dtype_right,
                                                    data_t                               i_dtype_comp,
                                                    data_t                               i_dtype_out,
-                                                   kernel_sub_t                         i_ktype_first_touch,
-                                                   kernel_main_t                        i_ktype_main,
-                                                   kernel_sub_t                         i_ktype_last_touch ){
+                                                   kernel_t                             i_ktype_first_touch,
+                                                   kernel_t                             i_ktype_main,
+                                                   kernel_t                             i_ktype_last_touch ){
 
   int64_t l_num_loops = i_loops.size();
   m_loop_dim_type.resize(l_num_loops);
@@ -130,10 +130,10 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::compile(){
   }
 
   //check if first and last touch exists
-  if( m_ktype_first_touch != kernel_sub_t::UNDEFINED_SUB_KTYPE ){
+  if( m_ktype_first_touch != kernel_t::UNDEFINED_KTYPE ){
     m_has_first_touch = true;
   }
-  if( m_ktype_last_touch != kernel_sub_t::UNDEFINED_SUB_KTYPE ){
+  if( m_ktype_last_touch != kernel_t::UNDEFINED_KTYPE ){
     m_has_last_touch = true;
   }
 
@@ -209,7 +209,6 @@ void einsum_ir::backend::ContractionBackend::contract_iter( int64_t         i_th
                                                             char          * i_ptr_out,
                                                             bool            i_first_access,
                                                             bool            i_last_access ) {
-
   bool l_first_access = i_first_access;
   bool l_last_access  = i_last_access;
 
@@ -276,9 +275,11 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::get_kernel_shape( ){
     }
     l_num_prims++;
   }
-  if( (m_ktype_main == kernel_main_t::MADD        && l_num_prims != 3) ||
-      (m_ktype_main == kernel_main_t::BR_MADD     && l_num_prims != 4) ||
-      (m_ktype_main == kernel_main_t::PACKED_MADD && l_num_prims != 4)    ){
+
+  if( (m_ktype_main == kernel_t::MADD            && l_num_prims != 3) ||
+      (m_ktype_main == kernel_t::BR_MADD         && l_num_prims != 4) ||
+      (m_ktype_main == kernel_t::PACKED_MADD     && l_num_prims != 4) ||
+      (m_ktype_main == kernel_t::CPX_PACKED_MADD && l_num_prims != 5)    ){
     return err_t::COMPILATION_FAILED; 
   }
 
@@ -317,7 +318,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::get_kernel_shape( ){
   m_br = 1;
   m_br_stride_a = 0;
   m_br_stride_b = 0;
-  if( m_ktype_main == kernel_main_t::BR_MADD ){
+  if( m_ktype_main == kernel_t::BR_MADD ){
     m_br = m_loop_sizes[l_size-4];
     m_br_stride_a = m_loop_strides_left[l_size-4];
     m_br_stride_b = m_loop_strides_right[l_size-4];
@@ -325,17 +326,28 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::get_kernel_shape( ){
 
   //set packed parameter
   m_r = 1;
-  if( m_ktype_main == kernel_main_t::PACKED_MADD ){
+  if( m_ktype_main == kernel_t::PACKED_MADD ){
     m_r = m_loop_sizes[l_size-4];
   }
 
   //fix leading dimensions for size 1 loops
   if( m_k == 1 ){
-    m_lda = m_m;
+    m_lda = m_m * m_r;
   }
   if( m_n == 1 ){
-    m_ldb = m_k;
-    m_ldc = m_m;
+    m_ldb = m_k * m_r;
+    m_ldc = m_m * m_r;
+  }
+
+  //set complex parameter
+  if( m_ktype_main == kernel_t::CPX_PACKED_MADD ){
+    if( m_loop_sizes[l_size-5] != 2 ){
+      return err_t::COMPILATION_FAILED; 
+    }
+    int64_t m_cpx_stride_in_left_bytes  = m_loop_strides_left[   l_size-5] * ce_n_bytes(m_dtype_left );
+    int64_t m_cpx_stride_in_right_bytes = m_loop_strides_right[  l_size-5] * ce_n_bytes(m_dtype_right);
+    int64_t m_cpx_stride_out_aux_bytes  = m_loop_strides_out_aux[l_size-5] * ce_n_bytes(m_dtype_out  );
+    int64_t m_cpx_stride_out_bytes      = m_loop_strides_out[    l_size-5] * ce_n_bytes(m_dtype_out  );
   }
 
   return err_t::SUCCESS;

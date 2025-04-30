@@ -9,11 +9,18 @@
 #endif
 
 void einsum_ir::backend::ContractionOptimizer::init( std::vector< loop_property > * i_loops,
-                                                     kernel_main_t                * i_ktype_main,
-                                                     int64_t                        i_num_threads ){
+                                                     kernel_t                     * i_ktype_main,
+                                                     int64_t                        i_num_threads,
+                                                     int64_t                        i_target_m,
+                                                     int64_t                        i_target_n,
+                                                     int64_t                        i_target_k ){
   m_loops = i_loops;
   m_ktype_main = i_ktype_main;
   m_num_threads = i_num_threads;
+
+  m_target_m = i_target_m;
+  m_target_n = i_target_n;
+  m_target_k = i_target_k;
 }
 
 void einsum_ir::backend::ContractionOptimizer::optimize(){
@@ -22,6 +29,8 @@ void einsum_ir::backend::ContractionOptimizer::optimize(){
 
   // fuse loops if possible
   fuseLoops();
+
+  //TODO add pass that removes size 1 dimensions
 
   // move loops to internal data structure
   moveLoopsToInternal();
@@ -96,29 +105,46 @@ void einsum_ir::backend::ContractionOptimizer::moveLoopsToInternal(){
 void einsum_ir::backend::ContractionOptimizer::addKernel(){
   typedef enum {
     PRIM_BR = 0,
-    PRIM_M  = 1,
-    PRIM_N  = 2,
-    PRIM_K  = 3
+    PRIM_C  = 1,
+    PRIM_M  = 2,
+    PRIM_N  = 3,
+    PRIM_K  = 4
   } gemm_prim_t;
 
+  //TODO get from outside
+  bool br_gemm_support = true;
+  bool packed_gemm_support = true;
+
   //find possible kernel dimensions
-  int64_t l_potential_kernel_size[] = {1,1,1,1};
+  bool l_transpose_a = false;
+  bool l_transpose_b = false;
+  int64_t l_potential_kernel_size[] = {1,1,1,1,1};
   std::vector<loop_property>::iterator l_potential_kernel_loop[] = { m_free_loops[ dim_t::K ].end(),
+                                                                     m_free_loops[ dim_t::C ].end(),
                                                                      m_free_loops[ dim_t::M ].end(),
                                                                      m_free_loops[ dim_t::N ].end(),
                                                                      m_free_loops[ dim_t::K ].end() };  
-  //find possible M kernel dimension
+  //find possible C kernel dimension
   std::vector<loop_property>::iterator l_loop;
+  int64_t l_req_stride = 1;
+  l_loop = m_free_loops[ dim_t::C ].end() - 1;
+  if( m_free_loops[ dim_t::C ].size() > 0  &&
+      l_loop->stride_left  == l_req_stride &&
+      l_loop->stride_right == l_req_stride &&
+      l_loop->stride_out   == l_req_stride &&
+      packed_gemm_support  == true            ){
+    l_potential_kernel_loop[ PRIM_C ] = l_loop;
+    l_potential_kernel_size[ PRIM_C ] = l_loop->size;
+    l_req_stride *= l_loop->size;
+  }
+  
+  //find possible M kernel dimension
   l_loop = m_free_loops[ dim_t::M ].end() - 1;
   if( m_free_loops[ dim_t::M ].size() > 0 &&
-      l_loop->stride_left == 1 && 
-      l_loop->stride_out  == 1 ){
+      l_loop->stride_out  == l_req_stride    ){
     l_potential_kernel_loop[ PRIM_M ] = l_loop;
     l_potential_kernel_size[ PRIM_M ] = l_loop->size;
-  }
-  else{
-    push_empty_loop( &m_free_loops[ dim_t::M ], dim_t::M );
-    l_potential_kernel_loop [PRIM_M ] = m_free_loops[ dim_t::M ].end() - 1;
+    l_transpose_a = l_loop->stride_left == l_req_stride ? false : true;
   }
 
   //find possible N kernel dimension
@@ -126,34 +152,39 @@ void einsum_ir::backend::ContractionOptimizer::addKernel(){
   if( m_free_loops[ dim_t::N ].size() > 0 ){
     l_potential_kernel_loop[ PRIM_N ] = l_loop;
     l_potential_kernel_size[ PRIM_N ] = l_loop->size;
-  }
-  else{
-    push_empty_loop( &m_free_loops[ dim_t::N ], dim_t::N );
-    l_potential_kernel_loop[ PRIM_N ] = m_free_loops[ dim_t::N ].end() - 1;
+    l_transpose_b = l_loop->stride_right == l_req_stride ? true : false;
   }
 
   //find possible K kernel dimension
   l_loop = m_free_loops[ dim_t::K ].end() - 1;
-  if( m_free_loops[ dim_t::K ].size() > 0 && 
-      l_loop->stride_right == 1 ){
+  if( l_transpose_a && l_transpose_b ){
+    while( l_loop >= m_free_loops[ dim_t::K ].begin() && 
+           l_loop->stride_left != l_req_stride ){
+      l_loop--;
+    }
+  }
+  if( m_free_loops[ dim_t::K ].size() > 0                        && 
+      ( l_loop->stride_left  == l_req_stride || !l_transpose_a ) &&
+      ( l_loop->stride_right == l_req_stride ||  l_transpose_b )    ){
     l_potential_kernel_loop[ PRIM_K ] = l_loop;
     l_potential_kernel_size[ PRIM_K ] = l_loop->size; 
-  }
-  else{
-    push_empty_loop( &m_free_loops[ dim_t::K ], dim_t::K );
-    l_potential_kernel_loop[ PRIM_K ] = m_free_loops[ dim_t::K ].end() - 1;
   }
 
   //find possible BR kernel dimension
   l_loop = m_free_loops[ dim_t::K ].end() - 2;
-  if( m_free_loops[ dim_t::K ].size() > 1 ){
+  if( m_free_loops[ dim_t::K ].size() > 1 &&
+      br_gemm_support == true                ){
     l_potential_kernel_loop[ PRIM_BR ] = l_loop;
     l_potential_kernel_size[ PRIM_BR ] = l_loop->size;
   }
 
 
   //adapt all kernel target sizes depending on what is possible e.g. small k kernel -> choose bigger m target
-  int64_t l_kernel_targets[] = {1, m_target_m, m_target_n, m_target_k};
+  int64_t l_kernel_targets[] = {1, 1, m_target_m, m_target_n, m_target_k};
+  if( l_potential_kernel_size[ PRIM_C ] > 1 ){
+    l_kernel_targets[ PRIM_C  ] = l_potential_kernel_size[ PRIM_C ];
+    l_potential_kernel_size[ PRIM_BR ] = 1;
+  }
   if( l_potential_kernel_size[ PRIM_K ] < l_kernel_targets[ PRIM_K ] ){
     l_kernel_targets[ PRIM_BR ] *= l_kernel_targets[ PRIM_K ] / l_potential_kernel_size[ PRIM_K ];
     l_kernel_targets[ PRIM_K  ]  = l_potential_kernel_size[ PRIM_K ];
@@ -165,6 +196,9 @@ void einsum_ir::backend::ContractionOptimizer::addKernel(){
   if( l_potential_kernel_size[PRIM_M] < l_kernel_targets[ PRIM_M ] ){
     l_kernel_targets[ PRIM_N ] *= l_kernel_targets[ PRIM_M ] / l_potential_kernel_size[ PRIM_M ];
     l_kernel_targets[ PRIM_M ]  = l_potential_kernel_size[ PRIM_M ];
+  }
+  if( l_potential_kernel_size[ PRIM_N ] < l_kernel_targets[ PRIM_N ] ){
+    l_kernel_targets[ PRIM_N  ] = l_potential_kernel_size[ PRIM_N ];
   }
 
 
@@ -179,36 +213,31 @@ void einsum_ir::backend::ContractionOptimizer::addKernel(){
       l_kernel_targets[PRIM_M] /= 2;
     }
   }
- 
+
   //create kernel from potential kernel dimensions
-  int64_t l_kernel_sizes[] = {1, 1, 1, 1};
-  l_kernel_sizes[PRIM_K] = splitLoop( l_potential_kernel_loop[PRIM_K],
-                                      &m_free_loops[dim_t::K],
-                                      m_loops,
-                                      l_kernel_targets[PRIM_K],
-                                      0,
-                                      exec_t::PRIM );
-  l_kernel_sizes[PRIM_N] = splitLoop( l_potential_kernel_loop[PRIM_N],
-                                      &m_free_loops[dim_t::N],
-                                      m_loops,
-                                      l_kernel_targets[PRIM_N],
-                                      0,
-                                      exec_t::PRIM );
-  l_kernel_sizes[PRIM_M] = splitLoop( l_potential_kernel_loop[PRIM_M],
-                                      &m_free_loops[dim_t::M],
-                                      m_loops,
-                                      l_kernel_targets[PRIM_M],
-                                      0,
-                                      exec_t::PRIM );
-  if( l_kernel_targets[PRIM_BR] > 1 ){
-      *m_ktype_main = kernel_main_t::BR_MADD;
-      l_kernel_sizes[PRIM_BR] = splitLoop( l_potential_kernel_loop[PRIM_BR],
-                                           &m_free_loops[dim_t::K],
-                                           m_loops,
-                                           l_kernel_targets[PRIM_BR],
-                                           0,
-                                           exec_t::PRIM );
+  int64_t l_kernel_sizes[] = {1, 1, 1, 1, 1};
+  bool l_loop_required[] = {false, false, true, true, true};
+  dim_t l_loop_dim_t[] = {dim_t::K, dim_t::C, dim_t::M, dim_t::N, dim_t::K};
+  for( int64_t l_prim_id = 4; l_prim_id >= 0; l_prim_id-- ){
+    if( l_kernel_targets[l_prim_id] > 1 ){
+      l_kernel_sizes[l_prim_id] = splitLoop( l_potential_kernel_loop[l_prim_id],
+                                          &m_free_loops[l_loop_dim_t[l_prim_id]],
+                                          m_loops,
+                                          l_kernel_targets[l_prim_id],
+                                          0,
+                                          exec_t::PRIM );
     }
+    else if( l_loop_required[l_prim_id] ){
+      add_empty_loop( m_loops, 0, l_loop_dim_t[l_prim_id], exec_t::PRIM );
+    }
+  }
+  if( l_kernel_targets[PRIM_C] > 1 ){
+    *m_ktype_main = kernel_t::PACKED_MADD;
+  }
+  else if( l_kernel_targets[PRIM_BR] > 1 ){
+    *m_ktype_main = kernel_t::BR_MADD;
+  }
+  
   m_size_all_m /= l_kernel_sizes[PRIM_M];
   m_size_all_n /= l_kernel_sizes[PRIM_N];
 }
@@ -331,27 +360,29 @@ int64_t einsum_ir::backend::ContractionOptimizer::splitLoop( std::vector<loop_pr
   return l_split;                                                         
 }
 
-void einsum_ir::backend::ContractionOptimizer::push_empty_loop( std::vector<loop_property> * i_dest_loops,
-                                                                dim_t                        i_new_dim_t ){
+void einsum_ir::backend::ContractionOptimizer::add_empty_loop( std::vector<loop_property> * i_dest_loops,
+                                                               int64_t                      i_new_loop_pos, 
+                                                               dim_t                        i_new_dim_t,
+                                                               exec_t                       i_new_exec_t ){
 
   loop_property l_empty_loop;
 
   l_empty_loop.dim_type = i_new_dim_t;
-  l_empty_loop.exec_type = exec_t::SEQ;
+  l_empty_loop.exec_type = i_new_exec_t;
   l_empty_loop.size = 1;
   l_empty_loop.stride_left = 0;
   l_empty_loop.stride_right = 0;
   l_empty_loop.stride_out = 0;
   l_empty_loop.stride_out_aux = 0;
 
-  i_dest_loops->push_back( l_empty_loop );                                                       
+  i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, l_empty_loop );                                                       
 }
 
 int64_t einsum_ir::backend::ContractionOptimizer::addLoop( std::vector<loop_property>::iterator i_loop,
                                                            std::vector<loop_property> *         i_source_loops,
                                                            std::vector<loop_property> *         i_dest_loops,
-                                                           int64_t i_new_loop_pos, 
-                                                           exec_t  i_new_exec_t ){
+                                                           int64_t                              i_new_loop_pos, 
+                                                           exec_t                               i_new_exec_t ){
   
   i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, *i_loop );
   i_dest_loops->at(i_new_loop_pos).exec_type = i_new_exec_t;

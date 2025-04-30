@@ -32,14 +32,11 @@ if g_env['blas'] != False:
 # default files
 l_sources = [ 'backend/Tensor.cpp',
               'backend/IterationSpaces.cpp',
-              'backend/binaryContraction/IterationSpacesSfc.cpp',
               'backend/UnaryLoops.cpp',
               'backend/UnaryLoopsSimple.cpp',
               'backend/Unary.cpp',
               'backend/UnaryScalar.cpp',
               'backend/ContractionLoops.cpp',
-              'backend/binaryContraction/ContractionBackend.cpp',
-              'backend/binaryContraction/ContractionOptimizer.cpp',
               'backend/ContractionLoopsSimple.cpp',
               'backend/BinaryContraction.cpp',
               'backend/BinaryContractionScalar.cpp',
@@ -54,7 +51,6 @@ l_sources = [ 'backend/Tensor.cpp',
 if g_env['libxsmm'] != False:
   l_sources += [ 'backend/UnaryLoopsTpp.cpp',
                  'backend/UnaryTpp.cpp',
-                 'backend/binaryContraction/ContractionBackendTpp.cpp',
                  'backend/ContractionLoopsTpp.cpp',
                  'backend/BinaryContractionTpp.cpp',
                  'backend/BinaryContractionSfcTpp.cpp',
@@ -65,8 +61,6 @@ if g_env['tblis'] != False:
 
 l_tests = [ 'tests.cpp',
             'backend/IterationSpaces.test.cpp',
-            'backend/binaryContraction/IterationSpacesSfc.test.cpp',
-            'backend/binaryContraction/ContractionOptimizer.test.cpp',
             'backend/Unary.test.cpp',
             'backend/ContractionLoopsSimple.test.cpp',
             'backend/BinaryContraction.test.cpp',
@@ -84,7 +78,6 @@ if g_env['libtorch'] != False:
 
 if g_env['libxsmm'] != False and g_env['libtorch'] != False:
   l_tests += [ 'backend/UnaryTpp.test.torch.cpp',
-               'backend/binaryContraction/ContractionBackendTpp.test.torch.cpp',
                'backend/BinaryContractionTpp.test.torch.cpp' ]
 
 if g_env['blas'] != False and g_env['libtorch'] != False:
@@ -99,7 +92,6 @@ for l_source in l_sources:
 
 for l_test in l_tests:
   g_env.tests.append( g_env.Object( l_test ) )
-g_env.tests.append( g_env.sources )
 
 if g_env['libxsmm'] != False and g_env['libtorch'] != False:
   g_env.exe['bench_unary']      = g_env.Object( 'bench_unary.cpp' )

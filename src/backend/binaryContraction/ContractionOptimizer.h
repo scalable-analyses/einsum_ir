@@ -3,7 +3,6 @@
 
 #include <vector>
 #include <map>
-#include "../../constants.h"
 #include "constants_local.h"
 #include "IterationSpacesSfc.h"
 
@@ -40,7 +39,7 @@ class einsum_ir::backend::ContractionOptimizer {
     int64_t m_num_threads;
 
     //! type of the main kernel
-    kernel_main_t * m_ktype_main;
+    kernel_t * m_ktype_main;
 
     /**
      * splits a loop from the source vector and adds it to the destination vector.
@@ -65,10 +64,14 @@ class einsum_ir::backend::ContractionOptimizer {
      * push an empty loop to the back of a destination vector.
      *
      * @param i_dest_loops destination vector.
-     * @param i_new_dim_t dimension type of empty loop
+     * @param i_new_loop_pos loop position in destination vector.
+     * @param i_new_dim_t dimension type of empty loop.
+     * @param i_new_exec_t execution type of empty loop.
      **/
-    void push_empty_loop( std::vector<loop_property> * i_dest_loops,
-                          dim_t                        i_new_dim_t );
+    void add_empty_loop( std::vector<loop_property> * i_dest_loops,
+                         int64_t                      i_new_loop_pos, 
+                         dim_t                        i_new_dim_t,
+                         exec_t                       i_new_exec_t );
 
     /**
      * adds a loop from the source vector to the destination vector.
@@ -137,8 +140,11 @@ class einsum_ir::backend::ContractionOptimizer {
      * @param i_num_threads number of participating threads in contraction.
      **/
     void init( std::vector< loop_property > * i_loops,
-               kernel_main_t                * i_ktype_main,
-               int64_t                        i_num_threads );    
+               kernel_t                     * i_ktype_main,
+               int64_t                        i_num_threads,
+               int64_t                        i_target_m,
+               int64_t                        i_target_n,
+               int64_t                        i_target_k );    
   
     /**
      * optimizes the loops.
