@@ -5,12 +5,13 @@
 
 namespace einsum_ir {
   typedef enum {
-    C = 0, // left, right, out
-    M = 1, // left, out
-    N = 2, // right, out
-    K = 3, // left, right
-    I = 4, // left
-    J = 5, // right
+    C = 0,  // left, right, out
+    M = 1,  // left, out
+    N = 2,  // right, out
+    K = 3,  // left, right
+    CPX = 4,// left, right, out
+    I = 5,  // left
+    J = 6,  // right
     UNDEFINED_DIM = 99
   } dim_t;
 

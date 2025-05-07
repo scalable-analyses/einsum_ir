@@ -2,7 +2,7 @@
 #define EINSUM_IR_BACKEND_BINARY_CONTRACTION_SCALAR
 
 #include "BinaryContraction.h"
-#include "ContractionLoopsSimple.h"
+#include "../binary/ContractionBackendScalar.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -12,98 +12,29 @@ namespace einsum_ir {
 
 class einsum_ir::backend::BinaryContractionScalar: public BinaryContraction {
   private:
-    //! contraction loop interface
-    ContractionLoopsSimple m_cont_loops;
-
-    //! C strides of the left tensor
-    std::vector< int64_t > m_strides_left_c;
-    //! M strides of the left tensor
-    std::vector< int64_t > m_strides_left_m;
-    //! K strides of the left tensor
-    std::vector< int64_t > m_strides_left_k;
-    //! I strides of the left tensor
-    std::vector< int64_t > m_strides_left_i;
-
-    //! C strides of the right tensor
-    std::vector< int64_t > m_strides_right_c;
-    //! N strides of the right tensor
-    std::vector< int64_t > m_strides_right_n;
-    //! K strides of the right tensor
-    std::vector< int64_t > m_strides_right_k;
-    //! J strides of the right tensor
-    std::vector< int64_t > m_strides_right_j;
-
-    //! C strides of the auxiliary output tensor
-    std::vector< int64_t > m_strides_out_aux_c;
-    //! M strides of the auxiliary output tensor
-    std::vector< int64_t > m_strides_out_aux_m;
-    //! N strides of the auxiliary output tensor
-    std::vector< int64_t > m_strides_out_aux_n;
-
-    //! C strides of the output tensor
-    std::vector< int64_t > m_strides_out_c;
-    //! M strides of the output tensor
-    std::vector< int64_t > m_strides_out_m;
-    //! N strides of the output tensor
-    std::vector< int64_t > m_strides_out_n;
+     //! contraction backend
+    einsum_ir::binary::ContractionBackendScalar m_backend;
 
     /**
-     * Compiler-based zero kernel.
+     * Helper function for map find with default value
      *
-     * @param_t datatype.
-     * @param o_data data which is zeroed.
-     **/
-    template < typename T >
-    static void kernel_zero( void const *,
-                             void       * o_data );
-
-    /**
-     * Compiler-based ReLU kernel.
+     * @param i_map map.
+     * @param i_key key.
+     * @param i_default default value.
      *
-     * @param_t datatype.
-     * @param io_data data to which the ReLU is applied.
+     * @param return value or default value.
      **/
-    template < typename T >
-    static void kernel_relu( void const *,
-                             void       * io_data );
-
-    /**
-     * Compiler-based copy kernel.
-     *
-     * @param_t datatype.
-     * @param i_data_src source of the copy operation.
-     * @param i_data_dst destination of the copy operation.
-     **/
-    template < typename T >
-    static void kernel_copy( void const * i_data_src,
-                             void       * io_data_dst );
-
-    /**
-     * Compiler-based multiply add kernel.
-     *
-     * @param_t T_LEFT data type of the left input.
-     * @param_t T_RIGHT data type of the right input.
-     * @param_t T_OUT data type of the output.
-     **/
-    template < typename T_LEFT,
-               typename T_RIGHT,
-               typename T_OUT >
-    static void kernel_madd( void const * i_in_left,
-                             void const * i_in_right,
-                             void       * io_out );
-
-    //! first-touch kernel
-    void (* m_kernel_first_touch)( void const *,
-                                   void       * ) = nullptr;
-
-    //! main kernel
-    void (* m_kernel_main)( void const *,
-                            void const *,
-                            void       * ) = nullptr;
-
-    //! last-touch kernel
-    void (* m_kernel_last_touch)( void const *,
-                                  void       * ) = nullptr;
+    template <typename T>
+    T map_find_default( std::map< int64_t, T > const * i_map,
+                        int64_t                        i_key,
+                        T                              i_default){
+      if(auto search = i_map->find(i_key); search != i_map->end() ) {
+        return search->second;
+      }
+      else {
+        return i_default;
+      }
+    }
 
   public:
     /**

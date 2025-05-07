@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include "ContractionLoops.h"
 
 void einsum_ir::backend::BinaryContraction::dim_types( int64_t         i_num_dims_t0,
                                                        int64_t         i_num_dims_t1,

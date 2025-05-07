@@ -196,7 +196,7 @@ g_env.tests = []
 g_env.exe = {}
 
 Export('g_env')
-SConscript( g_env['build_dir']+'/src/backend/binaryContraction/SConscript' )
+SConscript( g_env['build_dir']+'/src/binary/SConscript' )
 SConscript( g_env['build_dir']+'/src/SConscript' )
 Import('g_env')
 

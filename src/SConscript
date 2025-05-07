@@ -22,8 +22,7 @@ if g_env['blas'] != False:
   if( g_env['blas'] == 'nvpl' ):
     l_bin_cont_blas_defines.append( 'PP_EINSUM_IR_HAS_BLAS_NVPL' )
 
-  l_bin_cont_blas_sources = [ 'backend/ContractionLoopsBlas.cpp',
-                              'backend/BinaryContractionBlas.cpp' ]
+  l_bin_cont_blas_sources = [ 'backend/BinaryContractionBlas.cpp' ]
 
   for l_source in l_bin_cont_blas_sources:
     g_env.sources.append( g_env.Object( l_source,
@@ -36,8 +35,6 @@ l_sources = [ 'backend/Tensor.cpp',
               'backend/UnaryLoopsSimple.cpp',
               'backend/Unary.cpp',
               'backend/UnaryScalar.cpp',
-              'backend/ContractionLoops.cpp',
-              'backend/ContractionLoopsSimple.cpp',
               'backend/BinaryContraction.cpp',
               'backend/BinaryContractionScalar.cpp',
               'backend/BinaryPrimitives.cpp',
@@ -51,9 +48,7 @@ l_sources = [ 'backend/Tensor.cpp',
 if g_env['libxsmm'] != False:
   l_sources += [ 'backend/UnaryLoopsTpp.cpp',
                  'backend/UnaryTpp.cpp',
-                 'backend/ContractionLoopsTpp.cpp',
                  'backend/BinaryContractionTpp.cpp',
-                 'backend/BinaryContractionSfcTpp.cpp',
                  'backend/ContractionPackingTpp.cpp', ]
 
 if g_env['tblis'] != False:
@@ -62,7 +57,6 @@ if g_env['tblis'] != False:
 l_tests = [ 'tests.cpp',
             'backend/IterationSpaces.test.cpp',
             'backend/Unary.test.cpp',
-            'backend/ContractionLoopsSimple.test.cpp',
             'backend/BinaryContraction.test.cpp',
             'backend/BinaryPrimitives.test.cpp',
             'frontend/EinsumExpression.test.cpp',
@@ -81,8 +75,7 @@ if g_env['libxsmm'] != False and g_env['libtorch'] != False:
                'backend/BinaryContractionTpp.test.torch.cpp' ]
 
 if g_env['blas'] != False and g_env['libtorch'] != False:
-  l_tests += [ 'backend/ContractionLoopsBlas.test.torch.cpp',
-               'backend/BinaryContractionBlas.test.torch.cpp' ]
+  l_tests += [ 'backend/BinaryContractionBlas.test.torch.cpp' ]
 
 if g_env['tblis'] != False and g_env['libtorch'] != False:
   l_tests += [ 'backend/BinaryContractionTblis.test.torch.cpp' ]
