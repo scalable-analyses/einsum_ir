@@ -1,18 +1,18 @@
-#include "IterationSpacesSfc.h"
+#include "IterationSpace.h"
 #include <iostream>
 
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 
-void einsum_ir::backend::IterationSpacesSfc::init( std::vector< dim_t >   const * i_loop_dim_type,
-                                                   std::vector< exec_t >  const * i_loop_exec_type,
-                                                   std::vector< int64_t > const * i_loop_sizes,
-                                                   std::vector< int64_t > const * i_loop_strides_left,
-                                                   std::vector< int64_t > const * i_loop_strides_right,
-                                                   std::vector< int64_t > const * i_loop_strides_out_aux,
-                                                   std::vector< int64_t > const * i_loop_strides_out,
-                                                   int64_t                        i_num_threads){
+void einsum_ir::binary::IterationSpace::init( std::vector< dim_t >   const * i_loop_dim_type,
+                                              std::vector< exec_t >  const * i_loop_exec_type,
+                                              std::vector< int64_t > const * i_loop_sizes,
+                                              std::vector< int64_t > const * i_loop_strides_left,
+                                              std::vector< int64_t > const * i_loop_strides_right,
+                                              std::vector< int64_t > const * i_loop_strides_out_aux,
+                                              std::vector< int64_t > const * i_loop_strides_out,
+                                              int64_t                        i_num_threads){
 
   m_loop_dim_type        = i_loop_dim_type;
   m_loop_exec_type       = i_loop_exec_type;
@@ -27,7 +27,7 @@ void einsum_ir::backend::IterationSpacesSfc::init( std::vector< dim_t >   const 
   m_num_threads = i_num_threads;
 }
 
-einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
+einsum_ir::err_t einsum_ir::binary::IterationSpace::compile(){
  err_t l_err = err_t::UNDEFINED_ERROR;
 
   //calculate number of generated tasks
@@ -51,6 +51,8 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
   }
 
   //assigns parallel dimensions to three types omp, sfc_n, sfc_m
+  m_sfc_tasks_m = 1;
+  m_sfc_tasks_n = 1;
   int64_t l_last_found_type = 0;
   for( int64_t l_id = m_parallel_loops.begin; l_id < m_parallel_loops.end ; l_id++ ){
     if( m_loop_exec_type->at(l_id) == exec_t::OMP &&
@@ -121,7 +123,7 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
 
 //create 1D Map of task
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel for num_threads(m_num_threads)
 #endif
   for( int64_t l_thread_id = 0; l_thread_id < m_num_threads; l_thread_id++ ){
     int64_t l_begin = l_thread_work_space[l_thread_id].begin;
@@ -166,10 +168,10 @@ einsum_ir::err_t einsum_ir::backend::IterationSpacesSfc::compile(){
   return err_t::SUCCESS;
 }
 
-int64_t einsum_ir::backend::IterationSpacesSfc::calculateOffset( int64_t i_id_omp,
-                                                                 int64_t i_id_sfc_m,
-                                                                 int64_t i_id_sfc_n,
-                                                                 std::vector< int64_t > const & i_strides ) {
+int64_t einsum_ir::binary::IterationSpace::calculateOffset( int64_t i_id_omp,
+                                                                int64_t i_id_sfc_m,
+                                                                int64_t i_id_sfc_n,
+                                                                std::vector< int64_t > const & i_strides ) {
 
   int64_t l_offset = 0;
   for (int64_t l_id = m_sfc_loops_m.end - 1; l_id >= m_sfc_loops_m.begin; l_id--) {
@@ -199,8 +201,8 @@ int64_t einsum_ir::backend::IterationSpacesSfc::calculateOffset( int64_t i_id_om
 
 
 
-void einsum_ir::backend::IterationSpacesSfc::convertStridesToOffsets( std::vector< int64_t > const & i_strides,
-                                                                      std::vector< int64_t >       & io_offsets ) {
+void einsum_ir::binary::IterationSpace::convertStridesToOffsets( std::vector< int64_t > const & i_strides,
+                                                                 std::vector< int64_t >       & io_offsets ) {
    
   int64_t l_first = m_parallel_loops.begin;
 
@@ -238,9 +240,9 @@ void einsum_ir::backend::IterationSpacesSfc::convertStridesToOffsets( std::vecto
   }
 }
 
-uint8_t einsum_ir::backend::IterationSpacesSfc::getMaxDimJump( range_t i_dim_loops,
-                                                               int64_t i_id_new,
-                                                               int64_t i_id_old ){
+uint8_t einsum_ir::binary::IterationSpace::getMaxDimJump( range_t i_dim_loops,
+                                                          int64_t i_id_new,
+                                                          int64_t i_id_old ){
 
   int64_t l_direction = (( i_id_old - i_id_new ) + 1) / 2;
   int64_t l_max_id = i_id_new > i_id_old ? i_id_new : i_id_old;
@@ -257,37 +259,41 @@ uint8_t einsum_ir::backend::IterationSpacesSfc::getMaxDimJump( range_t i_dim_loo
   return 0;
 }
 
-int64_t einsum_ir::backend::IterationSpacesSfc::getNumTasks( int64_t i_thread_id ){
+int64_t einsum_ir::binary::IterationSpace::getNumTasks( int64_t i_thread_id ){
   return m_dim_movements[i_thread_id].size();
 }
 
-void einsum_ir::backend::IterationSpacesSfc::addMovementOffsets( int64_t          i_thread_id, 
-                                                                 int64_t          i_task_id,
-                                                                 char    const ** io_ptr_left,
-                                                                 char    const ** io_ptr_right,
-                                                                 char          ** io_ptr_out){
+void einsum_ir::binary::IterationSpace::addMovementOffsets( int64_t          i_thread_id, 
+                                                            int64_t          i_task_id,
+                                                            char    const ** io_ptr_left,
+                                                            char    const ** io_ptr_right,
+                                                            char    const ** io_ptr_out_aux,
+                                                            char          ** io_ptr_out){
   uint8_t l_move =  m_dim_movements[i_thread_id][i_task_id];
   int8_t l_direction = 1 - ((l_move & 1) << 1); 
   l_move = l_move >> 1;
 
-  *io_ptr_left  += l_direction * m_movement_offsets[0][l_move];
-  *io_ptr_right += l_direction * m_movement_offsets[1][l_move];
-  *io_ptr_out   += l_direction * m_movement_offsets[2][l_move];
+  *io_ptr_left    += l_direction * m_movement_offsets[0][l_move];
+  *io_ptr_right   += l_direction * m_movement_offsets[1][l_move];
+  *io_ptr_out     += l_direction * m_movement_offsets[2][l_move];
+  *io_ptr_out_aux += l_direction * m_movement_offsets[3][l_move];
 }
 
-void einsum_ir::backend::IterationSpacesSfc::getInitialOffsets( int64_t   i_thread_id,
-                                                                int64_t & io_off_left,
-                                                                int64_t & io_off_right,
-                                                                int64_t & io_off_out) {
-  io_off_left  = m_initial_offsets[i_thread_id][0];
-  io_off_right = m_initial_offsets[i_thread_id][1];
-  io_off_out   = m_initial_offsets[i_thread_id][2];
+void einsum_ir::binary::IterationSpace::getInitialOffsets( int64_t   i_thread_id,
+                                                           int64_t & o_off_left,
+                                                           int64_t & o_off_right,
+                                                           int64_t & o_off_out_aux,
+                                                           int64_t & o_off_out ) {
+  o_off_left    = m_initial_offsets[i_thread_id][0];
+  o_off_right   = m_initial_offsets[i_thread_id][1];
+  o_off_out     = m_initial_offsets[i_thread_id][2];
+  o_off_out_aux = m_initial_offsets[i_thread_id][3];
 }
 
-void einsum_ir::backend::IterationSpacesSfc::SfcOracle2d( int64_t *i_m, 
-                                                          int64_t *i_n,
-                                                          int64_t *i_omp, 
-                                                          int64_t  i_idx ){
+void einsum_ir::binary::IterationSpace::SfcOracle2d( int64_t *i_m, 
+                                                     int64_t *i_n,
+                                                     int64_t *i_omp, 
+                                                     int64_t  i_idx ){
   
   int l_w = m_sfc_tasks_m;
   int l_h = m_sfc_tasks_n;
@@ -403,11 +409,11 @@ int gilbert_d2xy_r( int dst_idx, int cur_idx,
                         -(ax-ax2), -(ay-ay2));
 }
 
-void einsum_ir::backend::IterationSpacesSfc::gilbert_d2xy( int *x, 
-                                                          int *y, 
-                                                          int  idx,
-                                                          int  w,
-                                                          int  h  ) {  
+void einsum_ir::binary::IterationSpace::gilbert_d2xy( int *x, 
+                                                      int *y, 
+                                                      int  idx,
+                                                      int  w,
+                                                      int  h  ) {  
   *x = 0;
   *y = 0;
 

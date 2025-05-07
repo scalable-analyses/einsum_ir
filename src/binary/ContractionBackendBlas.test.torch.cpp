@@ -16,7 +16,7 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction backend implementation
   //    k    2      8
 
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   at::Tensor l_left    = at::randn( { 8, 5 } );
   at::Tensor l_right   = at::randn( { 7, 8 } );
@@ -38,7 +38,7 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction backend implementation
   std::vector< int64_t > l_loop_strides_out     = {  1, 5, 0 };
 
 
-  einsum_ir::backend::ContractionBackendBlas l_cont_blas;
+  einsum_ir::binary::ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
@@ -53,7 +53,8 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction backend implementation
                     data_t::FP32,
                     kernel_t::ZERO,
                     kernel_t::MADD,
-                    kernel_t::UNDEFINED_KTYPE );                        
+                    kernel_t::UNDEFINED_KTYPE,
+                    2 );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
 
@@ -80,7 +81,7 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction backend implementation
   //    k    2      8
  
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   at::Tensor l_left    = at::randn( { 8, 5 },
                                     at::dtype( at::kDouble ) );
@@ -105,7 +106,7 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction backend implementation
   std::vector< int64_t > l_loop_strides_out     = {  1, 5, 0 };
 
 
-  einsum_ir::backend::ContractionBackendBlas l_cont_blas;
+  einsum_ir::binary::ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
@@ -120,7 +121,8 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction backend implementation
                     data_t::FP64,
                     kernel_t::ZERO,
                     kernel_t::MADD,
-                    kernel_t::UNDEFINED_KTYPE );                        
+                    kernel_t::UNDEFINED_KTYPE,
+                    3 );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
 
@@ -149,7 +151,7 @@ TEST_CASE( "Simple batched FP64 matmul using the BLAS contraction backend implem
   //    k    8
 
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   at::Tensor l_left    = at::randn( { 3, 8, 5 },
                                     at::dtype( at::kDouble ) );
@@ -176,7 +178,7 @@ TEST_CASE( "Simple batched FP64 matmul using the BLAS contraction backend implem
   std::vector< int64_t > l_loop_strides_out     = { 35, 1, 5, 0 };
 
 
-  einsum_ir::backend::ContractionBackendBlas l_cont_blas;
+  einsum_ir::binary::ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
@@ -191,7 +193,8 @@ TEST_CASE( "Simple batched FP64 matmul using the BLAS contraction backend implem
                     data_t::FP64,
                     kernel_t::UNDEFINED_KTYPE,
                     kernel_t::MADD,
-                    kernel_t::UNDEFINED_KTYPE );                        
+                    kernel_t::UNDEFINED_KTYPE,
+                    4 );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
 
@@ -229,7 +232,7 @@ TEST_CASE( "FP32 tensor contraction using the BLAS contraction backend implement
   at::Tensor l_out_ref = l_out.clone();
 
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C, 
                                              dim_t::M,
@@ -254,7 +257,7 @@ TEST_CASE( "FP32 tensor contraction using the BLAS contraction backend implement
   std::vector< int64_t > l_loop_strides_out     = {1344,672, 84,  0, 1,12, 0 };
 
 
-  einsum_ir::backend::ContractionBackendBlas l_cont_blas;
+  einsum_ir::binary::ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
@@ -269,7 +272,8 @@ TEST_CASE( "FP32 tensor contraction using the BLAS contraction backend implement
                     data_t::FP32,
                     kernel_t::ZERO,
                     kernel_t::MADD,
-                    kernel_t::UNDEFINED_KTYPE );                        
+                    kernel_t::UNDEFINED_KTYPE,
+                    5 );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
 
@@ -306,7 +310,7 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction backend impleme
   at::Tensor l_out_ref = l_out.clone();
 
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C, 
                                              dim_t::M,
@@ -325,7 +329,7 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction backend impleme
   std::vector< int64_t > l_loop_strides_out     = {  1, 3,15, 0 };
 
 
-  einsum_ir::backend::ContractionBackendBlas l_cont_blas;
+  einsum_ir::binary::ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
@@ -340,7 +344,8 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction backend impleme
                     data_t::FP64,
                     kernel_t::COPY,
                     kernel_t::PACKED_MADD,
-                    kernel_t::COPY );                        
+                    kernel_t::COPY,
+                    6 );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
 
@@ -380,7 +385,7 @@ TEST_CASE( "FP32 packed tensor contraction using the BLAS contraction backend im
   at::Tensor l_out_ref = l_out.clone();
 
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C, 
                                              dim_t::M,
@@ -407,7 +412,7 @@ TEST_CASE( "FP32 packed tensor contraction using the BLAS contraction backend im
   std::vector< int64_t > l_loop_strides_out     = {5376,2688,336,  0,  1, 4,48, 0 };
 
 
-  einsum_ir::backend::ContractionBackendBlas l_cont_blas;
+  einsum_ir::binary::ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
@@ -422,7 +427,8 @@ TEST_CASE( "FP32 packed tensor contraction using the BLAS contraction backend im
                     data_t::FP32,
                     kernel_t::ZERO,
                     kernel_t::PACKED_MADD,
-                    kernel_t::COPY );                        
+                    kernel_t::COPY,
+                    7 );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
   

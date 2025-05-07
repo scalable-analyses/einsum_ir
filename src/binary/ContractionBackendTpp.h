@@ -1,17 +1,16 @@
-//TODO change inlude guard
-#ifndef EINSUM_IR_BACKEND_CONTRACTION_SFC_TPP
-#define EINSUM_IR_BACKEND_CONTRACTION_SFC_TPP
+#ifndef EINSUM_IR_BINARY_CONTRACTION_BACKEND_TPP
+#define EINSUM_IR_BINARY_CONTRACTION_BACKEND_TPP
 
 #include <libxsmm.h>
 #include "ContractionBackend.h"
 
 namespace einsum_ir {
-  namespace backend {
+  namespace binary {
     class ContractionBackendTpp;
   }
 }
 
-class einsum_ir::backend::ContractionBackendTpp: public ContractionBackend {
+class einsum_ir::binary::ContractionBackendTpp: public ContractionBackend {
   private:
 
     //! LIBXSMM-based unary first-touch TPP

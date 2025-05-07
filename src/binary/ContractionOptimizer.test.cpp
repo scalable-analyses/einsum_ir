@@ -3,7 +3,7 @@
 
 TEST_CASE( "Simple test for Contraction Optimizer", "[contraction_optimizer]" ) {
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< loop_property > l_loops = { {dim_t::M, exec_t::SEQ,  32,   8,  0, 0,   8},
                                            {dim_t::K, exec_t::SEQ,  64, 256,  1, 0,   0},
@@ -72,7 +72,7 @@ TEST_CASE( "Simple test for Contraction Optimizer", "[contraction_optimizer]" ) 
 
 TEST_CASE( "Matmul blocking test for Contraction Optimizer", "[contraction_optimizer]" ) {
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< loop_property > l_loops = { {dim_t::N, exec_t::SEQ, 2048,    0, 2048, 0, 2048},
                                            {dim_t::K, exec_t::SEQ, 2048, 2048,    1, 0,    0},
@@ -138,7 +138,7 @@ TEST_CASE( "Matmul blocking test for Contraction Optimizer", "[contraction_optim
 
 TEST_CASE( "Test of Contraction Optimizer for transposed kernel", "[contraction_optimizer]" ) {
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< loop_property > l_loops = { {dim_t::K, exec_t::SEQ,   64, 4096,   64, 0,    0},
                                            {dim_t::N, exec_t::SEQ,   64,    0,    1, 0,   64},

@@ -1,19 +1,17 @@
-#ifndef EINSUM_IR_BACKEND_CONTRACTION_OPTIMIZER
-#define EINSUM_IR_BACKEND_CONTRACTION_OPTIMIZER
+#ifndef EINSUM_IR_BINARY_CONTRACTION_OPTIMIZER
+#define EINSUM_IR_BINARY_CONTRACTION_OPTIMIZER
 
 #include <vector>
 #include <map>
-#include "constants_local.h"
-#include "IterationSpacesSfc.h"
-
+#include "constants.h"
 
 namespace einsum_ir {
-  namespace backend {
+  namespace binary {
     class ContractionOptimizer;
   }
 }
 
-class einsum_ir::backend::ContractionOptimizer {
+class einsum_ir::binary::ContractionOptimizer {
   private:
     //! external vector with all loops 
     std::vector< loop_property > * m_loops;

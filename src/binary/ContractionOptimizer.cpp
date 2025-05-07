@@ -8,12 +8,12 @@
 #include <omp.h>
 #endif
 
-void einsum_ir::backend::ContractionOptimizer::init( std::vector< loop_property > * i_loops,
-                                                     kernel_t                     * i_ktype_main,
-                                                     int64_t                        i_num_threads,
-                                                     int64_t                        i_target_m,
-                                                     int64_t                        i_target_n,
-                                                     int64_t                        i_target_k ){
+void einsum_ir::binary::ContractionOptimizer::init( std::vector< loop_property > * i_loops,
+                                                    kernel_t                     * i_ktype_main,
+                                                    int64_t                        i_num_threads,
+                                                    int64_t                        i_target_m,
+                                                    int64_t                        i_target_n,
+                                                    int64_t                        i_target_k ){
   m_loops = i_loops;
   m_ktype_main = i_ktype_main;
   m_num_threads = i_num_threads;
@@ -23,7 +23,7 @@ void einsum_ir::backend::ContractionOptimizer::init( std::vector< loop_property 
   m_target_k = i_target_k;
 }
 
-void einsum_ir::backend::ContractionOptimizer::optimize(){
+void einsum_ir::binary::ContractionOptimizer::optimize(){
   // sort loops depeding on strides, exec_types and dim_types
   sortLoops();
 
@@ -42,7 +42,7 @@ void einsum_ir::backend::ContractionOptimizer::optimize(){
   reorderLoops();
 }
 
-void einsum_ir::backend::ContractionOptimizer::sortLoops(){
+void einsum_ir::binary::ContractionOptimizer::sortLoops(){
   
   std::stable_sort( m_loops->begin(), m_loops->end(), 
                     [&](loop_property l_a, loop_property l_b) -> bool {
@@ -62,7 +62,7 @@ void einsum_ir::backend::ContractionOptimizer::sortLoops(){
                     });
 }
 
-void einsum_ir::backend::ContractionOptimizer::fuseLoops(){
+void einsum_ir::binary::ContractionOptimizer::fuseLoops(){
   for( std::vector<loop_property>::iterator l_it = m_loops->begin() + 1; l_it < m_loops->end(); l_it++ ){
     std::vector<loop_property>::iterator l_other = l_it-1;
     if( l_it->dim_type  == l_other->dim_type && 
@@ -80,10 +80,10 @@ void einsum_ir::backend::ContractionOptimizer::fuseLoops(){
   }
 }
 
-void einsum_ir::backend::ContractionOptimizer::moveLoopsToInternal(){
+void einsum_ir::binary::ContractionOptimizer::moveLoopsToInternal(){
   m_size_all_m = 1;
   m_size_all_n = 1;
-  m_free_loops.resize(4);
+  m_free_loops.resize(5);
   std::vector<loop_property>::iterator l_it = m_loops->begin();
   while( l_it < m_loops->end() ){
     if( l_it->exec_type == exec_t::SEQ ){
@@ -102,7 +102,7 @@ void einsum_ir::backend::ContractionOptimizer::moveLoopsToInternal(){
   }
 }
 
-void einsum_ir::backend::ContractionOptimizer::addKernel(){
+void einsum_ir::binary::ContractionOptimizer::addKernel(){
   typedef enum {
     PRIM_BR = 0,
     PRIM_C  = 1,
@@ -112,8 +112,8 @@ void einsum_ir::backend::ContractionOptimizer::addKernel(){
   } gemm_prim_t;
 
   //TODO get from outside
-  bool br_gemm_support = true;
-  bool packed_gemm_support = true;
+  bool m_br_gemm_support = true;
+  bool m_packed_gemm_support = true;
 
   //find possible kernel dimensions
   bool l_transpose_a = false;
@@ -132,7 +132,7 @@ void einsum_ir::backend::ContractionOptimizer::addKernel(){
       l_loop->stride_left  == l_req_stride &&
       l_loop->stride_right == l_req_stride &&
       l_loop->stride_out   == l_req_stride &&
-      packed_gemm_support  == true            ){
+      m_packed_gemm_support  == true            ){
     l_potential_kernel_loop[ PRIM_C ] = l_loop;
     l_potential_kernel_size[ PRIM_C ] = l_loop->size;
     l_req_stride *= l_loop->size;
@@ -173,7 +173,7 @@ void einsum_ir::backend::ContractionOptimizer::addKernel(){
   //find possible BR kernel dimension
   l_loop = m_free_loops[ dim_t::K ].end() - 2;
   if( m_free_loops[ dim_t::K ].size() > 1 &&
-      br_gemm_support == true                ){
+      m_br_gemm_support == true                ){
     l_potential_kernel_loop[ PRIM_BR ] = l_loop;
     l_potential_kernel_size[ PRIM_BR ] = l_loop->size;
   }
@@ -231,18 +231,30 @@ void einsum_ir::backend::ContractionOptimizer::addKernel(){
       add_empty_loop( m_loops, 0, l_loop_dim_t[l_prim_id], exec_t::PRIM );
     }
   }
-  if( l_kernel_targets[PRIM_C] > 1 ){
-    *m_ktype_main = kernel_t::PACKED_MADD;
+
+  //add CPX dimensions and set kernel type
+  if( m_free_loops[ dim_t::CPX ].size() > 0 ){
+    add_all_loops( &m_free_loops[ dim_t::CPX ],
+                   m_loops,
+                   exec_t::PRIM );
+    if( l_kernel_targets[PRIM_C] > 1 ){
+      *m_ktype_main = kernel_t::CPX_PACKED_MADD;
+    }
   }
-  else if( l_kernel_targets[PRIM_BR] > 1 ){
-    *m_ktype_main = kernel_t::BR_MADD;
+  else{
+    if( l_kernel_targets[PRIM_C] > 1 ){
+      *m_ktype_main = kernel_t::PACKED_MADD;
+    }
+    else if( l_kernel_targets[PRIM_BR] > 1 ){
+      *m_ktype_main = kernel_t::BR_MADD;
+    }
   }
   
   m_size_all_m /= l_kernel_sizes[PRIM_M];
   m_size_all_n /= l_kernel_sizes[PRIM_N];
 }
 
-void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
+void einsum_ir::binary::ContractionOptimizer::reorderLoops(){
 
   //determine parallel targets similarly to kernel targets
   int64_t l_target_parallel_m = sqrt(m_target_parallel);
@@ -293,10 +305,10 @@ void einsum_ir::backend::ContractionOptimizer::reorderLoops(){
                  exec_t::SEQ );
 }
 
-int64_t einsum_ir::backend::ContractionOptimizer::add_loops_until( std::vector<loop_property> * i_source_loops,
-                                                                   std::vector<loop_property> * i_dest_loops,
-                                                                   int64_t                      i_target_size,
-                                                                   exec_t                       i_new_exec_t ){
+int64_t einsum_ir::binary::ContractionOptimizer::add_loops_until( std::vector<loop_property> * i_source_loops,
+                                                                  std::vector<loop_property> * i_dest_loops,
+                                                                  int64_t                      i_target_size,
+                                                                  exec_t                       i_new_exec_t ){
   int64_t l_size_all = 1;
   int64_t l_target_size = i_target_size;
   while( i_source_loops->size() > 0 && 
@@ -320,9 +332,9 @@ int64_t einsum_ir::backend::ContractionOptimizer::add_loops_until( std::vector<l
   return l_size_all;
 }
 
-int64_t einsum_ir::backend::ContractionOptimizer::add_all_loops( std::vector<loop_property> * i_source_loops,
-                                                                 std::vector<loop_property> * i_dest_loops,
-                                                                 exec_t                       i_new_exec_t ){
+int64_t einsum_ir::binary::ContractionOptimizer::add_all_loops( std::vector<loop_property> * i_source_loops,
+                                                                std::vector<loop_property> * i_dest_loops,
+                                                                exec_t                       i_new_exec_t ){
   int64_t l_size_all = 1;
   while( i_source_loops->size() > 0 ){
     std::vector<loop_property>::iterator l_it = i_source_loops->end() - 1;
@@ -335,12 +347,12 @@ int64_t einsum_ir::backend::ContractionOptimizer::add_all_loops( std::vector<loo
   return l_size_all;
 }
 
-int64_t einsum_ir::backend::ContractionOptimizer::splitLoop( std::vector<loop_property>::iterator i_loop,
-                                                             std::vector<loop_property> *         i_source_loops,
-                                                             std::vector<loop_property> *         i_dest_loops,
-                                                             int64_t                              i_target_size,
-                                                             int64_t                              i_new_loop_pos, 
-                                                             exec_t                               i_new_exec_t ){
+int64_t einsum_ir::binary::ContractionOptimizer::splitLoop( std::vector<loop_property>::iterator i_loop,
+                                                            std::vector<loop_property> *         i_source_loops,
+                                                            std::vector<loop_property> *         i_dest_loops,
+                                                            int64_t                              i_target_size,
+                                                            int64_t                              i_new_loop_pos, 
+                                                            exec_t                               i_new_exec_t ){
 
   int64_t l_split = findSplit(i_loop->size, i_target_size );
 
@@ -360,10 +372,10 @@ int64_t einsum_ir::backend::ContractionOptimizer::splitLoop( std::vector<loop_pr
   return l_split;                                                         
 }
 
-void einsum_ir::backend::ContractionOptimizer::add_empty_loop( std::vector<loop_property> * i_dest_loops,
-                                                               int64_t                      i_new_loop_pos, 
-                                                               dim_t                        i_new_dim_t,
-                                                               exec_t                       i_new_exec_t ){
+void einsum_ir::binary::ContractionOptimizer::add_empty_loop( std::vector<loop_property> * i_dest_loops,
+                                                              int64_t                      i_new_loop_pos, 
+                                                              dim_t                        i_new_dim_t,
+                                                              exec_t                       i_new_exec_t ){
 
   loop_property l_empty_loop;
 
@@ -378,11 +390,11 @@ void einsum_ir::backend::ContractionOptimizer::add_empty_loop( std::vector<loop_
   i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, l_empty_loop );                                                       
 }
 
-int64_t einsum_ir::backend::ContractionOptimizer::addLoop( std::vector<loop_property>::iterator i_loop,
-                                                           std::vector<loop_property> *         i_source_loops,
-                                                           std::vector<loop_property> *         i_dest_loops,
-                                                           int64_t                              i_new_loop_pos, 
-                                                           exec_t                               i_new_exec_t ){
+int64_t einsum_ir::binary::ContractionOptimizer::addLoop( std::vector<loop_property>::iterator i_loop,
+                                                          std::vector<loop_property> *         i_source_loops,
+                                                          std::vector<loop_property> *         i_dest_loops,
+                                                          int64_t                              i_new_loop_pos, 
+                                                          exec_t                               i_new_exec_t ){
   
   i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, *i_loop );
   i_dest_loops->at(i_new_loop_pos).exec_type = i_new_exec_t;
@@ -394,8 +406,8 @@ int64_t einsum_ir::backend::ContractionOptimizer::addLoop( std::vector<loop_prop
 }
 
 //TODO optimize. This does not find good kernels bigger than 1024
-int64_t einsum_ir::backend::ContractionOptimizer::findSplit( int64_t i_dim_size,
-                                                             int64_t i_target_size
+int64_t einsum_ir::binary::ContractionOptimizer::findSplit( int64_t i_dim_size,
+                                                            int64_t i_target_size
                                                            ){
   //factorization of number
   int64_t l_best_factor = i_dim_size;

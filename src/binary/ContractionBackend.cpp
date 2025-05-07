@@ -6,20 +6,21 @@
 
 #include <iostream>
 
-void einsum_ir::backend::ContractionBackend::init( std::vector< dim_t >   const & i_loop_dim_type,
-                                                   std::vector< exec_t >  const & i_loop_exec_type,
-                                                   std::vector< int64_t > const & i_loop_sizes,
-                                                   std::vector< int64_t > const & i_loop_strides_left,
-                                                   std::vector< int64_t > const & i_loop_strides_right,
-                                                   std::vector< int64_t > const & i_loop_strides_out_aux,
-                                                   std::vector< int64_t > const & i_loop_strides_out,
-                                                   data_t                               i_dtype_left,
-                                                   data_t                               i_dtype_right,
-                                                   data_t                               i_dtype_comp,
-                                                   data_t                               i_dtype_out,
-                                                   kernel_t                             i_ktype_first_touch,
-                                                   kernel_t                             i_ktype_main,
-                                                   kernel_t                             i_ktype_last_touch ){
+void einsum_ir::binary::ContractionBackend::init( std::vector< dim_t >   const & i_loop_dim_type,
+                                                  std::vector< exec_t >  const & i_loop_exec_type,
+                                                  std::vector< int64_t > const & i_loop_sizes,
+                                                  std::vector< int64_t > const & i_loop_strides_left,
+                                                  std::vector< int64_t > const & i_loop_strides_right,
+                                                  std::vector< int64_t > const & i_loop_strides_out_aux,
+                                                  std::vector< int64_t > const & i_loop_strides_out,
+                                                  data_t                               i_dtype_left,
+                                                  data_t                               i_dtype_right,
+                                                  data_t                               i_dtype_comp,
+                                                  data_t                               i_dtype_out,
+                                                  kernel_t                             i_ktype_first_touch,
+                                                  kernel_t                             i_ktype_main,
+                                                  kernel_t                             i_ktype_last_touch,
+                                                  int64_t                              i_num_threads ){
 
   //copy to local variables
   m_loop_dim_type        = i_loop_dim_type;
@@ -38,16 +39,19 @@ void einsum_ir::backend::ContractionBackend::init( std::vector< dim_t >   const 
   m_ktype_first_touch = i_ktype_first_touch;
   m_ktype_main        = i_ktype_main;
   m_ktype_last_touch  = i_ktype_last_touch;
+
+  m_num_threads = i_num_threads;
 }
 
-void einsum_ir::backend::ContractionBackend::init( std::vector< loop_property > const & i_loops,
-                                                   data_t                               i_dtype_left,
-                                                   data_t                               i_dtype_right,
-                                                   data_t                               i_dtype_comp,
-                                                   data_t                               i_dtype_out,
-                                                   kernel_t                             i_ktype_first_touch,
-                                                   kernel_t                             i_ktype_main,
-                                                   kernel_t                             i_ktype_last_touch ){
+void einsum_ir::binary::ContractionBackend::init( std::vector< loop_property > const & i_loops,
+                                                  data_t                               i_dtype_left,
+                                                  data_t                               i_dtype_right,
+                                                  data_t                               i_dtype_comp,
+                                                  data_t                               i_dtype_out,
+                                                  kernel_t                             i_ktype_first_touch,
+                                                  kernel_t                             i_ktype_main,
+                                                  kernel_t                             i_ktype_last_touch,
+                                                  int64_t                              i_num_threads ){
 
   int64_t l_num_loops = i_loops.size();
   m_loop_dim_type.resize(l_num_loops);
@@ -76,9 +80,11 @@ void einsum_ir::backend::ContractionBackend::init( std::vector< loop_property > 
   m_ktype_first_touch = i_ktype_first_touch;
   m_ktype_main        = i_ktype_main;
   m_ktype_last_touch  = i_ktype_last_touch;
+
+  m_num_threads = i_num_threads;
 }
 
-einsum_ir::err_t einsum_ir::backend::ContractionBackend::compile(){
+einsum_ir::err_t einsum_ir::binary::ContractionBackend::compile(){
   err_t l_err = err_t::UNDEFINED_ERROR;
 
   // get kernel shape
@@ -92,12 +98,6 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::compile(){
   if( l_err != err_t::SUCCESS ) {
     return l_err;
   }
-
-  // get number of threads for contraction
-  m_num_threads = 1;
-#ifdef _OPENMP
-  m_num_threads = omp_get_max_threads(); 
-#endif
 
   //create at least one non Primitive loop
   if( m_loop_exec_type.at(0) == exec_t::PRIM ){
@@ -130,12 +130,8 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::compile(){
   }
 
   //check if first and last touch exists
-  if( m_ktype_first_touch != kernel_t::UNDEFINED_KTYPE ){
-    m_has_first_touch = true;
-  }
-  if( m_ktype_last_touch != kernel_t::UNDEFINED_KTYPE ){
-    m_has_last_touch = true;
-  }
+  m_has_first_touch = m_ktype_first_touch != kernel_t::UNDEFINED_KTYPE;
+  m_has_last_touch = m_ktype_last_touch != kernel_t::UNDEFINED_KTYPE;
 
   //multiply strides by size of datatype 
   for(int64_t l_id = 0; l_id < l_num_loops; l_id++){
@@ -165,23 +161,23 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::compile(){
   return err_t::SUCCESS;
 }
 
-void einsum_ir::backend::ContractionBackend::contract( void const * i_tensor_left,
-                                                       void const * i_tensor_right,
-                                                       void const * i_tensor_out_aux,
-                                                       void       * io_tensor_out ) {
+void einsum_ir::binary::ContractionBackend::contract( void const * i_tensor_left,
+                                                      void const * i_tensor_right,
+                                                      void const * i_tensor_out_aux,
+                                                      void       * io_tensor_out ) {
   //only execute in parallel if there are parallel loops
   if( m_id_first_parallel_loop >= 0 && m_num_threads > 1 ){
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp parallel num_threads(m_num_threads)
     {
       int64_t l_thread_id = omp_get_thread_num();
-      int64_t l_offset_left, l_offset_right, l_offset_out;
-      m_iter.getInitialOffsets( l_thread_id, l_offset_left, l_offset_right, l_offset_out ); //could move to contract function
+      int64_t l_offset_left, l_offset_right, l_offset_out_aux, l_offset_out;
+      m_iter.getInitialOffsets( l_thread_id, l_offset_left, l_offset_right, l_offset_out_aux, l_offset_out );
       contract_iter( l_thread_id,
                      0,
                      (char *) i_tensor_left + l_offset_left,
                      (char *) i_tensor_right + l_offset_right,
-                     (char *) i_tensor_out_aux,
+                     (char *) i_tensor_out_aux + l_offset_out_aux,
                      (char *) io_tensor_out + l_offset_out,
                      m_has_first_touch,
                      m_has_last_touch );
@@ -201,14 +197,14 @@ void einsum_ir::backend::ContractionBackend::contract( void const * i_tensor_lef
 }
 
 
-void einsum_ir::backend::ContractionBackend::contract_iter( int64_t         i_thread_id,
-                                                            int64_t         i_id_loop,
-                                                            char    const * i_ptr_left,
-                                                            char    const * i_ptr_right,
-                                                            char    const * i_ptr_out_aux,
-                                                            char          * i_ptr_out,
-                                                            bool            i_first_access,
-                                                            bool            i_last_access ) {
+void einsum_ir::binary::ContractionBackend::contract_iter( int64_t         i_thread_id,
+                                                           int64_t         i_id_loop,
+                                                           char    const * i_ptr_left,
+                                                           char    const * i_ptr_right,
+                                                           char    const * i_ptr_out_aux,
+                                                           char          * i_ptr_out,
+                                                           bool            i_first_access,
+                                                           bool            i_last_access ) {
   bool l_first_access = i_first_access;
   bool l_last_access  = i_last_access;
 
@@ -252,7 +248,7 @@ void einsum_ir::backend::ContractionBackend::contract_iter( int64_t         i_th
 
     //update pointer
     if( i_id_loop == m_id_first_parallel_loop + m_num_parallel_loops - 1 ){
-      m_iter.addMovementOffsets(i_thread_id, l_it, &i_ptr_left, &i_ptr_right, &i_ptr_out );
+      m_iter.addMovementOffsets(i_thread_id, l_it, &i_ptr_left, &i_ptr_right, &i_ptr_out_aux, &i_ptr_out );
     }
     else{
       i_ptr_left    += m_loop_strides_left[ i_id_loop ];
@@ -263,7 +259,7 @@ void einsum_ir::backend::ContractionBackend::contract_iter( int64_t         i_th
   }
 }
 
-einsum_ir::err_t einsum_ir::backend::ContractionBackend::get_kernel_shape( ){
+einsum_ir::err_t einsum_ir::binary::ContractionBackend::get_kernel_shape( ){
   err_t l_err = err_t::UNDEFINED_ERROR;
 
   //check that there are enough primitive dimensions
@@ -276,10 +272,11 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::get_kernel_shape( ){
     l_num_prims++;
   }
 
-  if( (m_ktype_main == kernel_t::MADD            && l_num_prims != 3) ||
-      (m_ktype_main == kernel_t::BR_MADD         && l_num_prims != 4) ||
-      (m_ktype_main == kernel_t::PACKED_MADD     && l_num_prims != 4) ||
-      (m_ktype_main == kernel_t::CPX_PACKED_MADD && l_num_prims != 5)    ){
+  if(    ( m_ktype_main == kernel_t::MADD            && l_num_prims != 3 )
+      || ( m_ktype_main == kernel_t::BR_MADD         && l_num_prims != 4 )
+      || ( m_ktype_main == kernel_t::CPX_MADD        && l_num_prims != 4 )
+      || ( m_ktype_main == kernel_t::PACKED_MADD     && l_num_prims != 4 )
+      || ( m_ktype_main == kernel_t::CPX_PACKED_MADD && l_num_prims != 5 ) ){
     return err_t::COMPILATION_FAILED; 
   }
 
@@ -310,9 +307,10 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::get_kernel_shape( ){
     m_ldb = m_loop_strides_right[l_size-2];
   }
 
-  //set ldc and ld_out_aux
+  //set ldc and auxiliary strides
   m_ldc = m_loop_strides_out[l_size-2];
-  m_ld_out_aux = m_loop_strides_out_aux[l_size-2];
+  m_stride_m_out_aux = m_loop_strides_out_aux[l_size-3];
+  m_stride_n_out_aux = m_loop_strides_out_aux[l_size-2];
 
   //set br parameter
   m_br = 1;
@@ -340,14 +338,17 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackend::get_kernel_shape( ){
   }
 
   //set complex parameter
-  if( m_ktype_main == kernel_t::CPX_PACKED_MADD ){
-    if( m_loop_sizes[l_size-5] != 2 ){
+  int64_t l_cpx_offset = 0;
+  l_cpx_offset = (m_ktype_main == kernel_t::CPX_MADD       ) ? 4 : l_cpx_offset;
+  l_cpx_offset = (m_ktype_main == kernel_t::CPX_PACKED_MADD) ? 5 : l_cpx_offset;
+  if( l_cpx_offset ){
+    if( m_loop_sizes[l_size-l_cpx_offset] != 2 ){
       return err_t::COMPILATION_FAILED; 
     }
-    int64_t m_cpx_stride_in_left_bytes  = m_loop_strides_left[   l_size-5] * ce_n_bytes(m_dtype_left );
-    int64_t m_cpx_stride_in_right_bytes = m_loop_strides_right[  l_size-5] * ce_n_bytes(m_dtype_right);
-    int64_t m_cpx_stride_out_aux_bytes  = m_loop_strides_out_aux[l_size-5] * ce_n_bytes(m_dtype_out  );
-    int64_t m_cpx_stride_out_bytes      = m_loop_strides_out[    l_size-5] * ce_n_bytes(m_dtype_out  );
+    m_cpx_stride_in_left_bytes  = m_loop_strides_left[   l_size-l_cpx_offset] * ce_n_bytes(m_dtype_left );
+    m_cpx_stride_in_right_bytes = m_loop_strides_right[  l_size-l_cpx_offset] * ce_n_bytes(m_dtype_right);
+    m_cpx_stride_out_aux_bytes  = m_loop_strides_out_aux[l_size-l_cpx_offset] * ce_n_bytes(m_dtype_out  );
+    m_cpx_stride_out_bytes      = m_loop_strides_out[    l_size-l_cpx_offset] * ce_n_bytes(m_dtype_out  );
   }
 
   return err_t::SUCCESS;

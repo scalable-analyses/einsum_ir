@@ -1,24 +1,23 @@
-//TODO change inlude guard
-#ifndef EINSUM_IR_BACKEND_CONTRACTION_LOOPS_SFC
-#define EINSUM_IR_BACKEND_CONTRACTION_LOOPS_SFC
+#ifndef EINSUM_IR_BINARY_CONTRACTION_BACKEND
+#define EINSUM_IR_BINARY_CONTRACTION_BACKEND
 
 #include <vector>
 #include <map>
 
-#include "constants_local.h"
-#include "IterationSpacesSfc.h"
+#include "constants.h"
+#include "IterationSpace.h"
 
 
 namespace einsum_ir {
-  namespace backend {
+  namespace binary {
     class ContractionBackend;
   }
 }
 
-class einsum_ir::backend::ContractionBackend {
+class einsum_ir::binary::ContractionBackend {
   private:
     //! Iteration Space for parallel execution
-    einsum_ir::backend::IterationSpacesSfc m_iter;
+    einsum_ir::binary::IterationSpace m_iter;
 
     //! id of the first parallelized loop
     int64_t m_id_first_parallel_loop = 0;
@@ -98,8 +97,11 @@ class einsum_ir::backend::ContractionBackend {
     uint64_t m_ldb;
     //! kernel leading dimension C
     uint64_t m_ldc;
-    //! kernel leading dimension of auxiliary tensor
-    uint64_t m_ld_out_aux;
+
+    //! kernel m stride of auxiliary tensor
+    uint64_t m_stride_m_out_aux;
+    //! kernel n stride of auxiliary tensor
+    uint64_t m_stride_n_out_aux;
 
     //! kernel br stride a
     uint64_t m_br_stride_a;
@@ -138,6 +140,7 @@ class einsum_ir::backend::ContractionBackend {
      * @param i_ktype_first_touch type of the first touch kernel.
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
+     * @param i_num_threads number of threads used for contraction.
      **/
     void init( std::vector< dim_t >   const & i_loop_dim_type,
                std::vector< exec_t >  const & i_loop_exec_type,
@@ -152,7 +155,8 @@ class einsum_ir::backend::ContractionBackend {
                data_t                         i_dtype_out,
                kernel_t                       i_ktype_first_touch,
                kernel_t                       i_ktype_main,
-               kernel_t                       i_ktype_last_touch );
+               kernel_t                       i_ktype_last_touch,
+               int64_t                        i_num_threads );
 
 
     /**
@@ -166,6 +170,7 @@ class einsum_ir::backend::ContractionBackend {
      * @param i_ktype_first_touch type of the first touch kernel.
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
+     * @param i_num_threads number of threads used for contraction.
      **/
     void init( std::vector< loop_property > const & i_loops,
                data_t                               i_dtype_left,
@@ -174,7 +179,8 @@ class einsum_ir::backend::ContractionBackend {
                data_t                               i_dtype_out,
                kernel_t                             i_ktype_first_touch,
                kernel_t                             i_ktype_main,
-               kernel_t                             i_ktype_last_touch );
+               kernel_t                             i_ktype_last_touch,
+               int64_t                              i_num_threads );
 
     /**
      * Compiles the contraction loop interface.

@@ -8,7 +8,7 @@ TEST_CASE( "Matmul with sequential batch dimension.", "[contraction_backend]" ) 
   //example: [c1,k1,m1],[c1,n1,k1]->[c1,n1,m1]
   //sizes:   [17,13,20],[17,47,13]->[17,47,20]
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C,
                                              dim_t::M, 
@@ -31,7 +31,7 @@ TEST_CASE( "Matmul with sequential batch dimension.", "[contraction_backend]" ) 
   at::Tensor l_out     = at::zeros( { 17,47,20 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  backend::ContractionBackendTpp l_cont;
+  ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -46,7 +46,8 @@ TEST_CASE( "Matmul with sequential batch dimension.", "[contraction_backend]" ) 
                data_t::FP32,
                kernel_t::ZERO,
                kernel_t::MADD,
-               kernel_t::UNDEFINED_KTYPE );     
+               kernel_t::UNDEFINED_KTYPE,
+               2 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -66,7 +67,7 @@ TEST_CASE( "Packed Matmul with sequential M dimension.", "[contraction_backend]"
   //example: [m2,k1,m1,c1],[n1,k1,c1]->[m2,n1,m1,c1]
   //sizes:   [ 5,13,20,17],[47,13,17]->[ 5,47,20,17]
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::M,
                                              dim_t::C,
@@ -91,7 +92,7 @@ TEST_CASE( "Packed Matmul with sequential M dimension.", "[contraction_backend]"
   at::Tensor l_out     = at::ones( { 5,47,20,17 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  backend::ContractionBackendTpp l_cont;
+  ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -106,7 +107,8 @@ TEST_CASE( "Packed Matmul with sequential M dimension.", "[contraction_backend]"
                data_t::FP32,
                kernel_t::ZERO,
                kernel_t::PACKED_MADD,
-               kernel_t::UNDEFINED_KTYPE );     
+               kernel_t::UNDEFINED_KTYPE,
+               3 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -125,7 +127,7 @@ TEST_CASE( "Matmul with sequential batch dimension and transposed B.", "[contrac
   //example: [c1,k1,m1],[c1,k1,n1]->[c1,n1,m1]
   //sizes:   [ 5, 3, 2],[ 5, 3, 4]->[ 5, 4, 2]
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C,
                                              dim_t::M, 
@@ -148,7 +150,7 @@ TEST_CASE( "Matmul with sequential batch dimension and transposed B.", "[contrac
   at::Tensor l_out     = at::zeros( { 5,4,2 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  backend::ContractionBackendTpp l_cont;
+  ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -163,7 +165,8 @@ TEST_CASE( "Matmul with sequential batch dimension and transposed B.", "[contrac
                data_t::FP32,
                kernel_t::ZERO,
                kernel_t::MADD,
-               kernel_t::UNDEFINED_KTYPE );     
+               kernel_t::UNDEFINED_KTYPE,
+               4 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -183,7 +186,7 @@ TEST_CASE( "Simple Matmul with sequential batch dimension and transposed A.", "[
   //example: [c1,m1,k1],[c1,n1,k1]->[c1,n1,m1]
   //sizes:   [ 5, 2, 3],[ 5, 4, 3]->[ 5, 4, 2]
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C,
                                              dim_t::M, 
@@ -206,7 +209,7 @@ TEST_CASE( "Simple Matmul with sequential batch dimension and transposed A.", "[
   at::Tensor l_out     = at::zeros( { 5,4,2 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  backend::ContractionBackendTpp l_cont;
+  ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -221,7 +224,8 @@ TEST_CASE( "Simple Matmul with sequential batch dimension and transposed A.", "[
                data_t::FP32,
                kernel_t::ZERO,
                kernel_t::MADD,
-               kernel_t::UNDEFINED_KTYPE );     
+               kernel_t::UNDEFINED_KTYPE,
+               5 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -242,7 +246,7 @@ TEST_CASE( "Single call of batch reduce matmul.", "[contraction_backend]" ) {
   //example: [k2,k1,m1],[k2,n1,k1]->[n1,m1]
   //sizes:   [ 2, 7, 5],[ 2, 4, 7]->[ 4, 5]
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::K,
                                              dim_t::M, 
@@ -265,7 +269,7 @@ TEST_CASE( "Single call of batch reduce matmul.", "[contraction_backend]" ) {
   at::Tensor l_out     = at::zeros( {     4, 5 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  backend::ContractionBackendTpp l_cont;
+  ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -280,7 +284,8 @@ TEST_CASE( "Single call of batch reduce matmul.", "[contraction_backend]" ) {
                data_t::FP32,
                kernel_t::ZERO,
                kernel_t::BR_MADD,
-               kernel_t::UNDEFINED_KTYPE );     
+               kernel_t::UNDEFINED_KTYPE,
+               6 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -299,7 +304,7 @@ TEST_CASE( "tensor contraction with omp parallelisation.", "[contraction_backend
   //example: [m1,k1,m1],[n2,n1,k1]->[n2,m1,n1,m1]
   //sizes:   [17,13,20],[ 8,47,13]->[ 8,17,47,20]
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::N,
                                              dim_t::M,
@@ -324,7 +329,7 @@ TEST_CASE( "tensor contraction with omp parallelisation.", "[contraction_backend
   at::Tensor l_out     = at::zeros( { 8,17,47,20 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  backend::ContractionBackendTpp l_cont;
+  ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -339,7 +344,8 @@ TEST_CASE( "tensor contraction with omp parallelisation.", "[contraction_backend
                data_t::FP32,
                kernel_t::ZERO,
                kernel_t::MADD,
-               kernel_t::UNDEFINED_KTYPE );     
+               kernel_t::UNDEFINED_KTYPE,
+               7 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -360,7 +366,7 @@ TEST_CASE( "blocked matmul with omp parallelisation.", "[contraction_backend]" )
   //example: [m2,k2,k1,m1],[n2,k2,n1,k1]->[n2,m2,n1,m1]
   //sizes:   [32, 8,64,64],[32, 8,64,64]->[32,32,64,64]
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::N,
                                              dim_t::M,
@@ -387,7 +393,7 @@ TEST_CASE( "blocked matmul with omp parallelisation.", "[contraction_backend]" )
   at::Tensor l_out     = at::randn( { 32,32,64,64 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  backend::ContractionBackendTpp l_cont;
+  ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -402,7 +408,8 @@ TEST_CASE( "blocked matmul with omp parallelisation.", "[contraction_backend]" )
                data_t::FP32,
                kernel_t::ZERO,
                kernel_t::MADD,
-               kernel_t::UNDEFINED_KTYPE );     
+               kernel_t::UNDEFINED_KTYPE,
+               8 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -422,7 +429,7 @@ TEST_CASE( "tensor contraction with sfc parallelisation.", "[contraction_backend
   //example: [m1,k1,m1],[n2,n1,k1]->[n2,m1,n1,m1]
   //sizes:   [17,13,20],[ 8,47,13]->[ 8,17,47,20]
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::M,
                                              dim_t::N,
@@ -447,7 +454,7 @@ TEST_CASE( "tensor contraction with sfc parallelisation.", "[contraction_backend
   at::Tensor l_out     = at::zeros( { 8,17,47,20 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  backend::ContractionBackendTpp l_cont;
+  ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -462,7 +469,8 @@ TEST_CASE( "tensor contraction with sfc parallelisation.", "[contraction_backend
                data_t::FP32,
                kernel_t::ZERO,
                kernel_t::MADD,
-               kernel_t::UNDEFINED_KTYPE );     
+               kernel_t::UNDEFINED_KTYPE,
+               9 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -483,7 +491,7 @@ TEST_CASE( "tensor contraction with sfc and omp parallelisation.", "[contraction
   //example: [c1,m1,k1,m1],[c1,n2,n1,k1]->[c1,n2,m1,n1,m1]
   //sizes:   [ 5,17,13,20],[ 5, 8,47,13]->[ 5, 8,17,47,20]
   using namespace einsum_ir;
-  using namespace einsum_ir::backend;
+  using namespace einsum_ir::binary;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C,
                                              dim_t::M,
@@ -510,7 +518,7 @@ TEST_CASE( "tensor contraction with sfc and omp parallelisation.", "[contraction
   at::Tensor l_out     = at::zeros( { 5,8,17,47,20 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  backend::ContractionBackendTpp l_cont;
+  ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -525,7 +533,8 @@ TEST_CASE( "tensor contraction with sfc and omp parallelisation.", "[contraction
                data_t::FP32,
                kernel_t::ZERO,
                kernel_t::MADD,
-               kernel_t::UNDEFINED_KTYPE );     
+               kernel_t::UNDEFINED_KTYPE,
+               10 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );

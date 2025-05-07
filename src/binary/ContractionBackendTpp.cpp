@@ -1,7 +1,7 @@
 #include "ContractionBackendTpp.h"
 #include <iostream>
 
-libxsmm_datatype einsum_ir::backend::ContractionBackendTpp::dtype_to_libxsmm( data_t i_dtype ) {
+libxsmm_datatype einsum_ir::binary::ContractionBackendTpp::dtype_to_libxsmm( data_t i_dtype ) {
   if( i_dtype == FP32 ) {
     return libxsmm_datatype::LIBXSMM_DATATYPE_F32;
   }
@@ -13,13 +13,13 @@ libxsmm_datatype einsum_ir::backend::ContractionBackendTpp::dtype_to_libxsmm( da
 }
 
 
-void einsum_ir::backend::ContractionBackendTpp::kernel_first_touch( void const * i_out_aux,
-                                                                    void       * io_out ){
+void einsum_ir::binary::ContractionBackendTpp::kernel_first_touch( void const * i_out_aux,
+                                                                   void       * io_out ){
 
   if( m_xmm_kernel_first_touch_unary != nullptr ) {
     libxsmm_meltw_unary_param l_param;
-    l_param.in.primary = io_out;
-    l_param.out.primary = io_out;
+    l_param.in.primary  = (void *) i_out_aux;
+    l_param.out.primary =          io_out;
     m_xmm_kernel_first_touch_unary( &l_param );
   }
   else if( m_xmm_kernel_first_touch_binary != nullptr ) {
@@ -32,8 +32,8 @@ void einsum_ir::backend::ContractionBackendTpp::kernel_first_touch( void const *
 }
 
 
-void einsum_ir::backend::ContractionBackendTpp::kernel_last_touch( void const * i_out_aux,
-                                                                   void       * io_out ){
+void einsum_ir::binary::ContractionBackendTpp::kernel_last_touch( void const * i_out_aux,
+                                                                  void       * io_out ){
   if( m_xmm_kernel_last_touch_unary != nullptr ) {
     libxsmm_meltw_unary_param l_param;
     l_param.in.primary = io_out;
@@ -50,9 +50,9 @@ void einsum_ir::backend::ContractionBackendTpp::kernel_last_touch( void const * 
 }
 
 
-void einsum_ir::backend::ContractionBackendTpp::kernel_main( void const * i_left,
-                                                             void const * i_right,
-                                                             void       * io_out ){
+void einsum_ir::binary::ContractionBackendTpp::kernel_main( void const * i_left,
+                                                            void const * i_right,
+                                                            void       * io_out ){
   libxsmm_gemm_param l_param;
   l_param.a.primary = (void *) i_left;
   l_param.b.primary = (void *) i_right;
@@ -63,7 +63,7 @@ void einsum_ir::backend::ContractionBackendTpp::kernel_main( void const * i_left
 }
 
 
-einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
+einsum_ir::err_t einsum_ir::binary::ContractionBackendTpp::compile_kernels(){
 
   // libxsmm data types
   libxsmm_datatype l_xmm_dtype_left  = dtype_to_libxsmm( m_dtype_left  );
@@ -78,9 +78,28 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
     return einsum_ir::COMPILATION_FAILED;
   }
 
-  //flags
+  // setup bcast 
   libxsmm_bitfield l_flag_out_aux_unary  = LIBXSMM_MELTW_FLAG_UNARY_NONE;
   libxsmm_bitfield l_flag_out_aux_binary = LIBXSMM_MELTW_FLAG_BINARY_NONE;
+
+  // column to matrix bcast
+  if(         m_stride_m_out_aux >  0
+           && m_stride_n_out_aux == 0 ) {
+    l_flag_out_aux_unary  = LIBXSMM_MELTW_FLAG_UNARY_BCAST_COL;
+    l_flag_out_aux_binary = LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_1;
+  }
+  // row to matrix bcast
+  else if(    m_stride_m_out_aux == 0
+           && m_stride_n_out_aux >  0 ) {
+    l_flag_out_aux_unary  = LIBXSMM_MELTW_FLAG_UNARY_BCAST_ROW;
+    l_flag_out_aux_binary = LIBXSMM_MELTW_FLAG_BINARY_BCAST_ROW_IN_1;
+  }
+  // scalar to matrix bcast
+  else if(    m_stride_m_out_aux == 0
+           && m_stride_n_out_aux == 0 ) {
+    l_flag_out_aux_unary  = LIBXSMM_MELTW_FLAG_UNARY_BCAST_SCALAR;
+    l_flag_out_aux_binary = LIBXSMM_MELTW_FLAG_BINARY_BCAST_SCALAR_IN_1;
+  }
 
   // first-touch and last-touch shape
   libxsmm_meltw_unary_shape l_shape_single_touch = libxsmm_create_meltw_unary_shape( m_m * m_r,
@@ -90,10 +109,10 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
                                                                                      l_xmm_dtype_out,
                                                                                      l_xmm_dtype_out,
                                                                                      l_xmm_dtype_out );
-        
+  
   libxsmm_meltw_unary_shape l_shape_single_touch_aux_unary = libxsmm_create_meltw_unary_shape( m_m * m_r,
                                                                                                m_n,
-                                                                                               m_ld_out_aux,
+                                                                                               m_stride_n_out_aux,
                                                                                                m_ldc,
                                                                                                l_xmm_dtype_out,
                                                                                                l_xmm_dtype_out,
@@ -102,7 +121,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendTpp::compile_kernels(){
   libxsmm_meltw_binary_shape l_shape_single_touch_aux_binary = libxsmm_create_meltw_binary_shape( m_m * m_r,
                                                                                                   m_n,
                                                                                                   m_ldc,
-                                                                                                  m_ld_out_aux,
+                                                                                                  m_stride_n_out_aux,
                                                                                                   m_ldc,
                                                                                                   l_xmm_dtype_out,
                                                                                                   l_xmm_dtype_out,

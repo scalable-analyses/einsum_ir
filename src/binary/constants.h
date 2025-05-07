@@ -1,11 +1,11 @@
-#ifndef BINARY_BACKEND_CONSTANTS_LOCAL
-#define BINARY_BACKEND_CONSTANTS_LOCAL
+#ifndef EINSUM_IR_BINARY_CONSTANTS
+#define EINSUM_IR_BINARY_CONSTANTS
 
 #include <cstdint>
-#include "../../constants.h"
+#include "../constants.h"
 
 namespace einsum_ir {
-  namespace backend{
+  namespace binary{
     typedef enum {
       OMP =  0, // OMP parallelized dim
       SEQ =  1, // Sequential dimension

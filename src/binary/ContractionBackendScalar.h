@@ -1,16 +1,15 @@
-//TODO change inlude guard
-#ifndef EINSUM_IR_BACKEND_BINARY_CONTRACTION_SCALAR_NEW
-#define EINSUM_IR_BACKEND_BINARY_CONTRACTION_SCALAR_NEW
+#ifndef EINSUM_IR_BINARY_CONTRACTION_BACKEND_SCALAR
+#define EINSUM_IR_BINARY_CONTRACTION_BACKEND_SCALAR
 
 #include "ContractionBackend.h"
 
 namespace einsum_ir {
-  namespace backend {
+  namespace binary {
     class ContractionBackendScalar;
   }
 }
 
-class einsum_ir::backend::ContractionBackendScalar: public ContractionBackend {
+class einsum_ir::binary::ContractionBackendScalar: public ContractionBackend {
   private:
     /**
      * Compiler-based zero kernel.

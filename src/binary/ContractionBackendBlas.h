@@ -1,16 +1,15 @@
-//TODO change inlude guard
-#ifndef EINSUM_IR_BACKEND_CONTRACTION_LOOPS_BLAS
-#define EINSUM_IR_BACKEND_CONTRACTION_LOOPS_BLAS
+#ifndef EINSUM_IR_BINARY_CONTRACTION_BACKEND_BLAS
+#define EINSUM_IR_BINARY_CONTRACTION_BACKEND_BLAS
 
 #include "ContractionBackend.h"
 
 namespace einsum_ir {
-  namespace backend {
+  namespace binary {
     class ContractionBackendBlas;
   }
 }
 
-class einsum_ir::backend::ContractionBackendBlas: public ContractionBackend {
+class einsum_ir::binary::ContractionBackendBlas: public ContractionBackend {
   private:
     //! number of bytes in a scalar
     int64_t m_num_bytes_scalar = 0;

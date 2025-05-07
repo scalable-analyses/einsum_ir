@@ -3,22 +3,22 @@
 //#include <cmath>
 
 template < typename T >
-void einsum_ir::backend::ContractionBackendScalar::kernel_zero( void const *,
-                                                                void       * o_data ) {
+void einsum_ir::binary::ContractionBackendScalar::kernel_zero( void const *,
+                                                               void       * o_data ) {
   T * l_data = (T *) o_data;
   *l_data = T(0);
 }
 
 template < typename T >
-void einsum_ir::backend::ContractionBackendScalar::kernel_relu( void const *,
-                                                                void       * io_data ) {
+void einsum_ir::binary::ContractionBackendScalar::kernel_relu( void const *,
+                                                               void       * io_data ) {
   T * l_data = (T *) io_data;
   *l_data = std::max( *l_data, T(0) );
 }
 
 template < typename T >
-void einsum_ir::backend::ContractionBackendScalar::kernel_copy( void const * i_data_src,
-                                                                void       * io_data_dst ) {
+void einsum_ir::binary::ContractionBackendScalar::kernel_copy( void const * i_data_src,
+                                                               void       * io_data_dst ) {
   T const * l_data_src = (T const *) i_data_src;
   T * l_data_dst = (T *) io_data_dst;
 
@@ -28,9 +28,9 @@ void einsum_ir::backend::ContractionBackendScalar::kernel_copy( void const * i_d
 template < typename T_LEFT,
            typename T_RIGHT,
            typename T_OUT >
-void einsum_ir::backend::ContractionBackendScalar::kernel_madd( void const * i_left,
-                                                                void const * i_right,
-                                                                void       * io_out ) {
+void einsum_ir::binary::ContractionBackendScalar::kernel_madd( void const * i_left,
+                                                               void const * i_right,
+                                                               void       * io_out ) {
   T_LEFT  const * l_left  = (T_LEFT  const *) i_left;
   T_RIGHT const * l_right = (T_RIGHT const *) i_right;
   T_OUT         * l_out   = (T_OUT         *) io_out;
@@ -38,7 +38,7 @@ void einsum_ir::backend::ContractionBackendScalar::kernel_madd( void const * i_l
   *l_out += (*l_left) * (*l_right);
 }
 
-einsum_ir::err_t einsum_ir::backend::ContractionBackendScalar::compile_kernels() {
+einsum_ir::err_t einsum_ir::binary::ContractionBackendScalar::compile_kernels() {
 
   //kernel should be of size 1 for scalar interface
   if(    m_m != 1
@@ -128,24 +128,24 @@ einsum_ir::err_t einsum_ir::backend::ContractionBackendScalar::compile_kernels()
 }
 
 
-void einsum_ir::backend::ContractionBackendScalar::kernel_first_touch( void const * i_out_aux,
-                                                                       void       * io_out ) {
+void einsum_ir::binary::ContractionBackendScalar::kernel_first_touch( void const * i_out_aux,
+                                                                      void       * io_out ) {
   if( m_kernel_first_touch != nullptr ) {
     m_kernel_first_touch( i_out_aux,
                           io_out );
   }
 }
 
-void einsum_ir::backend::ContractionBackendScalar::kernel_main( void const * i_left,
-                                                                void const * i_right,
-                                                                void       * io_out ) {
+void einsum_ir::binary::ContractionBackendScalar::kernel_main( void const * i_left,
+                                                               void const * i_right,
+                                                               void       * io_out ) {
   m_kernel_main( i_left,
                  i_right,
                  io_out );
 }
 
-void einsum_ir::backend::ContractionBackendScalar::kernel_last_touch( void const * i_out_aux,
-                                                                      void       * io_out ) {
+void einsum_ir::binary::ContractionBackendScalar::kernel_last_touch( void const * i_out_aux,
+                                                                     void       * io_out ) {
   if( m_kernel_last_touch != nullptr ) {
     m_kernel_last_touch( i_out_aux,
                          io_out );

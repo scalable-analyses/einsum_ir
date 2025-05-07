@@ -1,18 +1,18 @@
-#ifndef EINSUM_IR_BACKEND_ITERATION_SPACES_SFC
-#define EINSUM_IR_BACKEND_ITERATION_SPACES_SFC
+#ifndef EINSUM_IR_BINARY_ITERATION_SPACE
+#define EINSUM_IR_BINARY_ITERATION_SPACE
 
 #include <vector>
 #include <map>
-#include "constants_local.h"
+#include "constants.h"
 
 
 namespace einsum_ir {
-  namespace backend {
-    class IterationSpacesSfc;
+  namespace binary {
+    class IterationSpace;
   }
 }
 
-class einsum_ir::backend::IterationSpacesSfc {
+class einsum_ir::binary::IterationSpace {
   private:
     struct range_t{
       int64_t begin = 0;
@@ -174,26 +174,30 @@ class einsum_ir::backend::IterationSpacesSfc {
      * @param i_task_id id of task.
      * @param io_ptr_left pointer to pointer of left tensor.
      * @param io_ptr_right pointer to pointer of right tensor.
+     * @param io_ptr_out pointer to pointer of auxiliary output tensor.
      * @param io_ptr_out pointer to pointer of output tensor.
      **/
     void addMovementOffsets( int64_t          i_thread_id, 
                              int64_t          i_task_id,
                              char    const ** io_ptr_left,
                              char    const ** io_ptr_right,
+                             char    const ** io_ptr_out_aux,
                              char          ** io_ptr_out );
     
     /**
      * Gets the initial offsets for all datapointer.
      *
      * @param i_thread_id id of thread.
-     * @param io_ptr_left pointer to pointer of left tensor.
-     * @param io_ptr_right pointer to pointer of right tensor.
-     * @param io_ptr_out pointer to pointer of output tensor.
+     * @param o_ptr_left offset of left tensor.
+     * @param o_ptr_right offset of right tensor.
+     * @param o_ptr_out_aux offset of auxiliary output tensor.
+     * @param o_ptr_out offset of output tensor.
      **/
     void getInitialOffsets( int64_t   i_thread_id,
-                            int64_t & io_off_left,
-                            int64_t & io_off_right,
-                            int64_t & io_off_out );
+                            int64_t & o_off_left,
+                            int64_t & o_off_right,
+                            int64_t & o_off_out_aux,
+                            int64_t & o_off_out );
 };
 
 #endif
