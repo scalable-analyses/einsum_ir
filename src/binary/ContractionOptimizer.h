@@ -39,6 +39,12 @@ class einsum_ir::binary::ContractionOptimizer {
     //! type of the main kernel
     kernel_t * m_ktype_main;
 
+    //! indicates if backend supports br gemms
+    bool m_br_gemm_support = true;
+
+    //! indicates if backend supports packed gemms
+    bool m_packed_gemm_support = true;
+
     /**
      * splits a loop from the source vector and adds it to the destination vector.
      *
@@ -136,13 +142,20 @@ class einsum_ir::binary::ContractionOptimizer {
      * @param i_loops vector of loops corresponding to an unoptimized contraction.
      * @param i_ktype_main execution type of main kernel. Optimizer might change GEMMs to BR_GEMMs
      * @param i_num_threads number of participating threads in contraction.
+     * @param i_target_m target m kernel size
+     * @param i_target_n target n kernel size
+     * @param i_target_k target k kernel size
+     * @param i_br_gemm_support true if backend supports br gemms
+     * @param i_packed_gemm_support true if backend supports packed gemms
      **/
     void init( std::vector< loop_property > * i_loops,
                kernel_t                     * i_ktype_main,
                int64_t                        i_num_threads,
                int64_t                        i_target_m,
                int64_t                        i_target_n,
-               int64_t                        i_target_k );    
+               int64_t                        i_target_k,
+               bool                           i_br_gemm_support,
+               bool                           i_packed_gemm_support  );    
   
     /**
      * optimizes the loops.

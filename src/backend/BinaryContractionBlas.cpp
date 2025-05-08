@@ -99,7 +99,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
                l_num_threads,
                512,
                512,
-               512 );
+               512,
+               false,
+               true );
   l_optim.optimize();
 
   //compile backend

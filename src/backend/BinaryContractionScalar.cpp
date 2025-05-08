@@ -81,7 +81,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
                l_num_threads,
                1,
                1,
-               1 );
+               1,
+               false,
+               false );
   l_optim.optimize();
   
   //compile backend

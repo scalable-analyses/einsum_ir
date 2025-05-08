@@ -31,7 +31,7 @@ TEST_CASE( "Simple test for Contraction Optimizer", "[contraction_optimizer]" ) 
     }
   }
 
-  l_opt.init( &l_loops, &l_kernel_main, 1, 16, 64, 256 );  
+  l_opt.init( &l_loops, &l_kernel_main, 1, 16, 64, 256, false, false );  
 
   l_opt.optimize();
 
@@ -98,7 +98,7 @@ TEST_CASE( "Matmul blocking test for Contraction Optimizer", "[contraction_optim
     }
   }
 
-  l_opt.init( &l_loops, &l_kernel_main, 72, 16, 64, 256);  
+  l_opt.init( &l_loops, &l_kernel_main, 72, 16, 64, 256, false, false );  
 
   l_opt.optimize();
 
@@ -165,7 +165,7 @@ TEST_CASE( "Test of Contraction Optimizer for transposed kernel", "[contraction_
     }
   }
 
-  l_opt.init( &l_loops, &l_kernel_main, 72, 16, 64, 256);  
+  l_opt.init( &l_loops, &l_kernel_main, 72, 16, 64, 256, false, false );  
 
   l_opt.optimize();
 

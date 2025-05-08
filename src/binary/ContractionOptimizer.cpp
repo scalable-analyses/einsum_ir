@@ -13,7 +13,9 @@ void einsum_ir::binary::ContractionOptimizer::init( std::vector< loop_property >
                                                     int64_t                        i_num_threads,
                                                     int64_t                        i_target_m,
                                                     int64_t                        i_target_n,
-                                                    int64_t                        i_target_k ){
+                                                    int64_t                        i_target_k,
+                                                    bool                           i_br_gemm_support,
+                                                    bool                           i_packed_gemm_support ){
   m_loops = i_loops;
   m_ktype_main = i_ktype_main;
   m_num_threads = i_num_threads;
@@ -21,6 +23,9 @@ void einsum_ir::binary::ContractionOptimizer::init( std::vector< loop_property >
   m_target_m = i_target_m;
   m_target_n = i_target_n;
   m_target_k = i_target_k;
+
+  m_br_gemm_support = i_br_gemm_support;
+  m_packed_gemm_support = i_packed_gemm_support;
 }
 
 void einsum_ir::binary::ContractionOptimizer::optimize(){
@@ -110,10 +115,6 @@ void einsum_ir::binary::ContractionOptimizer::addKernel(){
     PRIM_N  = 3,
     PRIM_K  = 4
   } gemm_prim_t;
-
-  //TODO get from outside
-  bool m_br_gemm_support = true;
-  bool m_packed_gemm_support = true;
 
   //find possible kernel dimensions
   bool l_transpose_a = false;

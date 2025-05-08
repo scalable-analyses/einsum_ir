@@ -80,7 +80,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                l_num_threads,
                16,
                64,
-               256 );
+               256,
+               true,
+               true );
   l_optim.optimize();
 
   /*
