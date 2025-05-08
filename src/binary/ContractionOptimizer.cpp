@@ -26,6 +26,8 @@ void einsum_ir::binary::ContractionOptimizer::init( std::vector< loop_property >
 
   m_br_gemm_support = i_br_gemm_support;
   m_packed_gemm_support = i_packed_gemm_support;
+
+  m_target_parallel = i_num_threads * 128;
 }
 
 void einsum_ir::binary::ContractionOptimizer::optimize(){
@@ -35,7 +37,8 @@ void einsum_ir::binary::ContractionOptimizer::optimize(){
   // fuse loops if possible
   fuseLoops();
 
-  //TODO add pass that removes size 1 dimensions
+  // removes size 1 loops
+  removeEmptyLoops();
 
   // move loops to internal data structure
   moveLoopsToInternal();
@@ -43,7 +46,7 @@ void einsum_ir::binary::ContractionOptimizer::optimize(){
   // find and add the Kernel
   addKernel();
 
-  // reodere loops and determine parallel loops
+  // reoders and adds all remaining loops
   reorderLoops();
 }
 
@@ -81,6 +84,15 @@ void einsum_ir::binary::ContractionOptimizer::fuseLoops(){
         m_loops->erase(l_other);
         l_it--;
       }
+    }
+  }
+}
+
+void einsum_ir::binary::ContractionOptimizer::removeEmptyLoops(){
+  for( std::vector<loop_property>::iterator l_it = m_loops->begin(); l_it < m_loops->end(); l_it++ ){
+    if( l_it->size      == 1 &&
+        l_it->exec_type != exec_t::PRIM ){
+      m_loops->erase( l_it );
     }
   }
 }

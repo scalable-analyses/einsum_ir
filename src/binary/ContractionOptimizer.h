@@ -31,7 +31,7 @@ class einsum_ir::binary::ContractionOptimizer {
     //! targeted size for kernel k dimension
     int64_t m_target_k  = 256;
     //! targeted number of tasks
-    int64_t m_target_parallel = 16384;
+    int64_t m_target_parallel = 1024;
 
     //! number of threads
     int64_t m_num_threads;
@@ -166,6 +166,11 @@ class einsum_ir::binary::ContractionOptimizer {
      * sorts all external loops depending on stride, dimension type and execution type.
      **/
     void sortLoops();
+
+    /**
+     * removes all size 1 Loops that are not of primitive type
+     **/
+    void removeEmptyLoops();
 
     /**
      * fuses all external loops with the same dimension type, execution type and contiguous storage.
