@@ -1,5 +1,4 @@
 #include "IterationSpace.h"
-#include <iostream>
 
 #ifdef _OPENMP
 #include <omp.h>

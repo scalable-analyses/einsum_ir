@@ -4,8 +4,6 @@
 #include <omp.h>
 #endif
 
-#include <iostream>
-
 void einsum_ir::binary::ContractionBackend::init( std::vector< dim_t >   const & i_loop_dim_type,
                                                   std::vector< exec_t >  const & i_loop_exec_type,
                                                   std::vector< int64_t > const & i_loop_sizes,

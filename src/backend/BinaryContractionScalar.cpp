@@ -1,7 +1,5 @@
 #include "BinaryContractionScalar.h"
 #include "../binary/ContractionOptimizer.h"
-#include <cmath>
-#include <iostream>
 
 #ifdef _OPENMP
 #include <omp.h>

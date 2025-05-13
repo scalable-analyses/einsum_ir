@@ -5,8 +5,6 @@
 #include <cblas.h>
 #endif
 
-#include <iostream>
-
 void einsum_ir::binary::ContractionBackendBlas::kernel_zero_32( int64_t   i_m,
                                                                 int64_t   i_n,
                                                                 int64_t   i_ld,

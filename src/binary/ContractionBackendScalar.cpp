@@ -1,6 +1,5 @@
 
 #include "ContractionBackendScalar.h"
-//#include <cmath>
 
 template < typename T >
 void einsum_ir::binary::ContractionBackendScalar::kernel_zero( void const *,

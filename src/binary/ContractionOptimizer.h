@@ -2,7 +2,6 @@
 #define EINSUM_IR_BINARY_CONTRACTION_OPTIMIZER
 
 #include <vector>
-#include <map>
 #include "constants.h"
 
 namespace einsum_ir {

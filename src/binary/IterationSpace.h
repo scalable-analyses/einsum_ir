@@ -2,7 +2,6 @@
 #define EINSUM_IR_BINARY_ITERATION_SPACE
 
 #include <vector>
-#include <map>
 #include "constants.h"
 
 

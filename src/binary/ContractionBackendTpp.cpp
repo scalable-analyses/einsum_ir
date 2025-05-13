@@ -1,5 +1,4 @@
 #include "ContractionBackendTpp.h"
-#include <iostream>
 
 libxsmm_datatype einsum_ir::binary::ContractionBackendTpp::dtype_to_libxsmm( data_t i_dtype ) {
   if( i_dtype == FP32 ) {

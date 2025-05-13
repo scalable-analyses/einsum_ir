@@ -2,7 +2,6 @@
 #define EINSUM_IR_BINARY_CONTRACTION_BACKEND
 
 #include <vector>
-#include <map>
 
 #include "constants.h"
 #include "IterationSpace.h"

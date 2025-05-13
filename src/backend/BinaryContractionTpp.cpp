@@ -1,8 +1,6 @@
 #include "BinaryContractionTpp.h"
 #include "../binary/ContractionOptimizer.h"
 
-#include <iostream>
-
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -85,19 +83,6 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                true );
   l_optim.optimize();
 
-  /*
-  std::cout << "after" << std::endl;
-  for(size_t l_id = 0; l_id < l_loops.size(); l_id++){
-    std::cout << "dtype: "<< l_loops[l_id].dim_type 
-              << " etype: " << l_loops[l_id].exec_type 
-              << " size: " << l_loops[l_id].size
-              << "\tstride_l: " << l_loops[l_id].stride_left
-              << "\tstride_r: " << l_loops[l_id].stride_right
-              << "\tstride_o: " << l_loops[l_id].stride_out
-              << "\tstride_o_aux: " << l_loops[l_id].stride_out_aux
-              << std::endl;
-  }
-  */
   
   //compile backend
   m_backend.init( l_loops,

@@ -1,12 +1,6 @@
 #include "ContractionOptimizer.h"
-#include <iostream>
 #include <algorithm>
-#include <numeric> 
 #include <math.h>
-
-#ifdef _OPENMP
-#include <omp.h>
-#endif
 
 void einsum_ir::binary::ContractionOptimizer::init( std::vector< loop_property > * i_loops,
                                                     kernel_t                     * i_ktype_main,
@@ -418,7 +412,6 @@ int64_t einsum_ir::binary::ContractionOptimizer::addLoop( std::vector<loop_prope
   return 1;                                                         
 }
 
-//TODO optimize. This does not find good kernels bigger than 1024
 int64_t einsum_ir::binary::ContractionOptimizer::findSplit( int64_t i_dim_size,
                                                             int64_t i_target_size
                                                            ){
