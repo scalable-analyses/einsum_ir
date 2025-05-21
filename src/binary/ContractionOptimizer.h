@@ -12,11 +12,11 @@ namespace einsum_ir {
 
 class einsum_ir::binary::ContractionOptimizer {
   private:
-    //! external vector with all loops 
-    std::vector< loop_property > * m_loops;
+    //! external vector with all iterations
+    std::vector< iter_property > * m_iter_space;
 
-    //! internal data structur with all loops
-    std::vector< std::vector< loop_property > > m_free_loops;
+    //! internal data structur with all unasigned iterations
+    std::vector< std::vector< iter_property > > m_free_iters;
 
     //! store the combined size off all m dimension
     int64_t m_size_all_m;
@@ -24,19 +24,19 @@ class einsum_ir::binary::ContractionOptimizer {
     int64_t m_size_all_n;
 
     //! targeted size for kernel m dimension
-    int64_t m_target_m  = 16;
+    int64_t m_target_m  = 1;
     //! targeted size for kernel n dimension
-    int64_t m_target_n  = 64;
+    int64_t m_target_n  = 1;
     //! targeted size for kernel k dimension
-    int64_t m_target_k  = 256;
+    int64_t m_target_k  = 1;
     //! targeted number of tasks
-    int64_t m_target_parallel = 1024;
+    int64_t m_target_parallel = 1;
 
     //! number of threads
-    int64_t m_num_threads;
+    int64_t m_num_threads = 1;
 
     //! type of the main kernel
-    kernel_t * m_ktype_main;
+    kernel_t * m_ktype_main = nullptr;
 
     //! indicates if backend supports br gemms
     bool m_br_gemm_support = true;
@@ -44,8 +44,12 @@ class einsum_ir::binary::ContractionOptimizer {
     //! indicates if backend supports packed gemms
     bool m_packed_gemm_support = true;
 
+    //! Bounds runtine of dimension splitting but might not find the best splitting for dimensions bigger than m_max_factor.
+    //! normal kernels are  smaller than 1024x1024x1024
+    int64_t m_max_factor = 1024;
+
     /**
-     * splits a loop from the source vector and adds it to the destination vector.
+     * Splits a loop from the source vector and adds it to the destination vector.
      *
      * @param i_loop iterator that points to the loop that is split.
      * @param i_source_loops source vector.
@@ -56,28 +60,28 @@ class einsum_ir::binary::ContractionOptimizer {
      *
      * @return returns the size of the splitted loop.
      **/
-    int64_t splitLoop( std::vector<loop_property>::iterator i_loop,
-                       std::vector<loop_property> * i_source_loops,
-                       std::vector<loop_property> * i_dest_loops,
-                       int64_t i_target_size,
-                       int64_t i_new_loop_pos, 
-                       exec_t  i_new_exec_t );
+    int64_t split_loop( std::vector<iter_property>::iterator   i_loop,
+                        std::vector<iter_property>           * i_source_loops,
+                        std::vector<iter_property>           * i_dest_loops,
+                        int64_t                                i_target_size,
+                        int64_t                                i_new_loop_pos, 
+                        exec_t                                 i_new_exec_t );
   
     /**
-     * push an empty loop to the back of a destination vector.
+     * Adds an empty loop to the destination vector.
      *
      * @param i_dest_loops destination vector.
      * @param i_new_loop_pos loop position in destination vector.
      * @param i_new_dim_t dimension type of empty loop.
      * @param i_new_exec_t execution type of empty loop.
      **/
-    void add_empty_loop( std::vector<loop_property> * i_dest_loops,
+    void add_empty_loop( std::vector<iter_property> * i_dest_loops,
                          int64_t                      i_new_loop_pos, 
                          dim_t                        i_new_dim_t,
                          exec_t                       i_new_exec_t );
 
     /**
-     * adds a loop from the source vector to the destination vector.
+     * Moves a loop from the source vector to the destination vector.
      *
      * @param i_loop iterator that points to the loop.
      * @param i_source_loops source vector.
@@ -87,15 +91,15 @@ class einsum_ir::binary::ContractionOptimizer {
      *
      * @return returns the size of the loop.
      **/
-    int64_t addLoop( std::vector<loop_property>::iterator i_loop,
-                     std::vector<loop_property> * i_source_loops,
-                     std::vector<loop_property> * i_dest_loops,
-                     int64_t i_new_loop_pos, 
-                     exec_t  i_new_exec_t );
+    int64_t move_loop( std::vector<iter_property>::iterator   i_loop,
+                       std::vector<iter_property>           * i_source_loops,
+                       std::vector<iter_property>           * i_dest_loops,
+                       int64_t                                i_new_loop_pos, 
+                       exec_t                                 i_new_exec_t );
 
     /**
-     * add loop to destination vector until target size is reached. 
-     * the last loop is split to better reach target size.
+     * Moves loops to destination vector until target size is reached. 
+     * The last loop is split to better reach target size.
      *
      * @param i_source_loops source vector.
      * @param i_dest_loops destination vector.
@@ -104,13 +108,13 @@ class einsum_ir::binary::ContractionOptimizer {
      *
      * @return returns the size of all added loops.
      **/
-    int64_t add_loops_until( std::vector<loop_property> * i_source_loops,
-                             std::vector<loop_property> * i_dest_loops,
-                             int64_t i_target_size,
-                             exec_t  i_new_exec_t );
+    int64_t move_loops_until( std::vector<iter_property> * i_source_loops,
+                              std::vector<iter_property> * i_dest_loops,
+                              int64_t                      i_target_size,
+                              exec_t                       i_new_exec_t );
     
     /**
-     * adds all remaining loops from the source vector to the destination vector.
+     * Move all remaining loops from the source vector to the destination vector.
      *
      * @param i_source_loops source vector.
      * @param i_dest_loops destination vector.
@@ -118,27 +122,27 @@ class einsum_ir::binary::ContractionOptimizer {
      *
      * @return returns the size of all added loops.
      **/
-    int64_t add_all_loops( std::vector<loop_property> * i_source_loops,
-                           std::vector<loop_property> * i_dest_loops,
-                           exec_t  i_new_exec_t );  
+    int64_t move_all_loops( std::vector<iter_property> * i_source_loops,
+                           std::vector<iter_property> * i_dest_loops,
+                           exec_t                       i_new_exec_t );  
             
 
     /**
-     * determines a good integer splitt for a dimension size to be close to the target size.
+     * Determines a good integer splitt for a dimension size to be close to the target size.
      *
      * @param i_dim_size dimension size before split.
      * @param i_target_size target size.
      *
      * @return returns a integer split.
      **/                  
-    int64_t findSplit( int64_t i_dim_size,
-                       int64_t i_target_size );
+    int64_t find_split( int64_t i_dim_size,
+                        int64_t i_target_size );
 
   public:
    /**
      * Initializes the contraction optimizer.
      *
-     * @param i_loops vector of loops corresponding to an unoptimized contraction.
+     * @param i_iter_space vector of loops corresponding to an unoptimized contraction.
      * @param i_ktype_main execution type of main kernel. Optimizer might change GEMMs to BR_GEMMs
      * @param i_num_threads number of participating threads in contraction.
      * @param i_target_m target m kernel size
@@ -147,7 +151,7 @@ class einsum_ir::binary::ContractionOptimizer {
      * @param i_br_gemm_support true if backend supports br gemms
      * @param i_packed_gemm_support true if backend supports packed gemms
      **/
-    void init( std::vector< loop_property > * i_loops,
+    void init( std::vector< iter_property > * i_iter_space,
                kernel_t                     * i_ktype_main,
                int64_t                        i_num_threads,
                int64_t                        i_target_m,
@@ -157,40 +161,39 @@ class einsum_ir::binary::ContractionOptimizer {
                bool                           i_packed_gemm_support  );    
   
     /**
-     * optimizes the loops.
+     * Optimizes the loops.
      **/
     void optimize();
 
     /**
-     * sorts all external loops depending on stride, dimension type and execution type.
+     * Sorts all external loops depending on stride, dimension type and execution type.
      **/
-    void sortLoops();
+    void sort_loops();
 
     /**
-     * removes all size 1 Loops that are not of primitive type
+     * Removes all size 1 Loops that are not of primitive type
      **/
-    void removeEmptyLoops();
+    void remove_empty_loops();
 
     /**
-     * fuses all external loops with the same dimension type, execution type and contiguous storage.
+     * Fuses all external loops with the same dimension type, execution type and contiguous storage.
      **/
-    void fuseLoops();
+    void fuse_loops();
 
     /**
-     * moves all unoptimized external loops to internal data structure.
+     * Moves all unoptimized external loops to internal data structure.
      **/
-    void moveLoopsToInternal();
-
-
-    /**
-     * finds and adds a kernel to the optimized loops.
-     **/
-    void addKernel();
+    void move_loops_to_internal();
 
     /**
-     * reorders loops, splits loops and determines parallel loops.
+     * Finds and adds a kernel to the optimized loops.
      **/
-    void reorderLoops();
+    void add_kernel();
+
+    /**
+     * Reorders loops, splits loops and determines parallel loops.
+     **/
+    void reorder_loops();
 };
 
 #endif

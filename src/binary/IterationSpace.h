@@ -60,8 +60,8 @@ class einsum_ir::binary::IterationSpace {
      * @param i_strides vector with strides.
      * @param io_offsets vector with calculated offsets.
      **/
-    void convertStridesToOffsets( std::vector< int64_t > const & i_strides,
-                                  std::vector< int64_t >       & io_offsets );
+    void convert_strides_to_offsets( std::vector< int64_t > const & i_strides,
+                                     std::vector< int64_t >       & io_offsets );
     
     /**
      * Calculates the offset to access an element specified by the ids.
@@ -69,13 +69,14 @@ class einsum_ir::binary::IterationSpace {
      * @param i_id_omp omp id.
      * @param i_id_sfc_m sfc m id.
      * @param i_id_sfc_n sfc n id.
+     * @param i_strides vector with strides.
      *
      * @return the calculated offset.
      **/
-    int64_t calculateOffset( int64_t i_id_omp,
-                             int64_t i_id_sfc_m,
-                             int64_t i_id_sfc_n,
-                             std::vector< int64_t > const & i_strides );
+    int64_t calculate_offset( int64_t                        i_id_omp,
+                              int64_t                        i_id_sfc_m,
+                              int64_t                        i_id_sfc_n,
+                              std::vector< int64_t > const & i_strides );
 
     /**
      * Calculates the movement direction for a tensor contraction from old and new id.
@@ -86,9 +87,9 @@ class einsum_ir::binary::IterationSpace {
      *
      * @return the movement.
      **/
-    uint8_t getMaxDimJump( range_t i_dim_loops,
-                           int64_t i_id_new,
-                           int64_t i_id_old );
+    uint8_t get_max_dim_jump( range_t i_dim_loops,
+                              int64_t i_id_new,
+                              int64_t i_id_old );
     
     /**
      * Calculates the SFC and OMP position at the id.
@@ -98,13 +99,13 @@ class einsum_ir::binary::IterationSpace {
      * @param i_omp omp id.
      * @param i_idx task id.
      **/
-    void SfcOracle2d( int64_t *i_m, 
-                      int64_t *i_n, 
-                      int64_t *i_omp, 
-                      int64_t  i_idx );
+    void sfc_oracle_2d( int64_t *i_m, 
+                        int64_t *i_n, 
+                        int64_t *i_omp, 
+                        int64_t  i_idx );
     
     /**
-     * calculates gilbert curve
+     * Calculates gilbert curve
      *
      * @param x calculated x id.
      * @param y calculated y id.
@@ -149,7 +150,6 @@ class einsum_ir::binary::IterationSpace {
                std::vector< int64_t > const * i_loop_strides_out,
                int64_t                        i_num_threads);
 
-
     /**
      * Compiles the contraction loop interface.
      *
@@ -164,7 +164,7 @@ class einsum_ir::binary::IterationSpace {
      *
      * @return number of tasks.
      **/
-    int64_t getNumTasks( int64_t i_thread_id );
+    int64_t get_num_tasks( int64_t i_thread_id );
 
     /**
      * Adds the Movement at the task id to all datapointer.
@@ -176,12 +176,12 @@ class einsum_ir::binary::IterationSpace {
      * @param io_ptr_out pointer to pointer of auxiliary output tensor.
      * @param io_ptr_out pointer to pointer of output tensor.
      **/
-    void addMovementOffsets( int64_t          i_thread_id, 
-                             int64_t          i_task_id,
-                             char    const ** io_ptr_left,
-                             char    const ** io_ptr_right,
-                             char    const ** io_ptr_out_aux,
-                             char          ** io_ptr_out );
+    void add_movement_offsets( int64_t          i_thread_id, 
+                               int64_t          i_task_id,
+                               char    const ** io_ptr_left,
+                               char    const ** io_ptr_right,
+                               char    const ** io_ptr_out_aux,
+                               char          ** io_ptr_out );
     
     /**
      * Gets the initial offsets for all datapointer.
@@ -192,11 +192,11 @@ class einsum_ir::binary::IterationSpace {
      * @param o_ptr_out_aux offset of auxiliary output tensor.
      * @param o_ptr_out offset of output tensor.
      **/
-    void getInitialOffsets( int64_t   i_thread_id,
-                            int64_t & o_off_left,
-                            int64_t & o_off_right,
-                            int64_t & o_off_out_aux,
-                            int64_t & o_off_out );
+    void get_initial_offsets( int64_t   i_thread_id,
+                              int64_t & o_off_left,
+                              int64_t & o_off_right,
+                              int64_t & o_off_out_aux,
+                              int64_t & o_off_out );
 };
 
 #endif

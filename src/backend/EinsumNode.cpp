@@ -442,7 +442,6 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::threading_intra_op( int64_t i_n
 #ifdef _OPENMP
   if( m_num_tasks_intra_op > 1 ) {
     if( m_unary != nullptr ) m_unary->threading( m_num_tasks_intra_op );
-    if( m_cont  != nullptr ) m_cont->threading(  m_num_tasks_intra_op );
   }
 #endif
   return einsum_ir::SUCCESS;

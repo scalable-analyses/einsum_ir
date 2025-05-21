@@ -199,8 +199,6 @@ void einsum_ir::binary::ContractionBackendBlas::kernel_first_touch( void const *
   }
 }
 einsum_ir::err_t einsum_ir::binary::ContractionBackendBlas::compile_kernels(){
-  err_t l_err = err_t::UNDEFINED_ERROR;
-
   m_num_bytes_scalar = ce_n_bytes( m_dtype_comp );
 
   m_cpx_outer_c = m_ktype_main == kernel_t::CPX_MADD || m_ktype_main == kernel_t::CPX_PACKED_MADD;

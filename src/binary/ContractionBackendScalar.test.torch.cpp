@@ -30,12 +30,12 @@ TEST_CASE( "Simple FP32 matmul using the Scalar contraction backend implementati
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                 m, n, k mp,np,kp
-  std::vector< int64_t > m_loop_sizes           = {  2, 3, 4, 1, 1, 1};  
-  std::vector< int64_t > l_loop_strides_left    = {  1, 0, 2, 1, 0, 1};
-  std::vector< int64_t > l_loop_strides_right   = {  0, 4, 1, 0, 1, 1};
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0, 0, 0};
-  std::vector< int64_t > l_loop_strides_out     = {  1, 2, 0, 1, 1, 0};
+  //                                                m, n, k mp,np,kp
+  std::vector< int64_t > m_loop_sizes           = { 2, 3, 4, 1, 1, 1 };  
+  std::vector< int64_t > l_loop_strides_left    = { 1, 0, 2, 1, 0, 1 };
+  std::vector< int64_t > l_loop_strides_right   = { 0, 4, 1, 0, 1, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux = { 0, 0, 0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out     = { 1, 2, 0, 1, 1, 0 };
 
   einsum_ir::binary::ContractionBackendScalar l_bin_cont;
   l_bin_cont.init( l_loop_dim_type,
@@ -101,12 +101,12 @@ TEST_CASE( "Matrix-matrix multiplication with a full-tensor bias using the Scala
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                 m, n, k mp,np,kp
-  std::vector< int64_t > m_loop_sizes           = {  2, 3, 4, 1, 1, 1};  
-  std::vector< int64_t > l_loop_strides_left    = {  1, 0, 2, 1, 0, 1};
-  std::vector< int64_t > l_loop_strides_right   = {  0, 4, 1, 0, 1, 1};
-  std::vector< int64_t > l_loop_strides_out_aux = {  1, 2, 0, 1, 1, 0};
-  std::vector< int64_t > l_loop_strides_out     = {  1, 2, 0, 1, 1, 0};
+  //                                                m, n, k mp,np,kp
+  std::vector< int64_t > m_loop_sizes           = { 2, 3, 4, 1, 1, 1 };  
+  std::vector< int64_t > l_loop_strides_left    = { 1, 0, 2, 1, 0, 1 };
+  std::vector< int64_t > l_loop_strides_right   = { 0, 4, 1, 0, 1, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux = { 1, 2, 0, 1, 1, 0 };
+  std::vector< int64_t > l_loop_strides_out     = { 1, 2, 0, 1, 1, 0 };
 
   einsum_ir::binary::ContractionBackendScalar l_bin_cont;
   l_bin_cont.init( l_loop_dim_type,
@@ -149,7 +149,7 @@ TEST_CASE( "Matrix-matrix multiplication with a full-tensor bias using the Scala
 }
 
 
-TEST_CASE( "Matrix-matrix multiplication with a bias (scalar to matrix bcast) using the Scalar contraction backend implementation..", "[contraction_backend_scalar]" ) {
+TEST_CASE( "Matrix-matrix multiplication with a bias (scalar to matrix bcast) using the Scalar contraction backend implementation.", "[contraction_backend_scalar]" ) {
   // Test Case:
   //
   //    ____nm___
@@ -176,12 +176,12 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (scalar to matrix bcast) us
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                 m, n, k mp,np,kp
-  std::vector< int64_t > m_loop_sizes           = {  2, 3, 4, 1, 1, 1};  
-  std::vector< int64_t > l_loop_strides_left    = {  1, 0, 2, 1, 0, 1};
-  std::vector< int64_t > l_loop_strides_right   = {  0, 4, 1, 0, 1, 1};
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 1, 1, 0};
-  std::vector< int64_t > l_loop_strides_out     = {  1, 2, 0, 1, 1, 0};
+  //                                                m, n, k mp,np,kp
+  std::vector< int64_t > m_loop_sizes           = { 2, 3, 4, 1, 1, 1 };  
+  std::vector< int64_t > l_loop_strides_left    = { 1, 0, 2, 1, 0, 1 };
+  std::vector< int64_t > l_loop_strides_right   = { 0, 4, 1, 0, 1, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux = { 0, 0, 0, 1, 1, 0 };
+  std::vector< int64_t > l_loop_strides_out     = { 1, 2, 0, 1, 1, 0 };
 
   einsum_ir::binary::ContractionBackendScalar l_bin_cont;
   l_bin_cont.init( l_loop_dim_type,
@@ -251,12 +251,12 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (row to matrix bcast) using
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                 m, n, k mp,np,kp
-  std::vector< int64_t > m_loop_sizes           = {  2, 3, 4, 1, 1, 1};  
-  std::vector< int64_t > l_loop_strides_left    = {  1, 0, 2, 1, 0, 1};
-  std::vector< int64_t > l_loop_strides_right   = {  0, 4, 1, 0, 1, 1};
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 1, 0, 1, 1, 0};
-  std::vector< int64_t > l_loop_strides_out     = {  1, 2, 0, 1, 1, 0};
+  //                                                m, n, k mp,np,kp
+  std::vector< int64_t > m_loop_sizes           = { 2, 3, 4, 1, 1, 1 };  
+  std::vector< int64_t > l_loop_strides_left    = { 1, 0, 2, 1, 0, 1 };
+  std::vector< int64_t > l_loop_strides_right   = { 0, 4, 1, 0, 1, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux = { 0, 1, 0, 1, 1, 0 };
+  std::vector< int64_t > l_loop_strides_out     = { 1, 2, 0, 1, 1, 0 };
 
   einsum_ir::binary::ContractionBackendScalar l_bin_cont;
   l_bin_cont.init( l_loop_dim_type,
@@ -325,12 +325,12 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (column to matrix bcast) us
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                 m, n, k mp,np,kp
-  std::vector< int64_t > m_loop_sizes           = {  2, 3, 4, 1, 1, 1};  
-  std::vector< int64_t > l_loop_strides_left    = {  1, 0, 2, 1, 0, 1};
-  std::vector< int64_t > l_loop_strides_right   = {  0, 4, 1, 0, 1, 1};
-  std::vector< int64_t > l_loop_strides_out_aux = {  1, 0, 0, 1, 1, 0};
-  std::vector< int64_t > l_loop_strides_out     = {  1, 2, 0, 1, 1, 0};
+  //                                                m, n, k mp,np,kp
+  std::vector< int64_t > m_loop_sizes           = { 2, 3, 4, 1, 1, 1 };  
+  std::vector< int64_t > l_loop_strides_left    = { 1, 0, 2, 1, 0, 1 };
+  std::vector< int64_t > l_loop_strides_right   = { 0, 4, 1, 0, 1, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux = { 1, 0, 0, 1, 1, 0 };
+  std::vector< int64_t > l_loop_strides_out     = { 1, 2, 0, 1, 1, 0 };
 
   einsum_ir::binary::ContractionBackendScalar l_bin_cont;
   l_bin_cont.init( l_loop_dim_type,
@@ -428,12 +428,12 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions using the Scal
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                 i, e, a,  c,   g, f,   h, x,   y,mp,np,kp
-  std::vector< int64_t > m_loop_sizes           = {  3, 8, 2,  7,   6, 5,   4, 3,   4, 1, 1, 1};  
-  std::vector< int64_t > l_loop_strides_left    = {  1, 3,24,144,1008, 0,   0,48,6048, 1, 0, 1};
-  std::vector< int64_t > l_loop_strides_right   = {  0, 0, 1, 30,   0, 2, 210,10, 840, 0, 1, 1};
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0,  0,   0, 0,   0, 0,   0, 0, 0, 0};
-  std::vector< int64_t > l_loop_strides_out     = {  1, 3, 0,  0, 360,72,2160,24,8640, 1, 1, 0};
+  //                                                i, e, a,  c,   g, f,   h, x,   y,mp,np,kp
+  std::vector< int64_t > m_loop_sizes           = { 3, 8, 2,  7,   6, 5,   4, 3,   4, 1, 1, 1 };  
+  std::vector< int64_t > l_loop_strides_left    = { 1, 3,24,144,1008, 0,   0,48,6048, 1, 0, 1 };
+  std::vector< int64_t > l_loop_strides_right   = { 0, 0, 1, 30,   0, 2, 210,10, 840, 0, 1, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux = { 0, 0, 0,  0,   0, 0,   0, 0,   0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out     = { 1, 3, 0,  0, 360,72,2160,24,8640, 1, 1, 0 };
 
   einsum_ir::binary::ContractionBackendScalar l_bin_cont;
   l_bin_cont.init( l_loop_dim_type,
@@ -533,12 +533,12 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions using FP64, ze
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                 i, e, a,  c,   g, f,   h, x,   y,mp,np,kp
-  std::vector< int64_t > m_loop_sizes           = {  3, 8, 2,  7,   6, 5,   4, 3,   4, 1, 1, 1};  
-  std::vector< int64_t > l_loop_strides_left    = {  1, 3,24,144,1008, 0,   0,48,6048, 1, 0, 1};
-  std::vector< int64_t > l_loop_strides_right   = {  0, 0, 1, 30,   0, 2, 210,10, 840, 0, 1, 1};
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0,  0,   0, 0,   0, 0,   0, 0, 0, 0};
-  std::vector< int64_t > l_loop_strides_out     = {  1, 3, 0,  0, 360,72,2160,24,8640, 1, 1, 0};
+  //                                                i, e, a,  c,   g, f,   h, x,   y,mp,np,kp
+  std::vector< int64_t > m_loop_sizes           = { 3, 8, 2,  7,   6, 5,   4, 3,   4, 1, 1, 1 };  
+  std::vector< int64_t > l_loop_strides_left    = { 1, 3,24,144,1008, 0,   0,48,6048, 1, 0, 1 };
+  std::vector< int64_t > l_loop_strides_right   = { 0, 0, 1, 30,   0, 2, 210,10, 840, 0, 1, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux = { 0, 0, 0,  0,   0, 0,   0, 0,   0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out     = { 1, 3, 0,  0, 360,72,2160,24,8640, 1, 1, 0 };
 
   einsum_ir::binary::ContractionBackendScalar l_bin_cont;
   l_bin_cont.init( l_loop_dim_type,

@@ -1,14 +1,13 @@
 #include "BinaryContractionScalar.h"
 #include "../binary/ContractionOptimizer.h"
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
-
 einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
-  BinaryContraction::compile_base();
   err_t l_err = err_t::UNDEFINED_ERROR;
+
+  l_err = BinaryContraction::compile_base();
+  if( l_err != einsum_ir::SUCCESS ) {
+    return l_err;
+  }
 
   // derive strides
   std::map< int64_t, int64_t > l_strides_left;
@@ -51,7 +50,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
 
 
   //lower to ContractionOptimizer data structure
-  std::vector<binary::loop_property> l_loops;
+  std::vector<binary::iter_property> l_loops;
   l_loops.resize(l_all_dim_ids.size());
 
   for(size_t l_id = 0; l_id < l_all_dim_ids.size(); l_id++){
@@ -65,18 +64,12 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
     l_loops[l_id].stride_out     = map_find_default<int64_t>(&l_strides_out,     l_dim_id, 0);
   }
 
-  // get number of threads for contraction
-  int64_t l_num_threads = 1;
-#ifdef _OPENMP
-  l_num_threads = omp_get_max_threads(); 
-#endif
-
   //optimize loops
   einsum_ir::binary::ContractionOptimizer l_optim;
 
   l_optim.init(&l_loops,
                &m_ktype_main,
-               l_num_threads,
+               m_num_threads,
                1,
                1,
                1,
@@ -93,7 +86,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
                   m_ktype_first_touch,
                   m_ktype_main,
                   m_ktype_last_touch,
-                  l_num_threads);
+                  m_num_threads);
   
   l_err = m_backend.compile();
   if( l_err != err_t::SUCCESS ) {

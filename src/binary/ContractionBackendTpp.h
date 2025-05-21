@@ -37,7 +37,7 @@ class einsum_ir::binary::ContractionBackendTpp: public ContractionBackend {
     
   public:
     /**
-     * Kernel applied to the output tensor before the contraction.
+     * Kernel applied to the output tensor before the main primitive touches the memory.
      *
      * @param i_out_aux pointer to a data section of the auxiliary output tensor.
      * @param io_out pointer to a data section of the output tensor.
@@ -46,7 +46,7 @@ class einsum_ir::binary::ContractionBackendTpp: public ContractionBackend {
                              void       * io_out );
 
     /**
-     * Kernel applied to the output tensor after the contraction.
+     * Kernel applied to the output tensor after the main primitve finished using the memory.
      *
      * @param i_out_aux pointer to a data section of the auxiliary output tensor.
      * @param io_out pointer to a data section of the output tensor.

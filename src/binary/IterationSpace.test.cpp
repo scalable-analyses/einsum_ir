@@ -25,11 +25,11 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP, 3 threads and broad
                                              exec_t::PRIM };
 
   //                                                c1 n2,m2,k2,m1,n1,k1
-  std::vector< int64_t > l_loop_sizes           = {  2, 3, 4, 5, 2, 2, 2};
-  std::vector< int64_t > l_loop_strides_left    = { 60,20, 0, 4, 2, 0, 1};
-  std::vector< int64_t > l_loop_strides_right   = { 80, 0,20, 4, 0, 2, 1};
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0, 1, 1, 1};
-  std::vector< int64_t > l_loop_strides_out     = { 48, 4,12, 0, 2, 1, 0};
+  std::vector< int64_t > l_loop_sizes           = {  2, 3, 4, 5, 2, 2, 2 };
+  std::vector< int64_t > l_loop_strides_left    = { 60,20, 0, 4, 2, 0, 1 };
+  std::vector< int64_t > l_loop_strides_right   = { 80, 0,20, 4, 0, 2, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0, 1, 1, 1 };
+  std::vector< int64_t > l_loop_strides_out     = { 48, 4,12, 0, 2, 1, 0 };
 
   IterationSpace l_iter;
 
@@ -50,7 +50,7 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP, 3 threads and broad
   //check that all task are distributed
   int64_t l_num_tasks = 0;
   for(int64_t l_thread_id = 0; l_thread_id < l_num_threads; l_thread_id++ ){
-    l_num_tasks += l_iter.getNumTasks(l_thread_id);
+    l_num_tasks += l_iter.get_num_tasks(l_thread_id);
   } 
   REQUIRE( l_num_tasks  == 2*3*4);
 
@@ -64,7 +64,7 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP, 3 threads and broad
     int64_t l_offset_right   = 0;
     int64_t l_offset_out_aux = 0;
     int64_t l_offset_out     = 0;
-    l_iter.getInitialOffsets(l_thread_id, l_offset_left, l_offset_right, l_offset_out_aux, l_offset_out);
+    l_iter.get_initial_offsets(l_thread_id, l_offset_left, l_offset_right, l_offset_out_aux, l_offset_out);
 
     char * l_ptr_rec_left    = 0;
     char * l_ptr_rec_right   = 0;
@@ -80,9 +80,9 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP, 3 threads and broad
     REQUIRE( l_ptr_out_aux == l_ptr_rec_out_aux );
     REQUIRE( l_ptr_out     == l_ptr_rec_out     );
 
-    int64_t l_size = l_iter.getNumTasks(l_thread_id);
+    int64_t l_size = l_iter.get_num_tasks(l_thread_id);
     for(int64_t l_id = 0; l_id < l_size; l_id++){
-      l_iter.addMovementOffsets(l_thread_id, l_id, &l_ptr_left, &l_ptr_right, &l_ptr_out_aux, &l_ptr_out);
+      l_iter.add_movement_offsets(l_thread_id, l_id, &l_ptr_left, &l_ptr_right, &l_ptr_out_aux, &l_ptr_out);
     }
   }
 }
@@ -111,11 +111,11 @@ TEST_CASE( "Threading test for OMP only Iteration Space, 5 threads and auxiliary
                                              exec_t::PRIM };
 
   //                                                c1 m2,n2,k2,m1,n1,k1
-  std::vector< int64_t > l_loop_sizes           = {  2, 3, 4, 5, 2, 2, 2};
-  std::vector< int64_t > l_loop_strides_left    = { 60,20, 0, 4, 2, 0, 1};
-  std::vector< int64_t > l_loop_strides_right   = { 80, 0,20, 4, 0, 2, 1};
-  std::vector< int64_t > l_loop_strides_out_aux = { 48, 4,12, 0, 2, 1, 0};
-  std::vector< int64_t > l_loop_strides_out     = { 48, 4,12, 0, 2, 1, 0};
+  std::vector< int64_t > l_loop_sizes           = {  2, 3, 4, 5, 2, 2, 2 };
+  std::vector< int64_t > l_loop_strides_left    = { 60,20, 0, 4, 2, 0, 1 };
+  std::vector< int64_t > l_loop_strides_right   = { 80, 0,20, 4, 0, 2, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux = { 48, 4,12, 0, 2, 1, 0 };
+  std::vector< int64_t > l_loop_strides_out     = { 48, 4,12, 0, 2, 1, 0 };
 
   IterationSpace l_iter;
 
@@ -136,7 +136,7 @@ TEST_CASE( "Threading test for OMP only Iteration Space, 5 threads and auxiliary
   //check that all task are distributed
   int64_t l_num_tasks = 0;
   for(int64_t l_thread_id = 0; l_thread_id < l_num_threads; l_thread_id++ ){
-    l_num_tasks += l_iter.getNumTasks(l_thread_id);
+    l_num_tasks += l_iter.get_num_tasks(l_thread_id);
   } 
   REQUIRE( l_num_tasks  == 2*3*4);
 
@@ -150,7 +150,7 @@ TEST_CASE( "Threading test for OMP only Iteration Space, 5 threads and auxiliary
     int64_t l_offset_right   = 0;
     int64_t l_offset_out_aux = 0;
     int64_t l_offset_out     = 0;
-    l_iter.getInitialOffsets(l_thread_id, l_offset_left, l_offset_right, l_offset_out_aux, l_offset_out);
+    l_iter.get_initial_offsets(l_thread_id, l_offset_left, l_offset_right, l_offset_out_aux, l_offset_out);
 
     char * l_ptr_rec_left    = 0;
     char * l_ptr_rec_right   = 0;
@@ -166,9 +166,9 @@ TEST_CASE( "Threading test for OMP only Iteration Space, 5 threads and auxiliary
     REQUIRE( l_ptr_out_aux == l_ptr_rec_out_aux );
     REQUIRE( l_ptr_out     == l_ptr_rec_out     );
 
-    int64_t l_size = l_iter.getNumTasks(l_thread_id);
+    int64_t l_size = l_iter.get_num_tasks(l_thread_id);
     for(int64_t l_id = 0; l_id < l_size; l_id++){
-      l_iter.addMovementOffsets(l_thread_id, l_id, &l_ptr_left, &l_ptr_right, &l_ptr_out_aux, &l_ptr_out);
+      l_iter.add_movement_offsets(l_thread_id, l_id, &l_ptr_left, &l_ptr_right, &l_ptr_out_aux, &l_ptr_out);
     }
   }
 }
@@ -197,11 +197,11 @@ TEST_CASE( "Threading test for SFC only Iteration Space with 1 thread and no bia
                                              exec_t::PRIM };
 
   //                                                m2,n3 n2,k2,m1,n1,k1
-  std::vector< int64_t > l_loop_sizes           = {  3, 2, 4, 5, 2, 2, 2};
-  std::vector< int64_t > l_loop_strides_left    = { 20, 0, 0, 4, 2, 0, 1};
-  std::vector< int64_t > l_loop_strides_right   = {  0,80,20, 4, 0, 2, 1};
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0, 0, 0, 0};
-  std::vector< int64_t > l_loop_strides_out     = {  4,48,12, 0, 2, 1, 0};
+  std::vector< int64_t > l_loop_sizes           = {  3, 2, 4, 5, 2, 2, 2 };
+  std::vector< int64_t > l_loop_strides_left    = { 20, 0, 0, 4, 2, 0, 1 };
+  std::vector< int64_t > l_loop_strides_right   = {  0,80,20, 4, 0, 2, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out     = {  4,48,12, 0, 2, 1, 0 };
 
   IterationSpace l_iter;
 
@@ -222,7 +222,7 @@ TEST_CASE( "Threading test for SFC only Iteration Space with 1 thread and no bia
   //check that all task are distributed
   int64_t l_num_tasks = 0;
   for(int64_t l_thread_id = 0; l_thread_id < l_num_threads; l_thread_id++ ){
-    l_num_tasks += l_iter.getNumTasks(l_thread_id);
+    l_num_tasks += l_iter.get_num_tasks(l_thread_id);
   } 
   REQUIRE( l_num_tasks  == 2*3*4);
 
@@ -236,7 +236,7 @@ TEST_CASE( "Threading test for SFC only Iteration Space with 1 thread and no bia
     int64_t l_offset_right   = 0;
     int64_t l_offset_out_aux = 0;
     int64_t l_offset_out     = 0;
-    l_iter.getInitialOffsets(l_thread_id, l_offset_left, l_offset_right, l_offset_out_aux, l_offset_out);
+    l_iter.get_initial_offsets(l_thread_id, l_offset_left, l_offset_right, l_offset_out_aux, l_offset_out);
 
     char * l_ptr_rec_left    = 0;
     char * l_ptr_rec_right   = 0;
@@ -252,9 +252,9 @@ TEST_CASE( "Threading test for SFC only Iteration Space with 1 thread and no bia
     REQUIRE( l_ptr_out_aux == l_ptr_rec_out_aux );
     REQUIRE( l_ptr_out     == l_ptr_rec_out     );
 
-    int64_t l_size = l_iter.getNumTasks(l_thread_id);
+    int64_t l_size = l_iter.get_num_tasks(l_thread_id);
     for(int64_t l_id = 0; l_id < l_size; l_id++){
-      l_iter.addMovementOffsets(l_thread_id, l_id, &l_ptr_left, &l_ptr_right, &l_ptr_out_aux, &l_ptr_out);
+      l_iter.add_movement_offsets(l_thread_id, l_id, &l_ptr_left, &l_ptr_right, &l_ptr_out_aux, &l_ptr_out);
     }
   }
 }

@@ -126,14 +126,6 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time_compile = l_dur.count();
 
-  // enable threading
-#ifdef _OPENMP
-  // four times overload
-  int64_t l_num_tasks = omp_get_max_threads() * 4;
-
-  l_bin_cont.threading( l_num_tasks );
-#endif
-
   // warm up
   l_tp0 = std::chrono::steady_clock::now();
   for( int64_t l_rep = 0; l_rep < l_repetitions_warm_up; l_rep++ ){

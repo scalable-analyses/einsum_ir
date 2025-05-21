@@ -40,6 +40,7 @@ class einsum_ir::backend::BinaryContractionBlas: public BinaryContraction {
 
     /**
      * Compiles the binary contraction.
+     * @return SUCCESS if successful, error code otherwise.
      **/
     err_t compile();
 
@@ -67,7 +68,7 @@ class einsum_ir::backend::BinaryContractionBlas: public BinaryContraction {
      * @param i_tensor_left left input tensor.
      * @param i_tensor_right right input tensor.
      * @param i_tensor_out_aux auxiliary data w.r.t. output tensor.
-     * @param io_tensor_out output tensor. 
+     * @param io_tensor_out output tensor.
      **/
     void contract( void const * i_tensor_left,
                    void const * i_tensor_right,

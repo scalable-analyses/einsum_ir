@@ -22,13 +22,13 @@ class einsum_ir::binary::ContractionBackend {
     int64_t m_id_first_parallel_loop = 0;
 
     //! id of the first primitive loop
-    int64_t m_id_first_primitive_loop = 0;
+    int64_t m_id_first_primitive_dim = 0;
 
     //! number of parallel loops
     int64_t m_num_parallel_loops = 0;
 
     //! number of threads used for execution
-    int64_t m_num_threads;
+    int64_t m_num_threads = 0;
 
     //! indicates existance of first touch kernel
     bool m_has_first_touch = false;
@@ -51,25 +51,25 @@ class einsum_ir::binary::ContractionBackend {
 
 
     //! vector with dimension types of all loops
-    std::vector< dim_t >   m_loop_dim_type;
+    std::vector< dim_t >   m_dim_type;
 
     //! vector with execution types of all loops
-    std::vector< exec_t >  m_loop_exec_type;
+    std::vector< exec_t >  m_exec_type;
 
     //! vector with sizes of all loops
-    std::vector< int64_t > m_loop_sizes;
+    std::vector< int64_t > m_dim_sizes;
 
     //! vector with the strides of the left input tensor
-    std::vector< int64_t > m_loop_strides_left;
+    std::vector< int64_t > m_strides_left;
 
     //! vector with the strides of the right input tensor
-    std::vector< int64_t > m_loop_strides_right;
+    std::vector< int64_t > m_strides_right;
 
     //! vector with the strides of the auxiliary tensor
-    std::vector< int64_t > m_loop_strides_out_aux;
+    std::vector< int64_t > m_strides_out_aux;
 
     //! vector with the strides of the output tensor
-    std::vector< int64_t > m_loop_strides_out;
+    std::vector< int64_t > m_strides_out;
 
     //! type of the first touch kernel
     kernel_t m_ktype_first_touch = UNDEFINED_KTYPE;
@@ -79,33 +79,33 @@ class einsum_ir::binary::ContractionBackend {
     kernel_t m_ktype_last_touch = UNDEFINED_KTYPE;
 
     //! kernel br size
-    uint64_t m_br;
+    uint64_t m_br = 0;
     //! kernel m size
-    uint64_t m_m;
+    uint64_t m_m = 0;
     //! kernel n size
-    uint64_t m_n;
+    uint64_t m_n = 0;
     //! kernel k size
-    uint64_t m_k;
+    uint64_t m_k = 0;
     //! kernel r size
-    uint64_t m_r;
+    uint64_t m_r = 0;
 
 
     //! kernel leading dimension A
-    uint64_t m_lda;
+    uint64_t m_lda = 0;
     //! kernel leading dimension B
-    uint64_t m_ldb;
+    uint64_t m_ldb = 0;
     //! kernel leading dimension C
-    uint64_t m_ldc;
+    uint64_t m_ldc = 0;
 
     //! kernel m stride of auxiliary tensor
-    uint64_t m_stride_m_out_aux;
+    uint64_t m_stride_m_out_aux = 0;
     //! kernel n stride of auxiliary tensor
-    uint64_t m_stride_n_out_aux;
+    uint64_t m_stride_n_out_aux = 0;
 
     //! kernel br stride a
-    uint64_t m_br_stride_a;
+    uint64_t m_br_stride_a = 0;
     //! kernel br stride b
-    uint64_t m_br_stride_b;
+    uint64_t m_br_stride_b = 0;
 
     //! complex stride of the left tensor
     int64_t m_cpx_stride_in_left_bytes = 0;
@@ -117,21 +117,21 @@ class einsum_ir::binary::ContractionBackend {
     int64_t m_cpx_stride_out_bytes = 0;
 
     //! indicates if kernel should transpose A
-    bool m_trans_a;
+    bool m_trans_a = false;
     //! indicates if kernel should transpose B
-    bool m_trans_b;
+    bool m_trans_b = false;
     
   public:
     /**
      * Initializes the class.
      *
-     * @param i_loop_dim_type dimension type of the loops.
-     * @param i_loop_exec_type execution type of the loops.
-     * @param i_loop_sizes sizes of the loops.
-     * @param i_loop_strides_left strides in the left input tensor.
-     * @param i_loop_strides_right strides in the right input tensor.
-     * @param i_loop_strides_out_aux strides in the auxiliary output tensor.
-     * @param i_loop_strides_out strides in the output tensor.
+     * @param i_dim_type dimension types.
+     * @param i_exec_type execution types.
+     * @param i_dim_sizes sizes of the dimensions.
+     * @param i_strides_left strides in the left input tensor.
+     * @param i_strides_right strides in the right input tensor.
+     * @param i_strides_out_aux strides in the auxiliary output tensor.
+     * @param i_strides_out strides in the output tensor.
      * @param i_dtype_left datatype of left input tensor.
      * @param i_dtype_right datatype of right input tensor.
      * @param i_dtype_comp datatype of computation.
@@ -141,13 +141,13 @@ class einsum_ir::binary::ContractionBackend {
      * @param i_ktype_last_touch type of the last touch kernel.
      * @param i_num_threads number of threads used for contraction.
      **/
-    void init( std::vector< dim_t >   const & i_loop_dim_type,
-               std::vector< exec_t >  const & i_loop_exec_type,
-               std::vector< int64_t > const & i_loop_sizes,
-               std::vector< int64_t > const & i_loop_strides_left,
-               std::vector< int64_t > const & i_loop_strides_right,
-               std::vector< int64_t > const & i_loop_strides_out_aux,
-               std::vector< int64_t > const & i_loop_strides_out,
+    void init( std::vector< dim_t >   const & i_dim_type,
+               std::vector< exec_t >  const & i_exec_type,
+               std::vector< int64_t > const & i_dim_sizes,
+               std::vector< int64_t > const & i_strides_left,
+               std::vector< int64_t > const & i_strides_right,
+               std::vector< int64_t > const & i_strides_out_aux,
+               std::vector< int64_t > const & i_strides_out,
                data_t                         i_dtype_left,
                data_t                         i_dtype_right,
                data_t                         i_dtype_comp,
@@ -159,9 +159,9 @@ class einsum_ir::binary::ContractionBackend {
 
 
     /**
-     * Initializes the class with a vector of loop_propertys.
+     * Initializes the class with a vector of iter_propertys.
      *
-     * @param i_loops vector of loop_propertys.
+     * @param i_loops vector of iter_propertys.
      * @param i_dtype_left datatype of left input tensor.
      * @param i_dtype_right datatype of right input tensor.
      * @param i_dtype_comp datatype of computation.
@@ -171,7 +171,7 @@ class einsum_ir::binary::ContractionBackend {
      * @param i_ktype_last_touch type of the last touch kernel.
      * @param i_num_threads number of threads used for contraction.
      **/
-    void init( std::vector< loop_property > const & i_loops,
+    void init( std::vector< iter_property > const & i_loops,
                data_t                               i_dtype_left,
                data_t                               i_dtype_right,
                data_t                               i_dtype_comp,
@@ -227,12 +227,12 @@ class einsum_ir::binary::ContractionBackend {
     /**
      * calculates the shape of the kernel i.e. m, n, k, lda, ldb, ldc, ...
      *
-     * @return SUCCESS if the compilation was successful, otherwise an appropiate error code.
+     * @return SUCCESS if the shape matches with the main primitive, otherwise an appropiate error code.
      **/
-    err_t get_kernel_shape( );
+    err_t set_kernel_shape( );
 
     /**
-     * Kernel applied to the output tensor before the contraction.
+     * Kernel applied to the output tensor before the main primitive touches the memory.
      *
      * @param i_out_aux pointer to a data section of the auxiliary output tensor.
      * @param io_out pointer to a data section of the output tensor.
@@ -241,7 +241,7 @@ class einsum_ir::binary::ContractionBackend {
                                      void       * io_out ) = 0;
 
     /**
-     * Kernel applied to the output tensor after the contraction.
+     * Kernel applied to the output tensor after the main primitve finished using the memory.
      *
      * @param i_out_aux pointer to a data section of the auxiliary output tensor.
      * @param io_out pointer to a data section of the output tensor.

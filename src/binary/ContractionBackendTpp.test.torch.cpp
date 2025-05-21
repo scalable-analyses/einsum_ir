@@ -2,8 +2,6 @@
 #include "catch.hpp"
 #include "ContractionBackendTpp.h"
 
-
-
 TEST_CASE( "Matmul with sequential batch dimension.", "[contraction_backend]" ) {
   //example: [c1,k1,m1],[c1,n1,k1]->[c1,n1,m1]
   //sizes:   [17,13,20],[17,47,13]->[17,47,20]
@@ -19,12 +17,12 @@ TEST_CASE( "Matmul with sequential batch dimension.", "[contraction_backend]" ) 
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                c1,m1,n1,k1
-  std::vector< int64_t > m_loop_sizes           = { 17,20,47,13 };  
-  std::vector< int64_t > l_loop_strides_left    = {260, 1, 0,20 };
-  std::vector< int64_t > l_loop_strides_right   = {611, 0,13, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = {940, 1,20, 0 };
+  //                                                 c1,m1,n1,k1
+  std::vector< int64_t > m_loop_sizes           = {  17,20,47,13 };  
+  std::vector< int64_t > l_loop_strides_left    = { 260, 1, 0,20 };
+  std::vector< int64_t > l_loop_strides_right   = { 611, 0,13, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux = {   0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out     = { 940, 1,20, 0 };
 
   at::Tensor l_left    = at::randn( { 17,13,20 } );
   at::Tensor l_right   = at::randn( { 17,47,13 } );
@@ -80,12 +78,12 @@ TEST_CASE( "Packed Matmul with sequential M dimension.", "[contraction_backend]"
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                  m2, c1, m1, n1, k1
-  std::vector< int64_t > m_loop_sizes           = {    5, 17, 20, 47, 13 };  
-  std::vector< int64_t > l_loop_strides_left    = { 4420,  1, 17,  0,340 };
-  std::vector< int64_t > l_loop_strides_right   = {    0,  1,  0,221, 17 };
-  std::vector< int64_t > l_loop_strides_out_aux = {    0,  0,  0,  0,  0 };
-  std::vector< int64_t > l_loop_strides_out     = {15980,  1, 17,340,  0 };
+  //                                                   m2, c1, m1, n1, k1
+  std::vector< int64_t > m_loop_sizes           = {     5, 17, 20, 47, 13 };  
+  std::vector< int64_t > l_loop_strides_left    = {  4420,  1, 17,  0,340 };
+  std::vector< int64_t > l_loop_strides_right   = {     0,  1,  0,221, 17 };
+  std::vector< int64_t > l_loop_strides_out_aux = {     0,  0,  0,  0,  0 };
+  std::vector< int64_t > l_loop_strides_out     = { 15980,  1, 17,340,  0 };
 
   at::Tensor l_left    = at::randn( { 5,13,20,17 } );
   at::Tensor l_right   = at::randn( {   47,13,17 } );
@@ -300,7 +298,7 @@ TEST_CASE( "Single call of batch reduce matmul.", "[contraction_backend]" ) {
   REQUIRE( at::allclose( l_out, l_out_ref, 1E-4, 1E-5 ) );
 }
 
-TEST_CASE( "tensor contraction with omp parallelisation.", "[contraction_backend]" ) {
+TEST_CASE( "Tensor contraction with omp parallelisation.", "[contraction_backend]" ) {
   //example: [m1,k1,m1],[n2,n1,k1]->[n2,m1,n1,m1]
   //sizes:   [17,13,20],[ 8,47,13]->[ 8,17,47,20]
   using namespace einsum_ir;
@@ -362,7 +360,7 @@ TEST_CASE( "tensor contraction with omp parallelisation.", "[contraction_backend
   REQUIRE( at::allclose( l_out, l_out_ref, 1E-4, 1E-5 ) );
 }
 
-TEST_CASE( "blocked matmul with omp parallelisation.", "[contraction_backend]" ) {
+TEST_CASE( "Blocked matmul with omp parallelisation.", "[contraction_backend]" ) {
   //example: [m2,k2,k1,m1],[n2,k2,n1,k1]->[n2,m2,n1,m1]
   //sizes:   [32, 8,64,64],[32, 8,64,64]->[32,32,64,64]
   using namespace einsum_ir;
@@ -425,7 +423,7 @@ TEST_CASE( "blocked matmul with omp parallelisation.", "[contraction_backend]" )
   REQUIRE( at::allclose( l_out, l_out_ref, 1E-4, 1E-5 ) );
 }
 
-TEST_CASE( "tensor contraction with sfc parallelisation.", "[contraction_backend]" ) {
+TEST_CASE( "Tensor contraction with SFC parallelisation.", "[contraction_backend]" ) {
   //example: [m1,k1,m1],[n2,n1,k1]->[n2,m1,n1,m1]
   //sizes:   [17,13,20],[ 8,47,13]->[ 8,17,47,20]
   using namespace einsum_ir;
@@ -487,7 +485,7 @@ TEST_CASE( "tensor contraction with sfc parallelisation.", "[contraction_backend
   REQUIRE( at::allclose( l_out, l_out_ref, 1E-4, 1E-5 ) );
 }
 
-TEST_CASE( "tensor contraction with sfc and omp parallelisation.", "[contraction_backend]" ) {
+TEST_CASE( "Tensor contraction with SFC and omp parallelisation.", "[contraction_backend]" ) {
   //example: [c1,m1,k1,m1],[c1,n2,n1,k1]->[c1,n2,m1,n1,m1]
   //sizes:   [ 5,17,13,20],[ 5, 8,47,13]->[ 5, 8,17,47,20]
   using namespace einsum_ir;

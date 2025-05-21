@@ -1,5 +1,5 @@
-#ifndef EINSUM_IR_BACKEND_BINARY_CONTRACTION_SFC_TPP
-#define EINSUM_IR_BACKEND_BINARY_CONTRACTION_SFC_TPP
+#ifndef EINSUM_IR_BACKEND_BINARY_CONTRACTION_TPP
+#define EINSUM_IR_BACKEND_BINARY_CONTRACTION_TPP
 
 #include "BinaryContraction.h"
 #include "../binary/ContractionBackendTpp.h"
@@ -40,6 +40,7 @@ class einsum_ir::backend::BinaryContractionTpp: public BinaryContraction {
 
     /**
      * Compiles the binary contraction.
+     * @return SUCCESS if successful, error code otherwise.
      **/
     err_t compile();
 
@@ -67,7 +68,7 @@ class einsum_ir::backend::BinaryContractionTpp: public BinaryContraction {
      * @param i_tensor_left left input tensor.
      * @param i_tensor_right right input tensor.
      * @param i_tensor_out_aux auxiliary data w.r.t. output tensor.
-     * @param io_tensor_out output tensor. 
+     * @param io_tensor_out output tensor.
      **/
     void contract( void const * i_tensor_left,
                    void const * i_tensor_right,
