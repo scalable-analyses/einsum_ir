@@ -2,6 +2,10 @@
 #include "catch.hpp"
 #include "BinaryContractionScalar.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 TEST_CASE( "Matrix-matrix multiplication.", "[binary_contraction_scalar]" ) {
   // Test Case:
   //
@@ -22,6 +26,12 @@ TEST_CASE( "Matrix-matrix multiplication.", "[binary_contraction_scalar]" ) {
   int64_t l_dim_ids_in_right[2] = { 1, 2 };
   int64_t l_dim_ids_out[2]      = { 1, 0 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::BinaryContractionScalar l_bin_cont;
   l_bin_cont.init( 2,
                    2,
@@ -40,7 +50,8 @@ TEST_CASE( "Matrix-matrix multiplication.", "[binary_contraction_scalar]" ) {
                    einsum_ir::FP32,
                    einsum_ir::UNDEFINED_KTYPE,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
   // data
   at::Tensor l_in_left  = at::rand( {4, 2} );
   at::Tensor l_in_right = at::rand( {3, 4} );
@@ -90,6 +101,12 @@ TEST_CASE( "Matrix-matrix multiplication with a full-tensor bias.", "[binary_con
   int64_t l_dim_ids_in_right[2] = { 1, 2 };
   int64_t l_dim_ids_out[2]      = { 1, 0 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::BinaryContractionScalar l_bin_cont;
   l_bin_cont.init( 2,
                    2,
@@ -108,7 +125,8 @@ TEST_CASE( "Matrix-matrix multiplication with a full-tensor bias.", "[binary_con
                    einsum_ir::FP32,
                    einsum_ir::COPY,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
   // data
   at::Tensor l_in_left  = at::rand( {4, 2} );
   at::Tensor l_in_right = at::rand( {3, 4} );
@@ -156,6 +174,12 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (scalar to matrix bcast).",
   int64_t l_dim_ids_in_right[2] = { 1, 2 };
   int64_t l_dim_ids_out[2]      = { 1, 0 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::BinaryContractionScalar l_bin_cont;
   l_bin_cont.init( 2,
                    2,
@@ -174,7 +198,8 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (scalar to matrix bcast).",
                    einsum_ir::FP32,
                    einsum_ir::COPY,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
   // data
   at::Tensor l_in_left  = at::rand( {4, 2} );
   at::Tensor l_in_right = at::rand( {3, 4} );
@@ -222,6 +247,12 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (row to matrix bcast).", "[
   int64_t l_dim_ids_in_right[2] = { 1, 2 };
   int64_t l_dim_ids_out[2]      = { 1, 0 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::BinaryContractionScalar l_bin_cont;
   l_bin_cont.init( 2,
                    2,
@@ -240,7 +271,8 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (row to matrix bcast).", "[
                    einsum_ir::FP32,
                    einsum_ir::COPY,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
   // data
   at::Tensor l_in_left  = at::rand( {4, 2} );
   at::Tensor l_in_right = at::rand( {3, 4} );
@@ -288,6 +320,12 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (column to matrix bcast).",
   int64_t l_dim_ids_in_right[2] = { 1, 2 };
   int64_t l_dim_ids_out[2]      = { 1, 0 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::BinaryContractionScalar l_bin_cont;
   l_bin_cont.init( 2,
                    2,
@@ -306,7 +344,8 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (column to matrix bcast).",
                    einsum_ir::FP32,
                    einsum_ir::COPY,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
   // data
   at::Tensor l_in_left  = at::rand( {4, 2} );
   at::Tensor l_in_right = at::rand( {3, 4} );
@@ -373,6 +412,12 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions.", "[binary_co
   int64_t l_dim_ids_in_right[6] = { 8, 6, 3, 7, 5, 2 };
   int64_t l_dim_ids_out[7] = { 8, 6, 4, 5, 7, 1, 0 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::BinaryContractionScalar l_bin_cont;
   l_bin_cont.init( 7,
                    6,
@@ -391,7 +436,8 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions.", "[binary_co
                    einsum_ir::FP32,
                    einsum_ir::UNDEFINED_KTYPE,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   //                                0  1  2  3  4  5  6
   //                                y  g  c  x  a  e  i
@@ -470,6 +516,12 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions using FP64, ze
   int64_t l_dim_ids_in_right[6] = { 8, 6, 3, 7, 5, 2 };
   int64_t l_dim_ids_out[7] = { 8, 6, 4, 5, 7, 1, 0 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::BinaryContractionScalar l_bin_cont;
   l_bin_cont.init( 7,
                    6,
@@ -488,7 +540,8 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions using FP64, ze
                    einsum_ir::FP64,
                    einsum_ir::ZERO,
                    einsum_ir::MADD,
-                   einsum_ir::RELU );
+                   einsum_ir::RELU,
+                   l_num_threads );
 
   //                                0  1  2  3  4  5  6
   //                                y  g  c  x  a  e  i

@@ -264,7 +264,8 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
                                                   data_t                               i_dtype_out,
                                                   kernel_t                             i_ktype_first_touch,
                                                   kernel_t                             i_ktype_main,
-                                                  kernel_t                             i_ktype_last_touch ) {
+                                                  kernel_t                             i_ktype_last_touch,
+                                                  int64_t                              i_num_threads ) {
   init( i_num_dims_left,
         i_num_dims_right,
         i_num_dims_out,
@@ -286,7 +287,8 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
         i_dtype_out,
         i_ktype_first_touch,
         i_ktype_main,
-        i_ktype_last_touch );
+        i_ktype_last_touch,
+        i_num_threads );
 }
 
 void einsum_ir::backend::BinaryContraction::init( int64_t                              i_num_dims_left,
@@ -310,7 +312,8 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
                                                   data_t                               i_dtype_out,
                                                   kernel_t                             i_ktype_first_touch,
                                                   kernel_t                             i_ktype_main,
-                                                  kernel_t                             i_ktype_last_touch ) {
+                                                  kernel_t                             i_ktype_last_touch,
+                                                  int64_t                              i_num_threads ) {
   m_num_dims_left  = i_num_dims_left;
   m_num_dims_right = i_num_dims_right;
   m_num_dims_out   = i_num_dims_out;
@@ -340,6 +343,8 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
   m_ktype_last_touch  = i_ktype_last_touch;
 
   m_memory = i_memory;
+
+  m_num_threads = i_num_threads;
 }
 
 einsum_ir::err_t einsum_ir::backend::BinaryContraction::compile_base() {

@@ -119,6 +119,9 @@ class einsum_ir::backend::EinsumNode {
     //! true if the external data was copied and locked
     bool m_data_locked = false;
 
+    //! number of threads for the evaluation
+    int64_t m_num_threads = 1;
+
     /**
      * Destructor.
      **/
@@ -154,6 +157,7 @@ class einsum_ir::backend::EinsumNode {
      * @param i_data_ptr data pointer of the tensor.
      * @param i_child child of the node.
      * @param i_memory memory manager for efficient memory usage.
+     * @param i_num_threads number of threads for the evaluation
      **/
     void init( int64_t                              i_num_dims,
                int64_t                      const * i_dim_ids,
@@ -162,7 +166,8 @@ class einsum_ir::backend::EinsumNode {
                data_t                               i_dtype,
                void                               * i_data_ptr,
                EinsumNode                         * i_child,
-               MemoryManager                      * i_memory );
+               MemoryManager                      * i_memory, 
+               int64_t                              i_num_threads );
 
     /**
      * Initializes the node with two children.
@@ -182,6 +187,7 @@ class einsum_ir::backend::EinsumNode {
      * @param i_left left child.
      * @param i_right right child. 
      * @param i_memory memory manager for efficient memory usage.
+     * @param i_num_threads number of threads for the evaluation
      **/
     void init( int64_t                              i_num_dims,
                int64_t                      const * i_dim_ids,
@@ -198,7 +204,8 @@ class einsum_ir::backend::EinsumNode {
                kernel_t                             i_ktype_last_touch,
                EinsumNode                         * i_left,
                EinsumNode                         * i_right,
-               MemoryManager                      * i_memory );
+               MemoryManager                      * i_memory,
+               int64_t                              i_num_threads );
 
     /**
      * Compiles the contraction of the node and recursively those of all children.
@@ -230,15 +237,6 @@ class einsum_ir::backend::EinsumNode {
      * @return SUCCESS if successful, error code otherwise.
      **/
     err_t unlock_data();
-
-    /**
-     * Enables intra-op threading with the given number of tasks.
-     *
-     * @param i_num_tasks number of targeted tasks.
-     * 
-     * @return SUCCESS if successful, error code otherwise.
-     **/
-    err_t threading_intra_op( int64_t i_num_tasks );
 
     /**
      * Evaluates the einsum tree described by the node all its children. 

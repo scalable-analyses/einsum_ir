@@ -94,6 +94,12 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
    */
   std::cout << "einsum_ir:" << std::endl;
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::MemoryManager l_memory;
   einsum_ir::backend::BinaryContractionTpp l_bin_cont;
   l_bin_cont.init( i_dim_ids_in_left.size(),
@@ -117,7 +123,8 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
                    i_dtype_einsum_ir,
                    einsum_ir::ZERO,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   l_tp0 = std::chrono::steady_clock::now();
   l_bin_cont.compile();

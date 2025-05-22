@@ -20,6 +20,12 @@ void einsum_ir::frontend::EinsumTree::init( std::vector< std::vector< int64_t > 
 einsum_ir::err_t einsum_ir::frontend::EinsumTree::compile() {
   err_t l_err = err_t::UNDEFINED_ERROR;
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   m_nodes.resize( m_children->size() );
 
   //initialize nodes
@@ -50,7 +56,8 @@ einsum_ir::err_t einsum_ir::frontend::EinsumTree::compile() {
                     m_dtype,
                     l_data_ptr,
                     &m_nodes[l_child_left],
-                    &m_memory );
+                    &m_memory,
+                    l_num_threads );
     }
     //binary node
     else{
@@ -74,7 +81,8 @@ einsum_ir::err_t einsum_ir::frontend::EinsumTree::compile() {
                     kernel_t::UNDEFINED_KTYPE,
                     &m_nodes[l_child_left],
                     &m_nodes[l_child_right],
-                    &m_memory );
+                    &m_memory,
+                    l_num_threads );
     }
   }
   
@@ -83,19 +91,6 @@ einsum_ir::err_t einsum_ir::frontend::EinsumTree::compile() {
   if( l_err != einsum_ir::SUCCESS ) {
     return l_err;
   }
-
-#ifdef _OPENMP
-  // four times overload
-  int64_t l_num_tasks = omp_get_max_threads() * 4;
-
-  for( std::size_t l_node_id = 0; l_node_id < m_nodes.size(); l_node_id++ ) {
-    // magic number: 64^3
-    if(    m_nodes[l_node_id].m_num_ops_node == 0
-        || m_nodes[l_node_id].m_num_ops_node >= 262144 ) {
-      m_nodes[l_node_id].threading_intra_op( l_num_tasks );
-    }
-  }
-#endif
 
   return einsum_ir::SUCCESS;
 }

@@ -9,7 +9,7 @@ namespace einsum_ir {
     M = 1,  // left, out
     N = 2,  // right, out
     K = 3,  // left, right
-    CPX = 4,// left, right, out
+    CPX = 4,// Complex dimension in left, right, out
     I = 5,  // left
     J = 6,  // right
     UNDEFINED_DIM = 99

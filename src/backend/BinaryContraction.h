@@ -271,6 +271,7 @@ class einsum_ir::backend::BinaryContraction {
      * @param i_ktype_first_touch type of the first-touch kernel.
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
+     * @param i_num_threads number of threads for the contraction.
      **/
     void init( int64_t                              i_num_dims_left,
                int64_t                              i_num_dims_right,
@@ -289,7 +290,8 @@ class einsum_ir::backend::BinaryContraction {
                data_t                               i_dtype_out,
                kernel_t                             i_ktype_first_touch,
                kernel_t                             i_ktype_main,
-               kernel_t                             i_ktype_last_touch );
+               kernel_t                             i_ktype_last_touch,
+               int64_t                              i_num_threads );
 
     /**
      * Initializes the binary contraction with fused permutations of the input tensors
@@ -316,6 +318,7 @@ class einsum_ir::backend::BinaryContraction {
      * @param i_ktype_first_touch type of the first-touch kernel.
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
+     * @param i_num_threads number of threads for the contraction.
      **/
     void init( int64_t                              i_num_dims_left,
                int64_t                              i_num_dims_right,
@@ -338,7 +341,8 @@ class einsum_ir::backend::BinaryContraction {
                data_t                               i_dtype_out,
                kernel_t                             i_ktype_first_touch,
                kernel_t                             i_ktype_main,
-               kernel_t                             i_ktype_last_touch );
+               kernel_t                             i_ktype_last_touch,
+               int64_t                              i_num_threads  );
 
     /**
      * Compiles the base data.

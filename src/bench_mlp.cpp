@@ -152,6 +152,12 @@ int main( int     i_argc,
   einsum_ir::backend::EinsumNode l_node_weight_4;
 
   einsum_ir::backend::MemoryManager l_memory;
+  
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
 
   l_node_input.init( 4,
                      l_dim_ids_input,
@@ -216,7 +222,8 @@ int main( int     i_argc,
                         einsum_ir::kernel_t::RELU,
                         &l_node_input,
                         &l_node_weight_0,
-                        &l_memory );
+                        &l_memory,
+                        l_num_threads );
 
   l_node_hidden_1.init( 4,
                         l_dim_ids_hidden_1,
@@ -233,7 +240,8 @@ int main( int     i_argc,
                         einsum_ir::kernel_t::RELU,
                         &l_node_hidden_0,
                         &l_node_weight_1,
-                        &l_memory );
+                        &l_memory,
+                        l_num_threads );
 
   l_node_hidden_2.init( 4,
                         l_dim_ids_hidden_2,
@@ -250,7 +258,8 @@ int main( int     i_argc,
                         einsum_ir::kernel_t::RELU,
                         &l_node_hidden_1,
                         &l_node_weight_2,
-                        &l_memory );
+                        &l_memory,
+                        l_num_threads );
 
   l_node_hidden_3.init( 4,
                         l_dim_ids_hidden_3,
@@ -267,7 +276,8 @@ int main( int     i_argc,
                         einsum_ir::kernel_t::RELU,
                         &l_node_hidden_2,
                         &l_node_weight_3,
-                        &l_memory );
+                        &l_memory,
+                        l_num_threads );
 
   l_node_out.init( 3,
                    l_dim_ids_out,
@@ -284,7 +294,8 @@ int main( int     i_argc,
                    einsum_ir::kernel_t::UNDEFINED_KTYPE,
                    &l_node_hidden_3,
                    &l_node_weight_4,
-                   &l_memory );
+                   &l_memory,
+                   l_num_threads );
 
   // compile and stage weights
   l_tp0 = std::chrono::steady_clock::now();
@@ -302,18 +313,6 @@ int main( int     i_argc,
   if( l_store_and_lock ) {
     l_node_input.store_and_lock_data();
   }
-
-  // enable threading
-#ifdef _OPENMP
-  // four times overload
-  int64_t l_num_tasks = omp_get_max_threads() * 4;
-
-  l_node_hidden_0.threading_intra_op( l_num_tasks );
-  l_node_hidden_1.threading_intra_op( l_num_tasks );
-  l_node_hidden_2.threading_intra_op( l_num_tasks );
-  l_node_hidden_3.threading_intra_op( l_num_tasks );
-  l_node_out.threading_intra_op( l_num_tasks );
-#endif
 
   l_tp1 = std::chrono::steady_clock::now();
 

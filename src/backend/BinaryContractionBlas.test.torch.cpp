@@ -2,6 +2,10 @@
 #include "catch.hpp"
 #include "BinaryContractionBlas.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 TEST_CASE( "FP32 BLAS-based binary contraction executing a matmul.", "[binary_contraction_blas]" ) {
   std::map< int64_t, int64_t > l_dim_sizes;
   l_dim_sizes.insert( std::pair< int64_t, int64_t >( 0, 2 ) );
@@ -11,6 +15,12 @@ TEST_CASE( "FP32 BLAS-based binary contraction executing a matmul.", "[binary_co
   int64_t l_dim_ids_in_left[2]  = { 2, 0 };
   int64_t l_dim_ids_in_right[2] = { 1, 2 };
   int64_t l_dim_ids_out[2]      = { 1, 0 };
+
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
 
   // data layout
   //
@@ -40,7 +50,8 @@ TEST_CASE( "FP32 BLAS-based binary contraction executing a matmul.", "[binary_co
                    einsum_ir::FP32,
                    einsum_ir::UNDEFINED_KTYPE,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   // data
   at::Tensor l_in_left  = at::randn( {4, 2} );
@@ -75,6 +86,12 @@ TEST_CASE( "Complex FP32 BLAS-based binary contraction executing a matmul.", "[b
   int64_t l_dim_ids_in_right[3] = { 0, 2, 3 };
   int64_t l_dim_ids_out[3]      = { 0, 2, 1 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   // data layout
   //
   //     ____cnm___
@@ -104,7 +121,8 @@ TEST_CASE( "Complex FP32 BLAS-based binary contraction executing a matmul.", "[b
                    einsum_ir::FP32,
                    einsum_ir::UNDEFINED_KTYPE,
                    einsum_ir::CPX_MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   // data
   at::Tensor l_left  = at::randn( {2, 4, 2},
@@ -147,6 +165,12 @@ TEST_CASE( "Complex FP32 BLAS-based binary contraction executing a matmul with z
   int64_t l_dim_ids_in_right[3] = { 0, 2, 3 };
   int64_t l_dim_ids_out[3]      = { 0, 2, 1 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   // data layout
   //
   //     ____cnm___
@@ -176,7 +200,8 @@ TEST_CASE( "Complex FP32 BLAS-based binary contraction executing a matmul with z
                    einsum_ir::FP32,
                    einsum_ir::CPX_ZERO,
                    einsum_ir::CPX_MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   // data
   at::Tensor l_left  = at::randn( {2, 4, 2},
@@ -219,6 +244,12 @@ TEST_CASE( "Complex FP64 BLAS-based binary contraction executing a matmul.", "[b
   int64_t l_dim_ids_in_right[3] = { 0, 2, 3 };
   int64_t l_dim_ids_out[3]      = { 0, 2, 1 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   // data layout
   //
   //     ____cnm___
@@ -248,7 +279,8 @@ TEST_CASE( "Complex FP64 BLAS-based binary contraction executing a matmul.", "[b
                    einsum_ir::FP64,
                    einsum_ir::UNDEFINED_KTYPE,
                    einsum_ir::CPX_MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   // data
   at::Tensor l_left  = at::randn( {2, 4, 2},
@@ -291,6 +323,12 @@ TEST_CASE( "Complex FP64 BLAS-based binary contraction executing a matmul with z
   int64_t l_dim_ids_in_right[3] = { 0, 2, 3 };
   int64_t l_dim_ids_out[3]      = { 0, 2, 1 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   // data layout
   //
   //     ____cnm___
@@ -320,7 +358,8 @@ TEST_CASE( "Complex FP64 BLAS-based binary contraction executing a matmul with z
                    einsum_ir::FP64,
                    einsum_ir::CPX_ZERO,
                    einsum_ir::CPX_MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   // data
   at::Tensor l_left  = at::randn( {2, 4, 2},
@@ -363,6 +402,12 @@ TEST_CASE( "FP64 BLAS-based binary contraction executing a packed matmul.", "[bi
   int64_t l_dim_ids_in_right[3] = { 3, 1, 2 };
   int64_t l_dim_ids_out[3]      = { 1, 0, 3 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   // data layout
   //
   //    ____nmc___
@@ -392,7 +437,8 @@ TEST_CASE( "FP64 BLAS-based binary contraction executing a packed matmul.", "[bi
                    einsum_ir::FP64,
                    einsum_ir::UNDEFINED_KTYPE,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   // data
   at::Tensor l_left    = at::randn( {3, 4, 2},
@@ -431,6 +477,12 @@ TEST_CASE( "Complex FP64 BLAS-based binary contraction executing a packed matmul
   int64_t l_dim_ids_in_right[4] = { 0, 4, 2, 3 };
   int64_t l_dim_ids_out[4]      = { 0, 2, 1, 4 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   // data layout
   //
   //     ____dnmc___
@@ -461,7 +513,8 @@ TEST_CASE( "Complex FP64 BLAS-based binary contraction executing a packed matmul
                    einsum_ir::FP64,
                    einsum_ir::UNDEFINED_KTYPE,
                    einsum_ir::CPX_MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   // data
   at::Tensor l_left    = at::randn( {2, 3, 4, 2},
@@ -544,6 +597,12 @@ TEST_CASE( "FP32 BLAS-based binary contraction involving C, M, N and K dimension
   int64_t l_dim_ids_left[7] = { 8, 7, 4, 3, 2, 1, 0 };
   int64_t l_dim_ids_right[6] = { 8, 7, 6, 5, 3, 2 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::BinaryContractionBlas l_bin_cont;
   l_bin_cont.init( 7,
                    6,
@@ -562,7 +621,8 @@ TEST_CASE( "FP32 BLAS-based binary contraction involving C, M, N and K dimension
                    einsum_ir::FP32,
                    einsum_ir::ZERO,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   //                              y  x  g  c  a  e  i
   at::Tensor l_left = at::randn( {4, 3, 6, 7, 2, 8, 3} );
@@ -639,6 +699,12 @@ TEST_CASE( "Complex FP32 BLAS-based binary contraction involving C, M, N and K d
   int64_t l_dim_ids_left[8] = { 9, 8, 7, 4, 3, 2, 1, 0 };
   int64_t l_dim_ids_right[7] = { 9, 8, 7, 6, 5, 3, 2 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::BinaryContractionBlas l_bin_cont;
   l_bin_cont.init( 8,
                    7,
@@ -657,7 +723,8 @@ TEST_CASE( "Complex FP32 BLAS-based binary contraction involving C, M, N and K d
                    einsum_ir::FP32,
                    einsum_ir::CPX_ZERO,
                    einsum_ir::CPX_MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   //                              z  y  x  g  c  a  e  i
   at::Tensor l_left = at::randn( {2, 4, 3, 6, 7, 2, 8, 3} );
@@ -738,6 +805,12 @@ TEST_CASE( "FP32 BLAS-based binary contraction involving C, M, N and K dimension
   int64_t l_dim_ids_left[7] = { 7, 4, 8, 3, 2, 1, 0 };
   int64_t l_dim_ids_right[6] = { 7, 6, 8, 5, 3, 2 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::BinaryContractionBlas l_bin_cont;
   l_bin_cont.init( 7,
                    6,
@@ -756,7 +829,8 @@ TEST_CASE( "FP32 BLAS-based binary contraction involving C, M, N and K dimension
                    einsum_ir::FP32,
                    einsum_ir::ZERO,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   //                              x  g  y  c  a  e  i
   at::Tensor l_left = at::randn( {3, 6, 4, 7, 2, 8, 3} );
@@ -834,6 +908,12 @@ TEST_CASE( "Complex FP32 BLAS-based binary contraction involving C, M, N and K d
   int64_t l_dim_ids_left[8] = { 9, 7, 4, 8, 3, 2, 1, 0 };
   int64_t l_dim_ids_right[7] = { 9, 7, 6, 8, 5, 3, 2 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::BinaryContractionBlas l_bin_cont;
   l_bin_cont.init( 8,
                    7,
@@ -852,7 +932,8 @@ TEST_CASE( "Complex FP32 BLAS-based binary contraction involving C, M, N and K d
                    einsum_ir::FP32,
                    einsum_ir::CPX_ZERO,
                    einsum_ir::CPX_MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   //                              z  x  g  y  c  a  e  i
   at::Tensor l_left = at::randn( {2, 3, 6, 4, 7, 2, 8, 3} );
