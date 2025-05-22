@@ -12,6 +12,15 @@ namespace einsum_ir {
 
 class einsum_ir::backend::BinaryContractionScalar: public BinaryContraction {
   private:
+    //! target for the primitive m dimension
+    int64_t m_target_prim_m = 1;
+
+    //! target for the primitive n dimension
+    int64_t m_target_prim_n = 1;
+
+    //! target for the primitive k dimension
+    int64_t m_target_prim_k = 1;
+  
      //! contraction backend
     einsum_ir::binary::ContractionBackendScalar m_backend;
 

@@ -70,9 +70,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   l_optim.init(&l_loops,
                &m_ktype_main,
                m_num_threads,
-               16,
-               64,
-               256,
+               m_target_prim_m,
+               m_target_prim_n,
+               m_target_prim_k,
                true,
                true );
   l_optim.optimize();
