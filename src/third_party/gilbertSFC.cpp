@@ -45,12 +45,9 @@
 constexpr int SIGN(int a){
     return (0 < a) ? 1 : (0 == a) ? 0 : -1;
 }
-//#define SIGN(A) (0 < (A) ? (1) : ( 0 == (A) ? (0) : (-1)))
 constexpr int ABS(int a){
     return (a < 0) ? -a : a;
 }
-
-//#define ABS(A) ((A) < 0 ? -(A) : (A))
 
 int gilbert_d2xy_r( int dst_idx, int cur_idx,
                     int *xres, int *yres,

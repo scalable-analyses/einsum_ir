@@ -53,7 +53,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   std::vector<binary::iter_property> l_loops;
   l_loops.resize(l_all_dim_ids.size());
 
-  for(size_t l_id = 0; l_id < l_all_dim_ids.size(); l_id++){
+  for(std::size_t l_id = 0; l_id < l_all_dim_ids.size(); l_id++){
     int64_t l_dim_id = l_all_dim_ids[l_id];
     l_loops[l_id].dim_type       = m_dim_types[l_dim_id];
     l_loops[l_id].exec_type      = binary::exec_t::SEQ;
