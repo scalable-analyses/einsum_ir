@@ -302,84 +302,117 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackend::set_kernel_shape( ){
       return err_t::COMPILATION_FAILED; 
   }
 
-
-  //set m, n, k
-  m_m  = m_dim_sizes[l_size-3];
-  m_n  = m_dim_sizes[l_size-2];
-  m_k  = m_dim_sizes[l_size-1];
-
-  //set lda
-  if(m_strides_left[l_size-1] == 1 &&
-     m_strides_left[l_size-3]  > 1    ){
-    m_trans_a = true;
-    m_lda = m_strides_left[l_size-3];
-  }
-  else{
-    m_trans_a = false;
-    m_lda = m_strides_left[l_size-1];
-  }
-
-  //set ldb
-  if(m_strides_right[l_size-2] == 1 &&
-     m_strides_right[l_size-1]  > 1    ){
-    m_trans_b = true;
-    m_ldb = m_strides_right[l_size-1];
-  }
-  else{
-    m_trans_b = false;
-    m_ldb = m_strides_right[l_size-2];
-  }
-
-  //set ldc and auxiliary strides
-  m_ldc = m_strides_out[l_size-2];
-  m_stride_m_out_aux = m_strides_out_aux[l_size-3];
-  m_stride_n_out_aux = m_strides_out_aux[l_size-2];
+  const int64_t l_id_br     = l_size-4;
+  const int64_t l_id_packed = l_size-4;
+  const int64_t l_id_m      = l_size-3;
+  const int64_t l_id_n      = l_size-2;
+  const int64_t l_id_k      = l_size-1;
 
   //set br parameter
   m_br = 1;
   m_br_stride_a = 0;
   m_br_stride_b = 0;
   if( m_ktype_main == kernel_t::BR_MADD ){
-    m_br = m_dim_sizes[l_size-4];
-    m_br_stride_a = m_strides_left[l_size-4];
-    m_br_stride_b = m_strides_right[l_size-4];
+    m_br = m_dim_sizes[l_id_br];
+    m_br_stride_a = m_strides_left[l_id_br];
+    m_br_stride_b = m_strides_right[l_id_br];
   }
 
   //set packed parameter
   m_r = 1;
   if( m_ktype_main == kernel_t::PACKED_MADD ){
-    m_r = m_dim_sizes[l_size-4];
+    m_r = m_dim_sizes[l_id_packed];
   }
 
-  //set leading dimensions of size 1 loops for LIBXSMM
+  //set m, n, k
+  m_m  = m_dim_sizes[l_id_m];
+  m_n  = m_dim_sizes[l_id_n];
+  m_k  = m_dim_sizes[l_id_k];
+
+  //set lda
+  if(    m_m == 1 
+      || m_strides_left[l_id_m] == m_r
+      || m_strides_left[l_id_m] == 1   ){
+    m_trans_a = false;
+    m_lda = m_strides_left[l_id_k];
+  }
+  else if(    m_k == 1
+           || m_strides_left[l_id_k] == 1 ){
+    m_trans_a = true;
+    m_lda = m_strides_left[l_id_m];
+  }
+  else{
+    return err_t::COMPILATION_FAILED;
+  }
+
+  //set ldb
+  if(    m_k == 1
+      || m_strides_right[l_id_k] == m_r
+      || m_strides_right[l_id_k] == 1 ){
+    m_trans_b = false;
+    m_ldb = m_strides_right[l_id_n];
+  }
+  else if(    m_n == 1
+           || m_strides_right[l_id_n] == 1 ){
+    m_trans_b = true;
+    m_ldb = m_strides_right[l_id_k];
+  } 
+  else{
+    return err_t::COMPILATION_FAILED;
+  }
+
+  //set ldc
+  if(    m_m == 1
+      || m_strides_out[l_id_m] == m_r ){
+    m_ldc = m_strides_out[l_id_n];
+  }
+  else{
+    return err_t::COMPILATION_FAILED;
+  }
+
+  //set auxiliary strides
+  if(    m_m == 1
+      || m_strides_out_aux[l_id_m] <= m_r ){
+    m_stride_m_out_aux = m_strides_out_aux[l_id_m];
+    m_stride_n_out_aux = m_strides_out_aux[l_id_n];
+  }
+  else{
+    return err_t::COMPILATION_FAILED;
+  }
+
+  //set leading dimensions of size 1 loops for correct kernel generation
   if( m_k == 1 && !m_trans_a ){
     m_lda = m_m * m_r;
   }
   if( m_m == 1 && m_trans_a ){
     m_lda = m_k * m_r;
   }
+  if( m_n == 1 && !m_trans_b){
+    m_ldb = m_k * m_r;
+  }
+  if( m_k == 1 && m_trans_b ){
+    m_ldb = m_n * m_r;
+  }
   if( m_n == 1 ){
-    if( m_trans_b ){
-      m_ldb = m_n * m_r;
-    }
-    else{
-      m_ldb = m_k * m_r;
-    }
     m_ldc = m_m * m_r;
+    m_stride_n_out_aux = m_m * m_r;
+  }
+  if( m_m == 1 ){
+    m_stride_m_out_aux = m_r;
   }
 
   //set complex parameter
-  int64_t l_cpx_offset = 0;
-  l_cpx_offset = (m_ktype_main == kernel_t::CPX_MADD       ) ? 4 : l_cpx_offset;
-  l_cpx_offset = (m_ktype_main == kernel_t::CPX_PACKED_MADD) ? 5 : l_cpx_offset;
-  if( l_cpx_offset ){
-    if( m_dim_sizes[l_size-l_cpx_offset] != 2 ){
+  int64_t l_id_cpx = -1;
+  l_id_cpx = (m_ktype_main == kernel_t::CPX_MADD       ) ? l_size - 4 : l_id_cpx;
+  l_id_cpx = (m_ktype_main == kernel_t::CPX_PACKED_MADD) ? l_size - 5 : l_id_cpx;
+  if( l_id_cpx >= 0){
+    if( m_dim_sizes[l_id_cpx] != 2 ){
       return err_t::COMPILATION_FAILED; 
     }
-    m_cpx_stride_in_left_bytes  = m_strides_left[   l_size-l_cpx_offset] * ce_n_bytes(m_dtype_left );
-    m_cpx_stride_in_right_bytes = m_strides_right[  l_size-l_cpx_offset] * ce_n_bytes(m_dtype_right);
-    m_cpx_stride_out_aux_bytes  = m_strides_out_aux[l_size-l_cpx_offset] * ce_n_bytes(m_dtype_out  );
-    m_cpx_stride_out_bytes      = m_strides_out[    l_size-l_cpx_offset] * ce_n_bytes(m_dtype_out  );
+    m_cpx_stride_in_left_bytes  = m_strides_left[   l_id_cpx] * ce_n_bytes(m_dtype_left );
+    m_cpx_stride_in_right_bytes = m_strides_right[  l_id_cpx] * ce_n_bytes(m_dtype_right);
+    m_cpx_stride_out_aux_bytes  = m_strides_out_aux[l_id_cpx] * ce_n_bytes(m_dtype_out  );
+    m_cpx_stride_out_bytes      = m_strides_out[    l_id_cpx] * ce_n_bytes(m_dtype_out  );
   }
 
   return err_t::SUCCESS;

@@ -147,15 +147,15 @@ einsum_ir::err_t einsum_ir::binary::IterationSpace::compile(){
       sfc_oracle_2d( &l_id_sfc_m_new, &l_id_sfc_n_new, &l_id_omp_new, l_id+1 );
 
       if( l_id_omp_new != l_id_omp_old ){
-        uint8_t l_move = get_max_dim_jump( m_omp_loops, l_id_omp_new, l_id_omp_old );
+        sfc_t l_move = get_max_dim_jump( m_omp_loops, l_id_omp_new, l_id_omp_old );
         m_dim_movements[l_thread_id][l_id-l_begin] = l_move; 
       }
       else if( l_id_sfc_m_new != l_id_sfc_m_old ){
-        uint8_t l_move = get_max_dim_jump( m_sfc_loops_m, l_id_sfc_m_new, l_id_sfc_m_old );
+        sfc_t l_move = get_max_dim_jump( m_sfc_loops_m, l_id_sfc_m_new, l_id_sfc_m_old );
         m_dim_movements[l_thread_id][l_id-l_begin] = l_move;
       }
       else if( l_id_sfc_n_new != l_id_sfc_n_old ){
-        uint8_t l_move = get_max_dim_jump( m_sfc_loops_n, l_id_sfc_n_new, l_id_sfc_n_old );
+        sfc_t l_move = get_max_dim_jump( m_sfc_loops_n, l_id_sfc_n_new, l_id_sfc_n_old );
         m_dim_movements[l_thread_id][l_id-l_begin] = l_move;
       }
 
@@ -240,9 +240,9 @@ void einsum_ir::binary::IterationSpace::convert_strides_to_offsets( std::vector<
   }
 }
 
-uint8_t einsum_ir::binary::IterationSpace::get_max_dim_jump( range_t i_dim_loops,
-                                                             int64_t i_id_new,
-                                                             int64_t i_id_old ){
+einsum_ir::binary::sfc_t einsum_ir::binary::IterationSpace::get_max_dim_jump( range_t i_dim_loops,
+                                                                              int64_t i_id_new,
+                                                                              int64_t i_id_old ){
 
   int64_t l_direction = (( i_id_old - i_id_new ) + 1) / 2;
   int64_t l_max_id = i_id_new > i_id_old ? i_id_new : i_id_old;
@@ -269,8 +269,9 @@ void einsum_ir::binary::IterationSpace::add_movement_offsets( int64_t          i
                                                               char    const ** io_ptr_right,
                                                               char    const ** io_ptr_out_aux,
                                                               char          ** io_ptr_out){
-  uint8_t l_move =  m_dim_movements[i_thread_id][i_task_id];
-  int8_t l_direction = 1 - ((l_move & 1) << 1); 
+  sfc_t l_move =  m_dim_movements[i_thread_id][i_task_id];
+  sfc_t l_sign = (l_move & 1);
+  int64_t l_direction = 1 - ( (int64_t)l_sign << 1); 
   l_move = l_move >> 1;
 
   *io_ptr_left    += l_direction * m_movement_offsets[0][l_move];

@@ -4,7 +4,6 @@
 #include <vector>
 #include "constants.h"
 
-
 namespace einsum_ir {
   namespace binary {
     class IterationSpace;
@@ -42,7 +41,7 @@ class einsum_ir::binary::IterationSpace {
     range_t m_sfc_loops_n;
 
     //! matrix of movements accessed by thread_id and task_id
-    std::vector< std::vector< uint8_t > > m_dim_movements;
+    std::vector< std::vector< sfc_t > > m_dim_movements;
     
     //! matrix of movement offsets accessed by io_id and movement_id
     std::vector< std::vector< int64_t > > m_movement_offsets;
@@ -87,9 +86,9 @@ class einsum_ir::binary::IterationSpace {
      *
      * @return the movement.
      **/
-    uint8_t get_max_dim_jump( range_t i_dim_loops,
-                              int64_t i_id_new,
-                              int64_t i_id_old );
+    sfc_t get_max_dim_jump( range_t i_dim_loops,
+                            int64_t i_id_new,
+                            int64_t i_id_old );
     
     /**
      * Calculates the SFC and OMP position at the id.

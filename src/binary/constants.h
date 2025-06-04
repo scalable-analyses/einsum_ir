@@ -23,6 +23,8 @@ namespace einsum_ir {
       int64_t stride_out_aux = 0;
       int64_t stride_out     = 0;
     };
+
+    typedef uint8_t sfc_t;
   }
 }
 

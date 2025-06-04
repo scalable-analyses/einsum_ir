@@ -22,18 +22,18 @@ void einsum_ir::binary::ContractionOptimizer::init( std::vector< iter_property >
   m_packed_gemm_support = i_packed_gemm_support;
 
   // targets 128 tasks per thread. 128 seems to be working well
-  m_target_parallel = i_num_threads * 128;
+  m_target_parallel = i_num_threads * 256;
 }
 
 void einsum_ir::binary::ContractionOptimizer::optimize(){
+  // removes size 1 loops
+  remove_empty_loops();
+
   // sort loops depeding on strides, exec_types and dim_types
   sort_loops();
 
   // fuse loops if possible
   fuse_loops();
-
-  // removes size 1 loops
-  remove_empty_loops();
 
   // move loops to internal data structure
   move_loops_to_internal();
@@ -164,18 +164,19 @@ void einsum_ir::binary::ContractionOptimizer::add_kernel(){
   }
 
   //find possible K kernel dimension
-  l_loop = m_free_iters[ dim_t::K ].end() - 1;
-  if( l_transpose_a && l_transpose_b ){
-    while( l_loop >= m_free_iters[ dim_t::K ].begin() && 
-           l_loop->stride_left != l_req_stride ){
-      l_loop--;
+  if( m_free_iters[ dim_t::K ].size() > 0 ) {
+    l_loop = m_free_iters[ dim_t::K ].end() - 1;
+    if( l_transpose_a && l_transpose_b ){
+      while( l_loop >= m_free_iters[ dim_t::K ].begin() + 1 && 
+            l_loop->stride_left != l_req_stride ){
+        l_loop--;
+      }
     }
-  }
-  if( m_free_iters[ dim_t::K ].size() > 0                        && 
-      ( l_loop->stride_left  == l_req_stride || !l_transpose_a ) &&
-      ( l_loop->stride_right == l_req_stride ||  l_transpose_b )    ){
-    l_potential_kernel_loop[ PRIM_K ] = l_loop;
-    l_potential_kernel_size[ PRIM_K ] = l_loop->size; 
+    if( ( l_loop->stride_left  == l_req_stride || !l_transpose_a ) &&
+        ( l_loop->stride_right == l_req_stride ||  l_transpose_b )    ){
+      l_potential_kernel_loop[ PRIM_K ] = l_loop;
+      l_potential_kernel_size[ PRIM_K ] = l_loop->size; 
+    }
   }
 
   //find possible BR kernel dimension
