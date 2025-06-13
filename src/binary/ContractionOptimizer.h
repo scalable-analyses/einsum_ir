@@ -49,57 +49,57 @@ class einsum_ir::binary::ContractionOptimizer {
     int64_t m_max_factor = 1024;
 
     /**
-     * Splits a loop from the source vector and adds it to the destination vector.
+     * Splits an iteration from the source vector and adds it to the destination vector.
      *
-     * @param i_loop iterator that points to the loop that is split.
+     * @param i_iteration iterator that points to the iteration that is split.
      * @param i_source_iters source vector.
      * @param i_dest_iters destination vector.
-     * @param i_target_size tartget size for loop splitting
-     * @param i_new_loop_pos loop position in destination vector
+     * @param i_target_size tartget size for iteration splitting
+     * @param i_new_iter_pos iteration position in destination vector
      * @param i_new_exec_t execution type after splitting
      *
-     * @return returns the size of the splitted loop.
+     * @return returns the size of the splitted iteration.
      **/
-    int64_t split_loop( std::vector<iter_property>::iterator   i_loop,
+    int64_t split_iter( std::vector<iter_property>::iterator   i_iteration,
                         std::vector<iter_property>           * i_source_iters,
                         std::vector<iter_property>           * i_dest_iters,
                         int64_t                                i_target_size,
-                        int64_t                                i_new_loop_pos, 
+                        int64_t                                i_new_iter_pos, 
                         exec_t                                 i_new_exec_t );
   
     /**
-     * Adds an empty loop to the destination vector.
+     * Adds an empty iteration to the destination vector.
      *
      * @param i_dest_iters destination vector.
-     * @param i_new_loop_pos loop position in destination vector.
-     * @param i_new_dim_t dimension type of empty loop.
-     * @param i_new_exec_t execution type of empty loop.
+     * @param i_new_iter_pos iteration position in destination vector.
+     * @param i_new_dim_t dimension type of empty iteration.
+     * @param i_new_exec_t execution type of empty iteration.
      **/
-    void add_empty_loop( std::vector<iter_property> * i_dest_iters,
-                         int64_t                      i_new_loop_pos, 
+    void add_empty_iter( std::vector<iter_property> * i_dest_iters,
+                         int64_t                      i_new_iter_pos, 
                          dim_t                        i_new_dim_t,
                          exec_t                       i_new_exec_t );
 
     /**
-     * Moves a loop from the source vector to the destination vector.
+     * Moves a iteration from the source vector to the destination vector.
      *
-     * @param i_loop iterator that points to the loop.
+     * @param i_iteration iterator that points to the iteration.
      * @param i_source_iters source vector.
      * @param i_dest_iters destination vector.
-     * @param i_new_loop_pos loop position in destination vector.
+     * @param i_new_iter_pos iteration position in destination vector.
      * @param i_new_exec_t execution type after moving.
      *
-     * @return returns the size of the loop.
+     * @return returns the size of the iteration.
      **/
-    int64_t move_loop( std::vector<iter_property>::iterator   i_loop,
+    int64_t move_iter( std::vector<iter_property>::iterator   i_iteration,
                        std::vector<iter_property>           * i_source_iters,
                        std::vector<iter_property>           * i_dest_iters,
-                       int64_t                                i_new_loop_pos, 
+                       int64_t                                i_new_iter_pos, 
                        exec_t                                 i_new_exec_t );
 
     /**
      * Moves iters to destination vector until target size is reached. 
-     * The last loop is split to better reach target size.
+     * The last iteration is split to better reach target size.
      *
      * @param i_source_iters source vector.
      * @param i_dest_iters destination vector.
