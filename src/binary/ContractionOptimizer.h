@@ -52,8 +52,8 @@ class einsum_ir::binary::ContractionOptimizer {
      * Splits a loop from the source vector and adds it to the destination vector.
      *
      * @param i_loop iterator that points to the loop that is split.
-     * @param i_source_loops source vector.
-     * @param i_dest_loops destination vector.
+     * @param i_source_iters source vector.
+     * @param i_dest_iters destination vector.
      * @param i_target_size tartget size for loop splitting
      * @param i_new_loop_pos loop position in destination vector
      * @param i_new_exec_t execution type after splitting
@@ -61,8 +61,8 @@ class einsum_ir::binary::ContractionOptimizer {
      * @return returns the size of the splitted loop.
      **/
     int64_t split_loop( std::vector<iter_property>::iterator   i_loop,
-                        std::vector<iter_property>           * i_source_loops,
-                        std::vector<iter_property>           * i_dest_loops,
+                        std::vector<iter_property>           * i_source_iters,
+                        std::vector<iter_property>           * i_dest_iters,
                         int64_t                                i_target_size,
                         int64_t                                i_new_loop_pos, 
                         exec_t                                 i_new_exec_t );
@@ -70,12 +70,12 @@ class einsum_ir::binary::ContractionOptimizer {
     /**
      * Adds an empty loop to the destination vector.
      *
-     * @param i_dest_loops destination vector.
+     * @param i_dest_iters destination vector.
      * @param i_new_loop_pos loop position in destination vector.
      * @param i_new_dim_t dimension type of empty loop.
      * @param i_new_exec_t execution type of empty loop.
      **/
-    void add_empty_loop( std::vector<iter_property> * i_dest_loops,
+    void add_empty_loop( std::vector<iter_property> * i_dest_iters,
                          int64_t                      i_new_loop_pos, 
                          dim_t                        i_new_dim_t,
                          exec_t                       i_new_exec_t );
@@ -84,47 +84,47 @@ class einsum_ir::binary::ContractionOptimizer {
      * Moves a loop from the source vector to the destination vector.
      *
      * @param i_loop iterator that points to the loop.
-     * @param i_source_loops source vector.
-     * @param i_dest_loops destination vector.
+     * @param i_source_iters source vector.
+     * @param i_dest_iters destination vector.
      * @param i_new_loop_pos loop position in destination vector.
      * @param i_new_exec_t execution type after moving.
      *
      * @return returns the size of the loop.
      **/
     int64_t move_loop( std::vector<iter_property>::iterator   i_loop,
-                       std::vector<iter_property>           * i_source_loops,
-                       std::vector<iter_property>           * i_dest_loops,
+                       std::vector<iter_property>           * i_source_iters,
+                       std::vector<iter_property>           * i_dest_iters,
                        int64_t                                i_new_loop_pos, 
                        exec_t                                 i_new_exec_t );
 
     /**
-     * Moves loops to destination vector until target size is reached. 
+     * Moves iters to destination vector until target size is reached. 
      * The last loop is split to better reach target size.
      *
-     * @param i_source_loops source vector.
-     * @param i_dest_loops destination vector.
+     * @param i_source_iters source vector.
+     * @param i_dest_iters destination vector.
      * @param i_target_size tartget size.
      * @param i_new_exec_t execution type after moving.
      *
-     * @return returns the size of all added loops.
+     * @return returns the size of all added iters.
      **/
-    int64_t move_loops_until( std::vector<iter_property> * i_source_loops,
-                              std::vector<iter_property> * i_dest_loops,
+    int64_t move_iters_until( std::vector<iter_property> * i_source_iters,
+                              std::vector<iter_property> * i_dest_iters,
                               int64_t                      i_target_size,
                               exec_t                       i_new_exec_t );
     
     /**
-     * Move all remaining loops from the source vector to the destination vector.
+     * Move all remaining iters from the source vector to the destination vector.
      *
-     * @param i_source_loops source vector.
-     * @param i_dest_loops destination vector.
+     * @param i_source_iters source vector.
+     * @param i_dest_iters destination vector.
      * @param i_new_exec_t execution type after moving.
      *
-     * @return returns the size of all added loops.
+     * @return returns the size of all added iters.
      **/
-    int64_t move_all_loops( std::vector<iter_property> * i_source_loops,
-                           std::vector<iter_property> * i_dest_loops,
-                           exec_t                       i_new_exec_t );  
+    int64_t move_all_iters( std::vector<iter_property> * i_source_iters,
+                            std::vector<iter_property> * i_dest_iters,
+                            exec_t                       i_new_exec_t );  
             
 
     /**
@@ -142,7 +142,7 @@ class einsum_ir::binary::ContractionOptimizer {
    /**
      * Initializes the contraction optimizer.
      *
-     * @param i_iter_space vector of loops corresponding to an unoptimized contraction.
+     * @param i_iter_space vector of iters corresponding to an unoptimized contraction.
      * @param i_ktype_main execution type of main kernel. Optimizer might change GEMMs to BR_GEMMs
      * @param i_num_threads number of participating threads in contraction.
      * @param i_target_m target m kernel size
@@ -161,39 +161,39 @@ class einsum_ir::binary::ContractionOptimizer {
                bool                           i_packed_gemm_support  );    
   
     /**
-     * Optimizes the loops.
+     * Optimizes the iters.
      **/
     void optimize();
 
     /**
-     * Sorts all external loops depending on stride, dimension type and execution type.
+     * Sorts all external iters depending on stride, dimension type and execution type.
      **/
-    void sort_loops();
+    void sort_iters();
 
     /**
-     * Removes all size 1 Loops that are not of primitive type
+     * Removes all size 1 iters that are not of primitive type
      **/
-    void remove_empty_loops();
+    void remove_empty_iters();
 
     /**
-     * Fuses all external loops with the same dimension type, execution type and contiguous storage.
+     * Fuses all external iters with the same dimension type, execution type and contiguous storage.
      **/
-    void fuse_loops();
+    void fuse_iters();
 
     /**
-     * Moves all unoptimized external loops to internal data structure.
+     * Moves all unoptimized external iters to internal data structure.
      **/
-    void move_loops_to_internal();
+    void move_iters_to_internal();
 
     /**
-     * Finds and adds a kernel to the optimized loops.
+     * Finds and adds a kernel to the optimized iters.
      **/
     void add_kernel();
 
     /**
-     * Reorders loops, splits loops and determines parallel loops.
+     * Reorders iters, splits iters and determines parallel iters.
      **/
-    void reorder_loops();
+    void reorder_iters();
 };
 
 #endif

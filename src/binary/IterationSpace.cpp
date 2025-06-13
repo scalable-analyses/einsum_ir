@@ -5,24 +5,24 @@
 #include <omp.h>
 #endif
 
-void einsum_ir::binary::IterationSpace::init( std::vector< dim_t >   const * i_loop_dim_type,
-                                              std::vector< exec_t >  const * i_loop_exec_type,
-                                              std::vector< int64_t > const * i_loop_sizes,
-                                              std::vector< int64_t > const * i_loop_strides_left,
-                                              std::vector< int64_t > const * i_loop_strides_right,
-                                              std::vector< int64_t > const * i_loop_strides_out_aux,
-                                              std::vector< int64_t > const * i_loop_strides_out,
+void einsum_ir::binary::IterationSpace::init( std::vector< dim_t >   const * i_dim_types,
+                                              std::vector< exec_t >  const * i_exec_types,
+                                              std::vector< int64_t > const * i_sizes,
+                                              std::vector< int64_t > const * i_strides_left,
+                                              std::vector< int64_t > const * i_strides_right,
+                                              std::vector< int64_t > const * i_strides_out_aux,
+                                              std::vector< int64_t > const * i_strides_out,
                                               int64_t                        i_num_threads){
 
-  m_loop_dim_type        = i_loop_dim_type;
-  m_loop_exec_type       = i_loop_exec_type;
-  m_loop_sizes           = i_loop_sizes;
+  m_dim_types  = i_dim_types;
+  m_exec_types = i_exec_types;
+  m_sizes      = i_sizes;
 
-  m_loop_strides.resize(4);
-  m_loop_strides[0] = i_loop_strides_left;
-  m_loop_strides[1] = i_loop_strides_right;
-  m_loop_strides[2] = i_loop_strides_out;
-  m_loop_strides[3] = i_loop_strides_out_aux;
+  m_strides.resize(4);
+  m_strides[0] = i_strides_left;
+  m_strides[1] = i_strides_right;
+  m_strides[2] = i_strides_out;
+  m_strides[3] = i_strides_out_aux;
 
   m_num_threads = i_num_threads;
 }
@@ -33,14 +33,14 @@ einsum_ir::err_t einsum_ir::binary::IterationSpace::compile(){
   //calculate number of generated tasks
   int64_t l_num_tasks = 1;
   int64_t l_num_parallel_loops = 0;
-  for( size_t l_id = 0; l_id < m_loop_dim_type->size(); l_id++ ){
-    if( m_loop_exec_type->at(l_id) == exec_t::OMP ||
-        m_loop_exec_type->at(l_id) == exec_t::SFC    ){
+  for( size_t l_id = 0; l_id < m_dim_types->size(); l_id++ ){
+    if( m_exec_types->at(l_id) == exec_t::OMP ||
+        m_exec_types->at(l_id) == exec_t::SFC    ){
       if( !l_num_parallel_loops ){
         m_parallel_loops.begin = l_id;
       }
-      if( m_loop_dim_type->at(l_id) != dim_t::K ){
-        l_num_tasks *= m_loop_sizes->at(l_id);
+      if( m_dim_types->at(l_id) != dim_t::K ){
+        l_num_tasks *= m_sizes->at(l_id);
       }
       l_num_parallel_loops += 1;
     }
@@ -55,7 +55,7 @@ einsum_ir::err_t einsum_ir::binary::IterationSpace::compile(){
   m_sfc_tasks_n = 1;
   int64_t l_last_found_type = 0;
   for( int64_t l_id = m_parallel_loops.begin; l_id < m_parallel_loops.end ; l_id++ ){
-    if( m_loop_exec_type->at(l_id) == exec_t::OMP &&
+    if( m_exec_types->at(l_id) == exec_t::OMP &&
         l_last_found_type <= 1 ){
       if( l_last_found_type == 0 ){
         m_omp_loops.begin = l_id;
@@ -63,20 +63,20 @@ einsum_ir::err_t einsum_ir::binary::IterationSpace::compile(){
       m_omp_loops.end = l_id + 1;
       l_last_found_type = 1;
     }
-    else if( m_loop_exec_type->at(l_id) == exec_t::SFC &&
-             m_loop_dim_type->at(l_id)  == dim_t::M &&
+    else if( m_exec_types->at(l_id) == exec_t::SFC &&
+             m_dim_types->at(l_id)  == dim_t::M &&
              l_last_found_type <= 2){
-      m_sfc_tasks_m *= m_loop_sizes->at(l_id);
+      m_sfc_tasks_m *= m_sizes->at(l_id);
       if( l_last_found_type <= 1 ){
         m_sfc_loops_m.begin = l_id;
       }
       m_sfc_loops_m.end = l_id + 1;
       l_last_found_type = 2;
     }
-    else if( m_loop_exec_type->at(l_id) == exec_t::SFC &&
-             m_loop_dim_type->at(l_id)  == dim_t::N   &&
+    else if( m_exec_types->at(l_id) == exec_t::SFC &&
+             m_dim_types->at(l_id)  == dim_t::N   &&
              l_last_found_type <= 3 ){
-      m_sfc_tasks_n *= m_loop_sizes->at(l_id);
+      m_sfc_tasks_n *= m_sizes->at(l_id);
       if( l_last_found_type <= 2 ){
         m_sfc_loops_n.begin = l_id;
       }
@@ -89,11 +89,11 @@ einsum_ir::err_t einsum_ir::binary::IterationSpace::compile(){
   }
 
   //convert strides to offsets
-  int64_t l_num_tensors = m_loop_strides.size();
+  int64_t l_num_tensors = m_strides.size();
   m_movement_offsets.resize(l_num_tensors );
   for(int64_t l_io_tensor = 0; l_io_tensor < l_num_tensors ; l_io_tensor++){
     m_movement_offsets[l_io_tensor].resize( l_num_parallel_loops );
-    convert_strides_to_offsets( *m_loop_strides.at(l_io_tensor),
+    convert_strides_to_offsets( *m_strides.at(l_io_tensor),
                                 m_movement_offsets[l_io_tensor] );
   } 
 
@@ -137,7 +137,7 @@ einsum_ir::err_t einsum_ir::binary::IterationSpace::compile(){
       int64_t l_offset = calculate_offset( l_id_omp_old,
                                            l_id_sfc_m_old,
                                            l_id_sfc_n_old,
-                                           *m_loop_strides.at(l_io_tensor) );
+                                           *m_strides.at(l_io_tensor) );
       m_initial_offsets[l_thread_id][l_io_tensor] = l_offset;
     }
 
@@ -175,21 +175,21 @@ int64_t einsum_ir::binary::IterationSpace::calculate_offset( int64_t i_id_omp,
 
   int64_t l_offset = 0;
   for (int64_t l_id = m_sfc_loops_m.end - 1; l_id >= m_sfc_loops_m.begin; l_id--) {
-    int64_t l_size   = m_loop_sizes->at(l_id);
+    int64_t l_size   = m_sizes->at(l_id);
     int64_t l_stride = i_strides[l_id];
 
     l_offset += (i_id_sfc_m % l_size) * l_stride;
     i_id_sfc_m /= l_size;
   }
   for (int64_t l_id = m_sfc_loops_n.end - 1; l_id >= m_sfc_loops_n.begin; l_id--) {
-    int64_t l_size   = m_loop_sizes->at(l_id);
+    int64_t l_size   = m_sizes->at(l_id);
     int64_t l_stride = i_strides[l_id];
 
     l_offset += (i_id_sfc_n % l_size) * l_stride;
     i_id_sfc_n /= l_size;
   }
   for (int64_t l_id = m_omp_loops.end - 1; l_id >= m_omp_loops.begin; l_id--) {
-    int64_t l_size   = m_loop_sizes->at(l_id);
+    int64_t l_size   = m_sizes->at(l_id);
     int64_t l_stride = i_strides[l_id];
 
     l_offset += (i_id_omp % l_size) * l_stride;
@@ -208,7 +208,7 @@ void einsum_ir::binary::IterationSpace::convert_strides_to_offsets( std::vector<
 
   int64_t l_all_offsets_sfc_m = 0;
   for (int64_t l_id = m_sfc_loops_m.end - 1; l_id >= m_sfc_loops_m.begin; l_id--) {
-    int64_t l_size   = m_loop_sizes->at(l_id);
+    int64_t l_size   = m_sizes->at(l_id);
     int64_t l_stride = i_strides[l_id];
 
     io_offsets[ l_id - l_first] = l_stride - l_all_offsets_sfc_m;
@@ -217,7 +217,7 @@ void einsum_ir::binary::IterationSpace::convert_strides_to_offsets( std::vector<
   
   int64_t l_all_offsets_sfc_n = 0;
   for (int64_t l_id = m_sfc_loops_n.end - 1; l_id >= m_sfc_loops_n.begin; l_id--) {
-    int64_t l_size   = m_loop_sizes->at(l_id);
+    int64_t l_size   = m_sizes->at(l_id);
     int64_t l_stride = i_strides[l_id];
 
     io_offsets[ l_id - l_first] = l_stride - l_all_offsets_sfc_n;
@@ -232,7 +232,7 @@ void einsum_ir::binary::IterationSpace::convert_strides_to_offsets( std::vector<
                                                 i_strides );
 
   for (int64_t l_id = m_omp_loops.end - 1; l_id >= m_omp_loops.begin; l_id--) {
-    int64_t l_size   = m_loop_sizes->at(l_id);
+    int64_t l_size   = m_sizes->at(l_id);
     int64_t l_stride = i_strides[l_id];
 
     io_offsets[ l_id - l_first] = l_stride - l_all_offsets_omp;
@@ -247,7 +247,7 @@ einsum_ir::binary::sfc_t einsum_ir::binary::IterationSpace::get_max_dim_jump( ra
   int64_t l_direction = (( i_id_old - i_id_new ) + 1) / 2;
   int64_t l_max_id = i_id_new > i_id_old ? i_id_new : i_id_old;
   for( int64_t l_di = i_dim_loops.end-1; l_di >= i_dim_loops.begin; l_di-- ){
-    int64_t l_size = m_loop_sizes->at(l_di);
+    int64_t l_size = m_sizes->at(l_di);
     if(l_max_id % l_size != 0){
       return (l_di - m_parallel_loops.begin) * 2 + l_direction;
     }
@@ -291,19 +291,19 @@ void einsum_ir::binary::IterationSpace::get_initial_offsets( int64_t   i_thread_
   o_off_out_aux = m_initial_offsets[i_thread_id][3];
 }
 
-void einsum_ir::binary::IterationSpace::sfc_oracle_2d( int64_t *i_m, 
-                                                       int64_t *i_n,
-                                                       int64_t *i_omp, 
+void einsum_ir::binary::IterationSpace::sfc_oracle_2d( int64_t *o_m, 
+                                                       int64_t *o_n,
+                                                       int64_t *o_omp, 
                                                        int64_t  i_idx ){
   
   int l_w = m_sfc_tasks_m;
   int l_h = m_sfc_tasks_n;
-  *i_omp = i_idx / (l_w*l_h);
+  *o_omp = i_idx / (l_w*l_h);
   i_idx = i_idx % (l_w*l_h);
 
   int l_idx_m, l_idx_n;
   gilbert_d2xy(&l_idx_m, &l_idx_n, i_idx, l_w, l_h);
 
-  *i_m = l_idx_m;
-  *i_n = l_idx_n;
+  *o_m = l_idx_m;
+  *o_n = l_idx_n;
 }

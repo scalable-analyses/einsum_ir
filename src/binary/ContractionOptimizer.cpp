@@ -22,30 +22,30 @@ void einsum_ir::binary::ContractionOptimizer::init( std::vector< iter_property >
   m_packed_gemm_support = i_packed_gemm_support;
 
   // targets 128 tasks per thread. 128 seems to be working well
-  m_target_parallel = i_num_threads * 256;
+  m_target_parallel = i_num_threads * 128;
 }
 
 void einsum_ir::binary::ContractionOptimizer::optimize(){
-  // removes size 1 loops
-  remove_empty_loops();
+  // removes size 1 iters
+  remove_empty_iters();
 
-  // sort loops depeding on strides, exec_types and dim_types
-  sort_loops();
+  // sort iters depeding on strides, exec_types and dim_types
+  sort_iters();
 
-  // fuse loops if possible
-  fuse_loops();
+  // fuse iters if possible
+  fuse_iters();
 
-  // move loops to internal data structure
-  move_loops_to_internal();
+  // move iters to internal data structure
+  move_iters_to_internal();
 
   // find and add the Kernel
   add_kernel();
 
-  // reoders and adds all remaining loops
-  reorder_loops();
+  // reoders and adds all remaining iters
+  reorder_iters();
 }
 
-void einsum_ir::binary::ContractionOptimizer::sort_loops(){
+void einsum_ir::binary::ContractionOptimizer::sort_iters(){
   
   std::stable_sort( m_iter_space->begin(), m_iter_space->end(), 
                     [&](iter_property l_a, iter_property l_b) -> bool {
@@ -65,7 +65,7 @@ void einsum_ir::binary::ContractionOptimizer::sort_loops(){
                     });
 }
 
-void einsum_ir::binary::ContractionOptimizer::fuse_loops(){
+void einsum_ir::binary::ContractionOptimizer::fuse_iters(){
   for( std::vector<iter_property>::iterator l_it = m_iter_space->begin() + 1; l_it < m_iter_space->end(); l_it++ ){
     std::vector<iter_property>::iterator l_other = l_it-1;
     if( l_it->dim_type  == l_other->dim_type && 
@@ -83,7 +83,7 @@ void einsum_ir::binary::ContractionOptimizer::fuse_loops(){
   }
 }
 
-void einsum_ir::binary::ContractionOptimizer::remove_empty_loops(){
+void einsum_ir::binary::ContractionOptimizer::remove_empty_iters(){
   for( std::vector<iter_property>::iterator l_it = m_iter_space->begin(); l_it < m_iter_space->end(); l_it++ ){
     if( l_it->size      == 1 &&
         l_it->exec_type != exec_t::PRIM ){
@@ -92,7 +92,7 @@ void einsum_ir::binary::ContractionOptimizer::remove_empty_loops(){
   }
 }
 
-void einsum_ir::binary::ContractionOptimizer::move_loops_to_internal(){
+void einsum_ir::binary::ContractionOptimizer::move_iters_to_internal(){
   m_size_all_m = 1;
   m_size_all_n = 1;
   m_free_iters.resize(5);
@@ -243,7 +243,7 @@ void einsum_ir::binary::ContractionOptimizer::add_kernel(){
 
   //add CPX dimensions and set kernel type
   if( m_free_iters[ dim_t::CPX ].size() > 0 ){
-    move_all_loops( &m_free_iters[ dim_t::CPX ],
+    move_all_iters( &m_free_iters[ dim_t::CPX ],
                     m_iter_space,
                     exec_t::PRIM );
     if( l_kernel_targets[PRIM_C] > 1 ){
@@ -263,7 +263,7 @@ void einsum_ir::binary::ContractionOptimizer::add_kernel(){
   m_size_all_n /= l_kernel_sizes[PRIM_N];
 }
 
-void einsum_ir::binary::ContractionOptimizer::reorder_loops(){
+void einsum_ir::binary::ContractionOptimizer::reorder_iters(){
   //determine parallel targets similarly to kernel targets
   int64_t l_target_parallel_m = std::sqrt(m_target_parallel);
   int64_t l_target_parallel_n = std::sqrt(m_target_parallel);
@@ -284,48 +284,48 @@ void einsum_ir::binary::ContractionOptimizer::reorder_loops(){
 
   //add parallel dimension
   int64_t l_size_parallel = 1;
-  l_size_parallel *= move_loops_until( &m_free_iters[dim_t::N],
+  l_size_parallel *= move_iters_until( &m_free_iters[dim_t::N],
                                        m_iter_space, 
                                        l_target_parallel_n,
                                        exec_t::SFC);
-  l_size_parallel *= move_loops_until( &m_free_iters[dim_t::M],
+  l_size_parallel *= move_iters_until( &m_free_iters[dim_t::M],
                                        m_iter_space, 
                                        l_target_parallel_m,
                                        exec_t::SFC);
-  l_size_parallel *= move_loops_until( &m_free_iters[dim_t::C],
+  l_size_parallel *= move_iters_until( &m_free_iters[dim_t::C],
                                        m_iter_space, 
                                        l_target_parallel_c,
                                        exec_t::OMP);
 
 
   //add remaining dimensions
-  move_all_loops( &m_free_iters[dim_t::K],
+  move_all_iters( &m_free_iters[dim_t::K],
                   m_iter_space,
                   exec_t::SEQ );
-  move_all_loops( &m_free_iters[dim_t::M],
+  move_all_iters( &m_free_iters[dim_t::M],
                   m_iter_space,
                   exec_t::SEQ );
-  move_all_loops( &m_free_iters[dim_t::N],
+  move_all_iters( &m_free_iters[dim_t::N],
                   m_iter_space,
                   exec_t::SEQ );
-  move_all_loops( &m_free_iters[dim_t::C], 
+  move_all_iters( &m_free_iters[dim_t::C], 
                   m_iter_space,
                   exec_t::SEQ );
 }
 
-int64_t einsum_ir::binary::ContractionOptimizer::move_loops_until( std::vector<iter_property> * i_source_loops,
-                                                                   std::vector<iter_property> * i_dest_loops,
+int64_t einsum_ir::binary::ContractionOptimizer::move_iters_until( std::vector<iter_property> * i_source_iters,
+                                                                   std::vector<iter_property> * i_dest_iters,
                                                                    int64_t                      i_target_size,
                                                                    exec_t                       i_new_exec_t ){
   int64_t l_size_all = 1;
   int64_t l_target_size = i_target_size;
-  while( i_source_loops->size() > 0 && 
+  while( i_source_iters->size() > 0 && 
          l_target_size > 1 ){
-    std::vector<iter_property>::iterator l_it = i_source_loops->end() - 1;
+    std::vector<iter_property>::iterator l_it = i_source_iters->end() - 1;
     int64_t l_size_loop  = l_it->size;
     int64_t l_size_split = split_loop( l_it,
-                                       i_source_loops,
-                                       i_dest_loops,
+                                       i_source_iters,
+                                       i_dest_iters,
                                        l_target_size,
                                        0,
                                        i_new_exec_t );
@@ -340,15 +340,15 @@ int64_t einsum_ir::binary::ContractionOptimizer::move_loops_until( std::vector<i
   return l_size_all;
 }
 
-int64_t einsum_ir::binary::ContractionOptimizer::move_all_loops( std::vector<iter_property> * i_source_loops,
-                                                                 std::vector<iter_property> * i_dest_loops,
+int64_t einsum_ir::binary::ContractionOptimizer::move_all_iters( std::vector<iter_property> * i_source_iters,
+                                                                 std::vector<iter_property> * i_dest_iters,
                                                                  exec_t                       i_new_exec_t ){
   int64_t l_size_all = 1;
-  while( i_source_loops->size() > 0 ){
-    std::vector<iter_property>::iterator l_it = i_source_loops->end() - 1;
+  while( i_source_iters->size() > 0 ){
+    std::vector<iter_property>::iterator l_it = i_source_iters->end() - 1;
     l_size_all *= move_loop( l_it,
-                             i_source_loops,
-                             i_dest_loops,
+                             i_source_iters,
+                             i_dest_iters,
                              0,
                              i_new_exec_t );
   }
@@ -356,17 +356,17 @@ int64_t einsum_ir::binary::ContractionOptimizer::move_all_loops( std::vector<ite
 }
 
 int64_t einsum_ir::binary::ContractionOptimizer::split_loop( std::vector<iter_property>::iterator i_loop,
-                                                             std::vector<iter_property> *         i_source_loops,
-                                                             std::vector<iter_property> *         i_dest_loops,
+                                                             std::vector<iter_property> *         i_source_iters,
+                                                             std::vector<iter_property> *         i_dest_iters,
                                                              int64_t                              i_target_size,
                                                              int64_t                              i_new_loop_pos, 
                                                              exec_t                               i_new_exec_t ){
 
   int64_t l_split = find_split(i_loop->size, i_target_size );
 
-  i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, *i_loop );
-  i_dest_loops->at(i_new_loop_pos).exec_type = i_new_exec_t;
-  i_dest_loops->at(0).size = l_split;
+  i_dest_iters->insert(i_dest_iters->begin() + i_new_loop_pos, *i_loop );
+  i_dest_iters->at(i_new_loop_pos).exec_type = i_new_exec_t;
+  i_dest_iters->at(0).size = l_split;
 
   i_loop->size           /= l_split;
   i_loop->stride_left    *= l_split;
@@ -375,12 +375,12 @@ int64_t einsum_ir::binary::ContractionOptimizer::split_loop( std::vector<iter_pr
   i_loop->stride_out     *= l_split;
 
   if( i_loop->size == 1 ){
-      i_source_loops->erase( i_loop );
+      i_source_iters->erase( i_loop );
   }
   return l_split;                                                         
 }
 
-void einsum_ir::binary::ContractionOptimizer::add_empty_loop( std::vector<iter_property> * i_dest_loops,
+void einsum_ir::binary::ContractionOptimizer::add_empty_loop( std::vector<iter_property> * i_dest_iters,
                                                               int64_t                      i_new_loop_pos, 
                                                               dim_t                        i_new_dim_t,
                                                               exec_t                       i_new_exec_t ){
@@ -395,18 +395,18 @@ void einsum_ir::binary::ContractionOptimizer::add_empty_loop( std::vector<iter_p
   l_empty_loop.stride_out = 0;
   l_empty_loop.stride_out_aux = 0;
 
-  i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, l_empty_loop );                                                       
+  i_dest_iters->insert(i_dest_iters->begin() + i_new_loop_pos, l_empty_loop );                                                       
 }
 
 int64_t einsum_ir::binary::ContractionOptimizer::move_loop( std::vector<iter_property>::iterator i_loop,
-                                                            std::vector<iter_property> *         i_source_loops,
-                                                            std::vector<iter_property> *         i_dest_loops,
+                                                            std::vector<iter_property> *         i_source_iters,
+                                                            std::vector<iter_property> *         i_dest_iters,
                                                             int64_t                              i_new_loop_pos, 
                                                             exec_t                               i_new_exec_t ){
   
-  i_dest_loops->insert(i_dest_loops->begin() + i_new_loop_pos, *i_loop );
-  i_dest_loops->at(i_new_loop_pos).exec_type = i_new_exec_t;
-  i_source_loops->erase( i_loop );
+  i_dest_iters->insert(i_dest_iters->begin() + i_new_loop_pos, *i_loop );
+  i_dest_iters->at(i_new_loop_pos).exec_type = i_new_exec_t;
+  i_source_iters->erase( i_loop );
     
   return  i_loop->size;
 

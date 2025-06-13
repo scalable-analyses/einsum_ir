@@ -159,9 +159,9 @@ class einsum_ir::binary::ContractionBackend {
 
 
     /**
-     * Initializes the class with a vector of iter_propertys.
+     * Initializes the class with a vector of iter_properties.
      *
-     * @param i_loops vector of iter_propertys.
+     * @param i_iterations vector of iter_properties.
      * @param i_dtype_left datatype of left input tensor.
      * @param i_dtype_right datatype of right input tensor.
      * @param i_dtype_comp datatype of computation.
@@ -171,7 +171,7 @@ class einsum_ir::binary::ContractionBackend {
      * @param i_ktype_last_touch type of the last touch kernel.
      * @param i_num_threads number of threads used for contraction.
      **/
-    void init( std::vector< iter_property > const & i_loops,
+    void init( std::vector< iter_property > const & i_iterations,
                data_t                               i_dtype_left,
                data_t                               i_dtype_right,
                data_t                               i_dtype_comp,

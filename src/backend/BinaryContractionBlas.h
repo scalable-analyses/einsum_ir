@@ -36,8 +36,8 @@ class einsum_ir::backend::BinaryContractionBlas: public BinaryContraction {
     template <typename T>
     T map_find_default( std::map< int64_t, T > const * i_map,
                         int64_t                        i_key,
-                        T                              i_default){
-      if(auto search = i_map->find(i_key); search != i_map->end() ) {
+                        T                              i_default ){
+      if( auto search = i_map->find(i_key); search != i_map->end() ) {
         return search->second;
       }
       else {

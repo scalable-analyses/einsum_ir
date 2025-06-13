@@ -41,7 +41,7 @@ void einsum_ir::binary::ContractionBackend::init( std::vector< dim_t >   const &
   m_num_threads = i_num_threads;
 }
 
-void einsum_ir::binary::ContractionBackend::init( std::vector< iter_property > const & i_loops,
+void einsum_ir::binary::ContractionBackend::init( std::vector< iter_property > const & i_iterations,
                                                   data_t                               i_dtype_left,
                                                   data_t                               i_dtype_right,
                                                   data_t                               i_dtype_comp,
@@ -51,23 +51,23 @@ void einsum_ir::binary::ContractionBackend::init( std::vector< iter_property > c
                                                   kernel_t                             i_ktype_last_touch,
                                                   int64_t                              i_num_threads ){
 
-  int64_t l_num_loops = i_loops.size();
-  m_dim_type.resize(l_num_loops);
-  m_exec_type.resize(l_num_loops);
-  m_dim_sizes.resize(l_num_loops); 
-  m_strides_left.resize(l_num_loops);
-  m_strides_right.resize(l_num_loops);
-  m_strides_out.resize(l_num_loops);
-  m_strides_out_aux.resize(l_num_loops);
+  int64_t l_num_iters = i_iterations.size();
+  m_dim_type.resize(l_num_iters);
+  m_exec_type.resize(l_num_iters);
+  m_dim_sizes.resize(l_num_iters); 
+  m_strides_left.resize(l_num_iters);
+  m_strides_right.resize(l_num_iters);
+  m_strides_out.resize(l_num_iters);
+  m_strides_out_aux.resize(l_num_iters);
 
-  for(int64_t l_id = 0; l_id < l_num_loops; l_id++){
-    m_dim_type[       l_id] = i_loops[l_id].dim_type;
-    m_exec_type[      l_id] = i_loops[l_id].exec_type;
-    m_dim_sizes[      l_id] = i_loops[l_id].size;
-    m_strides_left[   l_id] = i_loops[l_id].stride_left;
-    m_strides_right[  l_id] = i_loops[l_id].stride_right;
-    m_strides_out[    l_id] = i_loops[l_id].stride_out;  
-    m_strides_out_aux[l_id] = i_loops[l_id].stride_out_aux;
+  for(int64_t l_id = 0; l_id < l_num_iters; l_id++){
+    m_dim_type[       l_id] = i_iterations[l_id].dim_type;
+    m_exec_type[      l_id] = i_iterations[l_id].exec_type;
+    m_dim_sizes[      l_id] = i_iterations[l_id].size;
+    m_strides_left[   l_id] = i_iterations[l_id].stride_left;
+    m_strides_right[  l_id] = i_iterations[l_id].stride_right;
+    m_strides_out[    l_id] = i_iterations[l_id].stride_out;  
+    m_strides_out_aux[l_id] = i_iterations[l_id].stride_out_aux;
   }
 
   m_dtype_left  = i_dtype_left;
@@ -112,8 +112,8 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackend::compile(){
   m_id_first_parallel_loop = -1;
   m_id_first_primitive_dim = -1;
   m_num_parallel_loops = 0;
-  int64_t l_num_loops = m_dim_type.size();
-  for(int64_t l_id = 0; l_id < l_num_loops; l_id++){
+  int64_t l_num_iters = m_dim_type.size();
+  for(int64_t l_id = 0; l_id < l_num_iters; l_id++){
     if( m_exec_type.at(l_id) == exec_t::OMP ||
         m_exec_type.at(l_id) == exec_t::SFC    ){
       if( m_id_first_parallel_loop == -1 ){
@@ -132,7 +132,7 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackend::compile(){
   m_has_last_touch = m_ktype_last_touch != kernel_t::UNDEFINED_KTYPE;
 
   //multiply strides by size of datatype 
-  for(int64_t l_id = 0; l_id < l_num_loops; l_id++){
+  for(int64_t l_id = 0; l_id < l_num_iters; l_id++){
     m_strides_left[l_id]    *= ce_n_bytes(m_dtype_left );
     m_strides_right[l_id]   *= ce_n_bytes(m_dtype_right);
     m_strides_out[l_id]     *= ce_n_bytes(m_dtype_out  );

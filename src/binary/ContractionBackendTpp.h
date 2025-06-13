@@ -62,8 +62,8 @@ class einsum_ir::binary::ContractionBackendTpp: public ContractionBackend {
      * @param io_out pointer to a data section of the output tensor.
      **/
     void kernel_main( void const * i_left,
-                              void const * i_right,
-                              void       * io_out );
+                      void const * i_right,
+                      void       * io_out );
 
     /**
      * Compiles all kernels

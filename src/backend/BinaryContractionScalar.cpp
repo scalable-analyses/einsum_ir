@@ -55,7 +55,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
 
   for(std::size_t l_id = 0; l_id < l_all_dim_ids.size(); l_id++){
     int64_t l_dim_id = l_all_dim_ids[l_id];
-    l_loops[l_id].dim_type       = m_dim_types[      l_dim_id];
+    l_loops[l_id].dim_type       = m_dim_types[l_dim_id];
     l_loops[l_id].exec_type      = binary::exec_t::SEQ;
     l_loops[l_id].size           = m_dim_sizes_inner->at(l_dim_id);
     l_loops[l_id].stride_left    = map_find_default<int64_t>(&l_strides_left,    l_dim_id, 0);

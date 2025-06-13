@@ -18,13 +18,13 @@ class einsum_ir::binary::IterationSpace {
     };
 
     //! vector with the loop dimension types
-    std::vector< dim_t >   const * m_loop_dim_type;
+    std::vector< dim_t >   const * m_dim_types;
     //! vector with the loop execution types
-    std::vector< exec_t >  const * m_loop_exec_type;
+    std::vector< exec_t >  const * m_exec_types;
     //! vector with the loop sizes
-    std::vector< int64_t > const * m_loop_sizes;
+    std::vector< int64_t > const * m_sizes;
     //! vector with vectors for all strides
-    std::vector< std::vector< int64_t > const * > m_loop_strides;
+    std::vector< std::vector< int64_t > const * > m_strides;
 
     //! number of sfc tasks m tasks
     int64_t m_sfc_tasks_m = 1;
@@ -98,9 +98,9 @@ class einsum_ir::binary::IterationSpace {
      * @param i_omp omp id.
      * @param i_idx task id.
      **/
-    void sfc_oracle_2d( int64_t *i_m, 
-                        int64_t *i_n, 
-                        int64_t *i_omp, 
+    void sfc_oracle_2d( int64_t *o_m, 
+                        int64_t *o_n, 
+                        int64_t *o_omp, 
                         int64_t  i_idx );
     
     /**
