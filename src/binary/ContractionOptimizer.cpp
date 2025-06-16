@@ -66,18 +66,23 @@ void einsum_ir::binary::ContractionOptimizer::sort_iters(){
 }
 
 void einsum_ir::binary::ContractionOptimizer::fuse_iters(){
-  for( std::vector<iter_property>::iterator l_it = m_iter_space->begin() + 1; l_it < m_iter_space->end(); l_it++ ){
-    std::vector<iter_property>::iterator l_other = l_it-1;
-    if( l_it->dim_type  == l_other->dim_type && 
-        l_it->exec_type == l_other->exec_type ){
-      int64_t l_size = l_it->size; 
-      if( l_it->stride_left    * l_size == l_other->stride_left    && 
-          l_it->stride_right   * l_size == l_other->stride_right   && 
-          l_it->stride_out     * l_size == l_other->stride_out     &&
-          l_it->stride_out_aux * l_size == l_other->stride_out_aux    ){
-        l_it->size *= l_other->size;
-        m_iter_space->erase(l_other);
-        l_it--;
+  std::vector<iter_property>::iterator l_next;
+  for( std::vector<iter_property>::iterator l_it = m_iter_space->begin(); l_it < m_iter_space->end() - 1; l_it = l_next ){
+    l_next = l_it + 1;
+    if( l_it->dim_type  == l_next->dim_type && 
+        l_it->exec_type == l_next->exec_type ){
+      int64_t l_size = l_next->size; 
+      if( l_next->stride_left    * l_size == l_it->stride_left    && 
+          l_next->stride_right   * l_size == l_it->stride_right   && 
+          l_next->stride_out     * l_size == l_it->stride_out     &&
+          l_next->stride_out_aux * l_size == l_it->stride_out_aux    ){
+        l_it->size           *= l_size;
+        l_it->stride_left    /= l_size;
+        l_it->stride_right   /= l_size;
+        l_it->stride_out     /= l_size;
+        l_it->stride_out_aux /= l_size;
+        m_iter_space->erase(l_next);
+        l_next = l_it;
       }
     }
   }
@@ -87,7 +92,8 @@ void einsum_ir::binary::ContractionOptimizer::remove_empty_iters(){
   for( std::vector<iter_property>::iterator l_it = m_iter_space->begin(); l_it < m_iter_space->end(); l_it++ ){
     if( l_it->size      == 1 &&
         l_it->exec_type != exec_t::PRIM ){
-      m_iter_space->erase( l_it );
+      l_it--;
+      m_iter_space->erase( l_it + 1 );
     }
   }
 }
@@ -106,11 +112,10 @@ void einsum_ir::binary::ContractionOptimizer::move_iters_to_internal(){
         m_size_all_n *= l_it->size;
       }
       m_free_iters[l_it->dim_type].push_back(*l_it);
-      m_iter_space->erase(l_it);
+      l_it--;
+      m_iter_space->erase(l_it + 1);
     }
-    else{
-      l_it++;
-    }
+    l_it++;
   }
 }
 
