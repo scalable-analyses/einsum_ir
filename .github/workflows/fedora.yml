@@ -89,10 +89,6 @@ jobs:
 
       - name: Install einsum_ir
         run: |
-          git clone https://github.com/scalable-analyses/einsum_ir.git
-          cd einsum_ir
-          git log | head -n 25
-
           wget https://github.com/catchorg/Catch2/releases/download/v2.13.10/catch.hpp
 
           CXX=g++-13 CC=g++-13 scons libtorch=$(pwd)/../venv_pytorch/lib/python3.10/site-packages/torch blas=$(pwd)/../openblas tblis=$(pwd)/../tblis libxsmm=$(pwd)/../libxsmm -j$(nproc)
