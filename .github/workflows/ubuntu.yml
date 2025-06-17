@@ -45,8 +45,7 @@ jobs:
           echo "using libxsmm path: ${LIBXSMM_PATH}"
           echo "using libtorch path: ${LIBTORCH_PATH}"
           scons mode=debug+san libtorch=${LIBTORCH_PATH} libxsmm=${LIBXSMM_PATH} blas=yes
-          cd ..
 
       - name: Run unit tests
         run: |
-          ./einsum_ir/build/tests
+          ./build/tests

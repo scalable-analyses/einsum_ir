@@ -96,17 +96,14 @@ jobs:
 
           CXX=clang++ CC=clang scons libtorch=$(pwd)/venv_pytorch/lib/python3.10/site-packages/torch blas=$(pwd)/openblas tblis=$(pwd)/tblis libxsmm=$(pwd)/libxsmm -j$(nproc)
           mv build build_llvm
-          cd ..
 
       - name: Run unit tests
         run: |
-          cd einsum_ir
           ./build_gcc/tests
           ./build_llvm/tests
 
       - name: Run unary tests
         run: |
-          cd einsum_ir
           ./build_gcc/bench_unary "abcde->abcde" "8,16,24,32,48" "FP32"
           ./build_gcc/bench_unary "abcde->abced" "8,16,24,32,48" "FP32"
           ./build_gcc/bench_unary "abcde->abecd" "8,16,24,32,48" "FP32"
@@ -129,7 +126,6 @@ jobs:
 
       - name: Run binary tests
         run: |
-          cd einsum_ir
           ./build_gcc/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,128" FP32 "a,b,c,d,e,f"
           ./build_gcc/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,128" FP32 "a,b,c,d,f,e"
           ./build_gcc/bench_binary "dfab,efca->edfcb" "24,32,48,32,32,128" FP32 "a,b,c,f,d,e"
@@ -140,17 +136,16 @@ jobs:
 
       - name: Run expression benchmarks
         run: |
-          bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_gcc/bench_expression -l logs -r 1 -b tpp -d 1 -v
-          bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_llvm/bench_expression -l logs -r 1 -b tpp -d 1 -v
+          bash samples/tools/bench_einsum_ir.sh -e build_gcc/bench_expression -l logs -r 1 -b tpp -d 1 -v
+          bash samples/tools/bench_einsum_ir.sh -e build_llvm/bench_expression -l logs -r 1 -b tpp -d 1 -v
 
       - name: Run Einsum Tree Benchnarks
         run: |
-          bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_gcc/bench_tree -l logs -r 1 -b tpp -d 2 -v
-          bash einsum_ir/samples/tools/bench_einsum_ir.sh -e einsum_ir/build_llvm/bench_tree -l logs -r 1 -b tpp -d 2 -v
+          bash samples/tools/bench_einsum_ir.sh -e build_gcc/bench_tree -l logs -r 1 -b tpp -d 2 -v
+          bash samples/tools/bench_einsum_ir.sh -e build_llvm/bench_tree -l logs -r 1 -b tpp -d 2 -v
 
       - name: Run MLP benchmark
         run: |
-          cd einsum_ir
           wget https://gist.github.com/breuera/06894bc6353d75d13f6369b420174e0e/raw/7eb509e411b5ec04d4e2295b51225bdd90bd7285/model_mlp.pt
           ./build_gcc/bench_mlp model_mlp.pt 0
           ./build_gcc/bench_mlp model_mlp.pt 1
