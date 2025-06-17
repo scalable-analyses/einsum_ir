@@ -5,12 +5,13 @@
 
 namespace einsum_ir {
   typedef enum {
-    C = 0, // left, right, out
-    M = 1, // left, out
-    N = 2, // right, out
-    K = 3, // left, right
-    I = 4, // left
-    J = 5, // right
+    C = 0,  // left, right, out
+    M = 1,  // left, out
+    N = 2,  // right, out
+    K = 3,  // left, right
+    CPX = 4,// Complex dimension in left, right, out
+    I = 5,  // left
+    J = 6,  // right
     UNDEFINED_DIM = 99
   } dim_t;
 
@@ -60,8 +61,8 @@ namespace einsum_ir {
     ZERO            = 0,
     RELU            = 1,
     ADD             = 2,
-    MADD            = 3,
-    COPY            = 4,
+    COPY            = 3,
+    MADD            = 4,
     CPX_INT_LOW     = 5, // internal use only
     CPX_ZERO        = 6,
     CPX_ADD         = 7,
@@ -69,6 +70,9 @@ namespace einsum_ir {
     CPX_COPY        = 9,
     CPX_INT_HIGH    = 10, // internal use only
     CUSTOM_KTYPE    = 11,
+    BR_MADD         = 12,
+    PACKED_MADD     = 13,
+    CPX_PACKED_MADD = 14,
     UNDEFINED_KTYPE = 99
   } kernel_t;
 

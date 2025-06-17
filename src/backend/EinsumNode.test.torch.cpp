@@ -3,6 +3,10 @@
 #include "EinsumNode.h"
 #include "MemoryManager.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 TEST_CASE( "Simple matmul example without any intermediate data.", "[einsum_node]" ) {
   // test case:
   //
@@ -32,6 +36,12 @@ TEST_CASE( "Simple matmul example without any intermediate data.", "[einsum_node
   // reference
   l_out_ref += at::einsum( "km,nk->nm",
                            {l_in_left, l_in_right} );
+
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
 
   //Memory Manager
   einsum_ir::backend::MemoryManager l_memory;
@@ -72,7 +82,8 @@ TEST_CASE( "Simple matmul example without any intermediate data.", "[einsum_node
                  einsum_ir::UNDEFINED_KTYPE,
                  &l_node_0,
                  &l_node_1,
-                 &l_memory );
+                 &l_memory,
+                 l_num_threads );
 
   // check node info
   REQUIRE( l_node_0.m_data_ptr_ext != nullptr );
@@ -124,6 +135,12 @@ TEST_CASE( "Simple batch-outer complex matmul example without any intermediate d
   l_out_ref_aos += at::einsum( "km,nk->nm",
                                {l_left_aos, l_right_aos} );
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   //Memory Manager
   einsum_ir::backend::MemoryManager l_memory;
 
@@ -163,7 +180,8 @@ TEST_CASE( "Simple batch-outer complex matmul example without any intermediate d
                    einsum_ir::kernel_t::UNDEFINED_KTYPE,
                    &l_node_ckm,
                    &l_node_cnk,
-                   &l_memory );
+                   &l_memory,
+                 l_num_threads );
 
   // check node info
   REQUIRE( l_node_ckm.m_data_ptr_ext != nullptr );
@@ -214,6 +232,12 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-outer
   at::Tensor l_out_ref = at::einsum( "km,nk->nm",
                                      {l_left_aos, l_right_aos} );
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   //Memory Manager
   einsum_ir::backend::MemoryManager l_memory;
 
@@ -253,7 +277,8 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-outer
                    einsum_ir::kernel_t::UNDEFINED_KTYPE,
                    &l_node_kmc,
                    &l_node_nkc,
-                   &l_memory );
+                   &l_memory,
+                   l_num_threads );
 
   // check node info
   REQUIRE( l_node_kmc.m_data_ptr_ext != nullptr );
@@ -308,6 +333,12 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-inner
   at::Tensor l_data_nmc_ref = at::einsum( "km,nk->nm",
                                           {l_data_kmc, l_data_nkc} );
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   //Memory Manager
   einsum_ir::backend::MemoryManager l_memory;
 
@@ -348,7 +379,8 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-inner
                    einsum_ir::kernel_t::UNDEFINED_KTYPE,
                    &l_node_kmc,
                    &l_node_nkc,
-                   &l_memory );
+                   &l_memory,
+                   l_num_threads );
 
   l_node_nmc.init( 3,
                    l_dim_ids_nmc,
@@ -357,7 +389,8 @@ TEST_CASE( "Simple complex matmul example with batch-inner input and batch-inner
                    einsum_ir::data_t::FP32,
                    l_data_nmc.data_ptr(),
                    &l_node_cnm,
-                   &l_memory );
+                   &l_memory,
+                   l_num_threads );
 
   einsum_ir::err_t l_err = l_node_nmc.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
@@ -405,6 +438,12 @@ TEST_CASE( "Two matmul example with external intermediate data.", "[einsum_node]
   // reference
   l_data_bd_ref = at::einsum( "ca,bc,da->bd",
                               {l_data_ca, l_data_bc, l_data_da} );
+
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
 
   //Memory Manager
   einsum_ir::backend::MemoryManager l_memory;
@@ -455,7 +494,8 @@ TEST_CASE( "Two matmul example with external intermediate data.", "[einsum_node]
                   einsum_ir::UNDEFINED_KTYPE,
                   &l_node_ca,
                   &l_node_bc,
-                  &l_memory );
+                  &l_memory,
+                  l_num_threads );
 
   l_node_bd.init( 2,
                   l_dim_ids_bd,
@@ -472,7 +512,8 @@ TEST_CASE( "Two matmul example with external intermediate data.", "[einsum_node]
                   einsum_ir::UNDEFINED_KTYPE,
                   &l_node_ba,
                   &l_node_da,
-                  &l_memory );
+                  &l_memory,
+                  l_num_threads );
 
   einsum_ir::err_t l_err = l_node_bd.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
@@ -527,6 +568,12 @@ TEST_CASE( "Two matmul example with locked data.", "[einsum_node]" ) {
   l_data_bd_ref = at::einsum( "ca,bc,da->bd",
                               {l_data_ca, l_data_bc, l_data_da} );
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   //Memory Manager
   einsum_ir::backend::MemoryManager l_memory;
 
@@ -576,7 +623,8 @@ TEST_CASE( "Two matmul example with locked data.", "[einsum_node]" ) {
                   einsum_ir::UNDEFINED_KTYPE,
                   &l_node_ca,
                   &l_node_bc,
-                  &l_memory );
+                  &l_memory,
+                  l_num_threads );
 
   l_node_bd.init( 2,
                   l_dim_ids_bd,
@@ -593,7 +641,8 @@ TEST_CASE( "Two matmul example with locked data.", "[einsum_node]" ) {
                   einsum_ir::UNDEFINED_KTYPE,
                   &l_node_ba,
                   &l_node_da,
-                  &l_memory );
+                  &l_memory,
+                  l_num_threads );
 
   einsum_ir::err_t l_err = l_node_bd.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
@@ -675,6 +724,12 @@ TEST_CASE( "Two matmul example with internal intermediate data.", "[einsum_node]
   l_data_bd_ref = at::einsum( "ca,bc,da->bd",
                               {l_data_ca, l_data_bc, l_data_da} );
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   //Memory Manager
   einsum_ir::backend::MemoryManager l_memory;
 
@@ -724,7 +779,8 @@ TEST_CASE( "Two matmul example with internal intermediate data.", "[einsum_node]
                   einsum_ir::UNDEFINED_KTYPE,
                   &l_node_ca,
                   &l_node_bc,
-                  &l_memory );
+                  &l_memory,
+                  l_num_threads );
 
   l_node_bd.init( 2,
                   l_dim_ids_bd,
@@ -741,7 +797,8 @@ TEST_CASE( "Two matmul example with internal intermediate data.", "[einsum_node]
                   einsum_ir::UNDEFINED_KTYPE,
                   &l_node_ba,
                   &l_node_da,
-                  &l_memory );
+                  &l_memory,
+                  l_num_threads );
 
   einsum_ir::err_t l_err = l_node_bd.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
@@ -797,6 +854,12 @@ TEST_CASE( "Complex two matmul example with batch-inner input data and batch-out
   at::Tensor l_data_bdx_ref = at::einsum( "ca,bc,da->bd",
                                          {l_data_cax, l_data_bcx, l_data_dax} );
   
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   //Memory Manager
   einsum_ir::backend::MemoryManager l_memory;
 
@@ -847,7 +910,8 @@ TEST_CASE( "Complex two matmul example with batch-inner input data and batch-out
                    einsum_ir::UNDEFINED_KTYPE,
                    &l_node_cax,
                    &l_node_bcx,
-                   &l_memory );
+                   &l_memory,
+                   l_num_threads );
 
   l_node_xbd.init( 3,
                    l_dim_ids_xbd,
@@ -864,7 +928,8 @@ TEST_CASE( "Complex two matmul example with batch-inner input data and batch-out
                    einsum_ir::UNDEFINED_KTYPE,
                    &l_node_bax,
                    &l_node_dax,
-                   &l_memory );
+                   &l_memory,
+                   l_num_threads );
 
   l_node_bdx.init( 3,
                    l_dim_ids_bdx,
@@ -873,7 +938,8 @@ TEST_CASE( "Complex two matmul example with batch-inner input data and batch-out
                    einsum_ir::FP32,
                    l_data_bdx.data_ptr(),
                    &l_node_xbd,
-                   &l_memory );
+                   &l_memory,
+                   l_num_threads );
 
   einsum_ir::err_t l_err = l_node_bdx.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );
@@ -914,6 +980,12 @@ TEST_CASE( "Matmul example possibly requiring permuted input data.", "[einsum_no
   l_data_nm_ref = at::einsum( "mk,kn->nm",
                               {l_data_mk, l_data_kn} );
     
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   //Memory Manager
   einsum_ir::backend::MemoryManager l_memory;
 
@@ -953,7 +1025,8 @@ TEST_CASE( "Matmul example possibly requiring permuted input data.", "[einsum_no
                   einsum_ir::UNDEFINED_KTYPE,
                   &l_node_mk,
                   &l_node_kn,
-                  &l_memory );
+                  &l_memory,
+                  l_num_threads );
 
   // compile
   einsum_ir::err_t l_err = l_node_nm.compile();
@@ -1051,6 +1124,12 @@ TEST_CASE( "Einsum expression without batch dimensions.", "[einsum_node]" ) {
   at::Tensor l_data_iefgh_ref = at::rand( l_sizes_iefgh );
   at::Tensor l_data_iefgh     = l_data_iefgh_ref.clone();
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   //Memory Manager
   einsum_ir::backend::MemoryManager l_memory;
 
@@ -1121,7 +1200,8 @@ TEST_CASE( "Einsum expression without batch dimensions.", "[einsum_node]" ) {
                     einsum_ir::UNDEFINED_KTYPE,
                     &l_node_hd,
                     &l_node_facd,
-                    &l_memory );
+                    &l_memory,
+                    l_num_threads );
 
   l_node_facd.init( 4,
                     l_dim_ids_facd,
@@ -1138,7 +1218,8 @@ TEST_CASE( "Einsum expression without batch dimensions.", "[einsum_node]" ) {
                     einsum_ir::UNDEFINED_KTYPE,
                     &l_node_fb,
                     &l_node_abcd,
-                    &l_memory );
+                    &l_memory,
+                    l_num_threads );
 
   l_node_iaecg.init( 5,
                      l_dim_ids_iaecg,
@@ -1155,7 +1236,8 @@ TEST_CASE( "Einsum expression without batch dimensions.", "[einsum_node]" ) {
                      einsum_ir::UNDEFINED_KTYPE,
                      &l_node_eai,
                      &l_node_gic,
-                    &l_memory );
+                     &l_memory,
+                     l_num_threads );
 
   l_node_iefgh.init( 5,
                      l_dim_ids_iefgh,
@@ -1172,7 +1254,8 @@ TEST_CASE( "Einsum expression without batch dimensions.", "[einsum_node]" ) {
                      einsum_ir::UNDEFINED_KTYPE,
                      &l_node_hacf,
                      &l_node_iaecg,
-                     &l_memory );
+                     &l_memory,
+                     l_num_threads );
 
   einsum_ir::err_t l_err = l_node_iefgh.compile();
   REQUIRE( l_err == einsum_ir::SUCCESS );

@@ -123,6 +123,18 @@ class einsum_ir::backend::BinaryContraction {
     //! Memory manager for intermendiate results
     MemoryManager * m_memory = nullptr;
 
+    //! target for the primitive m dimension
+    int64_t m_target_prim_m = 1;
+
+    //! target for the primitive n dimension
+    int64_t m_target_prim_n = 1;
+
+    //! target for the primitive k dimension
+    int64_t m_target_prim_k = 1;
+
+    //! number of threads for the contraction
+    int64_t m_num_threads = 1;
+
     /**
      * Derives the dimension types of tensor t2 w.r.t. tensors t0 and t1.
      *
@@ -259,6 +271,7 @@ class einsum_ir::backend::BinaryContraction {
      * @param i_ktype_first_touch type of the first-touch kernel.
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
+     * @param i_num_threads number of threads for the contraction.
      **/
     void init( int64_t                              i_num_dims_left,
                int64_t                              i_num_dims_right,
@@ -277,7 +290,8 @@ class einsum_ir::backend::BinaryContraction {
                data_t                               i_dtype_out,
                kernel_t                             i_ktype_first_touch,
                kernel_t                             i_ktype_main,
-               kernel_t                             i_ktype_last_touch );
+               kernel_t                             i_ktype_last_touch,
+               int64_t                              i_num_threads );
 
     /**
      * Initializes the binary contraction with fused permutations of the input tensors
@@ -304,6 +318,7 @@ class einsum_ir::backend::BinaryContraction {
      * @param i_ktype_first_touch type of the first-touch kernel.
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
+     * @param i_num_threads number of threads for the contraction.
      **/
     void init( int64_t                              i_num_dims_left,
                int64_t                              i_num_dims_right,
@@ -326,7 +341,8 @@ class einsum_ir::backend::BinaryContraction {
                data_t                               i_dtype_out,
                kernel_t                             i_ktype_first_touch,
                kernel_t                             i_ktype_main,
-               kernel_t                             i_ktype_last_touch );
+               kernel_t                             i_ktype_last_touch,
+               int64_t                              i_num_threads  );
 
     /**
      * Compiles the base data.
@@ -371,12 +387,6 @@ class einsum_ir::backend::BinaryContraction {
      **/
     int64_t num_ops();
 
-    /**
-     * Initializes the threading configuration of the contraction.
-     *
-     * @param i_num_tasks_target number of targeted tasks.
-     **/
-    virtual void threading( int64_t i_num_tasks_target  ) = 0;
 };
 
 #endif

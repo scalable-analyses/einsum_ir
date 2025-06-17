@@ -259,6 +259,12 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
   kernel_t l_ktype_first_touch = (m_ctype_ext == complex_t::REAL_ONLY) ? einsum_ir::ZERO : einsum_ir::CPX_ZERO;
   kernel_t l_ktype_main        = (m_ctype_ext == complex_t::REAL_ONLY) ? einsum_ir::MADD : einsum_ir::CPX_MADD;
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   // add internal nodes
   for( int64_t l_co = 0; l_co < m_num_conts-1; l_co++ ) {
     int64_t l_id_left  = m_path_int[l_co*2 + 0];
@@ -283,7 +289,8 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
                                          kernel_t::UNDEFINED_KTYPE,
                                          &m_nodes[l_id_left],
                                          &m_nodes[l_id_right],
-                                         &m_memory );
+                                         &m_memory,
+                                         l_num_threads );
   }
 
   // add root contraction
@@ -308,7 +315,8 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
                                                     kernel_t::UNDEFINED_KTYPE,
                                                     &m_nodes[l_root_id_left],
                                                     &m_nodes[l_root_id_right],
-                                                    &m_memory );
+                                                    &m_memory,
+                                                    l_num_threads );
 
   // add batch-outer to batch-inner conversion
   if( m_ctype_ext == complex_t::BATCH_INNER ) {
@@ -323,26 +331,11 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
                          m_dtype,
                          m_data_ptrs[l_num_tensors-1],
                          &m_nodes[l_cpx_conv_child],
-                         &m_memory );
+                         &m_memory,
+                         l_num_threads );
   }
 
   err_t l_err = m_nodes.back().compile();
-
-  /*
-   * init intra-op parallelism
-   */
-#ifdef _OPENMP
-  // four times overload
-  int64_t l_num_tasks = omp_get_max_threads() * 4;
-
-  for( std::size_t l_no = 0; l_no < m_nodes.size(); l_no++ ) {
-    // magic number: 64^3
-    if(    m_nodes[l_no].m_num_ops_node == 0
-        || m_nodes[l_no].m_num_ops_node >= 262144 ) {
-      m_nodes[l_no].threading_intra_op( l_num_tasks );
-    }
-  }
-#endif
 
   m_compiled = true;
 

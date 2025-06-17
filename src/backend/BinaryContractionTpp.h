@@ -1,9 +1,8 @@
 #ifndef EINSUM_IR_BACKEND_BINARY_CONTRACTION_TPP
 #define EINSUM_IR_BACKEND_BINARY_CONTRACTION_TPP
 
-#include <libxsmm.h>
 #include "BinaryContraction.h"
-#include "ContractionLoopsTpp.h"
+#include "../binary/ContractionBackendTpp.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -13,84 +12,44 @@ namespace einsum_ir {
 
 class einsum_ir::backend::BinaryContractionTpp: public BinaryContraction {
   private:
-    //! LIBXSMM-based unary first-touch TPP
-    libxsmm_meltwfunction_unary m_xmm_kernel_first_touch_unary = nullptr;
+    //! target for the primitive m dimension
+    int64_t m_target_prim_m = 16;
 
-    //! LIBXSMM-based binary first-touch TPP
-    libxsmm_meltwfunction_binary m_xmm_kernel_first_touch_binary = nullptr;
+    //! target for the primitive n dimension
+    int64_t m_target_prim_n = 64;
 
-    //! LIBXSMM-based main TPP which is called in the innermost loop
-    libxsmm_xmmfunction m_xmm_kernel_main;
-
-    //! LIBXSMM-based unary last-touch TPP
-    libxsmm_meltwfunction_unary m_xmm_kernel_last_touch_unary = nullptr;
-
-    //! LIBXSMM-based binary last-touch TPP
-    libxsmm_meltwfunction_binary m_xmm_kernel_last_touch_binary = nullptr;
-
-    //! packing
-    ContractionPackingTpp * m_packing = nullptr;
-
-    //! contraction loop interface
-    ContractionLoopsTpp m_cont_loops;
-
-    //! BC sizes
-    std::vector< int64_t > m_sizes_bc;
-    //! BM sizes
-    std::vector< int64_t > m_sizes_bm;
-    //! BN sizes
-    std::vector< int64_t > m_sizes_bn;
-    //! BK sizes
-    std::vector< int64_t > m_sizes_bk;
-
-    //! BC strides of of the left tensor
-    std::vector< int64_t > m_strides_left_bc;
-    //! BM strides of the left tensor
-    std::vector< int64_t > m_strides_left_bm;
-    //! BK strides of the left tensor
-    std::vector< int64_t > m_strides_left_bk;
-    //! BI strides of the left tensor
-    std::vector< int64_t > m_strides_left_bi;
-
-    //! BC strides of the right tensor
-    std::vector< int64_t > m_strides_right_bc;
-    //! BN strides of the right tensor
-    std::vector< int64_t > m_strides_right_bn;
-    //! BK strides of the right tensor
-    std::vector< int64_t > m_strides_right_bk;
-    //! BJ strides of the right tensor
-    std::vector< int64_t > m_strides_right_bj;
-
-    //! BC strides of the auxiliary output tensor
-    std::vector< int64_t > m_strides_out_aux_bc;
-    //! BM strides of the auxiliary output tensor
-    std::vector< int64_t > m_strides_out_aux_bm;
-    //! BN strides of the auxiliary output tensor
-    std::vector< int64_t > m_strides_out_aux_bn;
-
-    //! BC strides of the output tensor
-    std::vector< int64_t > m_strides_out_bc;
-    //! BM strides of the output tensor
-    std::vector< int64_t > m_strides_out_bm;
-    //! BN strides of the output tensor
-    std::vector< int64_t > m_strides_out_bn;
+    //! target for the primitive k dimension
+    int64_t m_target_prim_k = 256;
+   
+    //! contraction backend
+    einsum_ir::binary::ContractionBackendTpp m_backend;
 
     /**
-     * Converts the given native datatype to a LIBXSMM datatype.
+     * Helper function for map find with default value
      *
-     * @param i_data_type native datatype.
-     * @return corresponding LIBXSMM datatype.
-     */
-    static libxsmm_datatype dtype_to_libxsmm( data_t i_dtype );
+     * @param i_map map.
+     * @param i_key key.
+     * @param i_default default value.
+     *
+     * @param return value or default value.
+     **/
+    template <typename T>
+    T map_find_default( std::map< int64_t, T > const * i_map,
+                        int64_t                        i_key,
+                        T                              i_default ){
+      if( auto search = i_map->find(i_key); search != i_map->end() ) {
+        return search->second;
+      }
+      else {
+        return i_default;
+      }
+    }
 
   public:
-    /**
-     * Destructor
-     **/
-    ~BinaryContractionTpp();
 
     /**
      * Compiles the binary contraction.
+     * @return SUCCESS if successful, error code otherwise.
      **/
     err_t compile();
 
@@ -118,7 +77,7 @@ class einsum_ir::backend::BinaryContractionTpp: public BinaryContraction {
      * @param i_tensor_left left input tensor.
      * @param i_tensor_right right input tensor.
      * @param i_tensor_out_aux auxiliary data w.r.t. output tensor.
-     * @param io_tensor_out output tensor. 
+     * @param io_tensor_out output tensor.
      **/
     void contract( void const * i_tensor_left,
                    void const * i_tensor_right,

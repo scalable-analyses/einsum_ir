@@ -94,6 +94,12 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
    */
   std::cout << "einsum_ir:" << std::endl;
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::MemoryManager l_memory;
   einsum_ir::backend::BinaryContractionTpp l_bin_cont;
   l_bin_cont.init( i_dim_ids_in_left.size(),
@@ -117,7 +123,8 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
                    i_dtype_einsum_ir,
                    einsum_ir::ZERO,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   l_tp0 = std::chrono::steady_clock::now();
   l_bin_cont.compile();
@@ -125,14 +132,6 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
   l_tp1 = std::chrono::steady_clock::now();
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time_compile = l_dur.count();
-
-  // enable threading
-#ifdef _OPENMP
-  // four times overload
-  int64_t l_num_tasks = omp_get_max_threads() * 4;
-
-  l_bin_cont.threading( l_num_tasks );
-#endif
 
   // warm up
   l_tp0 = std::chrono::steady_clock::now();

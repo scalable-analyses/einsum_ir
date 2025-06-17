@@ -2,7 +2,7 @@
 #define EINSUM_IR_BACKEND_BINARY_CONTRACTION_BLAS
 
 #include "BinaryContraction.h"
-#include "ContractionLoopsBlas.h"
+#include "../binary/ContractionBackendBlas.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -12,51 +12,41 @@ namespace einsum_ir {
 
 class einsum_ir::backend::BinaryContractionBlas: public BinaryContraction {
   private:
-    //! contraction loop interface
-    ContractionLoopsBlas m_cont_loops;
+    //! target for the primitive m dimension
+    int64_t m_target_prim_m = 512;
 
-    //! BC sizes
-    std::vector< int64_t > m_sizes_bc;
-    //! BM sizes
-    std::vector< int64_t > m_sizes_bm;
-    //! BN sizes
-    std::vector< int64_t > m_sizes_bn;
-    //! BK sizes
-    std::vector< int64_t > m_sizes_bk;
+    //! target for the primitive n dimension
+    int64_t m_target_prim_n = 512;
 
-    //! BC strides of of the left tensor
-    std::vector< int64_t > m_strides_left_bc;
-    //! BM strides of the left tensor
-    std::vector< int64_t > m_strides_left_bm;
-    //! BK strides of the left tensor
-    std::vector< int64_t > m_strides_left_bk;
-    //! BI strides of the left tensor
-    std::vector< int64_t > m_strides_left_bi;
+    //! target for the primitive k dimension
+    int64_t m_target_prim_k = 512;
+   
+    //! contraction backend
+    einsum_ir::binary::ContractionBackendBlas m_backend;
 
-    //! BC strides of the right tensor
-    std::vector< int64_t > m_strides_right_bc;
-    //! BN strides of the right tensor
-    std::vector< int64_t > m_strides_right_bn;
-    //! BK strides of the right tensor
-    std::vector< int64_t > m_strides_right_bk;
-    //! BJ strides of the right tensor
-    std::vector< int64_t > m_strides_right_bj;
-
-    //! BC strides of the auxiliary output tensor
-    std::vector< int64_t > m_strides_out_aux_bc;
-    //! BM strides of the auxiliary output tensor
-    std::vector< int64_t > m_strides_out_aux_bm;
-    //! BN strides of the auxiliary output tensor
-    std::vector< int64_t > m_strides_out_aux_bn;
-
-    //! BC strides of the output tensor
-    std::vector< int64_t > m_strides_out_bc;
-    //! BM strides of the output tensor
-    std::vector< int64_t > m_strides_out_bm;
-    //! BN strides of the output tensor
-    std::vector< int64_t > m_strides_out_bn;
+    /**
+     * Helper function for map find with default value
+     *
+     * @param i_map map.
+     * @param i_key key.
+     * @param i_default default value.
+     *
+     * @param return value or default value.
+     **/
+    template <typename T>
+    T map_find_default( std::map< int64_t, T > const * i_map,
+                        int64_t                        i_key,
+                        T                              i_default ){
+      if( auto search = i_map->find(i_key); search != i_map->end() ) {
+        return search->second;
+      }
+      else {
+        return i_default;
+      }
+    }
 
   public:
+
     /**
      * Compiles the binary contraction.
      * @return SUCCESS if successful, error code otherwise.

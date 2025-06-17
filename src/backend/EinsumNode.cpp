@@ -134,7 +134,8 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
                                            data_t                               i_dtype,
                                            void                               * i_data_ptr,
                                            EinsumNode                         * i_child,
-                                           MemoryManager                      * i_memory ) {
+                                           MemoryManager                      * i_memory,
+                                           int64_t                              i_num_threads ) {
   init( i_num_dims,
         i_dim_ids,
         i_dim_sizes_inner,
@@ -145,6 +146,8 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
 
   m_children.resize(1);
   m_children[0] = i_child;
+
+  m_num_threads = i_num_threads;
 }
 
 void einsum_ir::backend::EinsumNode::init( int64_t                              i_num_dims,
@@ -162,7 +165,8 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
                                            kernel_t                             i_ktype_last_touch,
                                            EinsumNode                         * i_left,
                                            EinsumNode                         * i_right,
-                                           MemoryManager                      * i_memory ) {
+                                           MemoryManager                      * i_memory,
+                                           int64_t                              i_num_threads ) {
   init( i_num_dims,
         i_dim_ids,
         i_dim_sizes_inner,
@@ -182,6 +186,8 @@ void einsum_ir::backend::EinsumNode::init( int64_t                              
   m_children.resize( 2 );
   m_children[0] = i_left;
   m_children[1] = i_right;
+
+  m_num_threads = i_num_threads;
 }
 einsum_ir::err_t einsum_ir::backend::EinsumNode::compile(){
   err_t l_err = err_t::UNDEFINED_ERROR;
@@ -301,7 +307,8 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
                   m_dtype,
                   m_ktype_first_touch,
                   m_ktype_main,
-                  m_ktype_last_touch );
+                  m_ktype_last_touch,
+                  m_num_threads );
 
     l_err = m_cont->compile();
     if( l_err != einsum_ir::SUCCESS ) {
@@ -431,22 +438,23 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
     m_num_ops_children += m_children[l_ch]->m_num_ops_children;
   }
 
+#ifdef _OPENMP
+  if( m_num_tasks_intra_op > 1 ) {
+    // magic number: 64^3
+    if(  m_num_ops_node == 0
+      || m_num_ops_node >= 262144 ) {
+      // four times overload
+      if( m_unary != nullptr ) m_unary->threading( m_num_threads * 4 );
+    }
+  }
+#endif
+
   m_compiled = true;
 
   return einsum_ir::SUCCESS;
 }
 
-einsum_ir::err_t einsum_ir::backend::EinsumNode::threading_intra_op( int64_t i_num_tasks ) {
-  m_num_tasks_intra_op = i_num_tasks;
 
-#ifdef _OPENMP
-  if( m_num_tasks_intra_op > 1 ) {
-    if( m_unary != nullptr ) m_unary->threading( m_num_tasks_intra_op );
-    if( m_cont  != nullptr ) m_cont->threading(  m_num_tasks_intra_op );
-  }
-#endif
-  return einsum_ir::SUCCESS;
-}
 
 einsum_ir::err_t einsum_ir::backend::EinsumNode::store_and_lock_data() {
   if( m_compiled == false ) {
