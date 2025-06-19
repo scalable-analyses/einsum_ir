@@ -386,9 +386,12 @@ TEST_CASE( "Blocked matmul with omp parallelisation.", "[contraction_backend]" )
   std::vector< int64_t > l_loop_strides_out_aux = {      0,    0,   0, 0, 0, 0 };
   std::vector< int64_t > l_loop_strides_out     = { 131072, 4096,   0, 1,64, 0 };
 
-  at::Tensor l_left    = at::randn( { 32, 8,64,64 } );
-  at::Tensor l_right   = at::randn( { 32, 8,64,64 } );
-  at::Tensor l_out     = at::randn( { 32,32,64,64 } );
+  at::Tensor l_left    = at::randn( { 32, 8,64,64 },
+                                    at::dtype( at::kDouble ) );
+  at::Tensor l_right   = at::randn( { 32, 8,64,64 },
+                                    at::dtype( at::kDouble ) );
+  at::Tensor l_out     = at::randn( { 32,32,64,64 },
+                                    at::dtype( at::kDouble ) );
   at::Tensor l_out_ref = l_out.clone();
 
   ContractionBackendTpp l_cont;
@@ -400,10 +403,10 @@ TEST_CASE( "Blocked matmul with omp parallelisation.", "[contraction_backend]" )
                l_loop_strides_right,
                l_loop_strides_out_aux,
                l_loop_strides_out,
-               data_t::FP32,
-               data_t::FP32,
-               data_t::FP32,
-               data_t::FP32,
+               data_t::FP64,
+               data_t::FP64,
+               data_t::FP64,
+               data_t::FP64,
                kernel_t::ZERO,
                kernel_t::MADD,
                kernel_t::UNDEFINED_KTYPE,
@@ -420,7 +423,7 @@ TEST_CASE( "Blocked matmul with omp parallelisation.", "[contraction_backend]" )
   l_out_ref = at::einsum( "abcd,ebfc->eafd",
                           { l_left, l_right } );
 
-  REQUIRE( at::allclose( l_out, l_out_ref, 1E-4, 1E-5 ) );
+  REQUIRE( at::allclose( l_out, l_out_ref ) );
 }
 
 TEST_CASE( "Tensor contraction with SFC parallelisation.", "[contraction_backend]" ) {

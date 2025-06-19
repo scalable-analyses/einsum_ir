@@ -2,6 +2,10 @@
 #include "catch.hpp"
 #include "BinaryContractionTblis.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 TEST_CASE( "FP32 TBLIS-based binary contraction executing a matmul.", "[binary_contraction_tblis]" ) {
   std::map< int64_t, int64_t > l_dim_sizes;
   l_dim_sizes.insert( std::pair< int64_t, int64_t >( 0, 2 ) );
@@ -11,6 +15,12 @@ TEST_CASE( "FP32 TBLIS-based binary contraction executing a matmul.", "[binary_c
   int64_t l_dim_ids_in_left[2]  = { 2, 0 };
   int64_t l_dim_ids_in_right[2] = { 1, 2 };
   int64_t l_dim_ids_out[2]      = { 1, 0 };
+
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
 
   // data layout
   //
@@ -40,7 +50,8 @@ TEST_CASE( "FP32 TBLIS-based binary contraction executing a matmul.", "[binary_c
                    einsum_ir::FP32,
                    einsum_ir::UNDEFINED_KTYPE,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   // data
   at::Tensor l_in_left  = at::rand( {4, 2} );
@@ -75,6 +86,12 @@ TEST_CASE( "FP64 TBLIS-based binary contraction executing a packed matmul.", "[b
   int64_t l_dim_ids_in_right[3] = { 1, 2, 3 };
   int64_t l_dim_ids_out[3]      = { 1, 0, 3 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   // data layout
   //
   //    ____nmc___
@@ -104,7 +121,8 @@ TEST_CASE( "FP64 TBLIS-based binary contraction executing a packed matmul.", "[b
                    einsum_ir::FP64,
                    einsum_ir::UNDEFINED_KTYPE,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   // data
   at::Tensor l_left    = at::rand( {4, 2, 3},
@@ -174,6 +192,12 @@ TEST_CASE( "FP32 TBLIS-based binary contraction involving C, M, N and K dimensio
   int64_t l_dim_ids_in_right[6] = { 8, 6, 3, 7, 5, 2 };
   int64_t l_dim_ids_out[7] = { 8, 6, 4, 5, 7, 1, 0 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::BinaryContractionTblis l_bin_cont;
   l_bin_cont.init( 7,
                    6,
@@ -192,7 +216,8 @@ TEST_CASE( "FP32 TBLIS-based binary contraction involving C, M, N and K dimensio
                    einsum_ir::FP32,
                    einsum_ir::ZERO,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   //                              0  1  2  3  4  5  6
   //                              y  g  c  x  a  e  i
@@ -261,6 +286,12 @@ TEST_CASE( "FP32 TBLIS-based binary contraction involving C, M, N and K dimensio
   int64_t l_dim_ids_in_right[6] = { 8, 6, 3, 7, 5, 2 };
   int64_t l_dim_ids_out[7] = { 6, 4, 5, 7, 1, 0, 8 };
 
+#ifdef _OPENMP
+  int64_t l_num_threads = omp_get_max_threads();
+#else
+  int64_t l_num_threads = 1;
+#endif
+
   einsum_ir::backend::BinaryContractionTblis l_bin_cont;
   l_bin_cont.init( 7,
                    6,
@@ -279,7 +310,8 @@ TEST_CASE( "FP32 TBLIS-based binary contraction involving C, M, N and K dimensio
                    einsum_ir::FP32,
                    einsum_ir::ZERO,
                    einsum_ir::MADD,
-                   einsum_ir::UNDEFINED_KTYPE );
+                   einsum_ir::UNDEFINED_KTYPE,
+                   l_num_threads );
 
   //                              0  1  2  3  4  5  6
   //                              y  g  c  x  a  e  i
