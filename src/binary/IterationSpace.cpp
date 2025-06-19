@@ -33,7 +33,7 @@ einsum_ir::err_t einsum_ir::binary::IterationSpace::compile(){
   //calculate number of generated tasks
   int64_t l_num_tasks = 1;
   int64_t l_num_parallel_loops = 0;
-  for( size_t l_id = 0; l_id < m_dim_types->size(); l_id++ ){
+  for( std::size_t l_id = 0; l_id < m_dim_types->size(); l_id++ ){
     if( m_exec_types->at(l_id) == exec_t::OMP ||
         m_exec_types->at(l_id) == exec_t::SFC    ){
       if( !l_num_parallel_loops ){
