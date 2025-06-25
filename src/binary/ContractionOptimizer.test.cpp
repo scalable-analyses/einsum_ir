@@ -16,7 +16,7 @@ TEST_CASE( "Simple test for Contraction Optimizer", "[contraction_optimizer]" ) 
   kernel_t l_kernel_main = kernel_t::MADD;
 
   int64_t l_size_before[] = {1,1,1,1};
-  for( int64_t l_id = 0; l_id < l_iters.size(); l_id++ ){
+  for( int64_t l_id = 0; l_id < (int64_t)l_iters.size(); l_id++ ){
     if( l_iters[l_id].dim_type == dim_t::C ){
       l_size_before[0] *= l_iters[l_id].size;
     }
@@ -83,7 +83,7 @@ TEST_CASE( "Matmul blocking test for Contraction Optimizer", "[contraction_optim
   kernel_t l_kernel_main = kernel_t::MADD;
 
   int64_t l_size_before[] = {1,1,1,1};
-  for( int64_t l_id = 0; l_id < l_iters.size(); l_id++ ){
+  for( int64_t l_id = 0; l_id < (int64_t)l_iters.size(); l_id++ ){
     if( l_iters[l_id].dim_type == dim_t::C ){
       l_size_before[0] *= l_iters[l_id].size;
     }
@@ -150,7 +150,7 @@ TEST_CASE( "Test of Contraction Optimizer for transposed kernel", "[contraction_
   kernel_t l_kernel_main = kernel_t::MADD;
 
   int64_t l_size_before[] = {1,1,1,1};
-  for( int64_t l_id = 0; l_id < l_iters.size(); l_id++ ){
+  for( int64_t l_id = 0; l_id < (int64_t)l_iters.size(); l_id++ ){
     if( l_iters[l_id].dim_type == dim_t::C ){
       l_size_before[0] *= l_iters[l_id].size;
     }

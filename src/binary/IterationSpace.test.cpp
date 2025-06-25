@@ -1,7 +1,6 @@
 #include "catch.hpp"
 #include "IterationSpace.h"
 
-#include <iostream>
 TEST_CASE( "Threading test for Iteration Space with SFC+OMP, 3 threads and broadcast of scalar value.", "[iter_space_sfc]" ) {
   //example: [c1,m2,k2,k1,m1],[c1,n2,k2,n1,k1]->[c1,n2,m2,n1,m1]
   //sizes:   [ 2, 3, 5, 2, 2],[ 2, 4, 5, 2, 2]->[ 2, 4, 3, 2, 2]
@@ -75,10 +74,10 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP, 3 threads and broad
     l_ptr_rec_out_aux += l_offset_out_aux;
     l_ptr_rec_out     += l_offset_out; 
 
-    REQUIRE( l_ptr_left    == l_ptr_rec_left    );
-    REQUIRE( l_ptr_right   == l_ptr_rec_right   );
-    REQUIRE( l_ptr_out_aux == l_ptr_rec_out_aux );
-    REQUIRE( l_ptr_out     == l_ptr_rec_out     );
+    REQUIRE( (int64_t)l_ptr_left    == (int64_t)l_ptr_rec_left    );
+    REQUIRE( (int64_t)l_ptr_right   == (int64_t)l_ptr_rec_right   );
+    REQUIRE( (int64_t)l_ptr_out_aux == (int64_t)l_ptr_rec_out_aux );
+    REQUIRE( (int64_t)l_ptr_out     == (int64_t)l_ptr_rec_out     );
 
     int64_t l_size = l_iter.get_num_tasks(l_thread_id);
     for(int64_t l_id = 0; l_id < l_size; l_id++){
@@ -161,10 +160,10 @@ TEST_CASE( "Threading test for OMP only Iteration Space, 5 threads and auxiliary
     l_ptr_rec_out_aux += l_offset_out_aux;
     l_ptr_rec_out     += l_offset_out; 
 
-    REQUIRE( l_ptr_left    == l_ptr_rec_left    );
-    REQUIRE( l_ptr_right   == l_ptr_rec_right   );
-    REQUIRE( l_ptr_out_aux == l_ptr_rec_out_aux );
-    REQUIRE( l_ptr_out     == l_ptr_rec_out     );
+    REQUIRE( (int64_t)l_ptr_left    == (int64_t)l_ptr_rec_left    );
+    REQUIRE( (int64_t)l_ptr_right   == (int64_t)l_ptr_rec_right   );
+    REQUIRE( (int64_t)l_ptr_out_aux == (int64_t)l_ptr_rec_out_aux );
+    REQUIRE( (int64_t)l_ptr_out     == (int64_t)l_ptr_rec_out     );
 
     int64_t l_size = l_iter.get_num_tasks(l_thread_id);
     for(int64_t l_id = 0; l_id < l_size; l_id++){
@@ -247,10 +246,10 @@ TEST_CASE( "Threading test for SFC only Iteration Space with 1 thread and no bia
     l_ptr_rec_out_aux += l_offset_out_aux;
     l_ptr_rec_out     += l_offset_out; 
 
-    REQUIRE( l_ptr_left    == l_ptr_rec_left    );
-    REQUIRE( l_ptr_right   == l_ptr_rec_right   );
-    REQUIRE( l_ptr_out_aux == l_ptr_rec_out_aux );
-    REQUIRE( l_ptr_out     == l_ptr_rec_out     );
+    REQUIRE( (int64_t)l_ptr_left    == (int64_t)l_ptr_rec_left    );
+    REQUIRE( (int64_t)l_ptr_right   == (int64_t)l_ptr_rec_right   );
+    REQUIRE( (int64_t)l_ptr_out_aux == (int64_t)l_ptr_rec_out_aux );
+    REQUIRE( (int64_t)l_ptr_out     == (int64_t)l_ptr_rec_out     );
 
     int64_t l_size = l_iter.get_num_tasks(l_thread_id);
     for(int64_t l_id = 0; l_id < l_size; l_id++){

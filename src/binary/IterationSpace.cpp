@@ -28,8 +28,6 @@ void einsum_ir::binary::IterationSpace::init( std::vector< dim_t >   const * i_d
 }
 
 einsum_ir::err_t einsum_ir::binary::IterationSpace::compile(){
- err_t l_err = err_t::UNDEFINED_ERROR;
-
   //calculate number of generated tasks
   int64_t l_num_tasks = 1;
   int64_t l_num_parallel_loops = 0;

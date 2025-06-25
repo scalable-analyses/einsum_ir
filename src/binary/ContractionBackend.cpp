@@ -258,8 +258,6 @@ void einsum_ir::binary::ContractionBackend::contract_iter( int64_t         i_thr
 }
 
 einsum_ir::err_t einsum_ir::binary::ContractionBackend::set_kernel_shape( ){
-  err_t l_err = err_t::UNDEFINED_ERROR;
-
   //check that there are enough primitive dimensions
   int64_t l_size = m_dim_sizes.size();
   int64_t l_num_prims = 0;
@@ -331,8 +329,8 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackend::set_kernel_shape( ){
 
   //set lda
   if(    m_m == 1 
-      || m_strides_left[l_id_m] == m_r
-      || m_strides_left[l_id_m] == 1   ){
+      || m_strides_left[l_id_m] == (int64_t)m_r
+      || m_strides_left[l_id_m] == 1            ){
     m_trans_a = false;
     m_lda = m_strides_left[l_id_k];
   }
@@ -347,8 +345,8 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackend::set_kernel_shape( ){
 
   //set ldb
   if(    m_k == 1
-      || m_strides_right[l_id_k] == m_r
-      || m_strides_right[l_id_k] == 1 ){
+      || m_strides_right[l_id_k] == (int64_t)m_r
+      || m_strides_right[l_id_k] == 1            ){
     m_trans_b = false;
     m_ldb = m_strides_right[l_id_n];
   }
@@ -363,7 +361,7 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackend::set_kernel_shape( ){
 
   //set ldc
   if(    m_m == 1
-      || m_strides_out[l_id_m] == m_r ){
+      || m_strides_out[l_id_m] == (int64_t)m_r ){
     m_ldc = m_strides_out[l_id_n];
   }
   else{
@@ -372,7 +370,7 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackend::set_kernel_shape( ){
 
   //set auxiliary strides
   if(    m_m == 1
-      || m_strides_out_aux[l_id_m] <= m_r ){
+      || m_strides_out_aux[l_id_m] <= (int64_t)m_r ){
     m_stride_m_out_aux = m_strides_out_aux[l_id_m];
     m_stride_n_out_aux = m_strides_out_aux[l_id_n];
   }
