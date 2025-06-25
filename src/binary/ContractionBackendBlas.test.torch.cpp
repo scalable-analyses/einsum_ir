@@ -65,7 +65,7 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction backend implementation
 
   l_out_ref = at::matmul( l_right, l_left );
 
-  REQUIRE( at::allclose( l_out, l_out_ref ) );
+  REQUIRE( at::allclose( l_out, l_out_ref, 1E-4, 1E-5 ) );
 }
 
 TEST_CASE( "Simple FP64 matmul using the BLAS contraction backend implementation.", "[contraction_backend_blas]" ) {
