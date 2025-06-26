@@ -126,6 +126,9 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackend::compile(){
       break;
     }
   }
+  if( m_num_parallel_loops == 0 ){
+    m_num_threads = 1;
+  }
 
   //check if first and last touch exists
   m_has_first_touch = m_ktype_first_touch != kernel_t::UNDEFINED_KTYPE;
@@ -163,34 +166,20 @@ void einsum_ir::binary::ContractionBackend::contract( void const * i_tensor_left
                                                       void const * i_tensor_right,
                                                       void const * i_tensor_out_aux,
                                                       void       * io_tensor_out ) {
-  //only execute in parallel if there are parallel loops
-  if( m_id_first_parallel_loop >= 0 && m_num_threads > 1 ){
 #ifdef _OPENMP
-#pragma omp parallel num_threads(m_num_threads)
-    {
-      int64_t l_thread_id = omp_get_thread_num();
-      int64_t l_offset_left, l_offset_right, l_offset_out_aux, l_offset_out;
-      m_iter.get_initial_offsets( l_thread_id, l_offset_left, l_offset_right, l_offset_out_aux, l_offset_out );
-      contract_iter( l_thread_id,
-                     0,
-                     (char *) i_tensor_left + l_offset_left,
-                     (char *) i_tensor_right + l_offset_right,
-                     (char *) i_tensor_out_aux + l_offset_out_aux,
-                     (char *) io_tensor_out + l_offset_out,
-                     m_has_first_touch,
-                     m_has_last_touch );
-    }
+#pragma omp parallel for num_threads(m_num_threads)
 #endif
-  }
-  else{
-    contract_iter( 0,
-                   0,
-                   (char *) i_tensor_left,
-                   (char *) i_tensor_right,
-                   (char *) i_tensor_out_aux,
-                   (char *) io_tensor_out,
-                   m_has_first_touch,
-                   m_has_last_touch );
+  for( int64_t l_thread_id = 0; l_thread_id < m_num_threads; l_thread_id++ ) {
+    int64_t l_offset_left, l_offset_right, l_offset_out_aux, l_offset_out;
+    m_iter.get_initial_offsets( l_thread_id, l_offset_left, l_offset_right, l_offset_out_aux, l_offset_out );
+    contract_iter( l_thread_id,
+                    0,
+                    (char *) i_tensor_left + l_offset_left,
+                    (char *) i_tensor_right + l_offset_right,
+                    (char *) i_tensor_out_aux + l_offset_out_aux,
+                    (char *) io_tensor_out + l_offset_out,
+                    m_has_first_touch,
+                    m_has_last_touch );
   }
 }
 

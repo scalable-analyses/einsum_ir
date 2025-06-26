@@ -44,9 +44,6 @@ einsum_ir::err_t einsum_ir::binary::IterationSpace::compile(){
     }
   }
   m_parallel_loops.end = m_parallel_loops.begin + l_num_parallel_loops;
-  if( l_num_parallel_loops == 0 ){
-    return err_t::SUCCESS;
-  }
 
   //assigns parallel dimensions to three types omp, sfc_n, sfc_m
   m_sfc_tasks_m = 1;
