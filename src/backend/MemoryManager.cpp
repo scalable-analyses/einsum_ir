@@ -9,7 +9,7 @@ einsum_ir::backend::MemoryManager::~MemoryManager() {
     delete [] (char *)  m_memory_ptr;
   }
   if( m_req_thread_mem){
-    for( int l_id = 0; l_id < m_thread_memory.size(); l_id++ ){
+    for( std::size_t l_id = 0; l_id < m_thread_memory.size(); l_id++ ){
       delete [] (char *) m_thread_memory[l_id];
     }
   }

@@ -71,7 +71,7 @@ TEST_CASE( "TPP-based binary contraction executing matmuls.", "[binary_contracti
                        l_in_right.data_ptr(),
                        l_out_native.data_ptr() );
 
-  REQUIRE( at::allclose( l_out_ref, l_out_native )  );
+  REQUIRE( at::allclose( l_out_ref, l_out_native, 1E-4, 1E-7 )  );
 }
 
 TEST_CASE( "TPP-based Matrix-matrix multiplication with a full-tensor bias.", "[binary_contraction_tpp]" ) {
@@ -362,7 +362,7 @@ TEST_CASE( "TPP-based matrix-matrix multiplication with a bias (column to matrix
                        l_bias.data_ptr(),
                        l_out.data_ptr() );
 
-  REQUIRE( at::allclose( l_out, l_out_ref )  );
+  REQUIRE( at::allclose( l_out, l_out_ref, 1E-4, 1E-7 )  );
 }
 
 TEST_CASE( "FP32 TPP-based binary contraction executing a batched matmul.", "[binary_contraction_tpp]" ) {

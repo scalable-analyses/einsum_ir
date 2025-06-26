@@ -172,7 +172,7 @@ void einsum_ir::binary::ContractionBackendBlas::kernel_first_touch_part( void * 
   // packed GEMM primitive without zeroing: n[...]mc -> n[...]cm
   else if(    ( m_ktype_main == kernel_t::PACKED_MADD || m_ktype_main == kernel_t::CPX_PACKED_MADD )
            && m_r > 1 ) {
-    for( int64_t l_n = 0; l_n < m_n; l_n++ ) {
+    for( uint64_t l_n = 0; l_n < m_n; l_n++ ) {
       void * l_out = (char *) io_out + l_n * m_ldc * m_num_bytes_scalar;
       if( m_dtype_comp == data_t::FP32 ) {
         kernel_trans_32( m_r,
@@ -266,7 +266,7 @@ void einsum_ir::binary::ContractionBackendBlas::kernel_main( void const * i_left
   }
   // packed GEMM primitive: ckm, cnk -> n[...]cm
   else {
-    for( int64_t l_c = 0; l_c < m_r; l_c++ ) {
+    for( uint64_t l_c = 0; l_c < m_r; l_c++ ) {
       // derive pointers for current GEMM
       void const * l_left  = (char *) i_left  + l_c * m_k * m_lda * m_num_bytes_scalar;
       void const * l_right = (char *) i_right + l_c * m_n * m_ldb * m_num_bytes_scalar;
@@ -326,7 +326,7 @@ void einsum_ir::binary::ContractionBackendBlas::kernel_last_touch_part( void * i
 
   if( m_r != 1 ) {
     // transpose part of the packed GEMM primitive: n[...]cm -> n[...]mc
-    for( int64_t l_n = 0; l_n < m_n; l_n++ ) {
+    for( uint64_t l_n = 0; l_n < m_n; l_n++ ) {
       void * l_out = (char *) io_out + l_n * m_ldc * m_num_bytes_scalar;
 
       if( m_dtype_comp == data_t::FP32 ) {

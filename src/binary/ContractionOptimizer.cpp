@@ -120,49 +120,51 @@ void einsum_ir::binary::ContractionOptimizer::move_iters_to_internal(){
 }
 
 void einsum_ir::binary::ContractionOptimizer::add_kernel(){
-  typedef enum {
+  enum {
     PRIM_BR = 0,
     PRIM_C  = 1,
     PRIM_M  = 2,
     PRIM_N  = 3,
     PRIM_K  = 4
-  } primitive_dim_t;
+  };
 
   //find possible kernel dimensions
   bool l_transpose_a = false;
   bool l_transpose_b = false;
+  int64_t l_req_stride = 1;
   int64_t l_potential_kernel_size[] = {1,1,1,1,1};
+  std::vector<iter_property>::iterator l_iteration;
   std::vector<iter_property>::iterator l_potential_kernel_iter[] = { m_free_iters[ dim_t::K ].end(),
                                                                      m_free_iters[ dim_t::C ].end(),
                                                                      m_free_iters[ dim_t::M ].end(),
                                                                      m_free_iters[ dim_t::N ].end(),
                                                                      m_free_iters[ dim_t::K ].end() };  
   //find possible C kernel dimension
-  std::vector<iter_property>::iterator l_iteration;
-  int64_t l_req_stride = 1;
-  l_iteration = m_free_iters[ dim_t::C ].end() - 1;
-  if( m_free_iters[ dim_t::C ].size() > 0  &&
-      l_iteration->stride_left  == l_req_stride &&
-      l_iteration->stride_right == l_req_stride &&
-      l_iteration->stride_out   == l_req_stride &&
-      m_packed_gemm_support  == true            ){
-    l_potential_kernel_iter[ PRIM_C ] = l_iteration;
-    l_potential_kernel_size[ PRIM_C ] = l_iteration->size;
-    l_req_stride *= l_iteration->size;
+  if(    m_free_iters[ dim_t::C ].size() > 0 
+      && m_packed_gemm_support  == true      ) {
+    l_iteration = m_free_iters[ dim_t::C ].end() - 1;
+    if(    l_iteration->stride_left  == l_req_stride
+        && l_iteration->stride_right == l_req_stride
+        && l_iteration->stride_out   == l_req_stride ){
+      l_potential_kernel_iter[ PRIM_C ] = l_iteration;
+      l_potential_kernel_size[ PRIM_C ] = l_iteration->size;
+      l_req_stride *= l_iteration->size;
+    }
   }
   
   //find possible M kernel dimension
-  l_iteration = m_free_iters[ dim_t::M ].end() - 1;
-  if( m_free_iters[ dim_t::M ].size() > 0 &&
-      l_iteration->stride_out  == l_req_stride    ){
-    l_potential_kernel_iter[ PRIM_M ] = l_iteration;
-    l_potential_kernel_size[ PRIM_M ] = l_iteration->size;
-    l_transpose_a = l_iteration->stride_left == l_req_stride ? false : true;
+  if( m_free_iters[ dim_t::M ].size() > 0 ) {
+    l_iteration = m_free_iters[ dim_t::M ].end() - 1;
+    if( l_iteration->stride_out  == l_req_stride    ){
+      l_potential_kernel_iter[ PRIM_M ] = l_iteration;
+      l_potential_kernel_size[ PRIM_M ] = l_iteration->size;
+      l_transpose_a = l_iteration->stride_left == l_req_stride ? false : true;
+    }
   }
 
   //find possible N kernel dimension
-  l_iteration = m_free_iters[ dim_t::N ].end() - 1;
   if( m_free_iters[ dim_t::N ].size() > 0 ){
+    l_iteration = m_free_iters[ dim_t::N ].end() - 1;
     l_potential_kernel_iter[ PRIM_N ] = l_iteration;
     l_potential_kernel_size[ PRIM_N ] = l_iteration->size;
     l_transpose_b = l_iteration->stride_right == l_req_stride ? true : false;
@@ -185,9 +187,9 @@ void einsum_ir::binary::ContractionOptimizer::add_kernel(){
   }
 
   //find possible BR kernel dimension
-  l_iteration = m_free_iters[ dim_t::K ].end() - 2;
   if( m_free_iters[ dim_t::K ].size() > 1 &&
       m_br_gemm_support == true                ){
+    l_iteration = m_free_iters[ dim_t::K ].end() - 2;
     l_potential_kernel_iter[ PRIM_BR ] = l_iteration;
     l_potential_kernel_size[ PRIM_BR ] = l_iteration->size;
   }
@@ -288,19 +290,18 @@ void einsum_ir::binary::ContractionOptimizer::reorder_iters(){
   }
 
   //add parallel dimension
-  int64_t l_size_parallel = 1;
-  l_size_parallel *= move_iters_until( &m_free_iters[dim_t::N],
-                                       m_iter_space, 
-                                       l_target_parallel_n,
-                                       exec_t::SFC);
-  l_size_parallel *= move_iters_until( &m_free_iters[dim_t::M],
-                                       m_iter_space, 
-                                       l_target_parallel_m,
-                                       exec_t::SFC);
-  l_size_parallel *= move_iters_until( &m_free_iters[dim_t::C],
-                                       m_iter_space, 
-                                       l_target_parallel_c,
-                                       exec_t::OMP);
+  move_iters_until( &m_free_iters[dim_t::N],
+                    m_iter_space, 
+                    l_target_parallel_n,
+                    exec_t::SFC);
+  move_iters_until( &m_free_iters[dim_t::M],
+                    m_iter_space, 
+                    l_target_parallel_m,
+                    exec_t::SFC);
+  move_iters_until( &m_free_iters[dim_t::C],
+                    m_iter_space, 
+                    l_target_parallel_c,
+                    exec_t::OMP);
 
 
   //add remaining dimensions
