@@ -36,6 +36,12 @@ class einsum_ir::binary::ContractionBackend {
     //! indicates existance of last touch kernel
     bool m_has_last_touch = false;
 
+    //! vector with thread personal information
+    std::vector<thread_info> m_thread_infos;
+
+    //! indicates if the backend is compiled
+    bool m_is_compiled = false;
+
   protected:
     //! datatype of the left input
     data_t m_dtype_left = UNDEFINED_DTYPE;
@@ -206,7 +212,7 @@ class einsum_ir::binary::ContractionBackend {
      * General purpose loop implementation featuring first and last touch operations.
      * No threading is applied.
      *
-     * @param i_thread_id id of the executing thread
+     * @param i_thread_inf information for the executing thread.
      * @param i_id_loop dimension id of the loop which is executed.
      * @param i_ptr_left pointer to the left tensor's data.
      * @param i_ptr_right pointer to the right tensor's data.
@@ -215,7 +221,7 @@ class einsum_ir::binary::ContractionBackend {
      * @param i_first_access true if first time accessing this data
      * @param i_last_access true if last time accessing this data
      **/
-    void contract_iter( int64_t         i_thread_id,
+    void contract_iter( thread_info   * i_thread_inf,
                         int64_t         i_id_loop,
                         char    const * i_ptr_left,
                         char    const * i_ptr_right,
