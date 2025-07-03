@@ -23,8 +23,6 @@ class einsum_ir::binary::IterationSpace {
     std::vector< exec_t >  const * m_exec_types;
     //! vector with the loop sizes
     std::vector< int64_t > const * m_sizes;
-    //! vector with vectors for all strides
-    std::vector< std::vector< int64_t > const * > m_strides;
 
     //! number of sfc tasks m tasks
     int64_t m_sfc_tasks_m = 1;
@@ -39,28 +37,16 @@ class einsum_ir::binary::IterationSpace {
     range_t m_sfc_loops_m;
     //! range of sfc n loops
     range_t m_sfc_loops_n;
-
-    //! matrix of movements accessed by thread_id and task_id
-    std::vector< std::vector< sfc_t > > m_dim_movements;
-    
-    //! matrix of movement offsets accessed by io_id and movement_id
-    std::vector< std::vector< int64_t > > m_movement_offsets;
-
-    //! matrix of initial offsets accessed by thread_id and io_id
-    std::vector< std::vector< int64_t > > m_initial_offsets;
     
     //! number of threads
     int64_t m_num_threads = 0;
 
     /**
-     * Converts strides into offsets from previous dimension.
-     * i.e. creates a data structure that encodes jumps corresponding to different movements through tensor
+     * Converts strides into offsets for sfc dimensions.
      *
-     * @param i_strides vector with strides.
-     * @param io_offsets vector with calculated offsets.
+     * @param io_strides vector with strides.
      **/
-    void convert_strides_to_offsets( std::vector< int64_t > const & i_strides,
-                                     std::vector< int64_t >       & io_offsets );
+    void convert_strides_to_offsets( std::vector< int64_t > & io_strides );
     
     /**
      * Calculates the offset to access an element specified by the ids.
@@ -102,22 +88,6 @@ class einsum_ir::binary::IterationSpace {
                         int64_t *o_n, 
                         int64_t *o_omp, 
                         int64_t  i_idx );
-    
-    /**
-     * Calculates gilbert curve
-     *
-     * @param x calculated x id.
-     * @param y calculated y id.
-     * @param idx sfc id.
-     * @param w sfc width.
-     * @param h sfc height
-     **/
-    void gilbert_d2xy( int *x, 
-                       int *y, 
-                       int  idx,
-                       int  w,
-                       int  h );
-
 
   public:
     /**
@@ -134,68 +104,29 @@ class einsum_ir::binary::IterationSpace {
      * @param i_loop_dim_type dimension type of the loops.
      * @param i_loop_exec_type execution type of the loops.
      * @param i_loop_sizes sizes of the loops.
-     * @param i_loop_strides_left strides in the left input tensor.
-     * @param i_loop_strides_right strides in the right input tensor.
-     * @param i_loop_strides_out_aux strides in the auxiliary output tensor.
-     * @param i_loop_strides_out strides in the output tensor.
      * @param i_num_threads number of threads for contraction.
     **/
     void init( std::vector< dim_t >   const * i_loop_dim_type,
                std::vector< exec_t >  const * i_loop_exec_type,
                std::vector< int64_t > const * i_loop_sizes,
-               std::vector< int64_t > const * i_loop_strides_left,
-               std::vector< int64_t > const * i_loop_strides_right,
-               std::vector< int64_t > const * i_loop_strides_out_aux,
-               std::vector< int64_t > const * i_loop_strides_out,
                int64_t                        i_num_threads);
 
     /**
-     * Compiles the contraction loop interface.
+     * Creates ThreadInfo objects for each thread and changes sfc strides.
+     *
+     * @param io_loop_strides_left strides in the left input tensor.
+     * @param io_loop_strides_right strides in the right input tensor.
+     * @param io_loop_strides_out_aux strides in the auxiliary output tensor.
+     * @param io_loop_strides_out strides in the output tensor.
+     * @param io_thread_infos vector to store thread information.
      *
      * @return SUCCESS if the compilation was successful, otherwise an appropiate error code.
      **/
-    err_t compile();
-
-    /**
-     * Gets the number of tasks for a specified thread.
-     *
-     * @param i_thread_id id of thread.
-     *
-     * @return number of tasks.
-     **/
-    int64_t get_num_tasks( int64_t i_thread_id );
-
-    /**
-     * Adds the Movement at the task id to all datapointer.
-     *
-     * @param i_thread_id id of thread.
-     * @param i_task_id id of task.
-     * @param io_ptr_left pointer to pointer of left tensor.
-     * @param io_ptr_right pointer to pointer of right tensor.
-     * @param io_ptr_out pointer to pointer of auxiliary output tensor.
-     * @param io_ptr_out pointer to pointer of output tensor.
-     **/
-    void add_movement_offsets( int64_t          i_thread_id, 
-                               int64_t          i_task_id,
-                               char    const ** io_ptr_left,
-                               char    const ** io_ptr_right,
-                               char    const ** io_ptr_out_aux,
-                               char          ** io_ptr_out );
-    
-    /**
-     * Gets the initial offsets for all datapointer.
-     *
-     * @param i_thread_id id of thread.
-     * @param o_ptr_left offset of left tensor.
-     * @param o_ptr_right offset of right tensor.
-     * @param o_ptr_out_aux offset of auxiliary output tensor.
-     * @param o_ptr_out offset of output tensor.
-     **/
-    void get_initial_offsets( int64_t   i_thread_id,
-                              int64_t & o_off_left,
-                              int64_t & o_off_right,
-                              int64_t & o_off_out_aux,
-                              int64_t & o_off_out );
+    err_t setup( std::vector< int64_t >   & io_strides_left,
+                 std::vector< int64_t >   & io_strides_right,
+                 std::vector< int64_t >   & io_strides_out_aux,
+                 std::vector< int64_t >   & io_strides_out,
+                 std::vector<thread_info> & io_thread_infos );
 };
 
 #endif

@@ -149,11 +149,11 @@ int gilbert_d2xy_r( int dst_idx, int cur_idx,
                         -(ax-ax2), -(ay-ay2));
 }
 
-void einsum_ir::binary::IterationSpace::gilbert_d2xy( int *x, 
-                                                      int *y, 
-                                                      int  idx,
-                                                      int  w,
-                                                      int  h  ) {  
+void gilbert_d2xy( int *x, 
+                   int *y, 
+                   int  idx,
+                   int  w,
+                   int  h  ) {  
   *x = 0;
   *y = 0;
 

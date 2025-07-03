@@ -39,6 +39,8 @@ void einsum_ir::binary::ContractionBackend::init( std::vector< dim_t >   const &
   m_ktype_last_touch  = i_ktype_last_touch;
 
   m_num_threads = i_num_threads;
+
+  m_is_compiled = false;
 }
 
 void einsum_ir::binary::ContractionBackend::init( std::vector< iter_property > const & i_iterations,
@@ -80,10 +82,15 @@ void einsum_ir::binary::ContractionBackend::init( std::vector< iter_property > c
   m_ktype_last_touch  = i_ktype_last_touch;
 
   m_num_threads = i_num_threads;
+
+  m_is_compiled = false;
 }
 
 einsum_ir::err_t einsum_ir::binary::ContractionBackend::compile(){
   err_t l_err = err_t::UNDEFINED_ERROR;
+  if( m_is_compiled ){
+    return err_t::SUCCESS;
+  }
 
   // get kernel shape
   l_err = set_kernel_shape();
@@ -142,23 +149,24 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackend::compile(){
     m_strides_out_aux[l_id] *= ce_n_bytes(m_dtype_out  );
   }
   
-
   // init iteration spaces
   m_iter.init( &m_dim_type,
                &m_exec_type,
                &m_dim_sizes,
-               &m_strides_left,
-               &m_strides_right,
-               &m_strides_out_aux,
-               &m_strides_out,
                m_num_threads );
 
   // compile iteration spaces
-  l_err = m_iter.compile();
+  l_err = m_iter.setup( m_strides_left,
+                        m_strides_right,
+                        m_strides_out_aux,
+                        m_strides_out,
+                        m_thread_infos );
+
   if( l_err != err_t::SUCCESS ) {
     return l_err;
   }
 
+  m_is_compiled = true;
   return err_t::SUCCESS;
 }
 
@@ -170,21 +178,19 @@ void einsum_ir::binary::ContractionBackend::contract( void const * i_tensor_left
 #pragma omp parallel for num_threads(m_num_threads)
 #endif
   for( int64_t l_thread_id = 0; l_thread_id < m_num_threads; l_thread_id++ ) {
-    int64_t l_offset_left, l_offset_right, l_offset_out_aux, l_offset_out;
-    m_iter.get_initial_offsets( l_thread_id, l_offset_left, l_offset_right, l_offset_out_aux, l_offset_out );
-    contract_iter( l_thread_id,
-                    0,
-                    (char *) i_tensor_left + l_offset_left,
-                    (char *) i_tensor_right + l_offset_right,
-                    (char *) i_tensor_out_aux + l_offset_out_aux,
-                    (char *) io_tensor_out + l_offset_out,
-                    m_has_first_touch,
-                    m_has_last_touch );
+    thread_info * l_thread_inf = &m_thread_infos[l_thread_id];
+    contract_iter( l_thread_inf,
+                   0,
+                   (char *) i_tensor_left    + l_thread_inf->offset_left,
+                   (char *) i_tensor_right   + l_thread_inf->offset_right,
+                   (char *) i_tensor_out_aux + l_thread_inf->offset_out_aux,
+                   (char *) io_tensor_out    + l_thread_inf->offset_out,
+                   m_has_first_touch,
+                   m_has_last_touch );
   }
 }
 
-
-void einsum_ir::binary::ContractionBackend::contract_iter( int64_t         i_thread_id,
+void einsum_ir::binary::ContractionBackend::contract_iter( thread_info   * i_thread_inf,
                                                            int64_t         i_id_loop,
                                                            char    const * i_ptr_left,
                                                            char    const * i_ptr_right,
@@ -195,10 +201,14 @@ void einsum_ir::binary::ContractionBackend::contract_iter( int64_t         i_thr
   bool l_first_access = i_first_access;
   bool l_last_access  = i_last_access;
 
+  int64_t l_current_id = i_id_loop;
+  int64_t l_direction = 1;
+
   int64_t l_size = m_dim_sizes[i_id_loop];
+  int64_t l_id_next_loop = i_id_loop + 1;
   if( i_id_loop == m_id_first_parallel_loop ){
-    i_id_loop += m_num_parallel_loops - 1;
-    l_size = m_iter.get_num_tasks( i_thread_id );
+    l_id_next_loop = i_id_loop + m_num_parallel_loops;
+    l_size = i_thread_inf->movement_ids.size();
   }
 
   // issue loop iterations
@@ -207,9 +217,16 @@ void einsum_ir::binary::ContractionBackend::contract_iter( int64_t         i_thr
     l_first_access = i_first_access && ( l_non_k_loop || l_it == 0 );
     l_last_access  = i_last_access  && ( l_non_k_loop || l_it == m_dim_sizes[i_id_loop] - 1 );
 
-    if( i_id_loop + 1 < m_id_first_primitive_dim ) {
-      contract_iter( i_thread_id,
-                     i_id_loop+1,
+    if( i_id_loop == m_id_first_parallel_loop ){
+      sfc_t l_move =  i_thread_inf->movement_ids[l_it];
+      sfc_t l_sign = (l_move & 1);
+      l_direction  = 1 - ( (int64_t)l_sign << 1); 
+      l_current_id = l_move >> 1;
+    }
+
+    if( l_id_next_loop < m_id_first_primitive_dim ) {
+      contract_iter( i_thread_inf,
+                     l_id_next_loop,
                      i_ptr_left,
                      i_ptr_right,
                      i_ptr_out_aux,
@@ -234,15 +251,10 @@ void einsum_ir::binary::ContractionBackend::contract_iter( int64_t         i_thr
     }
 
     //update pointer
-    if( i_id_loop == m_id_first_parallel_loop + m_num_parallel_loops - 1 ){
-      m_iter.add_movement_offsets(i_thread_id, l_it, &i_ptr_left, &i_ptr_right, &i_ptr_out_aux, &i_ptr_out );
-    }
-    else{
-      i_ptr_left    += m_strides_left[ i_id_loop ];
-      i_ptr_right   += m_strides_right[ i_id_loop ];
-      i_ptr_out_aux += m_strides_out_aux[ i_id_loop ];
-      i_ptr_out     += m_strides_out[ i_id_loop ];
-    }  
+    i_ptr_left    += l_direction * m_strides_left[    l_current_id ];
+    i_ptr_right   += l_direction * m_strides_right[   l_current_id ];
+    i_ptr_out_aux += l_direction * m_strides_out_aux[ l_current_id];
+    i_ptr_out     += l_direction * m_strides_out[     l_current_id ];
   }
 }
 

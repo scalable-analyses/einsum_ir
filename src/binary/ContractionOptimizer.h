@@ -32,6 +32,12 @@ class einsum_ir::binary::ContractionOptimizer {
     //! targeted number of tasks
     int64_t m_target_parallel = 1;
 
+    //! number of bytes for scalar data types in output tensor
+    int64_t m_num_bytes_scalar_out = 4;
+
+    //! size of L2 cache in bytes
+    int64_t m_l2_cache_size = 1024 * 1024; // 1MB L2 cache size
+
     //! number of threads
     int64_t m_num_threads = 1;
 
@@ -158,7 +164,9 @@ class einsum_ir::binary::ContractionOptimizer {
                int64_t                        i_target_n,
                int64_t                        i_target_k,
                bool                           i_br_gemm_support,
-               bool                           i_packed_gemm_support  );    
+               bool                           i_packed_gemm_support,
+               int64_t                        i_num_bytes_scalar_out = 4,
+               int64_t                        i_l2_cache_size = 1024 * 1024 );    
   
     /**
      * Optimizes the iters.

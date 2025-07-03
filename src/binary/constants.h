@@ -25,6 +25,14 @@ namespace einsum_ir {
     };
 
     typedef uint8_t sfc_t;
+
+    struct thread_info {
+      int64_t offset_left = 0;
+      int64_t offset_right = 0;
+      int64_t offset_out_aux = 0;
+      int64_t offset_out = 0;
+      std::vector<sfc_t> movement_ids;
+    };
   }
 }
 
