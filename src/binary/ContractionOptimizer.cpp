@@ -9,7 +9,9 @@ void einsum_ir::binary::ContractionOptimizer::init( std::vector< iter_property >
                                                     int64_t                        i_target_n,
                                                     int64_t                        i_target_k,
                                                     bool                           i_br_gemm_support,
-                                                    bool                           i_packed_gemm_support ){
+                                                    bool                           i_packed_gemm_support,
+                                                    int64_t                        i_num_bytes_scalar_out,
+                                                    int64_t                        i_l2_cache_size ){
   m_iter_space = i_iter_space;
   m_ktype_main = i_ktype_main;
   m_num_threads = i_num_threads;
@@ -21,8 +23,10 @@ void einsum_ir::binary::ContractionOptimizer::init( std::vector< iter_property >
   m_br_gemm_support = i_br_gemm_support;
   m_packed_gemm_support = i_packed_gemm_support;
 
-  // targets 128 tasks per thread. 128 seems to be working well
-  m_target_parallel = i_num_threads * 128;
+  m_target_parallel = i_num_threads;
+
+  m_num_bytes_scalar_out = i_num_bytes_scalar_out;
+  m_l2_cache_size = i_l2_cache_size;
 }
 
 void einsum_ir::binary::ContractionOptimizer::optimize(){
@@ -268,26 +272,27 @@ void einsum_ir::binary::ContractionOptimizer::add_kernel(){
   
   m_size_all_m /= l_kernel_sizes[PRIM_M];
   m_size_all_n /= l_kernel_sizes[PRIM_N];
+
+  //use about half of the L2 cache for C blocking (A and B tend to be a lot smaller because of SFC blocking in M and )
+  int64_t l_target_thread_tasks = m_l2_cache_size / 2 / (l_kernel_sizes[PRIM_M] * l_kernel_sizes[PRIM_N] * m_num_bytes_scalar_out );
+  m_target_parallel = m_num_threads * l_target_thread_tasks;
 }
 
 void einsum_ir::binary::ContractionOptimizer::reorder_iters(){
   //determine parallel targets similarly to kernel targets
-  int64_t l_target_parallel_m = std::sqrt(m_target_parallel);
-  int64_t l_target_parallel_n = std::sqrt(m_target_parallel);
+  int64_t l_target_parallel_m = m_size_all_m;
+  int64_t l_target_parallel_n = m_size_all_n;
   int64_t l_target_parallel_c = 1;
 
-  while( m_size_all_m <= l_target_parallel_m / 2 ){
-    l_target_parallel_m /= 2;
-    l_target_parallel_n *= 2;
+  while( l_target_parallel_m * l_target_parallel_n > m_target_parallel ){
+    if( l_target_parallel_m >= l_target_parallel_n ){
+      l_target_parallel_m /= 2;
+    }
+    else{
+      l_target_parallel_n /= 2;
+    }
   }
-  while( m_size_all_n <= l_target_parallel_n / 2 ){
-    l_target_parallel_n /= 2;
-    l_target_parallel_m *= 2;
-  }
-  while( m_size_all_m <= l_target_parallel_m / 2 ){
-    l_target_parallel_m /= 2;
-    l_target_parallel_c *= 2;
-  }
+  l_target_parallel_c = m_target_parallel / (l_target_parallel_m * l_target_parallel_n);
 
   //add parallel dimension
   move_iters_until( &m_free_iters[dim_t::N],

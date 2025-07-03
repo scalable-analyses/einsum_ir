@@ -74,7 +74,8 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                m_target_prim_n,
                m_target_prim_k,
                true,
-               true );
+               true,
+               ce_n_bytes(m_dtype_out) );
   l_optim.optimize();
 
   
