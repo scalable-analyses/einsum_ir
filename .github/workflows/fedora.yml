@@ -152,3 +152,21 @@ jobs:
 
           ./build_llvm/bench_mlp model_mlp.pt 0
           ./build_llvm/bench_mlp model_mlp.pt 1
+
+  binary_contraction_lib:
+    strategy:
+      matrix:
+        arch: [raptor-lake, grace, m4]
+    runs-on: ["${{ matrix.arch }}"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install
+        run: |
+          mkdir build
+          cd build
+          cmake ../src/binary
+          make -j
+          cd ..
+          cmake --install build --prefix $(pwd)/install
