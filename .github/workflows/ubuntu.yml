@@ -55,7 +55,30 @@ jobs:
         run: |
           ./build/tests
 
-  binary_contraction_lib:
+  binary_contraction_lib_manual:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LIBXSMM
+        run: |
+          git clone https://github.com/libxsmm/libxsmm.git
+          cd libxsmm
+          make BLAS=0 -j
+          cd ..
+          echo LIBXSMM_PATH=$(pwd)/libxsmm >> $GITHUB_ENV
+
+      - name: Install Binary Contraction Library
+        run: |
+          mkdir build
+          cd build
+          LIBXSMM_ROOT=${LIBTORCH_PATH} cmake ../src/binary
+          make -j
+          cd ..
+          cmake --install build --prefix $(pwd)/install
+
+  binary_contraction_lib_auto:
     runs-on: ubuntu-latest
 
     steps:
