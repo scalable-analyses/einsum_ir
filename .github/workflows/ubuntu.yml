@@ -65,7 +65,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake ../src/binary_tops
+          cmake ../src/binary
           make -j
           cd ..
           cmake --install build_maclex2 --prefix $(pwd)/install_binary_tops
