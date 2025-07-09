@@ -73,7 +73,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake ../src/binary -DLIBXSMM_ROOT=${LIBTORCH_PATH} -DEINSUM_IR_AUTO_INSTALL_LIBXSMM=OFF
+          cmake ../src/binary -DLIBXSMM_ROOT=${LIBXSMM_PATH} -DEINSUM_IR_AUTO_INSTALL_LIBXSMM=OFF
           make -j
           cd ..
           cmake --install build --prefix $(pwd)/install
