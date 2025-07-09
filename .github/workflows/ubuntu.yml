@@ -55,7 +55,7 @@ jobs:
         run: |
           ./build/tests
 
-  binary_contraction_lib_manual:
+  bcont_lib_manual:
     runs-on: ubuntu-latest
 
     steps:
@@ -78,7 +78,7 @@ jobs:
           cd ..
           cmake --install build --prefix $(pwd)/install
 
-  binary_contraction_lib_auto:
+  bcont_lib_auto:
     runs-on: ubuntu-latest
 
     steps:

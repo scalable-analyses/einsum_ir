@@ -153,7 +153,7 @@ jobs:
           ./build_llvm/bench_mlp model_mlp.pt 0
           ./build_llvm/bench_mlp model_mlp.pt 1
 
-  binary_contraction_lib:
+  bcont_lib_manual:
     strategy:
       matrix:
         arch: [raptor-lake, grace, m4]
@@ -162,7 +162,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install
+      - name: Install LIBXSMM
+        run: |
+          git clone https://github.com/libxsmm/libxsmm.git
+          cd libxsmm
+          make BLAS=0 -j
+          cd ..
+          echo LIBXSMM_PATH=$(pwd)/libxsmm >> $GITHUB_ENV
+
+      - name: Install Binary Contraction Library
+        run: |
+          mkdir build
+          cd build
+          cmake ../src/binary -DLIBXSMM_ROOT=${LIBXSMM_PATH} -DEINSUM_IR_AUTO_INSTALL_LIBXSMM=OFF
+          make -j
+          cd ..
+          cmake --install build --prefix $(pwd)/install
+
+  bcont_lib_auto:
+    strategy:
+      matrix:
+        arch: [raptor-lake, grace, m4]
+    runs-on: ["${{ matrix.arch }}"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Binary Contraction Library
         run: |
           mkdir build
           cd build
