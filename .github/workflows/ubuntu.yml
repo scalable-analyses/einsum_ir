@@ -55,7 +55,7 @@ jobs:
         run: |
           ./build/tests
 
-  binary_tops:
+  binary_contraction_lib:
     runs-on: ubuntu-latest
 
     steps:
@@ -68,4 +68,4 @@ jobs:
           cmake ../src/binary
           make -j
           cd ..
-          cmake --install build_maclex2 --prefix $(pwd)/install_binary_tops
+          cmake --install build --prefix $(pwd)/install
