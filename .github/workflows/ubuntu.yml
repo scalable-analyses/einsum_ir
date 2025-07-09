@@ -54,3 +54,18 @@ jobs:
       - name: Run unit tests
         run: |
           ./build/tests
+
+  binary_tops:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install
+        run: |
+          mkdir build
+          cd build
+          cmake ../src/binary_tops
+          make -j
+          cd ..
+          cmake --install build_maclex2 --prefix $(pwd)/install_binary_tops
