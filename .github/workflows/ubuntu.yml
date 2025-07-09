@@ -73,7 +73,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          LIBXSMM_ROOT=${LIBTORCH_PATH} cmake ../src/binary
+          cmake ../src/binary -DLIBXSMM_ROOT=${LIBTORCH_PATH} -DEINSUM_IR_AUTO_INSTALL_LIBXSMM=OFF
           make -j
           cd ..
           cmake --install build --prefix $(pwd)/install
@@ -84,7 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install
+      - name: Install Binary Contraction Library
         run: |
           mkdir build
           cd build
