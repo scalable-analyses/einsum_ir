@@ -5,10 +5,11 @@ project(einsum_ir LANGUAGES CXX VERSION 0.1.0)
 # ──────────────────────────────────────────────────────
 # Options
 # ──────────────────────────────────────────────────────
-option(EINSUM_IR_ENABLE_TPP           "Enable LIBXSMM TPP backend"        ON)
-option(EINSUM_IR_ENABLE_OPENMP        "Enable OpenMP parallelization"     ON)
-option(EINSUM_IR_AUTO_INSTALL_LIBXSMM "Auto-install LIBXSMM if not found" ON)
-option(BUILD_SHARED_LIBS              "Build shared libraries"            ON)
+option(EINSUM_IR_ENABLE_TPP           "Enable LIBXSMM TPP backend"              ON)
+option(EINSUM_IR_ENABLE_OPENMP        "Enable OpenMP parallelization"           ON)
+option(EINSUM_IR_AUTO_INSTALL_LIBXSMM "Auto-install LIBXSMM if not found"       ON)
+option(EINSUM_IR_BUNDLE_DEPENDENCIES  "Bundle dependencies for wheel packaging" OFF)
+option(BUILD_SHARED_LIBS              "Build shared libraries"                  ON)
 
 set(LIBXSMM_GIT_TAG "main" CACHE STRING "Git tag for auto-installed LIBXSMM")
 
@@ -79,7 +80,6 @@ if(EINSUM_IR_ENABLE_TPP)
     set(LIBXSMM_INCLUDE_DIR ${LIBXSMM_INSTALL_DIR}/include)
     set(LIBXSMM_FOUND TRUE)
     set(LIBXSMM_AUTO_INSTALLED TRUE)
-
 
     ExternalProject_Add(libxsmm_external
       GIT_REPOSITORY https://github.com/libxsmm/libxsmm.git
@@ -245,3 +245,23 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/einsum_irConfig.cmake"
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/einsum_irConfig.cmake"
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/einsum_ir)
+
+# ──────────────────────────────────────────────────────
+# Dependency Bundling Support
+# ──────────────────────────────────────────────────────
+if(EINSUM_IR_BUNDLE_DEPENDENCIES)
+  # Bundle auto-installed LIBXSMM libraries
+  if(EINSUM_IR_ENABLE_TPP AND LIBXSMM_AUTO_INSTALLED)
+    install(CODE "
+      # Find and bundle all libxsmm versioned libraries
+      file(GLOB LIBXSMM_LIBS \"${LIBXSMM_INSTALL_DIR}/lib/libxsmm.so*\")
+      foreach(LIB_FILE \${LIBXSMM_LIBS})
+        if(EXISTS \"\${LIB_FILE}\")
+          get_filename_component(LIB_NAME \"\${LIB_FILE}\" NAME)
+          file(INSTALL \"\${LIB_FILE}\" DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}\")
+          message(STATUS \"Bundled: \${LIB_NAME}\")
+        endif()
+      endforeach()
+    ")
+  endif()
+endif()
