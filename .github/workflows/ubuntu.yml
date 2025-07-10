@@ -12,11 +12,6 @@ jobs:
   tests:
     runs-on: ubuntu-latest
 
-    env:
-      ASAN_OPTIONS: "abort_on_error=1"
-      UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
-      LSAN_OPTIONS: "exitcode=1"
-
     steps:
       - uses: actions/checkout@v4
 
@@ -52,6 +47,10 @@ jobs:
           scons mode=debug+san libtorch=${LIBTORCH_PATH} libxsmm=${LIBXSMM_PATH} blas=yes
 
       - name: Run unit tests
+        env:
+          ASAN_OPTIONS: "abort_on_error=1"
+          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+          LSAN_OPTIONS: "exitcode=1"
         run: |
           ./build/tests
 
