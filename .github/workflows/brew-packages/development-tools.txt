@@ -1,0 +1,4 @@
+cmake
+gcc
+openblas
+scons
