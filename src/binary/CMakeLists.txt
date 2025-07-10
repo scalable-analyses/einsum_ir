@@ -8,6 +8,7 @@ project(einsum_ir LANGUAGES CXX VERSION 0.1.0)
 option(EINSUM_IR_ENABLE_TPP           "Enable LIBXSMM TPP backend"        ON)
 option(EINSUM_IR_ENABLE_OPENMP        "Enable OpenMP parallelization"     ON)
 option(EINSUM_IR_AUTO_INSTALL_LIBXSMM "Auto-install LIBXSMM if not found" ON)
+option(BUILD_SHARED_LIBS              "Build shared libraries"            ON)
 
 set(LIBXSMM_GIT_TAG "main" CACHE STRING "Git tag for auto-installed LIBXSMM")
 
@@ -122,6 +123,15 @@ endif()
 
 add_library(einsum_ir ${src})
 set_target_properties(einsum_ir PROPERTIES INSTALL_RPATH "$ORIGIN" INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+# Propagate options and definitions
+if(EINSUM_IR_ENABLE_TPP)
+    target_compile_definitions(einsum_ir PUBLIC EINSUM_IR_ENABLE_TPP)
+endif()
+
+if(EINSUM_IR_ENABLE_OPENMP AND OpenMP_CXX_FOUND)
+    target_compile_definitions(einsum_ir PUBLIC EINSUM_IR_ENABLE_OPENMP)
+endif()
 
 # Enable position independent code
 set_property(TARGET einsum_ir PROPERTY POSITION_INDEPENDENT_CODE ON)
