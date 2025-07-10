@@ -47,6 +47,7 @@ jobs:
           echo "using libxsmm path: ${LIBXSMM_PATH}"
           echo "using libtorch path: ${LIBTORCH_PATH}"
           scons mode=debug+san libtorch=${LIBTORCH_PATH} libxsmm=${LIBXSMM_PATH} blas=yes
+          cat config.log
 
       - name: Run unit tests
         env:

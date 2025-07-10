@@ -1,4 +1,1 @@
-cmake
-gcc
-openblas
 scons
