@@ -46,7 +46,7 @@ jobs:
           wget https://github.com/catchorg/Catch2/releases/download/v2.13.10/catch.hpp
           echo "using libxsmm path: ${LIBXSMM_PATH}"
           echo "using libtorch path: ${LIBTORCH_PATH}"
-          scons mode=debug+san libtorch=${LIBTORCH_PATH} libxsmm=${LIBXSMM_PATH} blas=yes || { cat config.log; exit 1; }
+          scons mode=debug+san libtorch=${LIBTORCH_PATH} libxsmm=${LIBXSMM_PATH} blas=yes || { cat config.log || true; exit 1; }
 
       - name: Run unit tests
         env:

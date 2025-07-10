@@ -1,4 +1,4 @@
-import os
+import os, sys
 
 print( 'running build script of einsum_ir' )
 
@@ -83,8 +83,11 @@ if 'san' in  g_env['mode']:
                                     '-fsanitize=undefined',
                                     '-fno-omit-frame-pointer',
                                     '-fsanitize=pointer-compare',
-                                    '-fsanitize=pointer-subtract',
-                                    '-fsanitize=leak'] )
+                                    '-fsanitize=pointer-subtract'] )
+
+  if sys.platform != 'darwin':
+    g_env.AppendUnique( CXXFLAGS = [ '-fsanitize=leak' ] )
+
   g_env.AppendUnique( LINKFLAGS = [ '-g',
                                     '-fsanitize=address',
                                     '-fsanitize=undefined'] )
