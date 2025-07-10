@@ -18,7 +18,7 @@ jobs:
       - name: Install Homebrew bundles
         run: |
           PKG_DIR=.github/workflows/brew-packages
-          for group in base development-tools runtimes; do
+          for group in development-tools; do
             grep -v '^\s*#' "$PKG_DIR/${group}.txt" | xargs brew install
           done
 
@@ -43,7 +43,6 @@ jobs:
 
       - name: Install einsum_ir
         run: |
-          sudo apt-get install scons
           wget https://github.com/catchorg/Catch2/releases/download/v2.13.10/catch.hpp
           echo "using libxsmm path: ${LIBXSMM_PATH}"
           echo "using libtorch path: ${LIBTORCH_PATH}"
