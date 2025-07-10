@@ -9,7 +9,7 @@ on:
     - cron: 0 0 * * *
 
 jobs:
-  build:
+  tests:
     runs-on: macos-latest
 
     steps:
@@ -55,3 +55,41 @@ jobs:
           LSAN_OPTIONS:  "exitcode=1"
         run: |
           ./build/tests
+
+  bcont_lib_manual:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LIBXSMM
+        run: |
+          git clone https://github.com/libxsmm/libxsmm.git
+          cd libxsmm
+          make BLAS=0 -j
+          cd ..
+          echo LIBXSMM_PATH=$(pwd)/libxsmm >> $GITHUB_ENV
+
+      - name: Install Binary Contraction Library
+        run: |
+          mkdir build
+          cd build
+          cmake ../src/binary -DLIBXSMM_ROOT=${LIBXSMM_PATH} -DEINSUM_IR_AUTO_INSTALL_LIBXSMM=OFF
+          make -j
+          cd ..
+          cmake --install build --prefix $(pwd)/install
+
+  bcont_lib_auto:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Binary Contraction Library
+        run: |
+          mkdir build
+          cd build
+          cmake ../src/binary
+          make -j
+          cd ..
+          cmake --install build --prefix $(pwd)/install
