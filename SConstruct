@@ -185,6 +185,11 @@ if g_env['tblis'] != False:
                                               'tblis/tblis.h',
                                               'CXX' )
 
+# macOS: convert every RPATH entry into an explicit link flag
+if sys.platform == "darwin" and g_env.get('RPATH'):
+  rpath_flags = [f"-Wl,-rpath,{p}" for p in g_env['RPATH']]
+  g_env.AppendUnique(LINKFLAGS=rpath_flags)
+
 # build
 g_env['build_dir'] = 'build'
 
