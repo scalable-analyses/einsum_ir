@@ -73,7 +73,14 @@ if(EINSUM_IR_ENABLE_TPP)
         set(CMAKE_BUILD_PARALLEL_LEVEL 1)
       endif()
     endif()
-    
+
+    # Set variables for later use
+    set(LIBXSMM_LIBRARY ${LIBXSMM_INSTALL_DIR}/lib/libxsmm${CMAKE_SHARED_LIBRARY_SUFFIX})
+    set(LIBXSMM_INCLUDE_DIR ${LIBXSMM_INSTALL_DIR}/include)
+    set(LIBXSMM_FOUND TRUE)
+    set(LIBXSMM_AUTO_INSTALLED TRUE)
+
+
     ExternalProject_Add(libxsmm_external
       GIT_REPOSITORY https://github.com/libxsmm/libxsmm.git
       GIT_TAG ${LIBXSMM_GIT_TAG}
@@ -85,13 +92,8 @@ if(EINSUM_IR_ENABLE_TPP)
       INSTALL_COMMAND ""
       LOG_DOWNLOAD ON
       LOG_BUILD ON
+      BUILD_BYPRODUCTS "${LIBXSMM_LIBRARY}"
     )
-
-    # Set variables for later use
-    set(LIBXSMM_LIBRARY ${LIBXSMM_INSTALL_DIR}/lib/libxsmm${CMAKE_SHARED_LIBRARY_SUFFIX})
-    set(LIBXSMM_INCLUDE_DIR ${LIBXSMM_INSTALL_DIR}/include)
-    set(LIBXSMM_FOUND TRUE)
-    set(LIBXSMM_AUTO_INSTALLED TRUE)
 
     # Create an imported target for the auto-installed LIBXSMM
     add_library(LIBXSMM::LIBXSMM SHARED IMPORTED GLOBAL)
