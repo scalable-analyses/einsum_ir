@@ -6,7 +6,6 @@ project(einsum_ir LANGUAGES CXX VERSION 0.1.0)
 # Options
 # ──────────────────────────────────────────────────────
 option(EINSUM_IR_ENABLE_TPP           "Enable LIBXSMM TPP backend"        ON)
-option(EINSUM_IR_ENABLE_BLAS          "Enable BLAS backend"               ON)
 option(EINSUM_IR_ENABLE_OPENMP        "Enable OpenMP parallelization"     ON)
 option(EINSUM_IR_AUTO_INSTALL_LIBXSMM "Auto-install LIBXSMM if not found" ON)
 
@@ -14,9 +13,6 @@ set(LIBXSMM_GIT_TAG "main" CACHE STRING "Git tag for auto-installed LIBXSMM")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Keep track of optional libs that will be linked PUBLIC
-set(optional_libs "")
 
 # ──────────────────────────────────────────────────────
 # LIBXSMM (TPP backend)
@@ -42,8 +38,7 @@ if(EINSUM_IR_ENABLE_TPP)
     if(LIBXSMM_INCLUDE_DIR AND LIBXSMM_LIBRARY)
       add_library(LIBXSMM::LIBXSMM UNKNOWN IMPORTED)
       set_target_properties(LIBXSMM::LIBXSMM PROPERTIES
-                            IMPORTED_LOCATION ${LIBXSMM_LIBRARY}
-                            INTERFACE_INCLUDE_DIRECTORIES ${LIBXSMM_INCLUDE_DIR})
+                            IMPORTED_LOCATION ${LIBXSMM_LIBRARY})
       set(LIBXSMM_FOUND TRUE)
       message(STATUS "Found LIBXSMM: ${LIBXSMM_LIBRARY}")
     else()
@@ -90,25 +85,19 @@ if(EINSUM_IR_ENABLE_TPP)
       LOG_DOWNLOAD ON
       LOG_BUILD ON
     )
-    
+
     # Set variables for later use
     set(LIBXSMM_LIBRARY ${LIBXSMM_INSTALL_DIR}/lib/libxsmm${CMAKE_SHARED_LIBRARY_SUFFIX})
     set(LIBXSMM_INCLUDE_DIR ${LIBXSMM_INSTALL_DIR}/include)
     set(LIBXSMM_FOUND TRUE)
     set(LIBXSMM_AUTO_INSTALLED TRUE)
+
+    # Create an imported target for the auto-installed LIBXSMM
+    add_library(LIBXSMM::LIBXSMM SHARED IMPORTED GLOBAL)
+    set_target_properties(LIBXSMM::LIBXSMM PROPERTIES IMPORTED_LOCATION ${LIBXSMM_LIBRARY})
+    add_dependencies(LIBXSMM::LIBXSMM libxsmm_external)
   else()
     message(FATAL_ERROR "EINSUM_IR_ENABLE_TPP is ON but LIBXSMM_ROOT is not set and EINSUM_IR_AUTO_INSTALL_LIBXSMM is OFF. Please set LIBXSMM_ROOT or enable EINSUM_IR_AUTO_INSTALL_LIBXSMM.")
-  endif()
-
-  if(LIBXSMM_FOUND)
-    if(LIBXSMM_AUTO_INSTALLED)
-      # For auto-installed LIBXSMM, link directly to avoid imported target issues
-      list(APPEND optional_libs ${LIBXSMM_LIBRARY})
-    else()
-      # For manually found LIBXSMM, use the imported target
-      list(APPEND optional_libs LIBXSMM::LIBXSMM)
-    endif()
-    message(STATUS "LIBXSMM enabled for TPP backend")
   endif()
 endif()
 
@@ -116,15 +105,7 @@ endif()
 # OpenMP Support
 # ──────────────────────────────────────────────────────
 if(EINSUM_IR_ENABLE_OPENMP)
-  find_package(OpenMP)
-
-  if(OpenMP_CXX_FOUND)
-    list(APPEND optional_libs OpenMP::OpenMP_CXX)
-    message(STATUS "OpenMP found - enabling parallel execution")
-  else()
-    message(STATUS "OpenMP not found - parallel execution disabled")
-    set(EINSUM_IR_ENABLE_OPENMP OFF)
-  endif()
+  find_package(OpenMP REQUIRED)
 endif()
 
 # ──────────────────────────────────────────────────────
@@ -140,6 +121,7 @@ if(EINSUM_IR_ENABLE_TPP)
 endif()
 
 add_library(einsum_ir ${src})
+set_target_properties(einsum_ir PROPERTIES INSTALL_RPATH "$ORIGIN" INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 # Enable position independent code
 set_property(TARGET einsum_ir PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -154,17 +136,22 @@ if(EINSUM_IR_ENABLE_OPENMP AND OpenMP_CXX_FOUND)
   endif()
 endif()
 
+# Link with LIBXSMM if available
+if(EINSUM_IR_ENABLE_TPP AND LIBXSMM_FOUND)
+  target_link_libraries(einsum_ir PUBLIC LIBXSMM::LIBXSMM)
+  target_include_directories(einsum_ir PUBLIC
+    $<BUILD_INTERFACE:${LIBXSMM_INCLUDE_DIR}>
+    $<INSTALL_INTERFACE:include>)
+
+    # Make sure LIBXSMM is built before we compile einsum_ir
+    if(LIBXSMM_AUTO_INSTALLED)
+        add_dependencies(einsum_ir libxsmm_external)
+    endif()
+endif()
+
 target_include_directories(einsum_ir
   PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
          $<INSTALL_INTERFACE:include>)
-
-target_link_libraries(einsum_ir PRIVATE ${optional_libs})
-
-# For auto-installed LIBXSMM, add include directories and dependencies
-if(EINSUM_IR_ENABLE_TPP AND LIBXSMM_AUTO_INSTALLED)
-  target_include_directories(einsum_ir PRIVATE ${LIBXSMM_INCLUDE_DIR})
-  add_dependencies(einsum_ir libxsmm_external)
-endif()
 
 target_compile_features(einsum_ir PUBLIC cxx_std_17)
 
@@ -215,12 +202,14 @@ endif()
 # Header Installation
 # ──────────────────────────────────────────────────────
 set(binary_headers
-  constants.h
-  ContractionBackend.h
-  ContractionBackendScalar.h
-  ContractionBackendTpp.h
-  ContractionOptimizer.h
-  IterationSpace.h)
+    constants.h
+    ContractionBackend.h
+    ContractionBackendScalar.h
+    ContractionOptimizer.h
+    IterationSpace.h)
+if(EINSUM_IR_ENABLE_TPP)
+  list(APPEND binary_headers ContractionBackendTpp.h)
+endif()
 
 set(top_level_headers
   ../constants.h)
