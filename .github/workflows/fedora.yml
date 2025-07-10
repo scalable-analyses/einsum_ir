@@ -20,17 +20,10 @@ jobs:
 
       - name: Install System Packages
         run: |
-          sudo dnf install -y util-linux-user
-          sudo dnf install -y which
-          sudo dnf install -y gfortran
-          sudo dnf install -y clang
-          sudo dnf install -y g++-13
-          sudo dnf install -y wget
-          sudo dnf install -y git
-          sudo dnf install -y cmake
-          sudo dnf install -y python3.10
-          sudo dnf install -y scons
-          sudo dnf install -y diffutils
+          PKG_DIR=.github/workflows/fedora-packages
+          for group in base development-tools runtimes; do
+            xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
+          done
 
       - name: Install PyTorch
         run: |
@@ -162,6 +155,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install System Packages
+        run: |
+          PKG_DIR=.github/workflows/fedora-packages
+          for group in base development-tools; do
+            xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
+          done
+
       - name: Install LIBXSMM
         run: |
           git clone https://github.com/libxsmm/libxsmm.git
@@ -187,6 +187,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install System Packages
+        run: |
+          PKG_DIR=.github/workflows/fedora-packages
+          for group in base development-tools; do
+            xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
+          done
 
       - name: Install Binary Contraction Library
         run: |
