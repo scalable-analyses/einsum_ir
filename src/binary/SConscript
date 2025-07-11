@@ -18,7 +18,8 @@ if g_env['blas'] != False:
 l_sources = [ 'IterationSpace.cpp',
               'ContractionBackend.cpp',
               'ContractionBackendScalar.cpp',
-              'ContractionOptimizer.cpp' ]
+              'ContractionOptimizer.cpp',
+              'ContractionMemoryManager.cpp' ]
 
 if g_env['libxsmm'] != False:
   l_sources += [ 'ContractionBackendTpp.cpp' ]

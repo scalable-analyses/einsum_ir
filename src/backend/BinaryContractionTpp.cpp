@@ -1,6 +1,8 @@
 #include "BinaryContractionTpp.h"
 #include "../binary/ContractionOptimizer.h"
 
+#include <iostream>
+
 einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   err_t l_err = err_t::UNDEFINED_ERROR;
 
@@ -78,7 +80,11 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                ce_n_bytes(m_dtype_out) );
   l_optim.optimize();
 
-  
+  binary::ContractionMemoryManager * l_contraction_memory = nullptr;
+  if( m_memory != nullptr ){
+    l_contraction_memory = m_memory->get_contraction_memory_manager();
+  }
+
   //compile backend
   m_backend.init( l_loops,
                   m_dtype_left,
@@ -88,7 +94,8 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                   m_ktype_first_touch,
                   m_ktype_main,
                   m_ktype_last_touch,
-                  m_num_threads );
+                  m_num_threads,
+                  l_contraction_memory );
   
   l_err = m_backend.compile();
   if( l_err != err_t::SUCCESS ) {

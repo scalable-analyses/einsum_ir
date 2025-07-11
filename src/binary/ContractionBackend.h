@@ -5,6 +5,8 @@
 
 #include "constants.h"
 #include "IterationSpace.h"
+#include "ContractionMemoryManager.h"
+#include "../unary/UnaryBackendTpp.h"
 
 
 namespace einsum_ir {
@@ -42,6 +44,26 @@ class einsum_ir::binary::ContractionBackend {
     //! indicates if the backend is compiled
     bool m_is_compiled = false;
 
+    //! memory manager for contraction
+    ContractionMemoryManager * m_memory = nullptr;
+
+    //! size of packed left input tensor
+    int64_t m_size_packing_left  = 0;
+
+    //! size of packed right input tensor
+    int64_t m_size_packing_right = 0;
+
+    //TODO 
+    UnaryBackendTpp m_unary_left;
+
+    UnaryBackendTpp m_unary_right;
+
+    int64_t m_packing_left_id  = -1;
+    int64_t m_packing_right_id = -1;
+
+    const static int64_t m_num_cached_ptrs_left  = 1;
+    const static int64_t m_num_cached_ptrs_right = 1;
+
   protected:
     //! datatype of the left input
     data_t m_dtype_left = UNDEFINED_DTYPE;
@@ -76,6 +98,12 @@ class einsum_ir::binary::ContractionBackend {
 
     //! vector with the strides of the output tensor
     std::vector< int64_t > m_strides_out;
+
+    //! vector with the packing strides of left tensor
+    std::vector< int64_t > m_packing_strides_left;
+
+    //! vector with the packing strides of right tensor
+    std::vector< int64_t > m_packing_strides_right;
 
     //! type of the first touch kernel
     kernel_t m_ktype_first_touch = UNDEFINED_KTYPE;
@@ -176,6 +204,7 @@ class einsum_ir::binary::ContractionBackend {
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
      * @param i_num_threads number of threads used for contraction.
+      * @param i_contraction_mem pointer to the contraction memory manager.
      **/
     void init( std::vector< iter_property > const & i_iterations,
                data_t                               i_dtype_left,
@@ -185,7 +214,8 @@ class einsum_ir::binary::ContractionBackend {
                kernel_t                             i_ktype_first_touch,
                kernel_t                             i_ktype_main,
                kernel_t                             i_ktype_last_touch,
-               int64_t                              i_num_threads );
+               int64_t                              i_num_threads,
+               ContractionMemoryManager           * i_contraction_mem );
 
     /**
      * Compiles the contraction loop interface.

@@ -48,8 +48,7 @@ l_sources = [ 'backend/Tensor.cpp',
 if g_env['libxsmm'] != False:
   l_sources += [ 'backend/UnaryLoopsTpp.cpp',
                  'backend/UnaryTpp.cpp',
-                 'backend/BinaryContractionTpp.cpp',
-                 'backend/ContractionPackingTpp.cpp', ]
+                 'backend/BinaryContractionTpp.cpp' ]
 
 if g_env['tblis'] != False:
   l_sources += [ 'backend/BinaryContractionTblis.cpp' ]

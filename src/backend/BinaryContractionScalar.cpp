@@ -77,6 +77,11 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
                false,
                ce_n_bytes(m_dtype_out) );
   l_optim.optimize();
+
+  binary::ContractionMemoryManager * l_contraction_memory = nullptr;
+  if( m_memory != nullptr ){
+    l_contraction_memory = m_memory->get_contraction_memory_manager();
+  }
   
   //compile backend
   m_backend.init( l_loops,
@@ -87,7 +92,8 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
                   m_ktype_first_touch,
                   m_ktype_main,
                   m_ktype_last_touch,
-                  m_num_threads);
+                  m_num_threads,
+                  l_contraction_memory);
   
   l_err = m_backend.compile();
   if( l_err != err_t::SUCCESS ) {

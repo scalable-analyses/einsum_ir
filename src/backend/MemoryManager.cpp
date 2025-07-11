@@ -1,21 +1,12 @@
 #include "MemoryManager.h"
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
 einsum_ir::backend::MemoryManager::~MemoryManager() {
   if(  m_memory_ptr != nullptr ) {
     delete [] (char *)  m_memory_ptr;
   }
-  if( m_req_thread_mem){
-    for( std::size_t l_id = 0; l_id < m_thread_memory.size(); l_id++ ){
-      delete [] (char *) m_thread_memory[l_id];
-    }
-  }
 }
 
-int64_t einsum_ir::backend::MemoryManager::reserve_memory(int64_t i_size){
+int64_t einsum_ir::backend::MemoryManager::reserve_memory( int64_t i_size ){
   m_last_id++;
 
   //increase size to multiple of alignment
@@ -58,7 +49,7 @@ int64_t einsum_ir::backend::MemoryManager::reserve_memory(int64_t i_size){
   return l_mem_id;
 }
 
-void einsum_ir::backend::MemoryManager::remove_reservation(int64_t i_id){
+void einsum_ir::backend::MemoryManager::remove_reservation( int64_t i_id ){
 
   //find offset and id in list of allocated and delete them
   std::list<int64_t>::iterator l_alloc_id_it;
@@ -98,43 +89,10 @@ void einsum_ir::backend::MemoryManager::alloc_all_memory(){
     m_aligned_memory_ptr = m_memory_ptr + l_align_offset;
   }
 
-  if( m_req_thread_mem ){
-    int64_t l_num_threads = 1;
-    #ifdef _OPENMP
-    l_num_threads = omp_get_max_threads();
-    #endif
-
-    m_thread_memory.reserve( l_num_threads );
-    m_aligned_thread_memory.reserve(l_num_threads);
-    for( int l_id = 0; l_id < l_num_threads; l_id++ ){
-      //allocate memory
-      char * l_ptr = new char[ m_req_thread_mem * m_alignment_line ];
-      m_thread_memory.push_back( l_ptr );
-
-      //allign data in memory
-      int64_t l_align_offset = (unsigned long)l_ptr % m_alignment_line;
-      l_align_offset = l_align_offset ? m_alignment_line - l_align_offset : 0;
-      m_aligned_thread_memory.push_back( l_ptr + l_align_offset );
-    }
-
-  
-    //first touch policy
-#ifdef _OPENMP
-    #pragma omp parallel
-#endif
-    {
-      int64_t l_thread_id = 0;
-#ifdef _OPENMP
-      l_thread_id = omp_get_thread_num();
-#endif
-      for( int64_t l_mem_id = 0; l_mem_id <= m_req_thread_mem; l_mem_id++ ){
-        m_aligned_thread_memory[l_thread_id][l_mem_id] = 0;
-      }
-    }
-  }
+  m_contraction_memory_manager.alloc_all_memory();
 }
 
-void * einsum_ir::backend::MemoryManager::get_mem_ptr(int64_t i_id){
+void * einsum_ir::backend::MemoryManager::get_mem_ptr( int64_t i_id ){
 
   void * l_return_ptr;
   if(i_id >= 0){
@@ -146,12 +104,7 @@ void * einsum_ir::backend::MemoryManager::get_mem_ptr(int64_t i_id){
   return l_return_ptr;
 }
 
-void einsum_ir::backend::MemoryManager::reserve_thread_memory(int64_t i_size){
-  if( i_size > m_req_thread_mem ){
-    m_req_thread_mem = i_size;
-  }
-}
 
-void * einsum_ir::backend::MemoryManager::get_thread_memory(){
-  return m_aligned_thread_memory.data();
+einsum_ir::binary::ContractionMemoryManager * einsum_ir::backend::MemoryManager::get_contraction_memory_manager(){
+  return &m_contraction_memory_manager;
 }

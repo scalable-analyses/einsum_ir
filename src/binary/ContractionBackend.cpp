@@ -1,4 +1,6 @@
 #include "ContractionBackend.h"
+#include <algorithm>
+#include <iostream>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -51,9 +53,10 @@ void einsum_ir::binary::ContractionBackend::init( std::vector< iter_property > c
                                                   kernel_t                             i_ktype_first_touch,
                                                   kernel_t                             i_ktype_main,
                                                   kernel_t                             i_ktype_last_touch,
-                                                  int64_t                              i_num_threads ){
+                                                  int64_t                              i_num_threads,
+                                                  ContractionMemoryManager           * i_contraction_mem ){
 
-  int64_t l_num_iters = i_iterations.size();
+  size_t l_num_iters = i_iterations.size();
   m_dim_type.resize(l_num_iters);
   m_exec_type.resize(l_num_iters);
   m_dim_sizes.resize(l_num_iters); 
@@ -61,15 +64,19 @@ void einsum_ir::binary::ContractionBackend::init( std::vector< iter_property > c
   m_strides_right.resize(l_num_iters);
   m_strides_out.resize(l_num_iters);
   m_strides_out_aux.resize(l_num_iters);
+  m_packing_strides_left.resize(l_num_iters);
+  m_packing_strides_right.resize(l_num_iters);
 
-  for(int64_t l_id = 0; l_id < l_num_iters; l_id++){
-    m_dim_type[       l_id] = i_iterations[l_id].dim_type;
-    m_exec_type[      l_id] = i_iterations[l_id].exec_type;
-    m_dim_sizes[      l_id] = i_iterations[l_id].size;
-    m_strides_left[   l_id] = i_iterations[l_id].stride_left;
-    m_strides_right[  l_id] = i_iterations[l_id].stride_right;
-    m_strides_out[    l_id] = i_iterations[l_id].stride_out;  
-    m_strides_out_aux[l_id] = i_iterations[l_id].stride_out_aux;
+  for(size_t l_id = 0; l_id < l_num_iters; l_id++){
+    m_dim_type[             l_id] = i_iterations[l_id].dim_type;
+    m_exec_type[            l_id] = i_iterations[l_id].exec_type;
+    m_dim_sizes[            l_id] = i_iterations[l_id].size;
+    m_strides_left[         l_id] = i_iterations[l_id].stride_left;
+    m_strides_right[        l_id] = i_iterations[l_id].stride_right;
+    m_strides_out[          l_id] = i_iterations[l_id].stride_out;  
+    m_strides_out_aux[      l_id] = i_iterations[l_id].stride_out_aux;
+    m_packing_strides_left[ l_id] = i_iterations[l_id].packing_stride_left;
+    m_packing_strides_right[l_id] = i_iterations[l_id].packing_stride_right;
   }
 
   m_dtype_left  = i_dtype_left;
@@ -82,6 +89,7 @@ void einsum_ir::binary::ContractionBackend::init( std::vector< iter_property > c
   m_ktype_last_touch  = i_ktype_last_touch;
 
   m_num_threads = i_num_threads;
+  m_memory = i_contraction_mem;
 
   m_is_compiled = false;
 }
@@ -91,6 +99,10 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackend::compile(){
   if( m_is_compiled ){
     return err_t::SUCCESS;
   }
+
+  //m_packing_strides_left[m_packing_strides_left.size()-1] = 8192; //TODO: remove
+  //m_packing_strides_left[m_packing_strides_left.size()-3] = 1;  //TODO: remove
+  //m_strides_left[m_strides_left.size()-1] = 16; //TODO: remove
 
   // get kernel shape
   l_err = set_kernel_shape();
@@ -141,6 +153,72 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackend::compile(){
   m_has_first_touch = m_ktype_first_touch != kernel_t::UNDEFINED_KTYPE;
   m_has_last_touch = m_ktype_last_touch != kernel_t::UNDEFINED_KTYPE;
 
+  //TODO move packing to extra function
+  //determine size of left packing
+  m_packing_left_id = -1;
+  for( std::size_t l_id = 0; l_id < m_packing_strides_left.size(); l_id++) {
+    size_t l_reversed_id = m_packing_strides_left.size() - 1 - l_id;
+    if( m_packing_strides_left[l_reversed_id] != 0 ){
+      m_packing_left_id = l_reversed_id;
+      m_size_packing_left += m_strides_left[l_reversed_id]  * (m_dim_sizes[l_reversed_id] - 1);
+    }
+  }
+  if( m_packing_left_id >= 0){
+    m_size_packing_left  = (m_size_packing_left  + 1) * ce_n_bytes(m_dtype_left); 
+  }
+
+  //determine size of right packing
+  m_packing_right_id = -1;
+  for( std::size_t l_id = 0; l_id < m_packing_strides_right.size(); l_id++) {
+    size_t l_reversed_id = m_packing_strides_right.size() - 1 - l_id;
+    if( m_packing_strides_right[l_reversed_id] != 0 ){
+      m_packing_right_id = l_reversed_id;
+      m_size_packing_right += m_strides_right[l_reversed_id] * (m_dim_sizes[l_reversed_id] - 1);
+    }
+  }
+  if( m_packing_right_id >= 0){
+    m_size_packing_right = (m_size_packing_right + 1) * ce_n_bytes(m_dtype_right);
+  }
+
+  //reserve memory for packing
+  int64_t l_reserved_size = m_size_packing_left * m_num_cached_ptrs_left + m_size_packing_right * m_num_cached_ptrs_right;
+  std::cout << "reserving " << l_reserved_size << " bytes for packing" << std::endl;
+  if( m_memory != nullptr ){
+    m_memory->reserve_thread_memory( l_reserved_size, m_num_threads );
+  }else if( l_reserved_size > 0 ){
+    return err_t::COMPILATION_FAILED;
+  }
+
+  //create left packing kernel
+  if(m_size_packing_left != 0 ){
+    //setup data structure for packing
+    std::vector< iter_property > l_packing_iters;
+    l_packing_iters.reserve( m_packing_strides_left.size() );
+    for( std::size_t l_id = 0; l_id < m_packing_strides_left.size(); l_id++ ) {
+      if(m_packing_strides_left[l_id] != 0){
+        iter_property iter_prop;
+        iter_prop.exec_type     = exec_t::SEQ;
+        iter_prop.size          = m_dim_sizes[l_id];
+        iter_prop.stride_left   = m_packing_strides_left[l_id];
+        iter_prop.stride_out    = m_strides_left[l_id];
+        l_packing_iters.push_back( iter_prop );
+        std::cout << "Packing left: " << l_id << " " << m_packing_strides_left[l_id] << " " << m_strides_left[l_id] << std::endl;
+      }
+    }
+
+    //optimize unary packing kernel
+    std::sort(l_packing_iters.begin(), l_packing_iters.end(),
+              [](iter_property const & a, iter_property const & b) {
+                return std::min((double)a.stride_left, a.stride_out + 0.1) > std::min((double)b.stride_left, b.stride_out + 0.1);
+              });
+    l_packing_iters[l_packing_iters.size() - 1].exec_type = exec_t::PRIM;
+    l_packing_iters[l_packing_iters.size() - 2].exec_type = exec_t::PRIM;
+
+    //init and compile kernel
+    m_unary_left.init(l_packing_iters, m_dtype_left, m_dtype_comp, m_dtype_out, kernel_t::COPY, 1);
+    m_unary_left.compile();
+  }
+
   //multiply strides by size of datatype 
   for(int64_t l_id = 0; l_id < l_num_iters; l_id++){
     m_strides_left[l_id]    *= ce_n_bytes(m_dtype_left );
@@ -179,6 +257,15 @@ void einsum_ir::binary::ContractionBackend::contract( void const * i_tensor_left
 #endif
   for( int64_t l_thread_id = 0; l_thread_id < m_num_threads; l_thread_id++ ) {
     thread_info * l_thread_inf = &m_thread_infos[l_thread_id];
+    //get packing memory
+    if( m_size_packing_left || m_size_packing_right ){
+      l_thread_inf->memory_left  = m_memory->get_thread_memory( l_thread_id );
+      l_thread_inf->memory_right = l_thread_inf->memory_left + m_size_packing_left * m_num_cached_ptrs_left;
+      l_thread_inf->cached_ptrs_left.resize(  m_num_cached_ptrs_left,  nullptr );
+      l_thread_inf->cached_ptrs_right.resize( m_num_cached_ptrs_right, nullptr );
+    }
+
+    //contract
     contract_iter( l_thread_inf,
                    0,
                    (char *) i_tensor_left    + l_thread_inf->offset_left,
@@ -188,6 +275,15 @@ void einsum_ir::binary::ContractionBackend::contract( void const * i_tensor_left
                    m_has_first_touch,
                    m_has_last_touch );
   }
+  int64_t l_misses = 0;
+  int64_t l_hits = 0;
+  for( int64_t l_thread_id = 0; l_thread_id < m_num_threads; l_thread_id++ ) {
+    l_misses += m_thread_infos[l_thread_id].cache_misses;
+    l_hits   += m_thread_infos[l_thread_id].cache_hits;
+    m_thread_infos[l_thread_id].cache_misses = 0;
+    m_thread_infos[l_thread_id].cache_hits   = 0;
+  }
+  std::cout << "Cache hits: " << l_hits << ", misses: " << l_misses << std::endl;
 }
 
 void einsum_ir::binary::ContractionBackend::contract_iter( thread_info   * i_thread_inf,
@@ -211,12 +307,16 @@ void einsum_ir::binary::ContractionBackend::contract_iter( thread_info   * i_thr
     l_size = i_thread_inf->movement_ids.size();
   }
 
+  uint64_t l_id_m = 256; //TODO use a good id
+  uint64_t l_id_n = 0; //TODO use a good id
+
   // issue loop iterations
   for( int64_t l_it = 0; l_it < l_size; l_it++ ) {
     bool l_non_k_loop = m_dim_type[i_id_loop] != dim_t::K;
     l_first_access = i_first_access && ( l_non_k_loop || l_it == 0 );
     l_last_access  = i_last_access  && ( l_non_k_loop || l_it == m_dim_sizes[i_id_loop] - 1 );
 
+    //calculate sfc current id and direction
     if( i_id_loop == m_id_first_parallel_loop ){
       sfc_t l_move =  i_thread_inf->movement_ids[l_it];
       sfc_t l_sign = (l_move & 1);
@@ -224,11 +324,37 @@ void einsum_ir::binary::ContractionBackend::contract_iter( thread_info   * i_thr
       l_current_id = l_move >> 1;
     }
 
+    //pack left tensor
+    const char * l_ptr_left_active = i_ptr_left;
+    if( m_packing_left_id == l_id_next_loop )  {
+      int64_t l_id = l_id_m % m_num_cached_ptrs_left;
+      l_ptr_left_active = i_thread_inf->memory_left + l_id * m_size_packing_left;
+      if( i_ptr_left != i_thread_inf->cached_ptrs_left[l_id] ){
+        m_unary_left.contract(i_ptr_left, (void *)l_ptr_left_active);
+        i_thread_inf->cached_ptrs_left[l_id] = i_ptr_left;
+        i_thread_inf->cache_misses++;
+      }
+      else{
+        i_thread_inf->cache_hits++;
+      }
+    }
+
+    //pack right tensor
+    const char * l_ptr_right_active = i_ptr_right;
+    // if( m_packing_right_id == l_id_next_loop )  {
+    //   int64_t l_id = l_id_n % m_num_cached_ptrs_right;
+    //   l_ptr_right_active = i_thread_inf->memory_right + l_id * m_size_packing_left;
+    //   if( i_ptr_right != i_thread_inf->cached_ptrs_right[l_id]){
+    //     m_unary_right.contract(i_ptr_right, (void *)l_ptr_right_active);
+    //     i_thread_inf->cached_ptrs_right[l_id] = i_ptr_right;
+    //   }
+    // }
+
     if( l_id_next_loop < m_id_first_primitive_dim ) {
       contract_iter( i_thread_inf,
                      l_id_next_loop,
-                     i_ptr_left,
-                     i_ptr_right,
+                     l_ptr_left_active,
+                     l_ptr_right_active,
                      i_ptr_out_aux,
                      i_ptr_out,
                      l_first_access,
@@ -240,8 +366,8 @@ void einsum_ir::binary::ContractionBackend::contract_iter( thread_info   * i_thr
                             i_ptr_out );
       }
       // execute main kernel
-      kernel_main( i_ptr_left,
-                   i_ptr_right,
+      kernel_main( l_ptr_left_active,
+                   l_ptr_right_active,
                    i_ptr_out );
       
       if( l_last_access ) {
@@ -255,6 +381,12 @@ void einsum_ir::binary::ContractionBackend::contract_iter( thread_info   * i_thr
     i_ptr_right   += l_direction * m_strides_right[   l_current_id ];
     i_ptr_out_aux += l_direction * m_strides_out_aux[ l_current_id];
     i_ptr_out     += l_direction * m_strides_out[     l_current_id ];
+
+    bool l_is_m_loop = m_dim_type[l_current_id] == dim_t::M;
+    bool l_is_n_loop = m_dim_type[l_current_id] == dim_t::N;
+    //std::cout << l_is_m_loop << " " << l_is_n_loop << " " << l_direction << std::endl;
+    l_id_m += l_direction * l_is_m_loop;
+    l_id_n += l_direction * l_is_n_loop;
   }
 }
 
