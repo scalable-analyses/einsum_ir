@@ -345,6 +345,8 @@ void einsum_ir::backend::BinaryContraction::init( int64_t                       
   m_memory = i_memory;
 
   m_num_threads = i_num_threads;
+  
+  m_l2_cache_size = 1024 * 1024; // default to 1MB L2 cache size
 }
 
 einsum_ir::err_t einsum_ir::backend::BinaryContraction::compile_base() {

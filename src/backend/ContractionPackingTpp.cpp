@@ -94,7 +94,7 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::compile() {
   l_dim_ids_packing_left.reserve(  l_dim_ids_extra_packing.size() + m_dim_ids_kernel_left->size()  );
   l_dim_ids_packing_right.reserve( l_dim_ids_extra_packing.size() + m_dim_ids_kernel_right->size() );
 
-  for( int64_t l_id = 0; l_id < l_dim_ids_extra_packing.size(); l_id++ ) {
+  for( size_t l_id = 0; l_id < l_dim_ids_extra_packing.size(); l_id++ ) {
     dim_t dim_type = m_dim_type->at( l_dim_ids_extra_packing[l_id] );
     if( m_packing_loop_offset_left || l_dim_ids_extra_packing[l_id] == l_dim_id_extra_left ) {
       m_packing_loop_offset_left++;
@@ -186,14 +186,14 @@ einsum_ir::err_t einsum_ir::backend::ContractionPackingTpp::create_kernel( int64
                     i_dim_sizes,
                     i_dim_ids_packed->data(),
                     l_strides_out.data());
-  for( int64_t l_di = 0; l_di < l_strides_out.size(); l_di++ ) {
+  for( size_t l_di = 0; l_di < l_strides_out.size(); l_di++ ) {
     std::pair< int64_t, int64_t > l_pair( i_dim_ids_packed->data()[l_di], l_strides_out[l_di] );
     o_strides_packed->insert( l_pair );
   }
 
   //determine required memory
   *o_size_packing = 1;
-  for( int64_t l_di = 0; l_di < i_dim_ids_packed->size(); l_di++){
+  for( size_t l_di = 0; l_di < i_dim_ids_packed->size(); l_di++){
     *o_size_packing *= i_dim_sizes->at( (*i_dim_ids_packed)[l_di] );
   }
   *o_size_packing *= ce_n_bytes(i_dtype);

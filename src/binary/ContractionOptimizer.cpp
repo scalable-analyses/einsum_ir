@@ -273,8 +273,11 @@ void einsum_ir::binary::ContractionOptimizer::add_kernel(){
   m_size_all_m /= l_kernel_sizes[PRIM_M];
   m_size_all_n /= l_kernel_sizes[PRIM_N];
 
-  //use about half of the L2 cache for C blocking (A and B tend to be a lot smaller because of SFC blocking in M and )
+  //use about half of the L2 cache for C blocking (A and B tend to be a lot smaller because of SFC blocking in M and N)
   int64_t l_target_thread_tasks = m_l2_cache_size / 2 / (l_kernel_sizes[PRIM_M] * l_kernel_sizes[PRIM_N] * m_num_bytes_scalar_out );
+  if( l_target_thread_tasks < 1 ){
+    l_target_thread_tasks = 1;
+  }
   m_target_parallel = m_num_threads * l_target_thread_tasks;
 }
 

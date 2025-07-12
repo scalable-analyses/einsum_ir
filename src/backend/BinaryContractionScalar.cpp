@@ -75,7 +75,8 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
                m_target_prim_k,
                false,
                false,
-               ce_n_bytes(m_dtype_out) );
+               ce_n_bytes(m_dtype_out),
+               m_l2_cache_size );
   l_optim.optimize();
   
   //compile backend
