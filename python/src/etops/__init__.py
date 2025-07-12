@@ -113,7 +113,7 @@ class dim:
 from dataclasses import dataclass
 from typing import Sequence, Union
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class TensorOperationConfig:
     data_type: _DataType
     prim_first: _PrimType
