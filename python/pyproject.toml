@@ -1,0 +1,47 @@
+# ─────────────────────────────────────────────
+# Build system
+# ─────────────────────────────────────────────
+[build-system]
+requires = [
+  "scikit-build-core>=0.11",
+  "pybind11>=2.13",
+  "setuptools_scm>=8.0",
+  "numpy>=1.20"
+]
+build-backend = "scikit_build_core.build"
+
+# ─────────────────────────────────────────────
+# Project metadata
+# ─────────────────────────────────────────────
+[project]
+name = "etops-"
+dynamic = ["version"]
+description = "Einsum tree operations."
+readme = "README.rst"
+requires-python = ">=3.8"
+keywords = ["einsum trees", "tensor operations"]
+dependencies = [
+  "numpy>=1.20"
+]
+license = { file = "LICENSE" }
+
+[project.urls]
+Homepage = "https://github.com/scalable-analyses/einsum_ir"
+Source = "https://github.com/scalable-analyses/einsum_ir"
+Issues = "https://github.com/scalable-analyses/einsum_ir/issues"
+
+# ─────────────────────────────────────────────
+# scikit-build-core settings
+# ─────────────────────────────────────────────
+[tool.scikit-build]
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+cmake.version = ">=3.20"
+wheel.packages = ["src/etops"]
+wheel.expand-macos-universal-tags = true
+
+# ─────────────────────────────────────────────
+# Version scheme
+# ─────────────────────────────────────────────
+[tool.setuptools_scm]
+write_to = "src/etops/_version.py"
+fallback_version = "0.0.0+unknown"
