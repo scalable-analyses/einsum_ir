@@ -14,7 +14,7 @@ build-backend = "scikit_build_core.build"
 # Project metadata
 # ─────────────────────────────────────────────
 [project]
-name = "etops-"
+name = "etops"
 dynamic = ["version"]
 description = "Einsum tree operations."
 readme = "README.rst"
