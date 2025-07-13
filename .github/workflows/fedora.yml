@@ -223,24 +223,10 @@ jobs:
             xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
           done
 
-      - name: Initialize pyenv & install Python ${{ matrix.python }}
-        shell: bash
-        run: |
-          curl -fsSL https://pyenv.run | bash
-          export PYENV_ROOT="$HOME/.pyenv"
-          export PATH="$PYENV_ROOT/bin:$PYENV_ROOT/shims:$PATH"
-          eval "$(pyenv init -)"
-          pyenv install -s "${{ matrix.python }}"
-
-      - name: Create and activate virtualenv
-        shell: bash
-        run: |
-          export PYENV_ROOT="$HOME/.pyenv"
-          export PATH="$PYENV_ROOT/bin:$PYENV_ROOT/shims:$PATH"
-          eval "$(pyenv init -)"
-          pyenv local "${{ matrix.python }}"
-          python -m venv venv_etops
-          echo "PATH=$(pwd)/venv_etops/bin:$PATH" >> $GITHUB_ENV
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
 
       - name: Install etops
         run: |
