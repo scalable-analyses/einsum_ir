@@ -222,7 +222,8 @@ jobs:
 
       - name: Install etops
         run: |
-          python{{ matrix.python }} -m pip install --upgrade pip
+          PYTHON=python${{ matrix.python }}
+          $PYTHON -m pip install --upgrade pip
           cd python
-          SETUPTOOLS_SCM_PRETEND_VERSION=$(python{{ matrix.python }} version_cli.py) pip install -ve .
-          python{{ matrix.python }} -c "import etops; print(etops.__version__)"
+          SETUPTOOLS_SCM_PRETEND_VERSION=$($PYTHON version_cli.py) pip install -ve .
+          $PYTHON -c "import etops; print(etops.__version__)"
