@@ -218,7 +218,7 @@ jobs:
 
       - name: Install System Packages
         run: |
-          sudo dnf install -y python${{ matrix.python }}-devel python${{ matrix.python }}-pip
+          sudo dnf install -y python${{ matrix.python }}-devel
 
       - name: Set up Python
         uses: actions/setup-python@v5
