@@ -218,6 +218,10 @@ jobs:
 
       - name: Install System Packages
         run: |
+          PKG_DIR=.github/workflows/fedora-packages
+          for group in base development-tools; do
+            xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
+          done
           sudo dnf install -y python${{ matrix.python }}-devel
           sudo python${{ matrix.python }} -m ensurepip --upgrade
 
