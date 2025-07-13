@@ -207,7 +207,7 @@ jobs:
   etops:
     strategy:
       matrix:
-        python: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
         arch: [raptor-lake, grace]
     runs-on: ["${{ matrix.arch }}"]
     steps:
@@ -218,10 +218,7 @@ jobs:
 
       - name: Install System Packages
         run: |
-          PKG_DIR=.github/workflows/fedora-packages
-          for group in base development-tools; do
-            xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
-          done
+          sudo dnf install -y python${{ matrix.python }}-devel python${{ matrix.python }}-pip
 
       - name: Set up Python
         uses: actions/setup-python@v5
