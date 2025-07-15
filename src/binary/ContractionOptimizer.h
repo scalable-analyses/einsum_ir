@@ -19,27 +19,27 @@ class einsum_ir::binary::ContractionOptimizer {
     std::vector< std::vector< iter_property > > m_free_iters;
 
     //! store the combined size off all m dimension
-    int64_t m_size_all_m;
+    int64_t m_size_all_m = 0;
     //! store the combined size off all n dimension
-    int64_t m_size_all_n;
+    int64_t m_size_all_n = 0;
 
     //! targeted size for kernel m dimension
-    int64_t m_target_m  = 1;
+    int64_t m_target_m  = 0;
     //! targeted size for kernel n dimension
-    int64_t m_target_n  = 1;
+    int64_t m_target_n  = 0;
     //! targeted size for kernel k dimension
-    int64_t m_target_k  = 1;
+    int64_t m_target_k  = 0;
     //! targeted number of tasks
-    int64_t m_target_parallel = 1;
+    int64_t m_target_parallel = 0;
 
     //! number of bytes for scalar data types in output tensor
-    int64_t m_num_bytes_scalar_out = 1;
+    int64_t m_num_bytes_scalar_out = 0;
 
     //! size of L2 cache in bytes
-    int64_t m_l2_cache_size = 1;
+    int64_t m_l2_cache_size = 0;
 
     //! number of threads
-    int64_t m_num_threads = 1;
+    int64_t m_num_threads = 0;
 
     //! type of the main kernel
     kernel_t * m_ktype_main = nullptr;
