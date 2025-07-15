@@ -36,7 +36,8 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
              m_dim_sizes_outer_out_aux,
              &l_strides_out_aux );
   }
-  else {
+  else if(    m_ktype_first_touch == kernel_t::ADD
+           || m_ktype_first_touch == kernel_t::COPY ) { 
     l_strides_out_aux = l_strides_out;
   }
 
@@ -93,7 +94,9 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
                m_target_prim_n,
                m_target_prim_k,
                false,
-               true );
+               true,
+               ce_n_bytes(m_dtype_out),
+               m_l2_cache_size);
   l_optim.optimize();
 
   //compile backend
