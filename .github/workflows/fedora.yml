@@ -20,17 +20,10 @@ jobs:
 
       - name: Install System Packages
         run: |
-          sudo dnf install -y util-linux-user
-          sudo dnf install -y which
-          sudo dnf install -y gfortran
-          sudo dnf install -y clang
-          sudo dnf install -y g++-13
-          sudo dnf install -y wget
-          sudo dnf install -y git
-          sudo dnf install -y cmake
-          sudo dnf install -y python3.10
-          sudo dnf install -y scons
-          sudo dnf install -y diffutils
+          PKG_DIR=.github/workflows/fedora-packages
+          for group in base development-tools runtimes; do
+            xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
+          done
 
       - name: Install PyTorch
         run: |
@@ -152,3 +145,61 @@ jobs:
 
           ./build_llvm/bench_mlp model_mlp.pt 0
           ./build_llvm/bench_mlp model_mlp.pt 1
+
+  bcont_lib_manual:
+    strategy:
+      matrix:
+        arch: [raptor-lake, grace, m4]
+    runs-on: ["${{ matrix.arch }}"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install System Packages
+        run: |
+          PKG_DIR=.github/workflows/fedora-packages
+          for group in base development-tools; do
+            xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
+          done
+
+      - name: Install LIBXSMM
+        run: |
+          git clone https://github.com/libxsmm/libxsmm.git
+          cd libxsmm
+          make BLAS=0 -j
+          cd ..
+          echo LIBXSMM_PATH=$(pwd)/libxsmm >> $GITHUB_ENV
+
+      - name: Install Binary Contraction Library
+        run: |
+          mkdir build
+          cd build
+          cmake ../src/binary -DLIBXSMM_ROOT=${LIBXSMM_PATH} -DEINSUM_IR_AUTO_INSTALL_LIBXSMM=OFF
+          make -j
+          cd ..
+          cmake --install build --prefix $(pwd)/install
+
+  bcont_lib_auto:
+    strategy:
+      matrix:
+        arch: [raptor-lake, grace, m4]
+    runs-on: ["${{ matrix.arch }}"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install System Packages
+        run: |
+          PKG_DIR=.github/workflows/fedora-packages
+          for group in base development-tools; do
+            xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
+          done
+
+      - name: Install Binary Contraction Library
+        run: |
+          mkdir build
+          cd build
+          cmake ../src/binary
+          make -j
+          cd ..
+          cmake --install build --prefix $(pwd)/install

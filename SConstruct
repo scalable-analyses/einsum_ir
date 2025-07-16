@@ -1,4 +1,4 @@
-import os
+import os, sys
 
 print( 'running build script of einsum_ir' )
 
@@ -83,8 +83,11 @@ if 'san' in  g_env['mode']:
                                     '-fsanitize=undefined',
                                     '-fno-omit-frame-pointer',
                                     '-fsanitize=pointer-compare',
-                                    '-fsanitize=pointer-subtract',
-                                    '-fsanitize=leak'] )
+                                    '-fsanitize=pointer-subtract'] )
+
+  if sys.platform != 'darwin':
+    g_env.AppendUnique( CXXFLAGS = [ '-fsanitize=leak' ] )
+
   g_env.AppendUnique( LINKFLAGS = [ '-g',
                                     '-fsanitize=address',
                                     '-fsanitize=undefined'] )
@@ -181,6 +184,11 @@ if g_env['tblis'] != False:
   g_env['tblis'] = g_conf.CheckLibWithHeader( 'tblis',
                                               'tblis/tblis.h',
                                               'CXX' )
+
+# macOS: convert every RPATH entry into an explicit link flag
+if sys.platform == "darwin" and g_env.get('RPATH'):
+  rpath_flags = [f"-Wl,-rpath,{p}" for p in g_env['RPATH']]
+  g_env.AppendUnique(LINKFLAGS=rpath_flags)
 
 # build
 g_env['build_dir'] = 'build'
