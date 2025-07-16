@@ -230,5 +230,6 @@ jobs:
           PYTHON=python${{ matrix.python }}
           $PYTHON -m pip install --upgrade pip
           cd python
-          SETUPTOOLS_SCM_PRETEND_VERSION=$($PYTHON version_cli.py) $PYTHON -m pip install -ve .
+          export SETUPTOOLS_SCM_PRETEND_VERSION=$($PYTHON version_cli.py)
+          $PYTHON -m pip install -ve .
           $PYTHON -c "import etops; print(etops.__version__)"
