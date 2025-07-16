@@ -158,6 +158,14 @@ void einsum_ir::py::TensorOperation::update_parameters_from_iters(
   }
 }
 
+int64_t einsum_ir::py::TensorOperation::dtype_to_num_bytes( dtype_t dtype ) {
+  switch (dtype) {
+    case dtype_t::fp32: return sizeof(float);
+    case dtype_t::fp64: return sizeof(double);
+    default:            return 0; // Undefined or unsupported type
+  }
+}
+
 einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
   dtype_t                       dtype,
   prim_t                        prim_first,
@@ -273,7 +281,8 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
                                                                                   int64_t                target_k,
                                                                                   int64_t                num_threads,
                                                                                   bool                   br_gemm_support,
-                                                                                  bool                   packed_gemm_support ) {
+                                                                                  bool                   packed_gemm_support,
+                                                                                  int64_t                l2_cache_size ) {
   // Create loop properties from input parameters
   std::vector<einsum_ir::binary::iter_property> l_iters = create_iter_properties(
     dim_types,
@@ -298,6 +307,8 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
   }
 #endif
 
+  int64_t l_num_bytes = dtype_to_num_bytes(dtype);
+
   // Initialize optimizer
   einsum_ir::binary::ContractionOptimizer l_optimizer;
   l_optimizer.init( &l_iters,
@@ -307,7 +318,9 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
                     target_n,
                     target_k,
                     br_gemm_support,
-                    packed_gemm_support );
+                    packed_gemm_support,
+                    l_num_bytes,
+                    l2_cache_size );
   
   // Run optimization
   l_optimizer.optimize();

@@ -172,7 +172,8 @@ def optimize(
     target_k: int, 
     num_threads: int = 0,
     br_gemm_support: bool = True,
-    packed_gemm_support: bool = True
+    packed_gemm_support: bool = True,
+    l2_cache_size: int = 0
 ) -> TensorOperationConfig:
     """
     Optimize a tensor operation configuration using ContractionOptimizer.
@@ -185,6 +186,7 @@ def optimize(
         num_threads: Number of threads for parallel execution automatically determined if <1
         br_gemm_support: Whether backend supports batch-reduce GEMM
         packed_gemm_support: Whether backend supports packed GEMM
+        l2_cache_size: Size of the L2 cache in bytes (default: 1MiB if <1)
         
     Returns:
         Optimized configuration with potentially modified dimensions and execution types.
@@ -192,6 +194,10 @@ def optimize(
     Raises:
         RuntimeError: If optimization fails
     """
+    # Use default L2 cache size if not provided
+    if l2_cache_size <= 0:
+        l2_cache_size = 1024 * 1024  # Default: 1MiB L2 cache
+
     # Call the static C++ method
     result = _CppOp.optimize(
         config.data_type,
@@ -209,7 +215,8 @@ def optimize(
         target_k,
         num_threads,
         br_gemm_support,
-        packed_gemm_support
+        packed_gemm_support,
+        l2_cache_size
     )
     
     # Unpack the result tuple

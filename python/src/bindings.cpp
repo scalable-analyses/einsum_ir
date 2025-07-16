@@ -116,7 +116,8 @@ PYBIND11_MODULE(_etops_core, m) {
         int64_t                                target_k,
         int64_t                                num_threads,
         bool                                   br_gemm_support,
-        bool                                   packed_gemm_support
+        bool                                   packed_gemm_support,
+        int64_t                                l2_cache_size
       ) -> py::tuple {
         // Call the static optimize function with references
         TensorOperation::error_t err = TensorOperation::optimize(
@@ -135,7 +136,9 @@ PYBIND11_MODULE(_etops_core, m) {
           target_k,
           num_threads,
           br_gemm_support,
-          packed_gemm_support);
+          packed_gemm_support,
+          l2_cache_size
+        );
         
         // Return tuple of (error, optimized_parameters)
         return py::make_tuple(
@@ -171,6 +174,7 @@ PYBIND11_MODULE(_etops_core, m) {
         :param num_threads: Number of threads to use for execution.
         :param br_gemm_support: Whether to support BR_GEMM optimizations.
         :param packed_gemm_support: Whether to support packed GEMM optimizations.
+        :param l2_cache_size: Size of L2 cache in bytes.
         :return: Tuple containing error code and optimized parameters.
       )doc",
       py::arg("dtype"),
@@ -188,6 +192,7 @@ PYBIND11_MODULE(_etops_core, m) {
       py::arg("target_k"),
       py::arg("num_threads"),
       py::arg("br_gemm_support"),
-      py::arg("packed_gemm_support")
+      py::arg("packed_gemm_support"),
+      py::arg("l2_cache_size")
     );
 }

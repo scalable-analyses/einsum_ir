@@ -117,6 +117,7 @@ class einsum_ir::py::TensorOperation {
      * @param num_threads         Number of threads for parallel execution (determined automatically if <0).
      * @param br_gemm_support     Whether backend supports batch-reduce GEMM.
      * @param packed_gemm_support Whether backend supports packed GEMM.
+     * @param l2_cache_size       Size of L2 cache in bytes.
      * @return                    Appropriate error code.
      **/
     static error_t optimize(
@@ -135,7 +136,8 @@ class einsum_ir::py::TensorOperation {
       int64_t                  target_k,
       int64_t                  num_threads,
       bool                     br_gemm_support,
-      bool                     packed_gemm_support
+      bool                     packed_gemm_support,
+      int64_t                  l2_cache_size
     );
 
   private:
@@ -219,6 +221,14 @@ class einsum_ir::py::TensorOperation {
       std::vector<int64_t>                                & strides_in1,
       std::vector<int64_t>                                & strides_out
     );
+
+    /**
+     * Converts TensorOperation dtype to number of bytes.
+     *
+     * @param dtype TensorOperation data type.
+     * @return      Number of bytes for the given data type.
+     **/
+    static inline int64_t dtype_to_num_bytes( dtype_t dtype );
 };
 
 #endif
