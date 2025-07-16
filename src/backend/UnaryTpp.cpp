@@ -173,6 +173,8 @@ einsum_ir::err_t einsum_ir::backend::UnaryTpp::compile() {
   if( l_num_loops == 0 ) {
     l_num_loops = 1;
     m_loop_sizes.push_back( 1 );
+    m_loop_strides_in.push_back( 0 );
+    m_loop_strides_out.push_back( 0 );
   }
 
   m_unary_loops.init( l_num_loops,
