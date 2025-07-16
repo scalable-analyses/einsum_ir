@@ -92,7 +92,6 @@ class einsum_ir::binary::ContractionOptimizer {
      * @param i_iteration iterator that points to the iteration.
      * @param i_source_iters source vector.
      * @param i_dest_iters destination vector.
-     * @param i_new_iter_pos iteration position in destination vector.
      * @param i_new_exec_t execution type after moving.
      *
      * @return returns the size of the iteration.
@@ -100,7 +99,6 @@ class einsum_ir::binary::ContractionOptimizer {
     int64_t move_iter( std::vector<iter_property>::iterator   i_iteration,
                        std::vector<iter_property>           * i_source_iters,
                        std::vector<iter_property>           * i_dest_iters,
-                       int64_t                                i_new_iter_pos, 
                        exec_t                                 i_new_exec_t );
 
     /**
