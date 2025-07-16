@@ -135,6 +135,9 @@ class einsum_ir::backend::BinaryContraction {
     //! number of threads for the contraction
     int64_t m_num_threads = 1;
 
+    //! size of the L2 cache in bytes
+    int64_t m_l2_cache_size = 1;
+
     /**
      * Derives the dimension types of tensor t2 w.r.t. tensors t0 and t1.
      *

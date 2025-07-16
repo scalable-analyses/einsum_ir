@@ -1,4 +1,4 @@
-name: Unit Tests (Ubuntu)
+name: Unit Tests (macOS-latest)
 
 on:
   push:
@@ -10,24 +10,27 @@ on:
 
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install OpenBLAS
+      - name: Install Homebrew bundles
         run: |
-          sudo apt-get install libopenblas-dev
+          PKG_DIR=.github/workflows/brew-packages
+          for group in development-tools; do
+            grep -v '^\s*#' "$PKG_DIR/${group}.txt" | xargs brew install
+          done
 
       - name: Install Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.8
+          python-version: "3.8"
 
       - name: Install PyTorch
         run: |
           python -m pip install --upgrade pip
-          pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install torch torchvision torchaudio
           echo LIBTORCH_PATH=$(python -c "import torch as _; print(_.__path__[0])") >> $GITHUB_ENV
 
       - name: Install LIBXSMM
@@ -40,17 +43,16 @@ jobs:
 
       - name: Install einsum_ir
         run: |
-          sudo apt-get install scons
           wget https://github.com/catchorg/Catch2/releases/download/v2.13.10/catch.hpp
           echo "using libxsmm path: ${LIBXSMM_PATH}"
           echo "using libtorch path: ${LIBTORCH_PATH}"
-          scons mode=debug+san libtorch=${LIBTORCH_PATH} libxsmm=${LIBXSMM_PATH} blas=yes
+          scons mode=debug+san libtorch=${LIBTORCH_PATH} libxsmm=${LIBXSMM_PATH} blas=yes parallel=none || { cat config.log || true; exit 1; }
 
       - name: Run unit tests
         env:
-          ASAN_OPTIONS: "abort_on_error=1"
+          ASAN_OPTIONS:  "abort_on_error=1"
           UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
-          LSAN_OPTIONS: "exitcode=1"
+          LSAN_OPTIONS:  "exitcode=1"
         run: |
           ./build/tests
 

@@ -52,21 +52,27 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP, 3 threads and broad
   } 
   REQUIRE( l_num_tasks  == 2*3*4);
 
+  //create 4 arrays of size 1 to obtain random pointers
+  char l_ptr_start_left [] = {0};
+  char l_ptr_start_right [] = {0};
+  char l_ptr_start_out_aux [] = {0};
+  char l_ptr_start_out [] = {0};
+
   //go through sfc and check that initial offsets are equal to calculated offsets with movement
-  const char * l_ptr_left    = 0;
-  const char * l_ptr_right   = 0;
-  const char * l_ptr_out_aux = 0;
-  char       * l_ptr_out     = 0;
+  const char * l_ptr_left    = l_ptr_start_left;
+  const char * l_ptr_right   = l_ptr_start_right;
+  const char * l_ptr_out_aux = l_ptr_start_out_aux;
+  char       * l_ptr_out     = l_ptr_start_out;
   for( int64_t l_thread_id = 0; l_thread_id < l_num_threads; l_thread_id++){
     int64_t l_offset_left    = m_thread_infos[l_thread_id].offset_left;
     int64_t l_offset_right   = m_thread_infos[l_thread_id].offset_right;
     int64_t l_offset_out_aux = m_thread_infos[l_thread_id].offset_out_aux;
     int64_t l_offset_out     = m_thread_infos[l_thread_id].offset_out;
 
-    char * l_ptr_rec_left    = 0;
-    char * l_ptr_rec_right   = 0;
-    char * l_ptr_rec_out_aux = 0;
-    char * l_ptr_rec_out     = 0;
+    char * l_ptr_rec_left    = l_ptr_start_left;
+    char * l_ptr_rec_right   = l_ptr_start_right;
+    char * l_ptr_rec_out_aux = l_ptr_start_out_aux;
+    char * l_ptr_rec_out     = l_ptr_start_out;
     l_ptr_rec_left    += l_offset_left;
     l_ptr_rec_right   += l_offset_right;
     l_ptr_rec_out_aux += l_offset_out_aux;
@@ -143,21 +149,27 @@ TEST_CASE( "Threading test for OMP only Iteration Space, 5 threads and auxiliary
   } 
   REQUIRE( l_num_tasks  == 2*3*4);
 
+  //create 4 arrays of size 1 to obtain random pointers
+  char l_ptr_start_left [] = {0};
+  char l_ptr_start_right [] = {0};
+  char l_ptr_start_out_aux [] = {0};
+  char l_ptr_start_out [] = {0};
+
   //go through sfc and check that initial offsets are equal to calculated offsets with movement
-  const char * l_ptr_left    = 0;
-  const char * l_ptr_right   = 0;
-  const char * l_ptr_out_aux = 0;
-  char       * l_ptr_out     = 0;
+  const char * l_ptr_left    = l_ptr_start_left;
+  const char * l_ptr_right   = l_ptr_start_right;
+  const char * l_ptr_out_aux = l_ptr_start_out_aux;
+  char       * l_ptr_out     = l_ptr_start_out;
   for( int64_t l_thread_id = 0; l_thread_id < l_num_threads; l_thread_id++){
     int64_t l_offset_left    = m_thread_infos[l_thread_id].offset_left;
     int64_t l_offset_right   = m_thread_infos[l_thread_id].offset_right;
     int64_t l_offset_out_aux = m_thread_infos[l_thread_id].offset_out_aux;
     int64_t l_offset_out     = m_thread_infos[l_thread_id].offset_out;
 
-    char * l_ptr_rec_left    = 0;
-    char * l_ptr_rec_right   = 0;
-    char * l_ptr_rec_out_aux = 0;
-    char * l_ptr_rec_out     = 0;
+    char * l_ptr_rec_left    = l_ptr_start_left;
+    char * l_ptr_rec_right   = l_ptr_start_right;
+    char * l_ptr_rec_out_aux = l_ptr_start_out_aux;
+    char * l_ptr_rec_out     = l_ptr_start_out;
     l_ptr_rec_left    += l_offset_left;
     l_ptr_rec_right   += l_offset_right;
     l_ptr_rec_out_aux += l_offset_out_aux;
@@ -234,21 +246,27 @@ TEST_CASE( "Threading test for SFC only Iteration Space with 1 thread and no bia
   } 
   REQUIRE( l_num_tasks  == 2*3*4);
 
+  //create 4 arrays of size 1 to obtain random pointers
+  char l_ptr_start_left [] = {0};
+  char l_ptr_start_right [] = {0};
+  char l_ptr_start_out_aux [] = {0};
+  char l_ptr_start_out [] = {0};
+
   //go through sfc and check that initial offsets are equal to calculated offsets with movement
-  const char * l_ptr_left    = 0;
-  const char * l_ptr_right   = 0;
-  const char * l_ptr_out_aux = 0;
-  char       * l_ptr_out     = 0;
+  const char * l_ptr_left    = l_ptr_start_left;
+  const char * l_ptr_right   = l_ptr_start_right;
+  const char * l_ptr_out_aux = l_ptr_start_out_aux;
+  char       * l_ptr_out     = l_ptr_start_out;
   for( int64_t l_thread_id = 0; l_thread_id < l_num_threads; l_thread_id++){
     int64_t l_offset_left    = m_thread_infos[l_thread_id].offset_left;
     int64_t l_offset_right   = m_thread_infos[l_thread_id].offset_right;
     int64_t l_offset_out_aux = m_thread_infos[l_thread_id].offset_out_aux;
     int64_t l_offset_out     = m_thread_infos[l_thread_id].offset_out;
 
-    char * l_ptr_rec_left    = 0;
-    char * l_ptr_rec_right   = 0;
-    char * l_ptr_rec_out_aux = 0;
-    char * l_ptr_rec_out     = 0;
+    char * l_ptr_rec_left    = l_ptr_start_left;
+    char * l_ptr_rec_right   = l_ptr_start_right;
+    char * l_ptr_rec_out_aux = l_ptr_start_out_aux;
+    char * l_ptr_rec_out     = l_ptr_start_out;
     l_ptr_rec_left    += l_offset_left;
     l_ptr_rec_right   += l_offset_right;
     l_ptr_rec_out_aux += l_offset_out_aux;
