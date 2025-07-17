@@ -592,7 +592,6 @@ int64_t einsum_ir::binary::ContractionOptimizer::move_all_iters( std::vector<ite
     l_size_all *= move_iter( l_it,
                              i_source_iters,
                              i_dest_iters,
-                             0,
                              i_new_exec_t );
   }
   return l_size_all;
@@ -642,16 +641,13 @@ void einsum_ir::binary::ContractionOptimizer::add_empty_iter( std::vector<iter_p
 int64_t einsum_ir::binary::ContractionOptimizer::move_iter( std::vector<iter_property>::iterator i_iteration,
                                                             std::vector<iter_property> *         i_source_iters,
                                                             std::vector<iter_property> *         i_dest_iters,
-                                                            int64_t                              i_new_iter_pos, 
                                                             exec_t                               i_new_exec_t ){
-  
-  i_dest_iters->insert(i_dest_iters->begin() + i_new_iter_pos, *i_iteration );
-  i_dest_iters->at(i_new_iter_pos).exec_type = i_new_exec_t;
+  i_iteration->exec_type = i_new_exec_t;
+  int64_t i_iteration_size = i_iteration->size;
+  i_dest_iters->insert(i_dest_iters->begin(), *i_iteration );
   i_source_iters->erase( i_iteration );
     
-  return  i_iteration->size;
-
-  return 1;                                                         
+  return  i_iteration_size;                                                    
 }
 
 int64_t einsum_ir::binary::ContractionOptimizer::find_split( int64_t i_dim_size,
