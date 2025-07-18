@@ -1,5 +1,4 @@
 #include "UnaryBackend.h"
-#include <iostream>
 
 void einsum_ir::binary::UnaryBackend::init( std::vector< exec_t >  const & i_exec_type,
                                             std::vector< int64_t > const & i_dim_sizes,

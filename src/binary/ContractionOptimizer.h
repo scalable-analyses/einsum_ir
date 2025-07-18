@@ -12,6 +12,7 @@ namespace einsum_ir {
 
 class einsum_ir::binary::ContractionOptimizer {
   private:
+    //! Internal enum to identify kernel iterations.
     enum{ 
       PRIM_BR = 0,
       PRIM_C  = 1,
@@ -20,26 +21,8 @@ class einsum_ir::binary::ContractionOptimizer {
       PRIM_K  = 4
     };
 
-
     //! external vector with all iterations
     std::vector< iter_property > * m_iter_space;
-
-    //! internal data structur with all unasigned iterations
-    std::vector< std::vector< iter_property > > m_free_iters;
-
-    //iterator pointing to the stride one dimenion in left tensor
-    std::vector< iter_property >::iterator m_stride_one_left;
-
-    //iterator pointing to the stride one dimenion in right tensor
-    std::vector< iter_property >::iterator m_stride_one_right;
-
-    //iterator pointing to the stride one dimenion in output tensor
-    std::vector< iter_property >::iterator m_stride_one_out;
-
-    //! store the combined size off all m dimension
-    int64_t m_size_all_m = 0;
-    //! store the combined size off all n dimension
-    int64_t m_size_all_n = 0;
 
     //! targeted size for kernel m dimension
     int64_t m_target_m  = 0;
@@ -56,6 +39,9 @@ class einsum_ir::binary::ContractionOptimizer {
     //! size of L2 cache in bytes
     int64_t m_l2_cache_size = 0;
 
+    //! target size for extra packing dimensions
+    int64_t m_target_extra_packing = 0;
+
     //! number of threads
     int64_t m_num_threads = 0;
 
@@ -66,26 +52,54 @@ class einsum_ir::binary::ContractionOptimizer {
     bool m_br_gemm_support = true;
 
     //! indicates if backend supports packed gemms
-    bool m_packed_gemm_support = true;
+    packed_gemm_t m_packed_gemm_support = packed_gemm_t::NONE;
 
-    //! Bounds runtine of dimension splitting but might not find the best splitting for dimensions bigger than m_max_factor.
-    //! normal kernels are  smaller than 1024x1024x1024
-    int64_t m_max_factor = 1024;
 
-    //TODO
+    /**
+      * Finds all iters with a specific stride in the iteration space.
+      *
+      * @param o_iter_left iterator that points to the found left tensor iteration.
+      * @param o_iter_right iterator that points to the found right tensor iteration.
+      * @param o_iter_out iterator that points to the found output tensor iteration.
+      * @param i_stride_left stride of the left tensor dimension.
+      * @param i_stride_right stride of the right tensor dimension.
+      * @param i_stride_out stride of the output tensor dimension.
+      */
     void find_iters_with_stride( std::vector<iter_property>::iterator & o_iter_left,
                                  std::vector<iter_property>::iterator & o_iter_right,
                                  std::vector<iter_property>::iterator & o_iter_out,
-                                 int64_t i_stride );
+                                 int64_t i_stride_left,
+                                 int64_t i_stride_right,
+                                 int64_t i_stride_out );
     
+    /**
+      * Finds an iteration with a specific dimension type. Choses the iteration with the smallest sum of strides.
+      *
+      * @param o_iter iterator that points to the found iteration.
+      * @param i_dim_type dimension type to search for.
+      **/
     void find_iter_with_dimtype( std::vector<iter_property>::iterator & o_iter,
                                  dim_t i_dim_type );
     
+    /**
+     * Calculates the size of all m and n dimensions in the iteration space.
+     *
+     * @param o_size_m size of all m dimensions. 
+     * @param o_size_n size of all n dimensions.
+     **/
     void get_size_all_m_n( int64_t & o_size_m,
                            int64_t & o_size_n );
 
+    /**
+      * Sets the kernel targets depending on the potential kernel size with an heuristic approach.
+      *
+      * @param i_potential_kernel_size potential kernel size for each dimension.
+      * @param io_kernel_targets kernel targets for each dimension. 
+      * @param i_iter_required indicates if at least a size 1 dimension is required.
+      **/
     void set_kernel_targets_heuristic( int64_t * i_potential_kernel_size,
-                                       int64_t * io_kernel_targets );
+                                       int64_t * io_kernel_targets,
+                                       bool    * i_iter_required );
 
     /**
      * Splits an iteration depending on a target size.
@@ -100,33 +114,6 @@ class einsum_ir::binary::ContractionOptimizer {
                      int64_t                                i_new_iter_pos, 
                      exec_t                                 i_new_exec_t );
   
-    /**
-     * Adds an empty iteration to the destination vector.
-     *
-     * @param i_dest_iters destination vector.
-     * @param i_new_iter_pos iteration position in destination vector.
-     * @param i_new_dim_t dimension type of empty iteration.
-     * @param i_new_exec_t execution type of empty iteration.
-     **/
-    void add_empty_iter( std::vector<iter_property> * i_dest_iters,
-                         int64_t                      i_new_iter_pos, 
-                         dim_t                        i_new_dim_t,
-                         exec_t                       i_new_exec_t );
-
-    /**
-     * Moves a iteration from the source vector to the destination vector.
-     *
-     * @param i_iteration iterator that points to the iteration.
-     * @param i_source_iters source vector.
-     * @param i_dest_iters destination vector.
-     * @param i_new_exec_t execution type after moving.
-     *
-     * @return returns the size of the iteration.
-     **/
-    int64_t move_iter( std::vector<iter_property>::iterator   i_iteration,
-                       std::vector<iter_property>           * i_source_iters,
-                       std::vector<iter_property>           * i_dest_iters,
-                       exec_t                                 i_new_exec_t );
 
     /**
      * Moves iters to destination vector until target size is reached. 
@@ -143,20 +130,6 @@ class einsum_ir::binary::ContractionOptimizer {
                               dim_t                        i_dim_type,
                               exec_t                       i_new_exec_t );
     
-    /**
-     * Move all remaining iters from the source vector to the destination vector.
-     *
-     * @param i_source_iters source vector.
-     * @param i_dest_iters destination vector.
-     * @param i_new_exec_t execution type after moving.
-     *
-     * @return returns the size of all added iters.
-     **/
-    int64_t move_all_iters( std::vector<iter_property> * i_source_iters,
-                            std::vector<iter_property> * i_dest_iters,
-                            exec_t                       i_new_exec_t );  
-            
-
     /**
      * Determines a good integer splitt for a dimension size to be close to the target size.
      *
@@ -179,7 +152,7 @@ class einsum_ir::binary::ContractionOptimizer {
      * @param i_target_n target n kernel size
      * @param i_target_k target k kernel size
      * @param i_br_gemm_support true if backend supports br gemms
-     * @param i_packed_gemm_support true if backend supports packed gemms
+     * @param i_packed_gemm_support indicates the support level for packed gemms
      * @param i_num_bytes_scalar_out number of bytes for scalar data types in output tensor
      * @param i_l2_cache_size size of L2 cache in bytes
      **/
@@ -190,14 +163,16 @@ class einsum_ir::binary::ContractionOptimizer {
                int64_t                        i_target_n,
                int64_t                        i_target_k,
                bool                           i_br_gemm_support,
-               bool                           i_packed_gemm_support,
+               packed_gemm_t                  i_packed_gemm_support,                  
                int64_t                        i_num_bytes_scalar_out,
                int64_t                        i_l2_cache_size );    
   
     /**
      * Optimizes the iters.
+     *
+     * @return SUCCESS if the compilation was successful, otherwise an appropiate error code.
      **/
-    void optimize();
+    err_t optimize();
 
     /**
      * Sorts all external iters depending on stride, dimension type and execution type.
@@ -216,6 +191,8 @@ class einsum_ir::binary::ContractionOptimizer {
 
     /**
      * Finds and adds a kernel to the optimized iters.
+     *
+     * @return SUCCESS if the compilation was successful, otherwise an appropiate error code.
      **/
     err_t set_primitive_iters();
 

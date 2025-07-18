@@ -246,7 +246,7 @@ TEST_CASE( "Binary contraction representing a sum of small GEMMs.", "[einsum_exp
                          l_out_ref )  );
 }
 
-TEST_CASE( "Binary contraction representing packed GEMM.", "[einsum_exp_tmp]" ) {
+TEST_CASE( "Binary contraction representing packed GEMM.", "[einsum_exp]" ) {
   // test case:
   //
   //       __bdc__

@@ -170,8 +170,8 @@ void einsum_ir::binary::ContractionBackendBlas::kernel_first_touch_part( void * 
     }
   }
   // packed GEMM primitive without zeroing: n[...]mc -> n[...]cm
-  else if(    ( m_ktype_main == kernel_t::PACKED_MADD || m_ktype_main == kernel_t::CPX_PACKED_MADD )
-           && m_r > 1 ) {
+  if(    ( m_ktype_main == kernel_t::PACKED_MADD || m_ktype_main == kernel_t::CPX_PACKED_MADD )
+      && m_r > 1 ) {
     for( uint64_t l_n = 0; l_n < m_n; l_n++ ) {
       void * l_out = (char *) io_out + l_n * m_ldc * m_num_bytes_scalar;
       if( m_dtype_comp == data_t::FP32 ) {
@@ -202,6 +202,13 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackendBlas::compile_kernels(){
   m_num_bytes_scalar = ce_n_bytes( m_dtype_comp );
 
   m_cpx_outer_c = m_ktype_main == kernel_t::CPX_MADD || m_ktype_main == kernel_t::CPX_PACKED_MADD;
+
+  if( m_ktype_main == kernel_t::PACKED_MADD || m_ktype_main == kernel_t::CPX_PACKED_MADD){
+    if(m_ktype_first_touch == kernel_t::UNDEFINED_KTYPE ){
+      m_ktype_first_touch = kernel_t::CPX_COPY;
+    }
+    m_ktype_last_touch = kernel_t::CPX_COPY;
+  }
 
   // disable threading in OpenBLAS
 #ifdef OPENBLAS_VERSION
@@ -268,8 +275,8 @@ void einsum_ir::binary::ContractionBackendBlas::kernel_main( void const * i_left
   else {
     for( uint64_t l_c = 0; l_c < m_r; l_c++ ) {
       // derive pointers for current GEMM
-      void const * l_left  = (char *) i_left  + l_c * m_k * m_lda * m_num_bytes_scalar;
-      void const * l_right = (char *) i_right + l_c * m_n * m_ldb * m_num_bytes_scalar;
+      void const * l_left  = (char *) i_left  + l_c * m_packed_stride_a * m_num_bytes_scalar;
+      void const * l_right = (char *) i_right + l_c * m_packed_stride_b * m_num_bytes_scalar;
       void       * l_out   = (char *) io_out  + l_c * m_m * m_num_bytes_scalar;
       // execute GEMM
       if( m_dtype_comp == data_t::FP32 ) {

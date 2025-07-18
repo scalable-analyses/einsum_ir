@@ -1,8 +1,6 @@
 #include "BinaryContractionTpp.h"
 #include "../binary/ContractionOptimizer.h"
 
-#include <iostream>
-
 einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   err_t l_err = err_t::UNDEFINED_ERROR;
 
@@ -77,7 +75,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                m_target_prim_n,
                m_target_prim_k,
                true,
-               true,
+               binary::packed_gemm_t::ALL_STRIDE_ONE,
                ce_n_bytes(m_dtype_out),
                m_l2_cache_size );
   l_optim.optimize();

@@ -53,15 +53,19 @@ class einsum_ir::binary::ContractionBackend {
     //! size of packed right input tensor
     int64_t m_size_packing_right = 0;
 
-    //TODO 
+    //! unary packing backend for left input tensor
     UnaryBackendTpp m_unary_left;
-
+    //! unary packing backend for right input tensor
     UnaryBackendTpp m_unary_right;
 
+    //! id of the left packing loop
     int64_t m_packing_left_id  = -1;
+    //! id of the right packing loop;
     int64_t m_packing_right_id = -1;
 
+    //! number of cached pointers for left input tensor
     const static int64_t m_num_cached_ptrs_left  = 1;
+    //! number of cached pointers for right input tensor
     const static int64_t m_num_cached_ptrs_right = 1;
 
   protected:
@@ -140,6 +144,11 @@ class einsum_ir::binary::ContractionBackend {
     uint64_t m_br_stride_a = 0;
     //! kernel br stride b
     uint64_t m_br_stride_b = 0;
+
+    //! kernel packed stride a
+    uint64_t m_packed_stride_a = 0;
+    //! kernel packed stride b
+    uint64_t m_packed_stride_b = 0;
 
     //! complex stride of the left tensor
     int64_t m_cpx_stride_in_left_bytes = 0;
@@ -266,6 +275,23 @@ class einsum_ir::binary::ContractionBackend {
      * @return SUCCESS if the shape matches with the main primitive, otherwise an appropiate error code.
      **/
     err_t set_kernel_shape( );
+
+    /**
+     * Creates a packing operation for the left or right tensor.
+     *
+     * @param o_packing_id id of the packing loop.
+     * @param o_size_packing memory size requried for packing.
+     * @param o_unary compiled unary backend used for packing.
+     * @param i_strides strides of the input tensor.
+     * @param i_packing_strides strides of the packing tensor.
+     *
+     * @return SUCCESS if packing was created successfully, otherwise an appropiate error code.
+     **/
+    err_t create_packing( int64_t              & o_packing_id,
+                          int64_t              & o_size_packing,
+                          UnaryBackendTpp      & o_unary,
+                          std::vector<int64_t> & i_strides,
+                          std::vector<int64_t> & i_packing_strides );
 
     /**
      * Kernel applied to the output tensor before the main primitive touches the memory.

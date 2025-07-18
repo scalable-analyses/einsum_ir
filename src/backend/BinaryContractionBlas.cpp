@@ -94,7 +94,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
                m_target_prim_n,
                m_target_prim_k,
                false,
-               true,
+               binary::packed_gemm_t::OUT_STRIDE_ONE,
                ce_n_bytes(m_dtype_out),
                m_l2_cache_size);
   l_optim.optimize();

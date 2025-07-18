@@ -15,6 +15,12 @@ namespace einsum_ir {
       UNDEFINED_EXECTYPE = 99
     } exec_t;
 
+    typedef enum {
+      NONE           = 0, // no packed gemm
+      ALL_STRIDE_ONE = 1, // all dimensions have stride one
+      OUT_STRIDE_ONE = 2  // output dimension has stride one
+    } packed_gemm_t;
+
     struct iter_property {
       dim_t   dim_type             = dim_t::UNDEFINED_DIM;
       exec_t  exec_type            = exec_t::SEQ;
@@ -40,10 +46,6 @@ namespace einsum_ir {
       std::vector<sfc_t>   movement_ids;
       std::vector<const char *> cached_ptrs_left;
       std::vector<const char *> cached_ptrs_right;
-
-      int64_t cache_hits = 0;
-      int64_t cache_misses = 0;
-    
     };
   }
 }

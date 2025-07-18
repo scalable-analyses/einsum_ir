@@ -2,7 +2,8 @@ Import('g_env')
 
 
 # default files
-l_sources = [ 'UnaryBackend.cpp', ]
+l_sources = [ 'UnaryBackend.cpp', 
+              'UnaryOptimizer.cpp',]
 
 l_tests = [ ]
 

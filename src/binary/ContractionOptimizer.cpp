@@ -2,8 +2,6 @@
 #include <algorithm>
 #include <cmath>
 
-#include <iostream>
-
 void einsum_ir::binary::ContractionOptimizer::init( std::vector< iter_property > * i_iter_space,
                                                     kernel_t                     * i_ktype_main,
                                                     int64_t                        i_num_threads,
@@ -11,7 +9,7 @@ void einsum_ir::binary::ContractionOptimizer::init( std::vector< iter_property >
                                                     int64_t                        i_target_n,
                                                     int64_t                        i_target_k,
                                                     bool                           i_br_gemm_support,
-                                                    bool                           i_packed_gemm_support,
+                                                    packed_gemm_t                  i_packed_gemm_support,
                                                     int64_t                        i_num_bytes_scalar_out,
                                                     int64_t                        i_l2_cache_size ){
   m_iter_space = i_iter_space;
@@ -29,9 +27,13 @@ void einsum_ir::binary::ContractionOptimizer::init( std::vector< iter_property >
 
   m_num_bytes_scalar_out = i_num_bytes_scalar_out;
   m_l2_cache_size = i_l2_cache_size;
+
+  //small power of 2 to avoid extra overhead and still utilise the stride one dimension to some extend
+  //heuristic right now, could choose this parameter architecture dependent
+  m_target_extra_packing = 16;
 }
 
-void einsum_ir::binary::ContractionOptimizer::optimize(){
+einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::optimize(){
   // removes size 1 iters
   remove_empty_iters();
 
@@ -39,13 +41,18 @@ void einsum_ir::binary::ContractionOptimizer::optimize(){
   sort_and_fuse_iters();
 
   // find and add the Kernel
-  set_primitive_iters();
+  err_t l_err = set_primitive_iters();
+  if( l_err != err_t::SUCCESS ){
+    return l_err;
+  }
 
-  // set primitive iters might create new size 1 iters
+  // remove size 1 iters created by primitive search
   remove_empty_iters();
 
-  // reoders, adds and parallelizes the remaining iteration space
+  // reoders and parallelizes the remaining iteration space
   reorder_and_parallelize_iters();
+
+  return err_t::SUCCESS;
 }
 
 void einsum_ir::binary::ContractionOptimizer::sort_and_fuse_iters(){
@@ -99,7 +106,9 @@ void einsum_ir::binary::ContractionOptimizer::remove_empty_iters(){
 void einsum_ir::binary::ContractionOptimizer::find_iters_with_stride( std::vector<iter_property>::iterator & o_iter_left,
                                                                       std::vector<iter_property>::iterator & o_iter_right,
                                                                       std::vector<iter_property>::iterator & o_iter_out,
-                                                                      int64_t i_stride ){
+                                                                      int64_t i_stride_left,
+                                                                      int64_t i_stride_right,
+                                                                      int64_t i_stride_out ){
   
   o_iter_left = m_iter_space->end();
   o_iter_right = m_iter_space->end();
@@ -107,13 +116,13 @@ void einsum_ir::binary::ContractionOptimizer::find_iters_with_stride( std::vecto
 
   std::vector<iter_property>::iterator l_it;
   for( l_it = m_iter_space->begin(); l_it < m_iter_space->end(); l_it++ ){
-    if( l_it->stride_left == i_stride ){
+    if( l_it->stride_left == i_stride_left ){
       o_iter_left = l_it;
     }
-    if( l_it->stride_right == i_stride ){
+    if( l_it->stride_right == i_stride_right ){
       o_iter_right = l_it;
     }
-    if( l_it->stride_out == i_stride ){
+    if( l_it->stride_out == i_stride_out ){
       o_iter_out = l_it;
     }
   }
@@ -129,6 +138,7 @@ void einsum_ir::binary::ContractionOptimizer::find_iter_with_dimtype( std::vecto
     if(    l_it->dim_type == i_dim_type
         && l_stride < l_min_stride ){
       o_iter = l_it;
+      l_min_stride = l_stride;
     }
   }
 }
@@ -149,7 +159,8 @@ void einsum_ir::binary::ContractionOptimizer::get_size_all_m_n( int64_t & o_size
 }
 
 void einsum_ir::binary::ContractionOptimizer::set_kernel_targets_heuristic( int64_t * i_potential_kernel_size,
-                                                                            int64_t * io_kernel_targets ){
+                                                                            int64_t * io_kernel_targets,
+                                                                            bool    * i_iter_required ){
   //adapt all kernel target sizes depending on what is possible e.g. small k kernel -> choose bigger m target
   if( i_potential_kernel_size[ PRIM_C ] > 1 ){
     io_kernel_targets[ PRIM_C  ] = i_potential_kernel_size[ PRIM_C ];
@@ -170,6 +181,12 @@ void einsum_ir::binary::ContractionOptimizer::set_kernel_targets_heuristic( int6
     io_kernel_targets[ PRIM_N  ] = i_potential_kernel_size[ PRIM_N ];
   }
 
+  //addapt BR kernel target in case of packing with a BR dimension
+  if(    i_iter_required[PRIM_BR] == true
+      && i_potential_kernel_size[ PRIM_BR ] > io_kernel_targets[ PRIM_BR ] 
+      && m_target_extra_packing             > io_kernel_targets[ PRIM_BR ] ){
+        io_kernel_targets[ PRIM_BR ]  = m_target_extra_packing;
+    }
 
   //reduce kernel targets when parallelism is low
   int64_t l_size_m, l_size_n;
@@ -196,8 +213,8 @@ einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::set_primitive_iters(){
   //-----------------------
   // Initial error handling
   //-----------------------
-
-  if( *m_ktype_main != kernel_t::MADD ){
+  if(    *m_ktype_main != kernel_t::MADD 
+      && *m_ktype_main != kernel_t::CPX_MADD ){
     return err_t::COMPILATION_FAILED;
   }
 
@@ -211,7 +228,8 @@ einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::set_primitive_iters(){
   if( l_complex_iter != m_iter_space->end() ){
     l_complex_iter_prop = *l_complex_iter;
     m_iter_space->erase( l_complex_iter );
-    if( l_complex_iter_prop.size != 2 ){
+    if(    l_complex_iter_prop.size != 2 
+        || *m_ktype_main != kernel_t::CPX_MADD ){
       return err_t::INVALID_CPX_DIM;
     }
 
@@ -222,13 +240,15 @@ einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::set_primitive_iters(){
     }
   }
 
-  //----------------------------------------------
-  // Variable definition for the optimization pass
-  //----------------------------------------------
 
+  //----------------------------------------------------
+  // Variable definition for the whole optimization pass
+  //----------------------------------------------------
   //packing variables
   bool l_packing_left = false;
   bool l_packing_right = false;
+  bool l_extra_packing_left_required = false;
+  bool l_extra_packing_right_required = false;
   std::vector<iter_property>::iterator l_extra_packing_iter_left  = m_iter_space->end();
   std::vector<iter_property>::iterator l_extra_packing_iter_right = m_iter_space->end();
   
@@ -243,9 +263,7 @@ einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::set_primitive_iters(){
   //-----------------------------------------
   // Step 1: Find potential kernel iterations
   //-----------------------------------------
-
   //variables definition for step 1
-  int64_t l_req_stride = 1;
   bool l_transpose_a = false;
   bool l_transpose_b = false;
   std::vector<iter_property>::iterator l_small_stride_left;
@@ -256,40 +274,38 @@ einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::set_primitive_iters(){
   find_iters_with_stride( l_small_stride_left,
                           l_small_stride_right,
                           l_small_stride_out,
-                          l_req_stride );
-
+                          1,
+                          1,
+                          1 );
 
   //find possible C kernel dimension
-  if(    l_small_stride_out != m_iter_space->end()
+  if(    m_packed_gemm_support != packed_gemm_t::NONE
+      && l_small_stride_out != m_iter_space->end()
       && l_small_stride_out->dim_type == dim_t::C ){
     l_potential_kernel_iter[ PRIM_C ] = l_small_stride_out;
     l_potential_kernel_size[ PRIM_C ] = l_small_stride_out->size;
-    l_req_stride *= l_small_stride_out->size;
 
-    if(l_small_stride_left != l_small_stride_out){
-      l_packing_left = true;
-      l_extra_packing_iter_left = l_small_stride_left;
+    bool l_requires_new_left  = false;
+    bool l_requires_new_right = false;
+    if( m_packed_gemm_support == packed_gemm_t::ALL_STRIDE_ONE ){
+      if(l_small_stride_left != l_small_stride_out){
+        l_packing_left = true;
+      }
+      if(l_small_stride_right != l_small_stride_out){
+        l_packing_right = true;
+      }
+      l_requires_new_left  = !l_packing_left;
+      l_requires_new_right = !l_packing_right;
     }
-    if(l_small_stride_right != l_small_stride_out){
-      l_packing_right = true;
-      l_extra_packing_iter_right = l_small_stride_right;
-    }
-  }
 
-  //get dimensions with a stride matching the required stride
-  find_iters_with_stride( l_small_stride_left,
-                          l_small_stride_right,
-                          l_small_stride_out,
-                          l_req_stride );
-  
-  //in case of packing use the extra dimension for kernel search
-  if( l_packing_left ){
-    l_small_stride_left = l_extra_packing_iter_left;
-    l_extra_packing_iter_left = m_iter_space->end();
-  }
-  if( l_packing_right ){
-    l_small_stride_right = l_extra_packing_iter_right;
-    l_extra_packing_iter_right = m_iter_space->end();
+    //get dimensions with the next smallest stride
+    int64_t l_c_size = l_small_stride_out->size;
+    find_iters_with_stride( l_small_stride_left,
+                            l_small_stride_right,
+                            l_small_stride_out,
+                            l_c_size * l_requires_new_left  + !l_requires_new_left,
+                            l_c_size * l_requires_new_right + !l_requires_new_right,
+                            l_c_size );
   }
 
   //find possible M kernel dimension
@@ -297,17 +313,19 @@ einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::set_primitive_iters(){
       && l_small_stride_out->dim_type == dim_t::M ){
     l_potential_kernel_iter[ PRIM_M ] = l_small_stride_out;
     l_potential_kernel_size[ PRIM_M ] = l_small_stride_out->size;
-    l_transpose_a = l_small_stride_out == l_small_stride_left ? false : true;
+    if( l_small_stride_out != l_small_stride_left ){
+      l_transpose_a = true;
+    }
   }
 
   //find possible N kernel dimension
-  if(    l_small_stride_left != m_iter_space->end()
-      && l_small_stride_left->dim_type == dim_t::N ){
-    l_potential_kernel_iter[ PRIM_N ] = l_small_stride_left;
-    l_potential_kernel_size[ PRIM_N ] = l_small_stride_left->size;
+  if(    l_small_stride_right != m_iter_space->end()
+      && l_small_stride_right->dim_type == dim_t::N ){
+    l_potential_kernel_iter[ PRIM_N ] = l_small_stride_right;
+    l_potential_kernel_size[ PRIM_N ] = l_small_stride_right->size;
+    l_transpose_b = true;
   }
   else{
-    l_transpose_b = true;
     std::vector<iter_property>::iterator l_iter;
     find_iter_with_dimtype( l_iter, dim_t::N );
     if( l_iter != m_iter_space->end() ){
@@ -317,42 +335,64 @@ einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::set_primitive_iters(){
   }
 
   //find possible K kernel dimension
+  //case 1: use right tensor to determine K kernel dimension
   if(    !l_transpose_b 
-      && l_small_stride_right != m_iter_space->end() ){
+      && l_small_stride_right != m_iter_space->end()
+      && l_small_stride_right->dim_type == dim_t::K ){
     l_potential_kernel_iter[ PRIM_K ] = l_small_stride_right;
     l_potential_kernel_size[ PRIM_K ] = l_small_stride_right->size;
-
     if(    l_transpose_a 
         && l_small_stride_left != l_small_stride_right ){
       l_packing_left = true;
-      l_extra_packing_iter_right = m_iter_space->end();
+      l_extra_packing_iter_left = l_small_stride_left;
     }
   }
-  else if( l_transpose_b ){
-    if(    l_transpose_a 
-        && l_small_stride_left != m_iter_space->end() ){
-      l_potential_kernel_iter[ PRIM_K ] = l_small_stride_left;
-      l_potential_kernel_size[ PRIM_K ] = l_small_stride_left->size;
+  //case 2: use left tensor to determine K kernel dimension
+  else if(    l_transpose_a 
+           && l_small_stride_left != m_iter_space->end() 
+           && l_small_stride_left->dim_type == dim_t::K ){
+    l_potential_kernel_iter[ PRIM_K ] = l_small_stride_left;
+    l_potential_kernel_size[ PRIM_K ] = l_small_stride_left->size;
+    if( !l_transpose_b ){
+      l_packing_right = true;
+      l_extra_packing_iter_right = l_small_stride_right;
     }
-    else{
-      std::vector<iter_property>::iterator l_iter;
-      find_iter_with_dimtype( l_iter, dim_t::K );
-      if( l_iter != m_iter_space->end() ){
-        l_potential_kernel_iter[ PRIM_K ] = l_iter;
-        l_potential_kernel_size[ PRIM_K ] = l_iter->size;
+  }
+  //case 3: search for K dimension in the iteration space
+  else{
+    std::vector<iter_property>::iterator l_iter;
+    find_iter_with_dimtype( l_iter, dim_t::K );
+    if( l_iter != m_iter_space->end() ){
+      l_potential_kernel_iter[ PRIM_K ] = l_iter;
+      l_potential_kernel_size[ PRIM_K ] = l_iter->size;
+      if( l_transpose_a ){
+        l_packing_left = true;
+        l_extra_packing_iter_left = l_small_stride_left;
+      }
+      if( !l_transpose_b ){
+        l_packing_right = true;
+        l_extra_packing_iter_right = l_small_stride_right;
       }
     }
   }
 
   //find possible BR kernel dimension
   if(    m_br_gemm_support 
-      && l_potential_kernel_size[ PRIM_C ] > 1){
-    //if an extra packing dimension is available use it as BR kernel
+      && l_potential_kernel_size[ PRIM_C ] <= 1){
+    //if an extra packing dimension of type K is available use it as BR kernel dimension
     if( l_extra_packing_iter_left != m_iter_space->end() &&
         l_extra_packing_iter_left->dim_type == dim_t::K ){
       l_potential_kernel_iter[ PRIM_BR ] = l_extra_packing_iter_left;
       l_potential_kernel_size[ PRIM_BR ] = l_extra_packing_iter_left->size;
       l_extra_packing_iter_left = m_iter_space->end();
+      l_iter_required[ PRIM_BR ] = true;
+    }
+    else if( l_extra_packing_iter_right != m_iter_space->end() &&
+             l_extra_packing_iter_right->dim_type == dim_t::K ){
+      l_potential_kernel_iter[ PRIM_BR ] = l_extra_packing_iter_right;
+      l_potential_kernel_size[ PRIM_BR ] = l_extra_packing_iter_right->size;
+      l_extra_packing_iter_right = m_iter_space->end();
+      l_iter_required[ PRIM_BR ] = true;
     }
     //if no extra packing dimension is available search for another K dimension
     else if( l_potential_kernel_iter[PRIM_K] != m_iter_space->end()){   
@@ -367,8 +407,18 @@ einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::set_primitive_iters(){
     }
   }
 
-  // pack input tensor if strides are a mulitple of a large power of 2 (2048)
-  // optimization to prevent cache misses caused by mapping to the same cache lane
+  if( l_extra_packing_iter_left != m_iter_space->end() ){
+    l_extra_packing_left_required = true;
+  }
+  if( l_extra_packing_iter_right != m_iter_space->end() ){
+    l_extra_packing_right_required = true;
+  }
+
+  //---------------------------------
+  // Step 2: Determine kernel targets
+  //---------------------------------
+  // pack input tensors if strides are a mulitple of (2048)
+  // optimization to prevent cetops packageache misses caused by mapping to the same cache lane
   if(    l_potential_kernel_size[ PRIM_K ] > 1
       && l_potential_kernel_iter[ PRIM_K ]->stride_left % 2048 == 0 ){
     l_packing_left = true;
@@ -377,22 +427,41 @@ einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::set_primitive_iters(){
       && l_potential_kernel_iter[ PRIM_M ]->stride_left % 2048 == 0 ){
     l_packing_left = true;
   }
-
-  //---------------------------------
-  // Step 2: Determine kernel targets
-  //---------------------------------
+  if(    l_potential_kernel_size[ PRIM_K ] > 1
+      && l_potential_kernel_iter[ PRIM_K ]->stride_right % 2048 == 0 ){
+    l_packing_right = true;
+  }
+  if(    l_potential_kernel_size[ PRIM_N ] > 1
+      && l_potential_kernel_iter[ PRIM_N ]->stride_right % 2048 == 0 ){
+    l_packing_right = true;
+  }
 
   //addapts the kernel targets depending on the potential kernel size
-  set_kernel_targets_heuristic( l_potential_kernel_size, l_kernel_targets );
-  //TODO use a performance model to determine the kernel targets
+  set_kernel_targets_heuristic( l_potential_kernel_size, l_kernel_targets, l_iter_required );
+
 
   //------------------------------------------
   // Step 3: Split potential kernel iterations
   //------------------------------------------
 
+  //add extra packing dimension if required
+  if( l_extra_packing_right_required ){
+    split_iter( l_extra_packing_iter_right,
+                m_target_extra_packing,
+                -1,
+                exec_t::SEQ );
+  }
+  if( l_extra_packing_left_required ){
+    split_iter( l_extra_packing_iter_left,
+                m_target_extra_packing,
+                -1,
+                exec_t::SEQ );
+  }
+
   //add CPX dimensions and set kernel type
   if( l_complex_iter_prop.dim_type == dim_t::CPX ){
-    m_iter_space->push_back(l_complex_iter_prop);
+    l_complex_iter_prop.exec_type = exec_t::PRIM;
+    m_iter_space->push_back(l_complex_iter_prop);  
     if( l_kernel_targets[PRIM_C] > 1 ){
       *m_ktype_main = kernel_t::CPX_PACKED_MADD;
     }
@@ -409,16 +478,6 @@ einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::set_primitive_iters(){
     }
   }
 
-  //TODO use better split
-  //TODO use another execution type for better identification
-  //add extra packing dimension if required
-  if( l_extra_packing_iter_left != m_iter_space->end() ){
-    split_iter( l_extra_packing_iter_left,
-                8,
-                -1,
-                exec_t::SEQ );
-  }
-
   //create kernel from potential kernel dimensions
   for( int64_t l_prim_id = 0; l_prim_id < 5; l_prim_id++ ){
     if( l_kernel_targets[l_prim_id] > 1 ){
@@ -428,41 +487,41 @@ einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::set_primitive_iters(){
                   exec_t::PRIM );
     }
     else if( l_iter_required[l_prim_id] ){
-      //std::cout << "adding empy" << std::endl;
       iter_property l_new_iter;
-
       l_new_iter.dim_type  = l_iter_dim_t[l_prim_id];
       l_new_iter.exec_type = exec_t::PRIM;
       l_new_iter.size      = 1;
       m_iter_space->push_back(l_new_iter);
-
     }
   }
 
   //set packing strides
   if( l_packing_left || l_packing_right ){
     int64_t l_next_id = -4;
-    std::vector<int64_t> l_packing_order;
+    std::vector<int64_t> l_packing_order = {-3, -2, -1};
     if( *m_ktype_main == kernel_t::PACKED_MADD ||
         *m_ktype_main == kernel_t::CPX_PACKED_MADD ){
-      l_packing_order.push_back(l_next_id--);
+      if( m_packed_gemm_support == packed_gemm_t::ALL_STRIDE_ONE ){
+        l_packing_order.insert(l_packing_order.begin(), l_next_id--);
+      }
+      else{
+        l_packing_order.insert(l_packing_order.end(), l_next_id--);
+      }
     }
-    l_packing_order.push_back(-3);
-    l_packing_order.push_back(-1);
-    l_packing_order.push_back(-2);
     if( *m_ktype_main == kernel_t::BR_MADD ){
-      l_packing_order.push_back(l_next_id--);
+      l_packing_order.insert(l_packing_order.end(), l_next_id--);
     }
     if( *m_ktype_main == kernel_t::CPX_MADD ||
         *m_ktype_main == kernel_t::CPX_PACKED_MADD){
-      l_packing_order.push_back(l_next_id--);
+      l_packing_order.insert(l_packing_order.end(), l_next_id--);
     }
-    if( l_extra_packing_iter_left != m_iter_space->end() ){
-      l_packing_order.push_back(l_next_id--);
+    if( l_extra_packing_left_required ){
+      l_packing_order.insert(l_packing_order.end(), l_next_id--);
     }
-    if( l_extra_packing_iter_right != m_iter_space->end() ){
-      l_packing_order.push_back(l_next_id--);
-    }
+    if( l_extra_packing_right_required ){
+      l_packing_order.insert(l_packing_order.end(), l_next_id--);
+    } 
+    
 
     int64_t l_stride_left  = 1;
     int64_t l_stride_right = 1;
@@ -508,8 +567,11 @@ void einsum_ir::binary::ContractionOptimizer::reorder_and_parallelize_iters(){
     }
   }
 
-  //use about half of the L2 cache for C blocking (A and B tend to be a lot smaller because of SFC blocking in M and N
+  //use about half of the L2 cache for C blocking (A and B tend to be a lot smaller because of SFC blocking in M and N)
   int64_t l_target_thread_tasks = m_l2_cache_size / 2 / (l_kernel_size_out * m_num_bytes_scalar_out );
+  if( l_target_thread_tasks < 1 ){
+    l_target_thread_tasks = 1;
+  }
   int64_t l_target_parallel = m_num_threads * l_target_thread_tasks;
 
   //simple heuristic to determine parallel targets
@@ -545,8 +607,9 @@ void einsum_ir::binary::ContractionOptimizer::reorder_and_parallelize_iters(){
   std::sort( m_iter_space->begin(), m_iter_space->end(), 
              [&](iter_property l_a, iter_property l_b) -> bool {
                 int64_t l_stride_a  = l_a.stride_left + l_a.stride_right + l_a.stride_out;
-                int64_t l_stride_b = l_b.stride_left + l_b.stride_right + l_b.stride_out; 
-                return l_stride_a > l_stride_b;
+                int64_t l_stride_b = l_b.stride_left + l_b.stride_right + l_b.stride_out;
+                bool l_smaller_stride = l_stride_a > l_stride_b;
+                return l_smaller_stride;
              });
   
   //add iterations from local data structures
@@ -571,30 +634,21 @@ void einsum_ir::binary::ContractionOptimizer::move_iters_until( std::vector<iter
                   l_target_remaining,
                   -1, 
                   i_new_exec_t );
+      if( l_it->size == 1 ){
+        m_iter_space->erase(l_it);
+      }
       l_it = m_iter_space->end() - 1;
     }
 
     //add iter to destination
     iter_property l_new_iter = *l_it;
     l_new_iter.exec_type = i_new_exec_t;
-    i_dest_iters->push_back(l_new_iter);
+    i_dest_iters->insert(i_dest_iters->begin(), l_new_iter );
     m_iter_space->erase(l_it);
     l_target_remaining /= l_size_iter;
-  }
-}
 
-int64_t einsum_ir::binary::ContractionOptimizer::move_all_iters( std::vector<iter_property> * i_source_iters,
-                                                                 std::vector<iter_property> * i_dest_iters,
-                                                                 exec_t                       i_new_exec_t ){
-  int64_t l_size_all = 1;
-  while( i_source_iters->size() > 0 ){
-    std::vector<iter_property>::iterator l_it = i_source_iters->end() - 1;
-    l_size_all *= move_iter( l_it,
-                             i_source_iters,
-                             i_dest_iters,
-                             i_new_exec_t );
+    find_iter_with_dimtype( l_it, i_dim_type );
   }
-  return l_size_all;
 }
 
 void einsum_ir::binary::ContractionOptimizer::split_iter( std::vector<iter_property>::iterator i_iteration,
@@ -618,36 +672,6 @@ void einsum_ir::binary::ContractionOptimizer::split_iter( std::vector<iter_prope
   i_iteration->stride_right   *= l_split;
   i_iteration->stride_out_aux *= l_split;
   i_iteration->stride_out     *= l_split;                        
-}
-
-void einsum_ir::binary::ContractionOptimizer::add_empty_iter( std::vector<iter_property> * i_dest_iters,
-                                                              int64_t                      i_new_iter_pos, 
-                                                              dim_t                        i_new_dim_t,
-                                                              exec_t                       i_new_exec_t ){
-
-  iter_property l_empty_iter;
-
-  l_empty_iter.dim_type = i_new_dim_t;
-  l_empty_iter.exec_type = i_new_exec_t;
-  l_empty_iter.size = 1;
-  l_empty_iter.stride_left = 0;
-  l_empty_iter.stride_right = 0;
-  l_empty_iter.stride_out = 0;  
-  l_empty_iter.stride_out_aux = 0;
-
-  i_dest_iters->insert(i_dest_iters->begin() + i_new_iter_pos, l_empty_iter );                                                       
-}
-
-int64_t einsum_ir::binary::ContractionOptimizer::move_iter( std::vector<iter_property>::iterator i_iteration,
-                                                            std::vector<iter_property> *         i_source_iters,
-                                                            std::vector<iter_property> *         i_dest_iters,
-                                                            exec_t                               i_new_exec_t ){
-  i_iteration->exec_type = i_new_exec_t;
-  int64_t i_iteration_size = i_iteration->size;
-  i_dest_iters->insert(i_dest_iters->begin(), *i_iteration );
-  i_source_iters->erase( i_iteration );
-    
-  return  i_iteration_size;                                                    
 }
 
 int64_t einsum_ir::binary::ContractionOptimizer::find_split( int64_t i_dim_size,
