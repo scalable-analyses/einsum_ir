@@ -34,8 +34,18 @@ jobs:
           for group in base development-tools runtimes; do
             xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
           done
-          sudo dnf install -y podman shadow-utils
+          sudo dnf install -y podman
           sudo python3 -m ensurepip --upgrade
+
+      - name: Configure rootless Podman (once per runner)
+        run: |
+          user=$(id -un)
+          sudo dnf install -y shadow-utils
+          if ! grep -q "^${user}:" /etc/subuid; then
+            sudo usermod --add-subuids 100000-165536 "$user"
+            sudo usermod --add-subgids 100000-165536 "$user"
+          fi
+          sudo chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap
 
       - name: Install cibuildwheel
         run: python3 -m pip install --upgrade pip cibuildwheel
