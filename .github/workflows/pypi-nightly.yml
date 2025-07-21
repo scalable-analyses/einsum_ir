@@ -13,58 +13,23 @@ jobs:
   build:
     runs-on: ["${{ matrix.runner }}"]
     strategy:
+      fail-fast: false
       matrix:
-        runner: [raptor-lake, grace]
+        include:
+          - runner: ubuntu-latest
+            cibw_arch: x86_64
+          - runner: ubuntu-22.04-arm
+            cibw_arch: aarch64
+    runs-on: ${{ matrix.runner }}
     
     steps:
-      # Install git first to ensure checkout uses proper git clone instead of ZIP download
-      # This is required for version_cli.py to access git metadata for version detection
-      - name: Install Git
-        run: |
-          sudo dnf install -y git
-
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Install System Packages
-        run: |
-          PKG_DIR=.github/workflows/fedora-packages
-          for group in base development-tools runtimes; do
-            xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
-          done
-
-          sudo dnf -y install dnf-plugins-core
-          sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-          sudo dnf -y install moby-engine docker-buildx-plugin docker-compose-plugin
-          sudo python3 -m ensurepip --upgrade
-
-      - name: Start Docker daemon
-        run: |
-          # start dockerd in background
-          sudo nohup dockerd \
-               --host=unix:///var/run/docker.sock \
-               --storage-driver=overlay2 \
-               > /tmp/dockerd.log 2>&1 &
-
-          # wait up to 20s
-          for i in {1..20}; do
-            if sudo docker info >/dev/null 2>&1; then
-              break
-            fi
-            sleep 1
-          done
-
-          # make the socket world-readable so the unprivileged
-          # GitHub-Actions user can connect without sudo
-          sudo chmod 666 /var/run/docker.sock
-
-          # final sanity check
-          docker info --format '{{.ServerVersion}}'
-
       - name: Install cibuildwheel
-        run: python3 -m pip install --upgrade pip cibuildwheel
+        run: python -m pip install --upgrade pip cibuildwheel
 
       - name: Modify package name to etops-nightly
         run: |
@@ -76,23 +41,24 @@ jobs:
       - name: Build wheels
         run: |
           cd python
-          export SETUPTOOLS_SCM_PRETEND_VERSION=$(python3 version_cli.py)
+          export SETUPTOOLS_SCM_PRETEND_VERSION=$(python version_cli.py)
           echo "Building version: $SETUPTOOLS_SCM_PRETEND_VERSION"
-          python3 -m cibuildwheel --output-dir wheelhouse
+          python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_CONTAINER_ENGINE: docker
+          CIBW_ARCHS_LINUX: ${{ matrix.cibw_arch }}
           CIBW_SKIP: "*-musllinux_*"
           CIBW_ENVIRONMENT_PASS_LINUX: "SETUPTOOLS_SCM_PRETEND_VERSION"
           CIBW_BEFORE_ALL_LINUX: |
-            yum install -y git cmake make gcc-c++ libomp-devel || 
-            apt-get update && apt-get install -y git cmake make g++ libomp-dev
+            apt-get update
+            apt-get install -y git cmake make g++ libomp-dev || true
 
       - name: Test wheel import
         run: |
           cd python
           # Install the built wheel and test basic import
-          python3 -m pip install wheelhouse/*.whl
-          python3 -c "import etops; print('etops-nightly version:', etops.__version__)"
+          python -m pip install wheelhouse/*.whl
+          python -c "import etops; print('etops-nightly version:', etops.__version__)"
 
       - name: Upload wheels as artifacts
         uses: actions/upload-artifact@v4
