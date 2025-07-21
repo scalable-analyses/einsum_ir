@@ -41,7 +41,7 @@ jobs:
         run: |
           export SETUPTOOLS_SCM_PRETEND_VERSION=$(python python/version_cli.py)
           echo "Building version: $SETUPTOOLS_SCM_PRETEND_VERSION"
-          python -m cibuildwheel --output-dir wheelhouse --package-dir python
+          python -m cibuildwheel python --output-dir wheelhouse
         env:
           CIBW_CONTAINER_ENGINE: docker
           CIBW_ARCHS_LINUX: ${{ matrix.cibw_arch }}
