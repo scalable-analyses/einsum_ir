@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    runs-on: [self-hosted, ${{ matrix.runner }}]
+    runs-on: ["${{ matrix.runner }}"]
     strategy:
       matrix:
         runner: [raptor-lake, grace]
