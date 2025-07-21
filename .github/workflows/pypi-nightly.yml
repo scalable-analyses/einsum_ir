@@ -39,18 +39,17 @@ jobs:
 
       - name: Build wheels
         run: |
-          cd python
-          export SETUPTOOLS_SCM_PRETEND_VERSION=$(python version_cli.py)
+          export SETUPTOOLS_SCM_PRETEND_VERSION=$(python python/version_cli.py)
           echo "Building version: $SETUPTOOLS_SCM_PRETEND_VERSION"
-          python -m cibuildwheel --output-dir wheelhouse
+          python -m cibuildwheel --output-dir wheelhouse --package-dir python
         env:
           CIBW_CONTAINER_ENGINE: docker
           CIBW_ARCHS_LINUX: ${{ matrix.cibw_arch }}
           CIBW_SKIP: "*-musllinux_*"
           CIBW_ENVIRONMENT_PASS_LINUX: "SETUPTOOLS_SCM_PRETEND_VERSION"
           CIBW_BEFORE_ALL_LINUX: |
-            apt-get update
-            apt-get install -y git cmake make g++ libomp-dev || true
+            apt update
+            apt install -y git cmake make g++ libomp-dev
 
       - name: Test wheel import
         run: |
