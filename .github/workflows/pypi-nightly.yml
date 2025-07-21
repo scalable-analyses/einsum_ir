@@ -37,14 +37,12 @@ jobs:
           sudo dnf install -y podman
           sudo python3 -m ensurepip --upgrade
 
-      - name: Start root-full Podman service
+      - name: Start root-full Podman API socket
         run: |
-          sudo systemctl enable --now podman.socket
-          sudo chmod 666 /run/podman/podman.sock
-
-          # Make the regular CLI use the root socket:
-          echo "CONTAINER_HOST=unix:///run/podman/podman.sock" >> $GITHUB_ENV
-          podman info --log-level error
+          sudo mkdir -p /run/podman
+          sudo nohup podman system service --time=0 \
+                unix:///run/podman/podman.sock >/tmp/podman-api.log 2>&1 &
+          echo "CONTAINER_HOST=unix:///run/podman/podman.sock" >> "$GITHUB_ENV"
 
       - name: Install cibuildwheel
         run: python3 -m pip install --upgrade pip cibuildwheel
