@@ -44,6 +44,21 @@ jobs:
                 unix:///run/podman/podman.sock >/tmp/podman-api.log 2>&1 &
           echo "CONTAINER_HOST=unix:///run/podman/podman.sock" >> "$GITHUB_ENV"
 
+          # wait until the socket is ready
+          for i in {1..20}; do
+            if sudo test -S /run/podman/podman.sock; then
+              podman info --log-level error && break
+            fi
+            sleep 1
+          done
+
+          # final sanity check
+          if ! sudo test -S /run/podman/podman.sock; then
+            echo "Podman API socket never appeared" >&2
+            sudo tail -n 50 /tmp/podman-api.log || true
+            exit 1
+          fi
+
       - name: Install cibuildwheel
         run: python3 -m pip install --upgrade pip cibuildwheel
 
