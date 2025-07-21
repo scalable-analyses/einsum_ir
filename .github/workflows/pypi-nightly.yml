@@ -11,7 +11,6 @@ on:
 
 jobs:
   build:
-    runs-on: ["${{ matrix.runner }}"]
     strategy:
       fail-fast: false
       matrix:
@@ -20,7 +19,7 @@ jobs:
             cibw_arch: x86_64
           - runner: ubuntu-22.04-arm
             cibw_arch: aarch64
-    runs-on: ${{ matrix.runner }}
+    runs-on: ["${{ matrix.runner }}"]
     
     steps:
       - uses: actions/checkout@v4
