@@ -34,7 +34,7 @@ jobs:
           for group in base development-tools runtimes; do
             xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
           done
-          sudo dnf install -y podman
+          sudo dnf install -y podman shadow-utils
           sudo python3 -m ensurepip --upgrade
 
       - name: Install cibuildwheel
@@ -54,7 +54,7 @@ jobs:
           echo "Building version: $SETUPTOOLS_SCM_PRETEND_VERSION"
           python3 -m cibuildwheel --output-dir wheelhouse
         env:
-          CIBW_CONTAINER_ENGINE: "sudo podman"
+          CIBW_CONTAINER_ENGINE: podman
           CIBW_SKIP: "*-musllinux_*"
           CIBW_ENVIRONMENT_PASS_LINUX: "SETUPTOOLS_SCM_PRETEND_VERSION"
           CIBW_BEFORE_ALL_LINUX: |
