@@ -37,15 +37,14 @@ jobs:
           sudo dnf install -y podman
           sudo python3 -m ensurepip --upgrade
 
-      - name: Configure rootless Podman (once per runner)
+      - name: Start root-full Podman service
         run: |
-          user=$(id -un)
-          sudo dnf install -y shadow-utils
-          if ! grep -q "^${user}:" /etc/subuid; then
-            sudo usermod --add-subuids 100000-165536 "$user"
-            sudo usermod --add-subgids 100000-165536 "$user"
-          fi
-          sudo chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap
+          sudo systemctl enable --now podman.socket
+          sudo chmod 666 /run/podman/podman.sock
+
+          # Make the regular CLI use the root socket:
+          echo "CONTAINER_HOST=unix:///run/podman/podman.sock" >> $GITHUB_ENV
+          podman info --log-level error
 
       - name: Install cibuildwheel
         run: python3 -m pip install --upgrade pip cibuildwheel
