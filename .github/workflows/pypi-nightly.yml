@@ -44,6 +44,8 @@ jobs:
           python -m cibuildwheel python --output-dir wheelhouse
         env:
           CIBW_CONTAINER_ENGINE: docker
+          CIBW_MANYLINUX_X86_64_IMAGE=manylinux_2_28
+          CIBW_MANYLINUX_AARCH64_IMAGE=manylinux_2_28
           CIBW_ARCHS_LINUX: ${{ matrix.cibw_arch }}
           CIBW_SKIP: "*-musllinux_*"
           CIBW_ENVIRONMENT_PASS_LINUX: "SETUPTOOLS_SCM_PRETEND_VERSION"
