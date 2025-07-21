@@ -34,30 +34,32 @@ jobs:
           for group in base development-tools runtimes; do
             xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
           done
-          sudo dnf install -y podman
+
+          sudo dnf -y install moby-engine docker-buildx-plugin docker-compose-plugin
           sudo python3 -m ensurepip --upgrade
 
-      - name: Start root-full Podman API socket
+      - name: Start Docker daemon
         run: |
-          sudo mkdir -p /run/podman
+          # start dockerd in background
+          sudo nohup dockerd \
+               --host=unix:///var/run/docker.sock \
+               --storage-driver=overlay2 \
+               > /tmp/dockerd.log 2>&1 &
 
-          # start the daemon in / (avoids “cannot chdir” errors)
-          sudo bash -c 'cd / && nohup podman system service --time=0 \
-               unix:///run/podman/podman.sock > /tmp/podman-api.log 2>&1 &'
-
-          # wait for the socket to appear, then open it up
+          # wait up to 20s
           for i in {1..20}; do
-            if sudo test -S /run/podman/podman.sock; then
-              sudo chgrp podman /run/podman/podman.sock || sudo chmod 666 /run/podman/podman.sock
+            if sudo docker info >/dev/null 2>&1; then
               break
             fi
             sleep 1
           done
 
+          # make the socket world-readable so the unprivileged
+          # GitHub-Actions user can connect without sudo
+          sudo chmod 666 /var/run/docker.sock
+
           # final sanity check
-          podman info --log-level error
-        env:
-          CONTAINER_HOST: unix:///run/podman/podman.sock
+          docker info --format '{{.ServerVersion}}'
 
       - name: Install cibuildwheel
         run: python3 -m pip install --upgrade pip cibuildwheel
@@ -76,7 +78,7 @@ jobs:
           echo "Building version: $SETUPTOOLS_SCM_PRETEND_VERSION"
           python3 -m cibuildwheel --output-dir wheelhouse
         env:
-          CIBW_CONTAINER_ENGINE: podman
+          CIBW_CONTAINER_ENGINE: docker
           CIBW_SKIP: "*-musllinux_*"
           CIBW_ENVIRONMENT_PASS_LINUX: "SETUPTOOLS_SCM_PRETEND_VERSION"
           CIBW_BEFORE_ALL_LINUX: |
