@@ -1,8 +1,6 @@
 name: PyPI Nightly Release
 
 on:
-  pull_request:
-    branches: [ main ]
   schedule:
     # Run daily at 2 AM UTC
     - cron: '0 2 * * *'
@@ -107,6 +105,9 @@ jobs:
   publish:
     needs: [build_linux, build_macos]
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -120,4 +121,3 @@ jobs:
         with:
           repository-url: https://test.pypi.org/legacy/
           skip-existing: true
-          password: ${{ secrets.PYPI_TOKEN }}
