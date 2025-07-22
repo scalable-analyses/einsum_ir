@@ -63,7 +63,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wheels-linux-${{ matrix.cibw_arch }}
-          path: python/wheelhouse/*.whl
+          path: wheelhouse/*.whl
 
   build_macos:
     runs-on: macos-14
@@ -102,7 +102,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wheels-macos-arm64
-          path: python/wheelhouse/*.whl
+          path: wheelhouse/*.whl
 
   publish:
     needs: [build_linux, build_macos]
