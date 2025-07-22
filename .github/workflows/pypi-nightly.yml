@@ -17,8 +17,14 @@ jobs:
         include:
           - runner: ubuntu-latest
             cibw_arch: x86_64
+            os: linux
           - runner: ubuntu-22.04-arm
             cibw_arch: aarch64
+            os: linux
+          - runner: macos-latest
+            cibw_arch: arm64
+            os: macos
+
     runs-on: ["${{ matrix.runner }}"]
     
     steps:
@@ -43,12 +49,15 @@ jobs:
           echo "Building version: $SETUPTOOLS_SCM_PRETEND_VERSION"
           python -m cibuildwheel python --output-dir wheelhouse
         env:
-          CIBW_CONTAINER_ENGINE: docker
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
-          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
-          CIBW_ARCHS_LINUX: ${{ matrix.cibw_arch }}
           CIBW_SKIP: "*-musllinux_*"
           CIBW_ENVIRONMENT_PASS_LINUX: "SETUPTOOLS_SCM_PRETEND_VERSION"
+          # per‑platform arch selection
+          CIBW_ARCHS_LINUX:  ${{ matrix.os == 'linux' && matrix.cibw_arch || '' }}
+          CIBW_ARCHS_MACOS:  ${{ matrix.os == 'macos' && matrix.cibw_arch || '' }}
+          # linux‑only
+          CIBW_CONTAINER_ENGINE:        ${{ matrix.os == 'linux' && 'docker' || '' }}
+          CIBW_MANYLINUX_X86_64_IMAGE:  ${{ matrix.os == 'linux' && 'manylinux_2_28' || '' }}
+          CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.os == 'linux' && 'manylinux_2_28' || '' }}
           CIBW_BEFORE_ALL_LINUX: |
             if command -v yum >/dev/null 2>&1; then
                 yum install -y git cmake make gcc-c++ libomp-devel
@@ -58,6 +67,11 @@ jobs:
                 apt-get update
                 apt-get install -y git cmake make g++ libomp-dev
             fi
+          # macOS‑only
+          CIBW_BEFORE_ALL_MACOS: |
+            brew update >/dev/null
+            brew install cmake llvm libomp git make || true
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
 
       - name: Upload wheels as artifacts
         uses: actions/upload-artifact@v4
