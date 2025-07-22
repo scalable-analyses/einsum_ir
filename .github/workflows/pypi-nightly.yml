@@ -89,7 +89,7 @@ jobs:
           CIBW_ARCHS_MACOS: arm64
           CIBW_BEFORE_ALL_MACOS: |
             brew update >/dev/null
-            brew install cmake llvm libomp git make || true
+            brew install cmake libomp git make || true
           MACOSX_DEPLOYMENT_TARGET: "11.0"
         run: |
           export SETUPTOOLS_SCM_PRETEND_VERSION="$(python python/version_cli.py)"
