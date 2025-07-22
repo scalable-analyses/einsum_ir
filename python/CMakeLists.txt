@@ -4,9 +4,11 @@ project(etops LANGUAGES CXX)
 # Check for OpenMP availability
 find_package(OpenMP QUIET)
 if(OpenMP_CXX_FOUND)
-    set(ETOPS_USE_OPENMP TRUE)
+    set(ETOPS_USE_OPENMP ON)
+    set(EINSUM_IR_ENABLE_OPENMP ON)
 else()
-    set(ETOPS_USE_OPENMP FALSE)
+    set(ETOPS_USE_OPENMP OFF)
+    set(EINSUM_IR_ENABLE_OPENMP OFF)
 endif()
 
 # ------------------------------------------------------------
@@ -80,17 +82,6 @@ target_compile_features(_etops_core PUBLIC)
 # ------------------------------------------------------------
 # Install
 # ------------------------------------------------------------
-install(
-    DIRECTORY
-        "${CMAKE_BINARY_DIR}/external/libxsmm/install/lib/"
-        "${CMAKE_BINARY_DIR}/external/libxsmm/install/lib64/"
-    DESTINATION etops
-    OPTIONAL
-    FILES_MATCHING
-        PATTERN "libxsmm*.so*"
-        PATTERN "libxsmm*.dylib"
-)
-
 install(
     TARGETS einsum_ir
     LIBRARY DESTINATION etops
