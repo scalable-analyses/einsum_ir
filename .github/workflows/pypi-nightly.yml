@@ -103,7 +103,7 @@ jobs:
           path: python/wheelhouse/*.whl
 
   publish:
-    needs: build
+    needs: [build_linux, build_macos]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
