@@ -39,7 +39,11 @@ jobs:
       - name: Modify package name to etops-nightly
         run: |
           cd python
-          sed -i 's/name = "etops"/name = "etops-nightly"/' pyproject.toml
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+              sed -i '' 's/name = "etops"/name = "etops-nightly"/' pyproject.toml
+          else
+              sed -i 's/name = "etops"/name = "etops-nightly"/' pyproject.toml
+          fi
           # Verify the change
           grep 'name = "etops-nightly"' pyproject.toml
 
@@ -49,7 +53,7 @@ jobs:
           echo "Building version: $SETUPTOOLS_SCM_PRETEND_VERSION"
           python -m cibuildwheel python --output-dir wheelhouse
         env:
-          CIBW_SKIP: "*-musllinux_*"
+          CIBW_BUILD: "cp*-manylinux*"
           CIBW_ENVIRONMENT_PASS_LINUX: "SETUPTOOLS_SCM_PRETEND_VERSION"
           # per‑platform arch selection
           CIBW_ARCHS_LINUX:  ${{ matrix.os == 'linux' && matrix.cibw_arch || '' }}
