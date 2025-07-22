@@ -84,7 +84,7 @@ jobs:
           sed -i.bak 's/requires-python = ">=3.8"/requires-python = ">=3.9"/' pyproject.toml
           rm pyproject.toml.bak
           grep 'name = "etops-nightly"' pyproject.toml
-          grep 'requires-python = ">=3.8"' pyproject.toml
+          grep 'requires-python = ">=3.9"' pyproject.toml
 
       - name: Build wheels
         env:
