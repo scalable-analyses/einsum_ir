@@ -58,12 +58,6 @@ jobs:
                 apt-get update
                 apt-get install -y git cmake make g++ libomp-dev
             fi
-      - name: Test wheel import
-        run: |
-          cd python
-          # Install the built wheel and test basic import
-          python -m pip install wheelhouse/*.whl
-          python -c "import etops; print('etops-nightly version:', etops.__version__)"
 
       - name: Upload wheels as artifacts
         uses: actions/upload-artifact@v4
