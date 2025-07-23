@@ -70,7 +70,7 @@ class einsum_ir::py::TensorOperation {
      * @param strides_in0 Strides of the first input tensor.
      * @param strides_in1 Strides of the second input tensor (ignored if unary).
      * @param strides_out Strides of the output tensor.
-     * @param num_threads Number of threads for parallel execution (determined automatically if <0).
+     * @param num_threads Number of threads for parallel execution (determined automatically if <1).
      * @return            Appropiate error code.
      **/
     error_t setup(
@@ -114,7 +114,7 @@ class einsum_ir::py::TensorOperation {
      * @param target_m            Target M block size for optimization.
      * @param target_n            Target N block size for optimization.
      * @param target_k            Target K block size for optimization.
-     * @param num_threads         Number of threads for parallel execution (determined automatically if <0).
+     * @param num_threads         Number of threads for parallel execution (determined automatically if <1).
      * @param br_gemm_support     Whether backend supports batch-reduce GEMM.
      * @param packed_gemm_support Whether backend supports packed GEMM.
      * @param l2_cache_size       Size of L2 cache in bytes.
