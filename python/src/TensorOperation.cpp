@@ -1,5 +1,4 @@
 #include "TensorOperation.h"
-#include <iostream>
 
 #ifdef _OPENMP
 #include <omp.h>
