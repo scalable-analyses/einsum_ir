@@ -93,8 +93,9 @@ jobs:
 
       - name: Patch Python version
         run: |
+          cd python
           sed -i.bak 's/requires-python = ">=3.8"/requires-python = ">=3.9"/' pyproject.toml
-          m pyproject.toml.bak
+          rm pyproject.toml.bak
           grep 'requires-python = ">=3.9"' pyproject.toml
 
       - name: Build wheels
