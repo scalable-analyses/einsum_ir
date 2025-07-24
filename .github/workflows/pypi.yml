@@ -129,7 +129,7 @@ jobs:
           merge-multiple: true
           path: dist/
       - name: Check dists
-        run: python -m pip install --upgrade twine && twine check dist/*
+        run: python -m pip install --upgrade packaging twine && twine check dist/*
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
