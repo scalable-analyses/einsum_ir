@@ -23,7 +23,8 @@ keywords = ["einsum trees", "tensor operations"]
 dependencies = [
   "numpy>=1.20"
 ]
-license = { file = "LICENSE" }
+license = "MIT AND BSD-3-Clause AND BSD-2-Clause"
+license-files = ["LICENSE"]
 
 [project.urls]
 Homepage = "https://github.com/scalable-analyses/einsum_ir"
