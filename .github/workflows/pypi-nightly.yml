@@ -15,7 +15,7 @@ jobs:
         include:
           - runner: ubuntu-latest
             cibw_arch: x86_64
-          - runner: ubuntu-22.04-arm
+          - runner: ubuntu-24.04-arm
             cibw_arch: aarch64
     runs-on: ["${{ matrix.runner }}"]
 
@@ -89,8 +89,8 @@ jobs:
           CIBW_ARCHS_MACOS: arm64
           CIBW_BEFORE_ALL_MACOS: |
             brew update >/dev/null
-            brew install cmake libomp git make || true
-          MACOSX_DEPLOYMENT_TARGET: "11.0"
+            brew install cmake libomp make || true
+          MACOSX_DEPLOYMENT_TARGET: "14.0"
         run: |
           export SETUPTOOLS_SCM_PRETEND_VERSION="$(python python/version_cli.py)"
           echo "Building version: $SETUPTOOLS_SCM_PRETEND_VERSION"
