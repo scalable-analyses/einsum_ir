@@ -32,13 +32,11 @@ if(EINSUM_IR_ENABLE_TPP)
   if(LIBXSMM_ROOT)
     message(STATUS "Looking for LIBXSMM in ${LIBXSMM_ROOT}")
     find_path(LIBXSMM_INCLUDE_DIR libxsmm.h PATHS ${LIBXSMM_ROOT}/include NO_DEFAULT_PATH)
-    find_library(LIBXSMM_LIBRARY NAMES xsmm xsmmf xsmmnoblas
+    find_library(LIBXSMM_LIBRARY NAMES libxsmm.a
                  PATHS ${LIBXSMM_ROOT}/lib
-                 NO_DEFAULT_PATH
-                 NAMES_PER_DIR)
-    
+                 NO_DEFAULT_PATH)
     if(LIBXSMM_INCLUDE_DIR AND LIBXSMM_LIBRARY)
-      add_library(LIBXSMM::LIBXSMM UNKNOWN IMPORTED)
+      add_library(LIBXSMM::LIBXSMM STATIC IMPORTED)
       set_target_properties(LIBXSMM::LIBXSMM PROPERTIES
                             IMPORTED_LOCATION ${LIBXSMM_LIBRARY})
       set(LIBXSMM_FOUND TRUE)
@@ -76,7 +74,7 @@ if(EINSUM_IR_ENABLE_TPP)
     endif()
 
     # Set variables for later use
-    set(LIBXSMM_LIBRARY ${LIBXSMM_INSTALL_DIR}/lib/libxsmm${CMAKE_SHARED_LIBRARY_SUFFIX})
+    set(LIBXSMM_LIBRARY ${LIBXSMM_INSTALL_DIR}/lib/libxsmm.a)
     set(LIBXSMM_INCLUDE_DIR ${LIBXSMM_INSTALL_DIR}/include)
     set(LIBXSMM_FOUND TRUE)
     set(LIBXSMM_AUTO_INSTALLED TRUE)
@@ -96,7 +94,7 @@ if(EINSUM_IR_ENABLE_TPP)
     )
 
     # Create an imported target for the auto-installed LIBXSMM
-    add_library(LIBXSMM::LIBXSMM SHARED IMPORTED GLOBAL)
+    add_library(LIBXSMM::LIBXSMM STATIC IMPORTED GLOBAL)
     set_target_properties(LIBXSMM::LIBXSMM PROPERTIES IMPORTED_LOCATION ${LIBXSMM_LIBRARY})
     add_dependencies(LIBXSMM::LIBXSMM libxsmm_external)
   else()
@@ -178,30 +176,13 @@ install(TARGETS einsum_ir EXPORT einsum_irTargets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-# Include LIBXSMM in the installation
+# Include LIBXSMM headers in the installation
 if(EINSUM_IR_ENABLE_TPP AND LIBXSMM_FOUND)
   if(LIBXSMM_AUTO_INSTALLED)
-    # For auto-installed LIBXSMM, install the entire directory structure
-    install(DIRECTORY "${LIBXSMM_INSTALL_DIR}/lib/"
-            DESTINATION ${CMAKE_INSTALL_LIBDIR}
-            FILES_MATCHING PATTERN "libxsmm.*")
-    
     install(DIRECTORY "${LIBXSMM_INSTALL_DIR}/include/"
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
             FILES_MATCHING PATTERN "*.h")
-            
-    # Install binaries if they exist
-    if(EXISTS "${LIBXSMM_INSTALL_DIR}/bin")
-      install(DIRECTORY "${LIBXSMM_INSTALL_DIR}/bin/"
-              DESTINATION ${CMAKE_INSTALL_BINDIR}
-              USE_SOURCE_PERMISSIONS
-              FILES_MATCHING PATTERN "*")
-    endif()
   else()
-    # Manually specified LIBXSMM
-    install(FILES "${LIBXSMM_LIBRARY}" 
-            DESTINATION ${CMAKE_INSTALL_LIBDIR})
-    
     if(LIBXSMM_INCLUDE_DIR)
       install(DIRECTORY "${LIBXSMM_INCLUDE_DIR}/"
               DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
@@ -245,23 +226,3 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/einsum_irConfig.cmake"
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/einsum_irConfig.cmake"
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/einsum_ir)
-
-# ──────────────────────────────────────────────────────
-# Dependency Bundling Support
-# ──────────────────────────────────────────────────────
-if(EINSUM_IR_BUNDLE_DEPENDENCIES)
-  # Bundle auto-installed LIBXSMM libraries
-  if(EINSUM_IR_ENABLE_TPP AND LIBXSMM_AUTO_INSTALLED)
-    install(CODE "
-      # Find and bundle all libxsmm versioned libraries
-      file(GLOB LIBXSMM_LIBS \"${LIBXSMM_INSTALL_DIR}/lib/libxsmm.so*\")
-      foreach(LIB_FILE \${LIBXSMM_LIBS})
-        if(EXISTS \"\${LIB_FILE}\")
-          get_filename_component(LIB_NAME \"\${LIB_FILE}\" NAME)
-          file(INSTALL \"\${LIB_FILE}\" DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}\")
-          message(STATUS \"Bundled: \${LIB_NAME}\")
-        endif()
-      endforeach()
-    ")
-  endif()
-endif()

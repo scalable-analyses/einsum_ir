@@ -1,4 +1,4 @@
-name: Unit Tests (macOS-latest)
+name: Unit Tests (macOS)
 
 on:
   push:
