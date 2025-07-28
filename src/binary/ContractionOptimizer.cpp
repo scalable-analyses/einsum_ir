@@ -589,19 +589,25 @@ void einsum_ir::binary::ContractionOptimizer::reorder_and_parallelize_iters(){
   l_target_parallel_c = l_target_parallel / (l_target_parallel_m * l_target_parallel_n);
 
   //add parallel dimension
-  std::vector<iter_property> l_parallel_iters;
-  move_iters_until( &l_parallel_iters, 
+  std::vector<iter_property> l_blocking_iters;
+  move_iters_until( &l_blocking_iters, 
                     l_target_parallel_n,
                     dim_t::N,
                     exec_t::SFC);
-  move_iters_until( &l_parallel_iters, 
+  move_iters_until( &l_blocking_iters, 
                     l_target_parallel_m,
                     dim_t::M,
                     exec_t::SFC);
-  move_iters_until( &l_parallel_iters, 
+  move_iters_until( &l_blocking_iters, 
                     l_target_parallel_c,
                     dim_t::C,
                     exec_t::OMP);
+
+  //add sequential K dimension for L3 blocking
+  move_iters_until( &l_blocking_iters, 
+                    64,
+                    dim_t::K,
+                    exec_t::SEQ);
 
   //sort remaining dimensions by sum of strides
   std::sort( m_iter_space->begin(), m_iter_space->end(), 
@@ -613,7 +619,7 @@ void einsum_ir::binary::ContractionOptimizer::reorder_and_parallelize_iters(){
              });
   
   //add iterations from local data structures
-  m_iter_space->insert(m_iter_space->end(), l_parallel_iters.begin(), l_parallel_iters.end() );
+  m_iter_space->insert(m_iter_space->end(), l_blocking_iters.begin(), l_blocking_iters.end() );
   m_iter_space->insert(m_iter_space->end(), l_kernel_iters.begin(), l_kernel_iters.end() );
 }
 
@@ -627,7 +633,7 @@ void einsum_ir::binary::ContractionOptimizer::move_iters_until( std::vector<iter
   find_iter_with_dimtype( l_it, i_dim_type );
   while(     l_target_remaining > 1
           && l_it != m_iter_space->end() ){
-    //if size is smalle than target size split it
+    //if size is smaller than target size split it
     int64_t l_size_iter  = l_it->size;
     if(l_size_iter > l_target_remaining){
       split_iter( l_it,
