@@ -4,7 +4,7 @@
 #include <vector>
 #include <list>
 #include "../constants.h"
-#include "../binary/ContractionMemoryManager.h"
+#include "../etops/binary/ContractionMemoryManager.h"
 
 namespace einsum_ir {
   namespace backend {

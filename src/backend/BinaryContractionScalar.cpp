@@ -1,5 +1,5 @@
 #include "BinaryContractionScalar.h"
-#include "../binary/ContractionOptimizer.h"
+#include "../etops/binary/ContractionOptimizer.h"
 
 einsum_ir::err_t einsum_ir::backend::BinaryContractionScalar::compile() {
   err_t l_err = err_t::UNDEFINED_ERROR;

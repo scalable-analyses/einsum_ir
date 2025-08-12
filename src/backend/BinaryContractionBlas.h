@@ -2,7 +2,7 @@
 #define EINSUM_IR_BACKEND_BINARY_CONTRACTION_BLAS
 
 #include "BinaryContraction.h"
-#include "../binary/ContractionBackendBlas.h"
+#include "../etops/binary/ContractionBackendBlas.h"
 
 namespace einsum_ir {
   namespace backend {

@@ -2,7 +2,7 @@
 #define EINSUM_IR_BINARY_UNARY_OPTIMIZER
 
 #include <vector>
-#include "../binary/constants.h"
+#include "../constants.h"
 
 namespace einsum_ir {
   namespace binary {

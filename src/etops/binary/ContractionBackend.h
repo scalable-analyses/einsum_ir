@@ -3,7 +3,7 @@
 
 #include <vector>
 
-#include "constants.h"
+#include "../constants.h"
 #include "IterationSpace.h"
 #include "ContractionMemoryManager.h"
 #include "../unary/UnaryBackendTpp.h"

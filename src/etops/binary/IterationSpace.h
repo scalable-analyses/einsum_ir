@@ -2,7 +2,7 @@
 #define EINSUM_IR_BINARY_ITERATION_SPACE
 
 #include <vector>
-#include "constants.h"
+#include "../constants.h"
 
 namespace einsum_ir {
   namespace binary {

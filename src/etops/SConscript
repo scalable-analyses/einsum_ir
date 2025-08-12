@@ -11,34 +11,38 @@ if g_env['blas'] != False:
   if( g_env['blas'] == 'nvpl' ):
     l_bin_cont_blas_defines.append( 'PP_EINSUM_IR_HAS_BLAS_NVPL' )
 
-  l_bin_cont_blas_sources = [ 'ContractionBackendBlas.cpp' ]
+  l_bin_cont_blas_sources = [ 'binary/ContractionBackendBlas.cpp' ]
 
   for l_source in l_bin_cont_blas_sources:
     g_env.sources.append( g_env.Object( l_source,
                                         CPPDEFINES = l_bin_cont_blas_defines ) )
 
 # default files
-l_sources = [ 'IterationSpace.cpp',
-              'ContractionBackend.cpp',
-              'ContractionBackendScalar.cpp',
-              'ContractionOptimizer.cpp',
-              'ContractionMemoryManager.cpp' ]
+l_sources = [ 'binary/IterationSpace.cpp',
+              'binary/ContractionBackend.cpp',
+              'binary/ContractionBackendScalar.cpp',
+              'binary/ContractionOptimizer.cpp',
+              'binary/ContractionMemoryManager.cpp',
+              'unary/UnaryBackend.cpp', 
+              'unary/UnaryOptimizer.cpp' ]
 
 if g_env['libxsmm'] != False:
-  l_sources += [ 'ContractionBackendTpp.cpp' ]
+  l_sources += [ 'binary/ContractionBackendTpp.cpp',
+                 'unary/UnaryBackendTpp.cpp' ]
 
 
-l_tests = [ 'IterationSpace.test.cpp',
-            'ContractionOptimizer.test.cpp']
+l_tests = [ 'binary/IterationSpace.test.cpp',
+            'binary/ContractionOptimizer.test.cpp']
 
 if g_env['libtorch'] != False:
-  l_tests += [ 'ContractionBackendScalar.test.torch.cpp' ]
+  l_tests += [ 'binary/ContractionBackendScalar.test.torch.cpp' ]
 
 if g_env['libxsmm'] != False and g_env['libtorch'] != False:
-  l_tests += [ 'ContractionBackendTpp.test.torch.cpp' ]
+  l_tests += [ 'binary/ContractionBackendTpp.test.torch.cpp',
+               'unary/UnaryBackendTpp.test.torch.cpp' ]
 
 if g_env['blas'] != False and g_env['libtorch'] != False:
-  l_tests += [ 'ContractionBackendBlas.test.torch.cpp' ]
+  l_tests += [ 'binary/ContractionBackendBlas.test.torch.cpp' ]
 
 
 for l_source in l_sources:

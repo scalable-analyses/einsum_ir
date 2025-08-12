@@ -2,7 +2,7 @@
 #define EINSUM_IR_BACKEND_BINARY_CONTRACTION_TPP
 
 #include "BinaryContraction.h"
-#include "../binary/ContractionBackendTpp.h"
+#include "../etops/binary/ContractionBackendTpp.h"
 
 namespace einsum_ir {
   namespace backend {
