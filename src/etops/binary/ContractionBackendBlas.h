@@ -1,15 +1,15 @@
-#ifndef ETOPS_BINARY_CONTRACTION_BACKEND_BLAS
-#define ETOPS_BINARY_CONTRACTION_BACKEND_BLAS
+#ifndef EINSUM_IR_ETOPS_BINARY_CONTRACTION_BACKEND_BLAS
+#define EINSUM_IR_ETOPS_BINARY_CONTRACTION_BACKEND_BLAS
 
 #include "ContractionBackend.h"
 
-namespace etops {
-  namespace binary {
+namespace einsum_ir {
+  namespace etops {
     class ContractionBackendBlas;
   }
 }
 
-class etops::binary::ContractionBackendBlas: public ContractionBackend {
+class einsum_ir::etops::ContractionBackendBlas: public ContractionBackend {
   private:
     //! number of bytes in a scalar
     int64_t m_num_bytes_scalar = 0;

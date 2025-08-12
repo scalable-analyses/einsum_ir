@@ -110,13 +110,10 @@ namespace einsum_ir {
     else if( i_ktype == ADD             ) return etops::kernel_t::ADD;
     else if( i_ktype == COPY            ) return etops::kernel_t::COPY;
     else if( i_ktype == MADD            ) return etops::kernel_t::MADD;
-    else if( i_ktype == CPX_INT_LOW     ) return etops::kernel_t::CPX_INT_LOW;
     else if( i_ktype == CPX_ZERO        ) return etops::kernel_t::CPX_ZERO;
     else if( i_ktype == CPX_ADD         ) return etops::kernel_t::CPX_ADD;
     else if( i_ktype == CPX_MADD        ) return etops::kernel_t::CPX_MADD;
     else if( i_ktype == CPX_COPY        ) return etops::kernel_t::CPX_COPY;
-    else if( i_ktype == CPX_INT_HIGH    ) return etops::kernel_t::CPX_INT_HIGH;
-    else if( i_ktype == CUSTOM_KTYPE    ) return etops::kernel_t::CUSTOM_KTYPE;
     else if( i_ktype == BR_MADD         ) return etops::kernel_t::BR_MADD;
     else if( i_ktype == PACKED_MADD     ) return etops::kernel_t::PACKED_MADD;
     else if( i_ktype == CPX_PACKED_MADD ) return etops::kernel_t::CPX_PACKED_MADD;
@@ -126,16 +123,8 @@ namespace einsum_ir {
   constexpr err_t ce_etops_err_to_err( etops::err_t i_err ) {
     if(      i_err == etops::err_t::SUCCESS                   ) return err_t::SUCCESS;
     else if( i_err == etops::err_t::COMPILATION_FAILED        ) return err_t::COMPILATION_FAILED;
-    else if( i_err == etops::err_t::DIMENSION_ORDERING_FAILED ) return err_t::DIMENSION_ORDERING_FAILED;
-    else if( i_err == etops::err_t::TENSOR_BLOCKING_FAILED    ) return err_t::TENSOR_BLOCKING_FAILED;
-    else if( i_err == etops::err_t::NO_DATA_PTR_PROVIDED      ) return err_t::NO_DATA_PTR_PROVIDED;
-    else if( i_err == etops::err_t::CALLED_BEFORE_COMPILATION ) return err_t::CALLED_BEFORE_COMPILATION;
-    else if( i_err == etops::err_t::INVALID_ID                ) return err_t::INVALID_ID;
-    else if( i_err == etops::err_t::INVALID_BACKEND           ) return err_t::INVALID_BACKEND;
     else if( i_err == etops::err_t::INVALID_CPX_DIM           ) return err_t::INVALID_CPX_DIM;
-    else if( i_err == etops::err_t::INVALID_DTYPE             ) return err_t::INVALID_DTYPE;
-    else if( i_err == etops::err_t::INVALID_KTYPE             ) return err_t::INVALID_KTYPE;
-    else                                                       return err_t::UNDEFINED_ERROR;
+    else                                                        return err_t::UNDEFINED_ERROR;
   }
 
   constexpr int64_t ce_n_bytes( data_t i_dtype ) {

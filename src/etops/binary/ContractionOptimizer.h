@@ -1,16 +1,16 @@
-#ifndef ETOPS_BINARY_CONTRACTION_OPTIMIZER
-#define ETOPS_BINARY_CONTRACTION_OPTIMIZER
+#ifndef EINSUM_IR_ETOPS_BINARY_CONTRACTION_OPTIMIZER
+#define EINSUM_IR_ETOPS_BINARY_CONTRACTION_OPTIMIZER
 
 #include <vector>
 #include "../constants.h"
 
-namespace etops {
-  namespace binary {
+namespace einsum_ir {
+  namespace etops {
     class ContractionOptimizer;
   }
 }
 
-class etops::binary::ContractionOptimizer {
+class einsum_ir::etops::ContractionOptimizer {
   private:
     //! Internal enum to identify kernel iterations.
     enum{ 

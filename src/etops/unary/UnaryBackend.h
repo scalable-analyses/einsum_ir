@@ -5,13 +5,13 @@
 #include "../constants.h"
 
 
-namespace etops {
-  namespace binary {
+namespace einsum_ir {
+  namespace etops {
     class UnaryBackend;
   }
 }
 
-class etops::binary::UnaryBackend {
+class einsum_ir::etops::UnaryBackend {
   private:
 
     //! id of the first primitive loop

@@ -1,6 +1,6 @@
 #include "UnaryBackendTpp.h"
 
-libxsmm_datatype etops::binary::UnaryBackendTpp::dtype_to_libxsmm( data_t i_dtype ) {
+libxsmm_datatype einsum_ir::etops::UnaryBackendTpp::dtype_to_libxsmm( data_t i_dtype ) {
   if( i_dtype == FP32 ) {
     return libxsmm_datatype::LIBXSMM_DATATYPE_F32;
   }
@@ -11,8 +11,8 @@ libxsmm_datatype etops::binary::UnaryBackendTpp::dtype_to_libxsmm( data_t i_dtyp
   return libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED;
 }
 
-void etops::binary::UnaryBackendTpp::kernel_main( void const * i_out_aux,
-                                                      void       * io_out ){
+void einsum_ir::etops::UnaryBackendTpp::kernel_main( void const * i_out_aux,
+                                                     void       * io_out ){
   if( m_xmm_kernel_unary != nullptr ) {
     libxsmm_meltw_unary_param l_param;
     l_param.in.primary  = (void *) i_out_aux;
@@ -28,7 +28,7 @@ void etops::binary::UnaryBackendTpp::kernel_main( void const * i_out_aux,
   }*/
 }
 
-etops::err_t etops::binary::UnaryBackendTpp::compile_kernels(){
+einsum_ir::etops::err_t einsum_ir::etops::UnaryBackendTpp::compile_kernels(){
 
   // libxsmm data types
   libxsmm_datatype l_xmm_dtype_in   = dtype_to_libxsmm( m_dtype_in  );

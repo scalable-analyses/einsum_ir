@@ -1,16 +1,16 @@
-#ifndef ETOPS_BINARY_UNARY_BACKEND_TPP
-#define ETOPS_BINARY_UNARY_BACKEND_TPP
+#ifndef EINSUM_IR_ETOPS_UNARY_BACKEND_TPP
+#define EINSUM_IR_ETOPS_UNARY_BACKEND_TPP
 
 #include <libxsmm.h>
 #include "UnaryBackend.h"
 
-namespace etops {
-  namespace binary {
+namespace einsum_ir {
+  namespace etops {
     class UnaryBackendTpp;
   }
 }
 
-class etops::binary::UnaryBackendTpp: public UnaryBackend {
+class einsum_ir::etops::UnaryBackendTpp: public UnaryBackend {
   private:
 
     //! LIBXSMM-based unary TPP

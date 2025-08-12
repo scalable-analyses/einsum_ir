@@ -15,7 +15,7 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction backend implementation
   //    n    1      7
   //    k    2      8
 
-  using namespace etops;
+  using namespace einsum_ir::etops;
 
   at::Tensor l_left    = at::randn( { 8, 5 } );
   at::Tensor l_right   = at::randn( { 7, 8 } );
@@ -37,7 +37,7 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction backend implementation
   std::vector< int64_t > l_loop_strides_out     = {  1, 5, 0 };
 
 
-  binary::ContractionBackendBlas l_cont_blas;
+  ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
@@ -79,7 +79,7 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction backend implementation
   //    n    1      7
   //    k    2      8
  
-  using namespace etops;
+  using namespace einsum_ir::etops;
 
   at::Tensor l_left    = at::randn( { 8, 5 },
                                     at::dtype( at::kDouble ) );
@@ -104,7 +104,7 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction backend implementation
   std::vector< int64_t > l_loop_strides_out     = {  1, 5, 0 };
 
 
-  binary::ContractionBackendBlas l_cont_blas;
+  ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
@@ -148,7 +148,7 @@ TEST_CASE( "Simple batched FP64 matmul using the BLAS contraction backend implem
   //    n    7
   //    k    8
 
-  using namespace etops;
+  using namespace einsum_ir::etops;
 
   at::Tensor l_left    = at::randn( { 3, 8, 5 },
                                     at::dtype( at::kDouble ) );
@@ -175,7 +175,7 @@ TEST_CASE( "Simple batched FP64 matmul using the BLAS contraction backend implem
   std::vector< int64_t > l_loop_strides_out     = { 35, 1, 5, 0 };
 
 
-  binary::ContractionBackendBlas l_cont_blas;
+  ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
@@ -228,7 +228,7 @@ TEST_CASE( "FP32 tensor contraction using the BLAS contraction backend implement
   at::Tensor l_out     = at::randn( { 5, 2, 8, 7, 12 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  using namespace etops;
+  using namespace einsum_ir::etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C, 
                                              dim_t::M,
@@ -253,7 +253,7 @@ TEST_CASE( "FP32 tensor contraction using the BLAS contraction backend implement
   std::vector< int64_t > l_loop_strides_out     = {1344,672, 84,  0, 1,12, 0 };
 
 
-  binary::ContractionBackendBlas l_cont_blas;
+  ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
@@ -305,7 +305,7 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction backend impleme
                                     at::dtype( at::kDouble ) );
   at::Tensor l_out_ref = l_out.clone();
 
-  using namespace etops;
+  using namespace einsum_ir::etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C, 
                                              dim_t::M,
@@ -324,7 +324,7 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction backend impleme
   std::vector< int64_t > l_loop_strides_out     = {  1, 3,15, 0 };
 
 
-  binary::ContractionBackendBlas l_cont_blas;
+  ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
@@ -379,7 +379,7 @@ TEST_CASE( "FP32 packed tensor contraction using the BLAS contraction backend im
   at::Tensor l_out     = at::randn( { 5, 2, 8, 7, 12, 4 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  using namespace etops;
+  using namespace einsum_ir::etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C, 
                                              dim_t::M,
@@ -406,7 +406,7 @@ TEST_CASE( "FP32 packed tensor contraction using the BLAS contraction backend im
   std::vector< int64_t > l_loop_strides_out     = {5376,2688,336,  0,  1, 4,48, 0 };
 
 
-  binary::ContractionBackendBlas l_cont_blas;
+  ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,

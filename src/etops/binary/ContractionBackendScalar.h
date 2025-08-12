@@ -1,15 +1,15 @@
-#ifndef ETOPS_BINARY_CONTRACTION_BACKEND_SCALAR
-#define ETOPS_BINARY_CONTRACTION_BACKEND_SCALAR
+#ifndef EINSUM_IR_ETOPS_BINARY_CONTRACTION_BACKEND_SCALAR
+#define EINSUM_IR_ETOPS_BINARY_CONTRACTION_BACKEND_SCALAR
 
 #include "ContractionBackend.h"
 
-namespace etops {
-  namespace binary {
+namespace einsum_ir {
+  namespace etops {
     class ContractionBackendScalar;
   }
 }
 
-class etops::binary::ContractionBackendScalar: public ContractionBackend {
+class einsum_ir::etops::ContractionBackendScalar: public ContractionBackend {
   private:
     /**
      * Compiler-based zero kernel.

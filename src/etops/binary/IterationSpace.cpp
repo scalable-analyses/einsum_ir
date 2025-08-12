@@ -5,22 +5,22 @@
 #include <omp.h>
 #endif
 
-void etops::binary::IterationSpace::init( std::vector< dim_t >   const * i_dim_types,
-                                          std::vector< exec_t >  const * i_exec_types,
-                                          std::vector< int64_t > const * i_sizes,
-                                          int64_t                        i_num_threads){
+void einsum_ir::etops::IterationSpace::init( std::vector< dim_t >   const * i_dim_types,
+                                             std::vector< exec_t >  const * i_exec_types,
+                                             std::vector< int64_t > const * i_sizes,
+                                             int64_t                        i_num_threads){
   m_dim_types  = i_dim_types;
   m_exec_types = i_exec_types;
   m_sizes      = i_sizes;
   m_num_threads = i_num_threads;
 }
 
-etops::err_t etops::binary::IterationSpace::setup( std::vector< int64_t >   & io_strides_left,
-                                                   std::vector< int64_t >   & io_strides_right,
-                                                   std::vector< int64_t >   & io_strides_out_aux,
-                                                   std::vector< int64_t >   & io_strides_out, 
-                                                   std::vector<thread_info> & io_thread_infos ) {
-  
+einsum_ir::etops::err_t einsum_ir::etops::IterationSpace::setup( std::vector< int64_t >   & io_strides_left,
+                                                                 std::vector< int64_t >   & io_strides_right,
+                                                                 std::vector< int64_t >   & io_strides_out_aux,
+                                                                 std::vector< int64_t >   & io_strides_out, 
+                                                                 std::vector<thread_info> & io_thread_infos ) {
+                
   //calculate number of tasks and assigns parallel dimensions to three types omp, sfc_n, sfc_m
   m_sfc_tasks_m = 1;
   m_sfc_tasks_n = 1;
@@ -134,10 +134,10 @@ etops::err_t etops::binary::IterationSpace::setup( std::vector< int64_t >   & io
   return err_t::SUCCESS;
 }
 
-int64_t etops::binary::IterationSpace::calculate_offset( int64_t i_id_omp,
-                                                         int64_t i_id_sfc_m,
-                                                         int64_t i_id_sfc_n,
-                                                         std::vector< int64_t > const & i_strides ) {
+int64_t einsum_ir::etops::IterationSpace::calculate_offset( int64_t i_id_omp,
+                                                            int64_t i_id_sfc_m,
+                                                            int64_t i_id_sfc_n,
+                                                            std::vector< int64_t > const & i_strides ) {
 
   int64_t l_offset = 0;
   for (int64_t l_id = m_sfc_loops_m.end - 1; l_id >= m_sfc_loops_m.begin; l_id--) {
@@ -165,7 +165,7 @@ int64_t etops::binary::IterationSpace::calculate_offset( int64_t i_id_omp,
   return l_offset;
 }
 
-void etops::binary::IterationSpace::convert_strides_to_offsets( std::vector< int64_t > & io_strides) {
+void einsum_ir::etops::IterationSpace::convert_strides_to_offsets( std::vector< int64_t > & io_strides) {
 
   int64_t l_id_sfc_m, l_id_sfc_n, l_id_omp;
   sfc_oracle_2d(&l_id_sfc_m, &l_id_sfc_n, &l_id_omp, m_sfc_tasks_m*m_sfc_tasks_n-1);
@@ -198,9 +198,9 @@ void etops::binary::IterationSpace::convert_strides_to_offsets( std::vector< int
   }
 }
 
-etops::binary::sfc_t etops::binary::IterationSpace::get_max_dim_jump( range_t i_dim_loops,
-                                                                      int64_t i_id_new,
-                                                                      int64_t i_id_old ){
+einsum_ir::etops::sfc_t einsum_ir::etops::IterationSpace::get_max_dim_jump( range_t i_dim_loops,
+                                                                            int64_t i_id_new,
+                                                                            int64_t i_id_old ){
 
   int64_t l_direction = (( i_id_old - i_id_new ) + 1) >> 1;
   int64_t l_max_id = i_id_new + l_direction;
@@ -217,10 +217,10 @@ etops::binary::sfc_t etops::binary::IterationSpace::get_max_dim_jump( range_t i_
   return 0;
 }
 
-void etops::binary::IterationSpace::sfc_oracle_2d( int64_t *o_m, 
-                                                   int64_t *o_n,
-                                                   int64_t *o_omp, 
-                                                   int64_t  i_idx ){
+void einsum_ir::etops::IterationSpace::sfc_oracle_2d( int64_t *o_m, 
+                                                      int64_t *o_n,
+                                                      int64_t *o_omp, 
+                                                      int64_t  i_idx ){
   
   int l_w = m_sfc_tasks_m;
   int l_h = m_sfc_tasks_n;

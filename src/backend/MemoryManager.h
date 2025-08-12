@@ -39,7 +39,7 @@ class einsum_ir::backend::MemoryManager{
     std::list<int64_t> m_allocated_offset_right;
 
     //! memory manager for contractions
-    etops::binary::ContractionMemoryManager m_contraction_memory_manager;
+    einsum_ir::etops::ContractionMemoryManager m_contraction_memory_manager;
 
   public:
     //! id of the current layer
@@ -85,7 +85,7 @@ class einsum_ir::backend::MemoryManager{
      *
      * @return pointer to the ContractionMemoryManager
      **/
-    etops::binary::ContractionMemoryManager * get_contraction_memory_manager();
+    einsum_ir::etops::ContractionMemoryManager * get_contraction_memory_manager();
 
 };
 

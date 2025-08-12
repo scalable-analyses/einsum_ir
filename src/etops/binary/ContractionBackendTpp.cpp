@@ -1,6 +1,6 @@
 #include "ContractionBackendTpp.h"
 
-libxsmm_datatype etops::binary::ContractionBackendTpp::dtype_to_libxsmm( data_t i_dtype ) {
+libxsmm_datatype einsum_ir::etops::ContractionBackendTpp::dtype_to_libxsmm( data_t i_dtype ) {
   if( i_dtype == FP32 ) {
     return libxsmm_datatype::LIBXSMM_DATATYPE_F32;
   }
@@ -12,8 +12,8 @@ libxsmm_datatype etops::binary::ContractionBackendTpp::dtype_to_libxsmm( data_t 
 }
 
 
-void etops::binary::ContractionBackendTpp::kernel_first_touch( void const * i_out_aux,
-                                                               void       * io_out ){
+void einsum_ir::etops::ContractionBackendTpp::kernel_first_touch( void const * i_out_aux,
+                                                                  void       * io_out ){
 
   if( m_xmm_kernel_first_touch_unary != nullptr ) {
     libxsmm_meltw_unary_param l_param;
@@ -31,8 +31,8 @@ void etops::binary::ContractionBackendTpp::kernel_first_touch( void const * i_ou
 }
 
 
-void etops::binary::ContractionBackendTpp::kernel_last_touch( void const * i_out_aux,
-                                                              void       * io_out ){
+void einsum_ir::etops::ContractionBackendTpp::kernel_last_touch( void const * i_out_aux,
+                                                                 void       * io_out ){
   if( m_xmm_kernel_last_touch_unary != nullptr ) {
     libxsmm_meltw_unary_param l_param;
     l_param.in.primary = io_out;
@@ -49,9 +49,9 @@ void etops::binary::ContractionBackendTpp::kernel_last_touch( void const * i_out
 }
 
 
-void etops::binary::ContractionBackendTpp::kernel_main( void const * i_left,
-                                                        void const * i_right,
-                                                        void       * io_out ){
+void einsum_ir::etops::ContractionBackendTpp::kernel_main( void const * i_left,
+                                                           void const * i_right,
+                                                           void       * io_out ){
   libxsmm_gemm_param l_param;
   l_param.a.primary = (void *) i_left;
   l_param.b.primary = (void *) i_right;
@@ -62,7 +62,7 @@ void etops::binary::ContractionBackendTpp::kernel_main( void const * i_left,
 }
 
 
-etops::err_t etops::binary::ContractionBackendTpp::compile_kernels(){
+einsum_ir::etops::err_t einsum_ir::etops::ContractionBackendTpp::compile_kernels(){
 
   // libxsmm data types
   libxsmm_datatype l_xmm_dtype_left  = dtype_to_libxsmm( m_dtype_left  );

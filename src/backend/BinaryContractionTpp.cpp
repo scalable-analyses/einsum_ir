@@ -77,7 +77,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   etops::data_t l_dtype_out   = ce_dtype_to_etops(m_dtype_out);
 
   //optimize loops
-  etops::binary::ContractionOptimizer l_optim;
+  einsum_ir::etops::ContractionOptimizer l_optim;
 
   l_optim.init(&l_loops,
                &l_ktype_main,
@@ -86,12 +86,12 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                m_target_prim_n,
                m_target_prim_k,
                true,
-               etops::binary::packed_gemm_t::ALL_STRIDE_ONE,
+               etops::packed_gemm_t::ALL_STRIDE_ONE,
                ce_n_bytes(m_dtype_out),
                m_l2_cache_size );
   l_optim.optimize();
 
-  etops::binary::ContractionMemoryManager * l_contraction_memory = nullptr;
+  einsum_ir::etops::ContractionMemoryManager * l_contraction_memory = nullptr;
   if( m_memory != nullptr ){
     l_contraction_memory = m_memory->get_contraction_memory_manager();
   }

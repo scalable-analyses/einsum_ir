@@ -1,16 +1,16 @@
-#ifndef ETOPS_BINARY_UNARY_OPTIMIZER
-#define ETOPS_BINARY_UNARY_OPTIMIZER
+#ifndef EINSUM_IR_ETOPS_UNARY_OPTIMIZER
+#define EINSUM_IR_ETOPS_UNARY_OPTIMIZER
 
 #include <vector>
 #include "../constants.h"
 
-namespace etops {
-  namespace binary {
+namespace einsum_ir {
+  namespace etops {
     class UnaryOptimizer;
   }
 }
 
-class etops::binary::UnaryOptimizer {
+class einsum_ir::etops::UnaryOptimizer {
   private:
    //! external vector with all iterations
    std::vector< iter_property > * m_iter_space;

@@ -3,7 +3,7 @@
 #include "UnaryBackendTpp.h"
 
 TEST_CASE( "TPP-based vector copy through the unary backend using FP64 data.", "[unary_backend_tpp]" ) {
-  using namespace etops;
+  using namespace einsum_ir::etops;
 
 
   std::vector< exec_t > l_loop_exec_type = { exec_t::PRIM, 
@@ -14,7 +14,7 @@ TEST_CASE( "TPP-based vector copy through the unary backend using FP64 data.", "
   std::vector< int64_t > l_loop_strides_out = { 3,1 };
 
 
-  binary::UnaryBackendTpp l_unary_tpp;
+  UnaryBackendTpp l_unary_tpp;
 
   l_unary_tpp.init( l_loop_exec_type,
                     l_loop_sizes,
@@ -43,7 +43,7 @@ TEST_CASE( "TPP-based vector copy through the unary backend using FP64 data.", "
 
 
 TEST_CASE( "TPP-based small tensor transposition through the unary backend using FP64 data.", "[unary_backend_tpp]" ) {
-  using namespace etops;
+  using namespace einsum_ir::etops;
 
   std::vector< exec_t > l_loop_exec_type = { exec_t::SEQ,
                                              exec_t::PRIM, 
@@ -54,7 +54,7 @@ TEST_CASE( "TPP-based small tensor transposition through the unary backend using
   std::vector< int64_t > l_loop_strides_out = { 3, 1,15 };
 
 
-  binary::UnaryBackendTpp l_unary_tpp;
+  UnaryBackendTpp l_unary_tpp;
 
   l_unary_tpp.init( l_loop_exec_type,
                     l_loop_sizes,
@@ -87,7 +87,7 @@ TEST_CASE( "TPP-based large tensor transposition through the unary backend using
   // dims_out  2, 1, 4, 0, 5, 7, 3, 8, 6 
   // sizes     0=3, 1=5, 2=4, 3=7, 4=2, 5=5, 6=3, 7=8, 8=6
 
-  using namespace etops;
+  using namespace einsum_ir::etops;
 
   std::vector< exec_t > l_loop_exec_type = { exec_t::SEQ,
                                              exec_t::SEQ,
@@ -105,7 +105,7 @@ TEST_CASE( "TPP-based large tensor transposition through the unary backend using
   std::vector< int64_t > l_loop_strides_out = {   5040, 30240, 151200,   18, 15120, 1008, 126,   1, 3 };
 
 
-  binary::UnaryBackendTpp l_unary_tpp;
+  UnaryBackendTpp l_unary_tpp;
 
   l_unary_tpp.init( l_loop_exec_type,
                     l_loop_sizes,
@@ -137,7 +137,7 @@ TEST_CASE( "TPP-based large tensor transposition through the unary backend with 
   // dims_out  2, 1, 4, 0, 5, 7, 3, 8, 6 
   // sizes     0=3, 1=5, 2=4, 3=7, 4=2, 5=5, 6=3, 7=8, 8=6
 
-  using namespace etops;
+  using namespace einsum_ir::etops;
 
   std::vector< exec_t > l_loop_exec_type = { exec_t::OMP,
                                              exec_t::OMP,
@@ -155,7 +155,7 @@ TEST_CASE( "TPP-based large tensor transposition through the unary backend with 
   std::vector< int64_t > l_loop_strides_out = {   5040, 30240, 151200,   18, 15120, 1008, 126,   1, 3 };
 
 
-  binary::UnaryBackendTpp l_unary_tpp;
+  UnaryBackendTpp l_unary_tpp;
 
   l_unary_tpp.init( l_loop_exec_type,
                     l_loop_sizes,

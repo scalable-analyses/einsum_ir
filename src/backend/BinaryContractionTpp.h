@@ -22,7 +22,7 @@ class einsum_ir::backend::BinaryContractionTpp: public BinaryContraction {
     int64_t m_target_prim_k = 256;
    
     //! contraction backend
-    etops::binary::ContractionBackendTpp m_backend;
+    einsum_ir::etops::ContractionBackendTpp m_backend;
 
     /**
      * Helper function for map find with default value

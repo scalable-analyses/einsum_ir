@@ -5,10 +5,10 @@
 #include <cblas.h>
 #endif
 
-void etops::binary::ContractionBackendBlas::kernel_zero_32( int64_t   i_m,
-                                                            int64_t   i_n,
-                                                            int64_t   i_ld,
-                                                            void    * io_out ) {
+void einsum_ir::etops::ContractionBackendBlas::kernel_zero_32( int64_t   i_m,
+                                                               int64_t   i_n,
+                                                               int64_t   i_ld,
+                                                               void    * io_out ) {
   float * l_out = (float *) io_out;
 
   for( int64_t l_n = 0; l_n < i_n; l_n++ ) {
@@ -21,10 +21,10 @@ void etops::binary::ContractionBackendBlas::kernel_zero_32( int64_t   i_m,
   }
 }
 
-void etops::binary::ContractionBackendBlas::kernel_zero_64( int64_t   i_m,
-                                                            int64_t   i_n,
-                                                            int64_t   i_ld,
-                                                            void    * io_out ) {
+void einsum_ir::etops::ContractionBackendBlas::kernel_zero_64( int64_t   i_m,
+                                                               int64_t   i_n,
+                                                               int64_t   i_ld,
+                                                               void    * io_out ) {
   double * l_out = (double *) io_out;
 
   for( int64_t l_n = 0; l_n < i_n; l_n++ ) {
@@ -37,11 +37,11 @@ void etops::binary::ContractionBackendBlas::kernel_zero_64( int64_t   i_m,
   }
 }
 
-void etops::binary::ContractionBackendBlas::kernel_trans_32( int64_t   i_m,
-                                                             int64_t   i_n,
-                                                             int64_t   i_ld_a,
-                                                             int64_t   i_ld_b,
-                                                             void    * io_out ) {
+void einsum_ir::etops::ContractionBackendBlas::kernel_trans_32( int64_t   i_m,
+                                                                int64_t   i_n,
+                                                                int64_t   i_ld_a,
+                                                                int64_t   i_ld_b,
+                                                                void    * io_out ) {
   float * l_out = (float *) io_out;
 
 #ifdef PP_EINSUM_IR_HAS_BLAS_IMATCOPY
@@ -75,11 +75,11 @@ void etops::binary::ContractionBackendBlas::kernel_trans_32( int64_t   i_m,
 #endif
 }
 
-void etops::binary::ContractionBackendBlas::kernel_trans_64( int64_t   i_m,
-                                                             int64_t   i_n,
-                                                             int64_t   i_ld_a,
-                                                             int64_t   i_ld_b,
-                                                             void    * io_out ) {
+void einsum_ir::etops::ContractionBackendBlas::kernel_trans_64( int64_t   i_m,
+                                                                int64_t   i_n,
+                                                                int64_t   i_ld_a,
+                                                                int64_t   i_ld_b,
+                                                                void    * io_out ) {
     double * l_out = (double *) io_out;
 
 #ifdef PP_EINSUM_IR_HAS_BLAS_IMATCOPY
@@ -113,10 +113,10 @@ void etops::binary::ContractionBackendBlas::kernel_trans_64( int64_t   i_m,
 #endif
 }
 
-void etops::binary::ContractionBackendBlas::kernel_gemm_fp32( float         i_alpha,
-                                                              void  const * i_a,
-                                                              void  const * i_b,
-                                                              void        * io_c ) {
+void einsum_ir::etops::ContractionBackendBlas::kernel_gemm_fp32( float         i_alpha,
+                                                                 void  const * i_a,
+                                                                 void  const * i_b,
+                                                                 void        * io_c ) {
   cblas_sgemm( CblasColMajor,
                m_trans_a ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
                m_trans_b ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
@@ -133,10 +133,10 @@ void etops::binary::ContractionBackendBlas::kernel_gemm_fp32( float         i_al
                m_ldc );
 }
 
-void etops::binary::ContractionBackendBlas::kernel_gemm_fp64( double         i_alpha,
-                                                              void   const * i_a,
-                                                              void   const * i_b,
-                                                              void         * io_c ) {
+void einsum_ir::etops::ContractionBackendBlas::kernel_gemm_fp64( double         i_alpha,
+                                                                 void   const * i_a,
+                                                                 void   const * i_b,
+                                                                 void         * io_c ) {
   cblas_dgemm( CblasColMajor,
                m_trans_a ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
                m_trans_b ? CBLAS_TRANSPOSE::CblasTrans : CBLAS_TRANSPOSE::CblasNoTrans,
@@ -153,7 +153,7 @@ void etops::binary::ContractionBackendBlas::kernel_gemm_fp64( double         i_a
                m_ldc );
 }
 
-void etops::binary::ContractionBackendBlas::kernel_first_touch_part( void * io_out ) {
+void einsum_ir::etops::ContractionBackendBlas::kernel_first_touch_part( void * io_out ) {
   if(    m_ktype_first_touch == kernel_t::ZERO
       || m_ktype_first_touch == kernel_t::CPX_ZERO ) {
     if( m_dtype_comp == data_t::FP32 ) {
@@ -191,14 +191,14 @@ void etops::binary::ContractionBackendBlas::kernel_first_touch_part( void * io_o
     }
   }
 }
-void etops::binary::ContractionBackendBlas::kernel_first_touch( void const *,
-                                                                void       * io_out ) {
+void einsum_ir::etops::ContractionBackendBlas::kernel_first_touch( void const *,
+                                                                   void       * io_out ) {
   kernel_first_touch_part( io_out );
   if( m_cpx_outer_c ) {
     kernel_first_touch_part( (char *) io_out + m_cpx_stride_out_bytes );
   }
 }
-etops::err_t etops::binary::ContractionBackendBlas::compile_kernels(){
+einsum_ir::etops::err_t einsum_ir::etops::ContractionBackendBlas::compile_kernels(){
   m_num_bytes_scalar = ce_n_bytes( m_dtype_comp );
 
   m_cpx_outer_c = m_ktype_main == kernel_t::CPX_MADD || m_ktype_main == kernel_t::CPX_PACKED_MADD;
@@ -219,9 +219,9 @@ etops::err_t etops::binary::ContractionBackendBlas::compile_kernels(){
 }
 
 
-void etops::binary::ContractionBackendBlas::kernel_main( void const * i_left,
-                                                         void const * i_right,
-                                                         void       * io_out ) {
+void einsum_ir::etops::ContractionBackendBlas::kernel_main( void const * i_left,
+                                                            void const * i_right,
+                                                            void       * io_out ) {
   // GEMM primitive
   if( m_r == 1 ) {
     if( m_dtype_comp == data_t::FP32 ) {
@@ -329,7 +329,7 @@ void etops::binary::ContractionBackendBlas::kernel_main( void const * i_left,
   }
 }
 
-void etops::binary::ContractionBackendBlas::kernel_last_touch_part( void * io_out ) {
+void einsum_ir::etops::ContractionBackendBlas::kernel_last_touch_part( void * io_out ) {
 
   if( m_r != 1 ) {
     // transpose part of the packed GEMM primitive: n[...]cm -> n[...]mc
@@ -354,8 +354,8 @@ void etops::binary::ContractionBackendBlas::kernel_last_touch_part( void * io_ou
   }
 }
 
-void etops::binary::ContractionBackendBlas::kernel_last_touch( void const *,
-                                                               void       * io_out ) {
+void einsum_ir::etops::ContractionBackendBlas::kernel_last_touch( void const *,
+                                                                  void       * io_out ) {
   kernel_last_touch_part( io_out );
   if( m_cpx_outer_c ) {
     kernel_last_touch_part( (char *) io_out + m_cpx_stride_out_bytes );

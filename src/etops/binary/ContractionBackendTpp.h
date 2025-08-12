@@ -1,16 +1,16 @@
-#ifndef ETOPS_BINARY_CONTRACTION_BACKEND_TPP
-#define ETOPS_BINARY_CONTRACTION_BACKEND_TPP
+#ifndef EINSUM_IR_ETOPS_BINARY_CONTRACTION_BACKEND_TPP
+#define EINSUM_IR_ETOPS_BINARY_CONTRACTION_BACKEND_TPP
 
 #include <libxsmm.h>
 #include "ContractionBackend.h"
 
-namespace etops {
-  namespace binary {
+namespace einsum_ir {
+  namespace etops {
     class ContractionBackendTpp;
   }
 }
 
-class etops::binary::ContractionBackendTpp: public ContractionBackend {
+class einsum_ir::etops::ContractionBackendTpp: public ContractionBackend {
   private:
 
     //! LIBXSMM-based unary first-touch TPP
