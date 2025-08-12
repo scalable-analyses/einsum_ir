@@ -20,6 +20,12 @@ class einsum_ir::binary::UnaryBackend {
     //! number of threads used for execution
     int64_t m_num_threads = 0;
 
+    //! number of parallel loops
+    int64_t m_num_parallel_loops = 0;
+
+    //! id of the first parallel loop
+    int64_t m_id_first_parallel_loop = 0;
+
   protected:
     //! datatype of the input
     data_t m_dtype_in = UNDEFINED_DTYPE;
@@ -123,15 +129,25 @@ class einsum_ir::binary::UnaryBackend {
      * General purpose loop implementation featuring first and last touch operations.
      * No threading is applied.
      *
-     * @param i_thread_id id of the executing thread
      * @param i_id_loop dimension id of the loop which is executed.
      * @param i_ptr_in pointer to the input tensor's data.
      * @param i_ptr_out pointer to the output tensor's data.
      **/
-    void contract_iter( int64_t         i_thread_id,
-                        int64_t         i_id_loop,
+    void contract_iter( int64_t         i_id_loop,
                         char    const * i_ptr_in,
                         char          * i_ptr_out );
+
+    /**
+     * General purpose loop implementation featuring first and last touch operations.
+     * Omp parallelization is applied by funsing all parallel loops.
+     *
+     * @param i_id_loop dimension id of the loop which is executed.
+     * @param i_ptr_in pointer to the input tensor's data.
+     * @param i_ptr_out pointer to the output tensor's data.
+     **/
+    void contract_iter_parallel( int64_t         i_id_loop,
+                                 char    const * i_ptr_in,
+                                 char          * i_ptr_out );
 
     /**
      * calculates the shape of the kernel i.e. m, n, k, lda, ldb, ldc, ...
