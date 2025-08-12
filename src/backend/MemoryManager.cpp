@@ -105,6 +105,6 @@ void * einsum_ir::backend::MemoryManager::get_mem_ptr( int64_t i_id ){
 }
 
 
-einsum_ir::binary::ContractionMemoryManager * einsum_ir::backend::MemoryManager::get_contraction_memory_manager(){
+etops::binary::ContractionMemoryManager * einsum_ir::backend::MemoryManager::get_contraction_memory_manager(){
   return &m_contraction_memory_manager;
 }

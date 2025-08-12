@@ -1,16 +1,16 @@
-#ifndef EINSUM_IR_BINARY_CONTRACTION_MEMORY_MANAGER
-#define EINSUM_IR_BINARY_CONTRACTION_MEMORY_MANAGER
+#ifndef ETOPS_BINARY_CONTRACTION_MEMORY_MANAGER
+#define ETOPS_BINARY_CONTRACTION_MEMORY_MANAGER
 
 #include <vector>
 #include "constants.h"
 
-namespace einsum_ir {
+namespace etops {
   namespace binary {
     class ContractionMemoryManager;
   }
 }
 
-class einsum_ir::binary::ContractionMemoryManager{
+class etops::binary::ContractionMemoryManager{
   private:
     // alignment of memory to cache lines in bytes 
     int64_t m_alignment_line = 64;

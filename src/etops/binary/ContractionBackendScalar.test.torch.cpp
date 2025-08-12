@@ -14,8 +14,7 @@ TEST_CASE( "Simple FP32 matmul using the Scalar contraction backend implementati
   //    m    0      2
   //    n    1      3
   //    k    2      4
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::M, 
                                              dim_t::N, 
@@ -37,7 +36,7 @@ TEST_CASE( "Simple FP32 matmul using the Scalar contraction backend implementati
   std::vector< int64_t > l_loop_strides_out_aux = { 0, 0, 0, 0, 0, 0 };
   std::vector< int64_t > l_loop_strides_out     = { 1, 2, 0, 1, 1, 0 };
 
-  einsum_ir::binary::ContractionBackendScalar l_bin_cont;
+  binary::ContractionBackendScalar l_bin_cont;
   l_bin_cont.init( l_loop_dim_type,
                    l_loop_exec_type,
                    m_loop_sizes,
@@ -85,8 +84,7 @@ TEST_CASE( "Matrix-matrix multiplication with a full-tensor bias using the Scala
   //    m    0      2
   //    n    1      3
   //    k    2      4
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::M, 
                                              dim_t::N, 
@@ -108,7 +106,7 @@ TEST_CASE( "Matrix-matrix multiplication with a full-tensor bias using the Scala
   std::vector< int64_t > l_loop_strides_out_aux = { 1, 2, 0, 1, 1, 0 };
   std::vector< int64_t > l_loop_strides_out     = { 1, 2, 0, 1, 1, 0 };
 
-  einsum_ir::binary::ContractionBackendScalar l_bin_cont;
+  binary::ContractionBackendScalar l_bin_cont;
   l_bin_cont.init( l_loop_dim_type,
                    l_loop_exec_type,
                    m_loop_sizes,
@@ -137,8 +135,8 @@ TEST_CASE( "Matrix-matrix multiplication with a full-tensor bias using the Scala
                                    {l_in_left, l_in_right} );
 
   // native input dimensions
-  einsum_ir::err_t l_err = l_bin_cont.compile();
-  REQUIRE( l_err == einsum_ir::err_t::SUCCESS );
+  err_t l_err = l_bin_cont.compile();
+  REQUIRE( l_err == err_t::SUCCESS );
 
   l_bin_cont.contract( l_in_left.data_ptr(),
                        l_in_right.data_ptr(),
@@ -160,8 +158,7 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (scalar to matrix bcast) us
   //    m    0      2
   //    n    1      3
   //    k    2      4
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::M, 
                                              dim_t::N, 
@@ -183,7 +180,7 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (scalar to matrix bcast) us
   std::vector< int64_t > l_loop_strides_out_aux = { 0, 0, 0, 1, 1, 0 };
   std::vector< int64_t > l_loop_strides_out     = { 1, 2, 0, 1, 1, 0 };
 
-  einsum_ir::binary::ContractionBackendScalar l_bin_cont;
+  binary::ContractionBackendScalar l_bin_cont;
   l_bin_cont.init( l_loop_dim_type,
                    l_loop_exec_type,
                    m_loop_sizes,
@@ -212,8 +209,8 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (scalar to matrix bcast) us
                                    {l_in_left, l_in_right} );
 
   // native input dimensions
-  einsum_ir::err_t l_err = l_bin_cont.compile();
-  REQUIRE( l_err == einsum_ir::err_t::SUCCESS );
+  err_t l_err = l_bin_cont.compile();
+  REQUIRE( l_err == err_t::SUCCESS );
 
   l_bin_cont.contract( l_in_left.data_ptr(),
                        l_in_right.data_ptr(),
@@ -235,8 +232,7 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (row to matrix bcast) using
   //    m    0      2
   //    n    1      3
   //    k    2      4
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::M, 
                                              dim_t::N, 
@@ -258,7 +254,7 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (row to matrix bcast) using
   std::vector< int64_t > l_loop_strides_out_aux = { 0, 1, 0, 1, 1, 0 };
   std::vector< int64_t > l_loop_strides_out     = { 1, 2, 0, 1, 1, 0 };
 
-  einsum_ir::binary::ContractionBackendScalar l_bin_cont;
+  binary::ContractionBackendScalar l_bin_cont;
   l_bin_cont.init( l_loop_dim_type,
                    l_loop_exec_type,
                    m_loop_sizes,
@@ -286,8 +282,8 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (row to matrix bcast) using
                                    {l_in_left, l_in_right} );
 
   // native input dimensions
-  einsum_ir::err_t l_err = l_bin_cont.compile();
-  REQUIRE( l_err == einsum_ir::err_t::SUCCESS );
+  err_t l_err = l_bin_cont.compile();
+  REQUIRE( l_err == err_t::SUCCESS );
 
   l_bin_cont.contract( l_in_left.data_ptr(),
                        l_in_right.data_ptr(),
@@ -309,8 +305,7 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (column to matrix bcast) us
   //    m    0      2
   //    n    1      3
   //    k    2      4
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::M, 
                                              dim_t::N, 
@@ -332,7 +327,7 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (column to matrix bcast) us
   std::vector< int64_t > l_loop_strides_out_aux = { 1, 0, 0, 1, 1, 0 };
   std::vector< int64_t > l_loop_strides_out     = { 1, 2, 0, 1, 1, 0 };
 
-  einsum_ir::binary::ContractionBackendScalar l_bin_cont;
+  binary::ContractionBackendScalar l_bin_cont;
   l_bin_cont.init( l_loop_dim_type,
                    l_loop_exec_type,
                    m_loop_sizes,
@@ -361,8 +356,8 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (column to matrix bcast) us
                                    {l_in_left, l_in_right} );
 
   // native input dimensions
-  einsum_ir::err_t l_err = l_bin_cont.compile();
-  REQUIRE( l_err == einsum_ir::err_t::SUCCESS );
+  err_t l_err = l_bin_cont.compile();
+  REQUIRE( l_err == err_t::SUCCESS );
 
   l_bin_cont.contract( l_in_left.data_ptr(),
                        l_in_right.data_ptr(),
@@ -400,8 +395,7 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions using the Scal
   //     n:  hf /  65
   //     k:  ca /  32
 
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::M, 
                                              dim_t::M, 
@@ -435,7 +429,7 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions using the Scal
   std::vector< int64_t > l_loop_strides_out_aux = { 0, 0, 0,  0,   0, 0,   0, 0,   0, 0, 0, 0 };
   std::vector< int64_t > l_loop_strides_out     = { 1, 3, 0,  0, 360,72,2160,24,8640, 1, 1, 0 };
 
-  einsum_ir::binary::ContractionBackendScalar l_bin_cont;
+  binary::ContractionBackendScalar l_bin_cont;
   l_bin_cont.init( l_loop_dim_type,
                    l_loop_exec_type,
                    m_loop_sizes,
@@ -505,8 +499,7 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions using FP64, ze
   //     n:  hf /  65
   //     k:  ca /  32
 
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::M, 
                                              dim_t::M, 
@@ -540,7 +533,7 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions using FP64, ze
   std::vector< int64_t > l_loop_strides_out_aux = { 0, 0, 0,  0,   0, 0,   0, 0,   0, 0, 0, 0 };
   std::vector< int64_t > l_loop_strides_out     = { 1, 3, 0,  0, 360,72,2160,24,8640, 1, 1, 0 };
 
-  einsum_ir::binary::ContractionBackendScalar l_bin_cont;
+  binary::ContractionBackendScalar l_bin_cont;
   l_bin_cont.init( l_loop_dim_type,
                    l_loop_exec_type,
                    m_loop_sizes,

@@ -2,6 +2,7 @@
 #define EINSUM_IR_CONSTANTS
 
 #include <cstdint>
+#include <etops/constants.h>
 
 namespace einsum_ir {
   typedef enum {
@@ -84,6 +85,58 @@ namespace einsum_ir {
     TBLIS  = 4,
     UNDEFINED_BACKEND = 99
   } backend_t;
+
+  constexpr etops::dim_t ce_dimt_to_etops( dim_t i_dim ) {
+    if(      i_dim == dim_t::C   ) return etops::dim_t::C;
+    else if( i_dim == dim_t::M   ) return etops::dim_t::M;
+    else if( i_dim == dim_t::N   ) return etops::dim_t::N;
+    else if( i_dim == dim_t::K   ) return etops::dim_t::K;
+    else if( i_dim == dim_t::CPX ) return etops::dim_t::CPX;
+    else if( i_dim == dim_t::I   ) return etops::dim_t::I;
+    else if( i_dim == dim_t::J   ) return etops::dim_t::J;
+    else return etops::dim_t::UNDEFINED_DIM;
+    
+  }
+
+  constexpr etops::data_t ce_dtype_to_etops( data_t i_dtype ) {
+    if(      i_dtype == FP32 ) return etops::data_t::FP32;
+    else if( i_dtype == FP64 ) return etops::data_t::FP64;
+    else                       return etops::data_t::UNDEFINED_DTYPE;
+  }
+
+  constexpr etops::kernel_t ce_kernelt_to_etops( kernel_t i_ktype ) {
+    if(      i_ktype == ZERO            ) return etops::kernel_t::ZERO;
+    else if( i_ktype == RELU            ) return etops::kernel_t::RELU;
+    else if( i_ktype == ADD             ) return etops::kernel_t::ADD;
+    else if( i_ktype == COPY            ) return etops::kernel_t::COPY;
+    else if( i_ktype == MADD            ) return etops::kernel_t::MADD;
+    else if( i_ktype == CPX_INT_LOW     ) return etops::kernel_t::CPX_INT_LOW;
+    else if( i_ktype == CPX_ZERO        ) return etops::kernel_t::CPX_ZERO;
+    else if( i_ktype == CPX_ADD         ) return etops::kernel_t::CPX_ADD;
+    else if( i_ktype == CPX_MADD        ) return etops::kernel_t::CPX_MADD;
+    else if( i_ktype == CPX_COPY        ) return etops::kernel_t::CPX_COPY;
+    else if( i_ktype == CPX_INT_HIGH    ) return etops::kernel_t::CPX_INT_HIGH;
+    else if( i_ktype == CUSTOM_KTYPE    ) return etops::kernel_t::CUSTOM_KTYPE;
+    else if( i_ktype == BR_MADD         ) return etops::kernel_t::BR_MADD;
+    else if( i_ktype == PACKED_MADD     ) return etops::kernel_t::PACKED_MADD;
+    else if( i_ktype == CPX_PACKED_MADD ) return etops::kernel_t::CPX_PACKED_MADD;
+    else                                 return etops::kernel_t::UNDEFINED_KTYPE;
+  }
+
+  constexpr err_t ce_etops_err_to_err( etops::err_t i_err ) {
+    if(      i_err == etops::err_t::SUCCESS                   ) return err_t::SUCCESS;
+    else if( i_err == etops::err_t::COMPILATION_FAILED        ) return err_t::COMPILATION_FAILED;
+    else if( i_err == etops::err_t::DIMENSION_ORDERING_FAILED ) return err_t::DIMENSION_ORDERING_FAILED;
+    else if( i_err == etops::err_t::TENSOR_BLOCKING_FAILED    ) return err_t::TENSOR_BLOCKING_FAILED;
+    else if( i_err == etops::err_t::NO_DATA_PTR_PROVIDED      ) return err_t::NO_DATA_PTR_PROVIDED;
+    else if( i_err == etops::err_t::CALLED_BEFORE_COMPILATION ) return err_t::CALLED_BEFORE_COMPILATION;
+    else if( i_err == etops::err_t::INVALID_ID                ) return err_t::INVALID_ID;
+    else if( i_err == etops::err_t::INVALID_BACKEND           ) return err_t::INVALID_BACKEND;
+    else if( i_err == etops::err_t::INVALID_CPX_DIM           ) return err_t::INVALID_CPX_DIM;
+    else if( i_err == etops::err_t::INVALID_DTYPE             ) return err_t::INVALID_DTYPE;
+    else if( i_err == etops::err_t::INVALID_KTYPE             ) return err_t::INVALID_KTYPE;
+    else                                                       return err_t::UNDEFINED_ERROR;
+  }
 
   constexpr int64_t ce_n_bytes( data_t i_dtype ) {
     if(      i_dtype == FP32 )  return 4;

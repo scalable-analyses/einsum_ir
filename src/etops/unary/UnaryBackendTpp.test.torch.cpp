@@ -3,8 +3,8 @@
 #include "UnaryBackendTpp.h"
 
 TEST_CASE( "TPP-based vector copy through the unary backend using FP64 data.", "[unary_backend_tpp]" ) {
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
+
 
   std::vector< exec_t > l_loop_exec_type = { exec_t::PRIM, 
                                              exec_t::PRIM };
@@ -14,7 +14,7 @@ TEST_CASE( "TPP-based vector copy through the unary backend using FP64 data.", "
   std::vector< int64_t > l_loop_strides_out = { 3,1 };
 
 
-  einsum_ir::binary::UnaryBackendTpp l_unary_tpp;
+  binary::UnaryBackendTpp l_unary_tpp;
 
   l_unary_tpp.init( l_loop_exec_type,
                     l_loop_sizes,
@@ -26,8 +26,8 @@ TEST_CASE( "TPP-based vector copy through the unary backend using FP64 data.", "
                     kernel_t::COPY,
                     1 );     
 
-  einsum_ir::err_t l_err = l_unary_tpp.compile();
-  REQUIRE( l_err == einsum_ir::err_t::SUCCESS );
+  err_t l_err = l_unary_tpp.compile();
+  REQUIRE( l_err == err_t::SUCCESS );
 
   at::Tensor l_t0 = at::randn( {3},
                                at::ScalarType::Double );
@@ -43,8 +43,7 @@ TEST_CASE( "TPP-based vector copy through the unary backend using FP64 data.", "
 
 
 TEST_CASE( "TPP-based small tensor transposition through the unary backend using FP64 data.", "[unary_backend_tpp]" ) {
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< exec_t > l_loop_exec_type = { exec_t::SEQ,
                                              exec_t::PRIM, 
@@ -55,7 +54,7 @@ TEST_CASE( "TPP-based small tensor transposition through the unary backend using
   std::vector< int64_t > l_loop_strides_out = { 3, 1,15 };
 
 
-  einsum_ir::binary::UnaryBackendTpp l_unary_tpp;
+  binary::UnaryBackendTpp l_unary_tpp;
 
   l_unary_tpp.init( l_loop_exec_type,
                     l_loop_sizes,
@@ -67,8 +66,8 @@ TEST_CASE( "TPP-based small tensor transposition through the unary backend using
                     kernel_t::COPY,
                     1 );  
 
-  einsum_ir::err_t l_err = l_unary_tpp.compile();
-  REQUIRE( l_err == einsum_ir::err_t::SUCCESS );
+  err_t l_err = l_unary_tpp.compile();
+  REQUIRE( l_err == err_t::SUCCESS );
 
   at::Tensor l_t0 = at::randn( {3, 5, 4},
                                at::ScalarType::Double );
@@ -88,8 +87,7 @@ TEST_CASE( "TPP-based large tensor transposition through the unary backend using
   // dims_out  2, 1, 4, 0, 5, 7, 3, 8, 6 
   // sizes     0=3, 1=5, 2=4, 3=7, 4=2, 5=5, 6=3, 7=8, 8=6
 
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< exec_t > l_loop_exec_type = { exec_t::SEQ,
                                              exec_t::SEQ,
@@ -107,7 +105,7 @@ TEST_CASE( "TPP-based large tensor transposition through the unary backend using
   std::vector< int64_t > l_loop_strides_out = {   5040, 30240, 151200,   18, 15120, 1008, 126,   1, 3 };
 
 
-  einsum_ir::binary::UnaryBackendTpp l_unary_tpp;
+  binary::UnaryBackendTpp l_unary_tpp;
 
   l_unary_tpp.init( l_loop_exec_type,
                     l_loop_sizes,
@@ -139,8 +137,7 @@ TEST_CASE( "TPP-based large tensor transposition through the unary backend with 
   // dims_out  2, 1, 4, 0, 5, 7, 3, 8, 6 
   // sizes     0=3, 1=5, 2=4, 3=7, 4=2, 5=5, 6=3, 7=8, 8=6
 
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< exec_t > l_loop_exec_type = { exec_t::OMP,
                                              exec_t::OMP,
@@ -158,7 +155,7 @@ TEST_CASE( "TPP-based large tensor transposition through the unary backend with 
   std::vector< int64_t > l_loop_strides_out = {   5040, 30240, 151200,   18, 15120, 1008, 126,   1, 3 };
 
 
-  einsum_ir::binary::UnaryBackendTpp l_unary_tpp;
+  binary::UnaryBackendTpp l_unary_tpp;
 
   l_unary_tpp.init( l_loop_exec_type,
                     l_loop_sizes,

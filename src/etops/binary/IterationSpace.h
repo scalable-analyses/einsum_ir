@@ -1,16 +1,16 @@
-#ifndef EINSUM_IR_BINARY_ITERATION_SPACE
-#define EINSUM_IR_BINARY_ITERATION_SPACE
+#ifndef ETOPS_BINARY_ITERATION_SPACE
+#define ETOPS_BINARY_ITERATION_SPACE
 
 #include <vector>
 #include "../constants.h"
 
-namespace einsum_ir {
+namespace etops {
   namespace binary {
     class IterationSpace;
   }
 }
 
-class einsum_ir::binary::IterationSpace {
+class etops::binary::IterationSpace {
   private:
     struct range_t{
       int64_t begin = 0;

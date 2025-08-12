@@ -1,6 +1,6 @@
 #include "UnaryBackendTpp.h"
-#include <iostream>
-libxsmm_datatype einsum_ir::binary::UnaryBackendTpp::dtype_to_libxsmm( data_t i_dtype ) {
+
+libxsmm_datatype etops::binary::UnaryBackendTpp::dtype_to_libxsmm( data_t i_dtype ) {
   if( i_dtype == FP32 ) {
     return libxsmm_datatype::LIBXSMM_DATATYPE_F32;
   }
@@ -11,7 +11,7 @@ libxsmm_datatype einsum_ir::binary::UnaryBackendTpp::dtype_to_libxsmm( data_t i_
   return libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED;
 }
 
-void einsum_ir::binary::UnaryBackendTpp::kernel_main( void const * i_out_aux,
+void etops::binary::UnaryBackendTpp::kernel_main( void const * i_out_aux,
                                                       void       * io_out ){
   if( m_xmm_kernel_unary != nullptr ) {
     libxsmm_meltw_unary_param l_param;
@@ -28,9 +28,7 @@ void einsum_ir::binary::UnaryBackendTpp::kernel_main( void const * i_out_aux,
   }*/
 }
 
-einsum_ir::err_t einsum_ir::binary::UnaryBackendTpp::compile_kernels(){
-
-  std::cout << m_m << " " << m_n << " " << m_lda << " " << m_ldb << std::endl;
+etops::err_t etops::binary::UnaryBackendTpp::compile_kernels(){
 
   // libxsmm data types
   libxsmm_datatype l_xmm_dtype_in   = dtype_to_libxsmm( m_dtype_in  );
@@ -40,7 +38,7 @@ einsum_ir::err_t einsum_ir::binary::UnaryBackendTpp::compile_kernels(){
   if(    l_xmm_dtype_in   == libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED
       || l_xmm_dtype_comp == libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED
       || l_xmm_dtype_out  == libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED ) {
-    return einsum_ir::COMPILATION_FAILED;
+    return err_t::COMPILATION_FAILED;
   }
 
   // first-touch and last-touch shape

@@ -2,16 +2,16 @@
 #include <algorithm>
 #include <cmath>
 
-void einsum_ir::binary::ContractionOptimizer::init( std::vector< iter_property > * i_iter_space,
-                                                    kernel_t                     * i_ktype_main,
-                                                    int64_t                        i_num_threads,
-                                                    int64_t                        i_target_m,
-                                                    int64_t                        i_target_n,
-                                                    int64_t                        i_target_k,
-                                                    bool                           i_br_gemm_support,
-                                                    packed_gemm_t                  i_packed_gemm_support,
-                                                    int64_t                        i_num_bytes_scalar_out,
-                                                    int64_t                        i_l2_cache_size ){
+void etops::binary::ContractionOptimizer::init( std::vector< iter_property > * i_iter_space,
+                                                kernel_t                     * i_ktype_main,
+                                                int64_t                        i_num_threads,
+                                                int64_t                        i_target_m,
+                                                int64_t                        i_target_n,
+                                                int64_t                        i_target_k,
+                                                bool                           i_br_gemm_support,
+                                                packed_gemm_t                  i_packed_gemm_support,
+                                                int64_t                        i_num_bytes_scalar_out,
+                                                int64_t                        i_l2_cache_size ){
   m_iter_space = i_iter_space;
   m_ktype_main = i_ktype_main;
   m_num_threads = i_num_threads;
@@ -33,7 +33,7 @@ void einsum_ir::binary::ContractionOptimizer::init( std::vector< iter_property >
   m_target_extra_packing = 16;
 }
 
-einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::optimize(){
+etops::err_t etops::binary::ContractionOptimizer::optimize(){
   // removes size 1 iters
   remove_empty_iters();
 
@@ -55,7 +55,7 @@ einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::optimize(){
   return err_t::SUCCESS;
 }
 
-void einsum_ir::binary::ContractionOptimizer::sort_and_fuse_iters(){
+void etops::binary::ContractionOptimizer::sort_and_fuse_iters(){
   //sort iters depending on stride and dimension type
   std::stable_sort( m_iter_space->begin(), m_iter_space->end(), 
                     [&](iter_property l_a, iter_property l_b) -> bool {
@@ -92,7 +92,7 @@ void einsum_ir::binary::ContractionOptimizer::sort_and_fuse_iters(){
   }
 }
 
-void einsum_ir::binary::ContractionOptimizer::remove_empty_iters(){
+void etops::binary::ContractionOptimizer::remove_empty_iters(){
     std::vector<iter_property>::iterator l_it;
     l_it = std::remove_if( m_iter_space->begin(), 
                            m_iter_space->end(), 
@@ -103,12 +103,12 @@ void einsum_ir::binary::ContractionOptimizer::remove_empty_iters(){
 }
 
 
-void einsum_ir::binary::ContractionOptimizer::find_iters_with_stride( std::vector<iter_property>::iterator & o_iter_left,
-                                                                      std::vector<iter_property>::iterator & o_iter_right,
-                                                                      std::vector<iter_property>::iterator & o_iter_out,
-                                                                      int64_t i_stride_left,
-                                                                      int64_t i_stride_right,
-                                                                      int64_t i_stride_out ){
+void etops::binary::ContractionOptimizer::find_iters_with_stride( std::vector<iter_property>::iterator & o_iter_left,
+                                                                  std::vector<iter_property>::iterator & o_iter_right,
+                                                                  std::vector<iter_property>::iterator & o_iter_out,
+                                                                  int64_t i_stride_left,
+                                                                  int64_t i_stride_right,
+                                                                  int64_t i_stride_out ){
   
   o_iter_left = m_iter_space->end();
   o_iter_right = m_iter_space->end();
@@ -128,8 +128,8 @@ void einsum_ir::binary::ContractionOptimizer::find_iters_with_stride( std::vecto
   }
 }
 
-void einsum_ir::binary::ContractionOptimizer::find_iter_with_dimtype( std::vector<iter_property>::iterator & o_iter,
-                                                                      dim_t i_dim_type ){
+void etops::binary::ContractionOptimizer::find_iter_with_dimtype( std::vector<iter_property>::iterator & o_iter,
+                                                                  dim_t i_dim_type ){
   o_iter = m_iter_space->end();
   int64_t l_min_stride = 0x7FFFFFFFFFFFFFFF;
   std::vector<iter_property>::iterator l_it;
@@ -143,7 +143,7 @@ void einsum_ir::binary::ContractionOptimizer::find_iter_with_dimtype( std::vecto
   }
 }
 
-void einsum_ir::binary::ContractionOptimizer::get_size_all_m_n( int64_t & o_size_m,
+void etops::binary::ContractionOptimizer::get_size_all_m_n( int64_t & o_size_m,
                                                                 int64_t & o_size_n ){
   std::vector<iter_property>::iterator l_it;
   o_size_m = 1;
@@ -158,9 +158,9 @@ void einsum_ir::binary::ContractionOptimizer::get_size_all_m_n( int64_t & o_size
   }
 }
 
-void einsum_ir::binary::ContractionOptimizer::set_kernel_targets_heuristic( int64_t * i_potential_kernel_size,
-                                                                            int64_t * io_kernel_targets,
-                                                                            bool    * i_iter_required ){
+void etops::binary::ContractionOptimizer::set_kernel_targets_heuristic( int64_t * i_potential_kernel_size,
+                                                                        int64_t * io_kernel_targets,
+                                                                        bool    * i_iter_required ){
   //adapt all kernel target sizes depending on what is possible e.g. small k kernel -> choose bigger m target
   if( i_potential_kernel_size[ PRIM_C ] > 1 ){
     io_kernel_targets[ PRIM_C  ] = i_potential_kernel_size[ PRIM_C ];
@@ -204,7 +204,7 @@ void einsum_ir::binary::ContractionOptimizer::set_kernel_targets_heuristic( int6
 }
 
 
-einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::set_primitive_iters(){
+etops::err_t etops::binary::ContractionOptimizer::set_primitive_iters(){
   //The Algorithm consits of three steps:
   // 1. Find iterations of the iteration space that could be used for the kernel.
   // 2. Determine a good size for the potential kernel iterations depending on a heuristic or a performance model.
@@ -544,7 +544,7 @@ einsum_ir::err_t einsum_ir::binary::ContractionOptimizer::set_primitive_iters(){
   return err_t::SUCCESS;
 }
 
-void einsum_ir::binary::ContractionOptimizer::reorder_and_parallelize_iters(){
+void etops::binary::ContractionOptimizer::reorder_and_parallelize_iters(){
   //move primitive iterations to another data structure
   std::vector<iter_property> l_kernel_iters;
   std::vector<iter_property>::iterator l_it = m_iter_space->begin();
@@ -623,10 +623,10 @@ void einsum_ir::binary::ContractionOptimizer::reorder_and_parallelize_iters(){
   m_iter_space->insert(m_iter_space->end(), l_kernel_iters.begin(), l_kernel_iters.end() );
 }
 
-void einsum_ir::binary::ContractionOptimizer::move_iters_until( std::vector<iter_property> * i_dest_iters,
-                                                                int64_t                      i_target_size,
-                                                                dim_t                        i_dim_type, 
-                                                                exec_t                       i_new_exec_t ){
+void etops::binary::ContractionOptimizer::move_iters_until( std::vector<iter_property> * i_dest_iters,
+                                                            int64_t                      i_target_size,
+                                                            dim_t                        i_dim_type, 
+                                                            exec_t                       i_new_exec_t ){
 
   int64_t l_target_remaining = i_target_size;
   std::vector<iter_property>::iterator l_it;
@@ -657,10 +657,10 @@ void einsum_ir::binary::ContractionOptimizer::move_iters_until( std::vector<iter
   }
 }
 
-void einsum_ir::binary::ContractionOptimizer::split_iter( std::vector<iter_property>::iterator i_iteration,
-                                                          int64_t                              i_target_size,
-                                                          int64_t                              i_new_iter_pos, 
-                                                          exec_t                               i_new_exec_t ){
+void etops::binary::ContractionOptimizer::split_iter( std::vector<iter_property>::iterator i_iteration,
+                                                      int64_t                              i_target_size,
+                                                      int64_t                              i_new_iter_pos, 
+                                                      exec_t                               i_new_exec_t ){
   int64_t l_split = find_split(i_iteration->size, i_target_size );
 
   iter_property l_new_iter = *i_iteration;
@@ -680,9 +680,8 @@ void einsum_ir::binary::ContractionOptimizer::split_iter( std::vector<iter_prope
   i_iteration->stride_out     *= l_split;                        
 }
 
-int64_t einsum_ir::binary::ContractionOptimizer::find_split( int64_t i_dim_size,
-                                                             int64_t i_target_size
-                                                           ){
+int64_t etops::binary::ContractionOptimizer::find_split( int64_t i_dim_size,
+                                                         int64_t i_target_size ){
   //factorization of number
   int64_t l_best_factor = i_dim_size;
   double l_best_distance = std::abs(std::log((double)i_dim_size/i_target_size));

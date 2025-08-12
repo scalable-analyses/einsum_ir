@@ -5,8 +5,7 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP, 3 threads and broad
   //example: [c1,m2,k2,k1,m1],[c1,n2,k2,n1,k1]->[c1,n2,m2,n1,m1]
   //sizes:   [ 2, 3, 5, 2, 2],[ 2, 4, 5, 2, 2]->[ 2, 4, 3, 2, 2]
   //strides: [60,20, 4, 2, 1],[80,20, 4, 2, 1]->[48,12, 4, 2, 1]
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C, 
                                              dim_t::M, 
@@ -31,13 +30,13 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP, 3 threads and broad
   std::vector< int64_t > l_loop_strides_out     = { 48, 4,12, 0, 2, 1, 0 };
 
   int64_t l_num_threads = 3;
-  IterationSpace l_iter;
+  binary::IterationSpace l_iter;
   l_iter.init( &l_loop_dim_type,
                &l_loop_exec_type,
                &l_loop_sizes,
                l_num_threads );     
 
-  std::vector<thread_info> m_thread_infos;
+  std::vector<binary::thread_info> m_thread_infos;
   err_t l_err = l_iter.setup( l_loop_strides_left,
                               l_loop_strides_right,
                               l_loop_strides_out_aux,
@@ -85,8 +84,8 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP, 3 threads and broad
 
     int64_t l_size = m_thread_infos[l_thread_id].movement_ids.size();
     for(int64_t l_id = 0; l_id < l_size; l_id++){
-      sfc_t l_move =  m_thread_infos[l_thread_id].movement_ids[l_id];
-      sfc_t l_sign = (l_move & 1);
+      binary::sfc_t l_move =  m_thread_infos[l_thread_id].movement_ids[l_id];
+      binary::sfc_t l_sign = (l_move & 1);
       int64_t l_direction  = 1 - ( (int64_t)l_sign << 1); 
       int64_t l_current_id = l_move >> 1;
 
@@ -102,8 +101,7 @@ TEST_CASE( "Threading test for OMP only Iteration Space, 5 threads and auxiliary
   //example: [c1,m2,k2,k1,m1],[c1,n2,k2,n1,k1]->[c1,n2,m2,n1,m1]
   //sizes:   [ 2, 3, 5, 2, 2],[ 2, 4, 5, 2, 2]->[ 2, 4, 3, 2, 2]
   //strides: [60,20, 4, 2, 1],[80,20, 4, 2, 1]->[48,12, 4, 2, 1]
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C, 
                                              dim_t::M, 
@@ -128,13 +126,13 @@ TEST_CASE( "Threading test for OMP only Iteration Space, 5 threads and auxiliary
   std::vector< int64_t > l_loop_strides_out     = { 48, 4,12, 0, 2, 1, 0 };
 
   int64_t l_num_threads = 5;
-  IterationSpace l_iter;
+  binary::IterationSpace l_iter;
   l_iter.init( &l_loop_dim_type,
                &l_loop_exec_type,
                &l_loop_sizes,
                l_num_threads );     
 
-  std::vector<thread_info> m_thread_infos;
+  std::vector<binary::thread_info> m_thread_infos;
   err_t l_err = l_iter.setup( l_loop_strides_left,
                               l_loop_strides_right,
                               l_loop_strides_out_aux,
@@ -182,8 +180,8 @@ TEST_CASE( "Threading test for OMP only Iteration Space, 5 threads and auxiliary
 
     int64_t l_size = m_thread_infos[l_thread_id].movement_ids.size();
     for(int64_t l_id = 0; l_id < l_size; l_id++){
-      sfc_t l_move =  m_thread_infos[l_thread_id].movement_ids[l_id];
-      sfc_t l_sign = (l_move & 1);
+      binary::sfc_t l_move =  m_thread_infos[l_thread_id].movement_ids[l_id];
+      binary::sfc_t l_sign = (l_move & 1);
       int64_t l_direction  = 1 - ( (int64_t)l_sign << 1); 
       int64_t l_current_id = l_move >> 1;
 
@@ -199,8 +197,7 @@ TEST_CASE( "Threading test for SFC only Iteration Space with 1 thread and no bia
   //example: [m2,k2,k1,m1],[n3,n2,k2,n1,k1]->[n3,n2,m2,n1,m1]
   //sizes:   [ 3, 5, 2, 2],[ 2, 4, 5, 2, 2]->[ 2, 4, 3, 2, 2]
   //strides: [20, 4, 2, 1],[80,20, 4, 2, 1]->[48,12, 4, 2, 1]
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::M, 
                                              dim_t::N, 
@@ -225,13 +222,13 @@ TEST_CASE( "Threading test for SFC only Iteration Space with 1 thread and no bia
   std::vector< int64_t > l_loop_strides_out     = {  4,48,12, 0, 2, 1, 0 };
 
   int64_t l_num_threads = 1;
-  IterationSpace l_iter;
+  binary::IterationSpace l_iter;
   l_iter.init( &l_loop_dim_type,
                &l_loop_exec_type,
                &l_loop_sizes,
                l_num_threads );     
 
-  std::vector<thread_info> m_thread_infos;
+  std::vector<binary::thread_info> m_thread_infos;
   err_t l_err = l_iter.setup( l_loop_strides_left,
                               l_loop_strides_right,
                               l_loop_strides_out_aux,
@@ -279,8 +276,8 @@ TEST_CASE( "Threading test for SFC only Iteration Space with 1 thread and no bia
 
     int64_t l_size = m_thread_infos[l_thread_id].movement_ids.size();
     for(int64_t l_id = 0; l_id < l_size; l_id++){
-      sfc_t l_move =  m_thread_infos[l_thread_id].movement_ids[l_id];
-      sfc_t l_sign = (l_move & 1);
+      binary::sfc_t l_move =  m_thread_infos[l_thread_id].movement_ids[l_id];
+      binary::sfc_t l_sign = (l_move & 1);
       int64_t l_direction  = 1 - ( (int64_t)l_sign << 1); 
       int64_t l_current_id = l_move >> 1;
 

@@ -6,21 +6,21 @@
 #include <omp.h>
 #endif
 
-void einsum_ir::binary::ContractionBackend::init( std::vector< dim_t >   const & i_dim_type,
-                                                  std::vector< exec_t >  const & i_exec_type,
-                                                  std::vector< int64_t > const & i_dim_sizes,
-                                                  std::vector< int64_t > const & i_strides_left,
-                                                  std::vector< int64_t > const & i_strides_right,
-                                                  std::vector< int64_t > const & i_strides_out_aux,
-                                                  std::vector< int64_t > const & i_strides_out,
-                                                  data_t                         i_dtype_left,
-                                                  data_t                         i_dtype_right,
-                                                  data_t                         i_dtype_comp,
-                                                  data_t                         i_dtype_out,
-                                                  kernel_t                       i_ktype_first_touch,
-                                                  kernel_t                       i_ktype_main,
-                                                  kernel_t                       i_ktype_last_touch,
-                                                  int64_t                        i_num_threads ){
+void etops::binary::ContractionBackend::init( std::vector< dim_t >   const & i_dim_type,
+                                              std::vector< exec_t >  const & i_exec_type,
+                                              std::vector< int64_t > const & i_dim_sizes,
+                                              std::vector< int64_t > const & i_strides_left,
+                                              std::vector< int64_t > const & i_strides_right,
+                                              std::vector< int64_t > const & i_strides_out_aux,
+                                              std::vector< int64_t > const & i_strides_out,
+                                              data_t                         i_dtype_left,
+                                              data_t                         i_dtype_right,
+                                              data_t                         i_dtype_comp,
+                                              data_t                         i_dtype_out,
+                                              kernel_t                       i_ktype_first_touch,
+                                              kernel_t                       i_ktype_main,
+                                              kernel_t                       i_ktype_last_touch,
+                                              int64_t                        i_num_threads ){
 
   //copy to local variables
   m_dim_type        = i_dim_type;
@@ -45,7 +45,7 @@ void einsum_ir::binary::ContractionBackend::init( std::vector< dim_t >   const &
   m_is_compiled = false;
 }
 
-void einsum_ir::binary::ContractionBackend::init( std::vector< iter_property > const & i_iterations,
+void etops::binary::ContractionBackend::init( std::vector< iter_property > const & i_iterations,
                                                   data_t                               i_dtype_left,
                                                   data_t                               i_dtype_right,
                                                   data_t                               i_dtype_comp,
@@ -94,7 +94,7 @@ void einsum_ir::binary::ContractionBackend::init( std::vector< iter_property > c
   m_is_compiled = false;
 }
 
-einsum_ir::err_t einsum_ir::binary::ContractionBackend::compile(){
+etops::err_t etops::binary::ContractionBackend::compile(){
   err_t l_err = err_t::UNDEFINED_ERROR;
   if( m_is_compiled ){
     return err_t::SUCCESS;
@@ -201,10 +201,10 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackend::compile(){
   return err_t::SUCCESS;
 }
 
-void einsum_ir::binary::ContractionBackend::contract( void const * i_tensor_left,
-                                                      void const * i_tensor_right,
-                                                      void const * i_tensor_out_aux,
-                                                      void       * io_tensor_out ) {
+void etops::binary::ContractionBackend::contract( void const * i_tensor_left,
+                                                  void const * i_tensor_right,
+                                                  void const * i_tensor_out_aux,
+                                                  void       * io_tensor_out ) {
 #ifdef _OPENMP
 #pragma omp parallel for num_threads(m_num_threads)
 #endif
@@ -230,14 +230,14 @@ void einsum_ir::binary::ContractionBackend::contract( void const * i_tensor_left
   }
 }
 
-void einsum_ir::binary::ContractionBackend::contract_iter( thread_info   * i_thread_inf,
-                                                           int64_t         i_id_loop,
-                                                           char    const * i_ptr_left,
-                                                           char    const * i_ptr_right,
-                                                           char    const * i_ptr_out_aux,
-                                                           char          * i_ptr_out,
-                                                           bool            i_first_access,
-                                                           bool            i_last_access ) {
+void etops::binary::ContractionBackend::contract_iter( thread_info   * i_thread_inf,
+                                                       int64_t         i_id_loop,
+                                                       char    const * i_ptr_left,
+                                                       char    const * i_ptr_right,
+                                                       char    const * i_ptr_out_aux,
+                                                       char          * i_ptr_out,
+                                                       bool            i_first_access,
+                                                       bool            i_last_access ) {
   bool l_first_access = i_first_access;
   bool l_last_access  = i_last_access;
 
@@ -330,7 +330,7 @@ void einsum_ir::binary::ContractionBackend::contract_iter( thread_info   * i_thr
   }
 }
 
-einsum_ir::err_t einsum_ir::binary::ContractionBackend::set_kernel_shape( ){
+etops::err_t etops::binary::ContractionBackend::set_kernel_shape( ){
   //check that there are enough primitive dimensions
   int64_t l_size = m_dim_sizes.size();
   int64_t l_num_prims = 0;
@@ -492,11 +492,11 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackend::set_kernel_shape( ){
   return err_t::SUCCESS;
 }
 
-einsum_ir::err_t einsum_ir::binary::ContractionBackend::create_packing( int64_t              & o_packing_id,
-                                                                        int64_t              & o_size_packing,
-                                                                        UnaryBackendTpp      & o_unary,
-                                                                        std::vector<int64_t> & i_strides,
-                                                                        std::vector<int64_t> & i_packing_strides ){
+etops::err_t etops::binary::ContractionBackend::create_packing( int64_t              & o_packing_id,
+                                                                int64_t              & o_size_packing,
+                                                                UnaryBackendTpp      & o_unary,
+                                                                std::vector<int64_t> & i_strides,
+                                                                std::vector<int64_t> & i_packing_strides ){
   //determine size of and iteration id of packing
   o_packing_id = -1;
   for( std::size_t l_id = 0; l_id < i_packing_strides.size(); l_id++ ) {

@@ -5,8 +5,7 @@
 TEST_CASE( "Matmul with sequential batch dimension.", "[contraction_backend]" ) {
   //example: [c1,k1,m1],[c1,n1,k1]->[c1,n1,m1]
   //sizes:   [17,13,20],[17,47,13]->[17,47,20]
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C,
                                              dim_t::M, 
@@ -29,7 +28,7 @@ TEST_CASE( "Matmul with sequential batch dimension.", "[contraction_backend]" ) 
   at::Tensor l_out     = at::zeros( { 17,47,20 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  ContractionBackendTpp l_cont;
+  binary::ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -64,8 +63,7 @@ TEST_CASE( "Matmul with sequential batch dimension.", "[contraction_backend]" ) 
 TEST_CASE( "Packed Matmul with sequential M dimension.", "[contraction_backend]" ) {
   //example: [m2,k1,m1,c1],[n1,k1,c1]->[m2,n1,m1,c1]
   //sizes:   [ 5,13,20,17],[47,13,17]->[ 5,47,20,17]
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::M,
                                              dim_t::C,
@@ -90,7 +88,7 @@ TEST_CASE( "Packed Matmul with sequential M dimension.", "[contraction_backend]"
   at::Tensor l_out     = at::ones( { 5,47,20,17 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  ContractionBackendTpp l_cont;
+  binary::ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -124,8 +122,7 @@ TEST_CASE( "Packed Matmul with sequential M dimension.", "[contraction_backend]"
 TEST_CASE( "Matmul with sequential batch dimension and transposed B.", "[contraction_backend]" ) {
   //example: [c1,k1,m1],[c1,k1,n1]->[c1,n1,m1]
   //sizes:   [ 5, 3, 2],[ 5, 3, 4]->[ 5, 4, 2]
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C,
                                              dim_t::M, 
@@ -148,7 +145,7 @@ TEST_CASE( "Matmul with sequential batch dimension and transposed B.", "[contrac
   at::Tensor l_out     = at::zeros( { 5,4,2 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  ContractionBackendTpp l_cont;
+  binary::ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -183,8 +180,7 @@ TEST_CASE( "Matmul with sequential batch dimension and transposed B.", "[contrac
 TEST_CASE( "Simple Matmul with sequential batch dimension and transposed A.", "[contraction_backend]" ) {
   //example: [c1,m1,k1],[c1,n1,k1]->[c1,n1,m1]
   //sizes:   [ 5, 2, 3],[ 5, 4, 3]->[ 5, 4, 2]
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C,
                                              dim_t::M, 
@@ -207,7 +203,7 @@ TEST_CASE( "Simple Matmul with sequential batch dimension and transposed A.", "[
   at::Tensor l_out     = at::zeros( { 5,4,2 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  ContractionBackendTpp l_cont;
+  binary::ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -243,8 +239,7 @@ TEST_CASE( "Simple Matmul with sequential batch dimension and transposed A.", "[
 TEST_CASE( "Single call of batch reduce matmul.", "[contraction_backend]" ) {
   //example: [k2,k1,m1],[k2,n1,k1]->[n1,m1]
   //sizes:   [ 2, 7, 5],[ 2, 4, 7]->[ 4, 5]
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::K,
                                              dim_t::M, 
@@ -267,7 +262,7 @@ TEST_CASE( "Single call of batch reduce matmul.", "[contraction_backend]" ) {
   at::Tensor l_out     = at::zeros( {     4, 5 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  ContractionBackendTpp l_cont;
+  binary::ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -301,8 +296,7 @@ TEST_CASE( "Single call of batch reduce matmul.", "[contraction_backend]" ) {
 TEST_CASE( "Tensor contraction with omp parallelisation.", "[contraction_backend]" ) {
   //example: [m1,k1,m1],[n2,n1,k1]->[n2,m1,n1,m1]
   //sizes:   [17,13,20],[ 8,47,13]->[ 8,17,47,20]
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::N,
                                              dim_t::M,
@@ -327,7 +321,7 @@ TEST_CASE( "Tensor contraction with omp parallelisation.", "[contraction_backend
   at::Tensor l_out     = at::zeros( { 8,17,47,20 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  ContractionBackendTpp l_cont;
+  binary::ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -363,8 +357,7 @@ TEST_CASE( "Tensor contraction with omp parallelisation.", "[contraction_backend
 TEST_CASE( "Blocked matmul with omp parallelisation.", "[contraction_backend]" ) {
   //example: [m2,k2,k1,m1],[n2,k2,n1,k1]->[n2,m2,n1,m1]
   //sizes:   [32, 8,64,64],[32, 8,64,64]->[32,32,64,64]
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::N,
                                              dim_t::M,
@@ -394,7 +387,7 @@ TEST_CASE( "Blocked matmul with omp parallelisation.", "[contraction_backend]" )
                                     at::dtype( at::kDouble ) );
   at::Tensor l_out_ref = l_out.clone();
 
-  ContractionBackendTpp l_cont;
+  binary::ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -429,8 +422,7 @@ TEST_CASE( "Blocked matmul with omp parallelisation.", "[contraction_backend]" )
 TEST_CASE( "Tensor contraction with SFC parallelisation.", "[contraction_backend]" ) {
   //example: [m1,k1,m1],[n2,n1,k1]->[n2,m1,n1,m1]
   //sizes:   [17,13,20],[ 8,47,13]->[ 8,17,47,20]
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::M,
                                              dim_t::N,
@@ -455,7 +447,7 @@ TEST_CASE( "Tensor contraction with SFC parallelisation.", "[contraction_backend
   at::Tensor l_out     = at::zeros( { 8,17,47,20 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  ContractionBackendTpp l_cont;
+  binary::ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,
@@ -491,8 +483,7 @@ TEST_CASE( "Tensor contraction with SFC parallelisation.", "[contraction_backend
 TEST_CASE( "Tensor contraction with SFC and omp parallelisation.", "[contraction_backend]" ) {
   //example: [c1,m1,k1,m1],[c1,n2,n1,k1]->[c1,n2,m1,n1,m1]
   //sizes:   [ 5,17,13,20],[ 5, 8,47,13]->[ 5, 8,17,47,20]
-  using namespace einsum_ir;
-  using namespace einsum_ir::binary;
+  using namespace etops;
 
   std::vector< dim_t >  l_loop_dim_type  = { dim_t::C,
                                              dim_t::M,
@@ -519,7 +510,7 @@ TEST_CASE( "Tensor contraction with SFC and omp parallelisation.", "[contraction
   at::Tensor l_out     = at::zeros( { 5,8,17,47,20 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  ContractionBackendTpp l_cont;
+  binary::ContractionBackendTpp l_cont;
 
   l_cont.init( l_loop_dim_type,
                l_loop_exec_type,

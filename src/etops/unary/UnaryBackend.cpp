@@ -2,15 +2,15 @@
 
 #include <iostream>
 
-void einsum_ir::binary::UnaryBackend::init( std::vector< exec_t >  const & i_exec_type,
-                                            std::vector< int64_t > const & i_dim_sizes,
-                                            std::vector< int64_t > const & i_strides_in,
-                                            std::vector< int64_t > const & i_strides_out,
-                                            data_t                         i_dtype_in,
-                                            data_t                         i_dtype_comp,
-                                            data_t                         i_dtype_out,
-                                            kernel_t                       i_ktype,
-                                            int64_t                        i_num_threads ){
+void etops::binary::UnaryBackend::init( std::vector< exec_t >  const & i_exec_type,
+                                        std::vector< int64_t > const & i_dim_sizes,
+                                        std::vector< int64_t > const & i_strides_in,
+                                        std::vector< int64_t > const & i_strides_out,
+                                        data_t                         i_dtype_in,
+                                        data_t                         i_dtype_comp,
+                                        data_t                         i_dtype_out,
+                                        kernel_t                       i_ktype,
+                                        int64_t                        i_num_threads ){
 
   //copy to local variables
   m_exec_type = i_exec_type;
@@ -28,12 +28,12 @@ void einsum_ir::binary::UnaryBackend::init( std::vector< exec_t >  const & i_exe
   m_num_threads = i_num_threads;
 }
 
-void einsum_ir::binary::UnaryBackend::init( std::vector< iter_property > const & i_iterations,
-                                            data_t                               i_dtype_in,
-                                            data_t                               i_dtype_comp,
-                                            data_t                               i_dtype_out,
-                                            kernel_t                             i_ktype,
-                                            int64_t                              i_num_threads ){
+void etops::binary::UnaryBackend::init( std::vector< iter_property > const & i_iterations,
+                                        data_t                               i_dtype_in,
+                                        data_t                               i_dtype_comp,
+                                        data_t                               i_dtype_out,
+                                        kernel_t                             i_ktype,
+                                        int64_t                              i_num_threads ){
 
   int64_t l_num_iters = i_iterations.size();
   m_exec_type.resize(l_num_iters);
@@ -57,7 +57,7 @@ void einsum_ir::binary::UnaryBackend::init( std::vector< iter_property > const &
   m_num_threads = i_num_threads;
 }
 
-einsum_ir::err_t einsum_ir::binary::UnaryBackend::compile(){
+etops::err_t etops::binary::UnaryBackend::compile(){
   err_t l_err = err_t::UNDEFINED_ERROR;
 
   // get kernel shape
@@ -104,8 +104,8 @@ einsum_ir::err_t einsum_ir::binary::UnaryBackend::compile(){
   return err_t::SUCCESS;
 }
 
-void einsum_ir::binary::UnaryBackend::contract( void const * i_tensor_in,
-                                                void       * io_tensor_out ) {
+void etops::binary::UnaryBackend::contract( void const * i_tensor_in,
+                                            void       * io_tensor_out ) {
   if(m_id_first_primitive_dim == 0){
     kernel_main( (char *) i_tensor_in,
                  (char *) io_tensor_out );
@@ -123,9 +123,9 @@ void einsum_ir::binary::UnaryBackend::contract( void const * i_tensor_in,
 }
 
 
-void einsum_ir::binary::UnaryBackend::contract_iter( int64_t         i_id_loop,
-                                                     char    const * i_ptr_in,
-                                                     char          * i_ptr_out ) {
+void etops::binary::UnaryBackend::contract_iter( int64_t         i_id_loop,
+                                                 char    const * i_ptr_in,
+                                                 char          * i_ptr_out ) {
 
   int64_t l_size = m_dim_sizes[i_id_loop];
 
@@ -146,9 +146,9 @@ void einsum_ir::binary::UnaryBackend::contract_iter( int64_t         i_id_loop,
   }
 }
 
-void einsum_ir::binary::UnaryBackend::contract_iter_parallel( int64_t         i_id_loop,
-                                                              char    const * i_ptr_in,
-                                                              char          * i_ptr_out ) {
+void etops::binary::UnaryBackend::contract_iter_parallel( int64_t         i_id_loop,
+                                                          char    const * i_ptr_in,
+                                                          char          * i_ptr_out ) {
 
   int64_t l_all_size = 1;
   for( int64_t l_loop = 0; l_loop < m_num_parallel_loops; l_loop++ ) {
@@ -189,7 +189,7 @@ void einsum_ir::binary::UnaryBackend::contract_iter_parallel( int64_t         i_
   }
 }
 
-einsum_ir::err_t einsum_ir::binary::UnaryBackend::set_kernel_shape( ){
+etops::err_t etops::binary::UnaryBackend::set_kernel_shape( ){
 
   //check that there are enough primitive dimensions
   int64_t l_size = m_dim_sizes.size();

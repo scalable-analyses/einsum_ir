@@ -1,6 +1,6 @@
 #include "ContractionBackendTpp.h"
 
-libxsmm_datatype einsum_ir::binary::ContractionBackendTpp::dtype_to_libxsmm( data_t i_dtype ) {
+libxsmm_datatype etops::binary::ContractionBackendTpp::dtype_to_libxsmm( data_t i_dtype ) {
   if( i_dtype == FP32 ) {
     return libxsmm_datatype::LIBXSMM_DATATYPE_F32;
   }
@@ -12,8 +12,8 @@ libxsmm_datatype einsum_ir::binary::ContractionBackendTpp::dtype_to_libxsmm( dat
 }
 
 
-void einsum_ir::binary::ContractionBackendTpp::kernel_first_touch( void const * i_out_aux,
-                                                                   void       * io_out ){
+void etops::binary::ContractionBackendTpp::kernel_first_touch( void const * i_out_aux,
+                                                               void       * io_out ){
 
   if( m_xmm_kernel_first_touch_unary != nullptr ) {
     libxsmm_meltw_unary_param l_param;
@@ -31,8 +31,8 @@ void einsum_ir::binary::ContractionBackendTpp::kernel_first_touch( void const * 
 }
 
 
-void einsum_ir::binary::ContractionBackendTpp::kernel_last_touch( void const * i_out_aux,
-                                                                  void       * io_out ){
+void etops::binary::ContractionBackendTpp::kernel_last_touch( void const * i_out_aux,
+                                                              void       * io_out ){
   if( m_xmm_kernel_last_touch_unary != nullptr ) {
     libxsmm_meltw_unary_param l_param;
     l_param.in.primary = io_out;
@@ -49,9 +49,9 @@ void einsum_ir::binary::ContractionBackendTpp::kernel_last_touch( void const * i
 }
 
 
-void einsum_ir::binary::ContractionBackendTpp::kernel_main( void const * i_left,
-                                                            void const * i_right,
-                                                            void       * io_out ){
+void etops::binary::ContractionBackendTpp::kernel_main( void const * i_left,
+                                                        void const * i_right,
+                                                        void       * io_out ){
   libxsmm_gemm_param l_param;
   l_param.a.primary = (void *) i_left;
   l_param.b.primary = (void *) i_right;
@@ -62,7 +62,7 @@ void einsum_ir::binary::ContractionBackendTpp::kernel_main( void const * i_left,
 }
 
 
-einsum_ir::err_t einsum_ir::binary::ContractionBackendTpp::compile_kernels(){
+etops::err_t etops::binary::ContractionBackendTpp::compile_kernels(){
 
   // libxsmm data types
   libxsmm_datatype l_xmm_dtype_left  = dtype_to_libxsmm( m_dtype_left  );
@@ -74,7 +74,7 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackendTpp::compile_kernels(){
       || l_xmm_dtype_right == libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED
       || l_xmm_dtype_comp  == libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED
       || l_xmm_dtype_out   == libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED ) {
-    return einsum_ir::COMPILATION_FAILED;
+    return err_t::COMPILATION_FAILED;
   }
 
   // setup bcast 
@@ -218,7 +218,7 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackendTpp::compile_kernels(){
   }
 
   if( m_xmm_kernel_main == nullptr ) {
-    return einsum_ir::COMPILATION_FAILED;
+    return err_t::COMPILATION_FAILED;
   }
   
   return err_t::SUCCESS;

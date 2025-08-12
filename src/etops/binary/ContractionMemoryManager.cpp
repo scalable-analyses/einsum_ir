@@ -4,7 +4,7 @@
 #include <omp.h>
 #endif
 
-einsum_ir::binary::ContractionMemoryManager::~ContractionMemoryManager() {
+etops::binary::ContractionMemoryManager::~ContractionMemoryManager() {
   for( std::size_t l_id = 0; l_id < m_thread_memory.size(); l_id++ ){
     if( m_thread_memory[l_id] != nullptr ){
       delete [] (char *) m_thread_memory[l_id];
@@ -12,7 +12,7 @@ einsum_ir::binary::ContractionMemoryManager::~ContractionMemoryManager() {
   }
 }
 
-void einsum_ir::binary::ContractionMemoryManager::alloc_all_memory(){
+void etops::binary::ContractionMemoryManager::alloc_all_memory(){
   if( m_req_thread_mem ){
     m_thread_memory.resize( m_num_threads, nullptr );
     m_aligned_thread_memory.resize(m_num_threads, nullptr);
@@ -38,8 +38,8 @@ void einsum_ir::binary::ContractionMemoryManager::alloc_all_memory(){
   }
 }
 
-void einsum_ir::binary::ContractionMemoryManager::reserve_thread_memory( int64_t i_size, 
-                                                               int64_t i_num_threads ){
+void etops::binary::ContractionMemoryManager::reserve_thread_memory( int64_t i_size, 
+                                                                     int64_t i_num_threads ){
   if( i_size > m_req_thread_mem ){
     m_req_thread_mem = i_size;
   }
@@ -48,7 +48,7 @@ void einsum_ir::binary::ContractionMemoryManager::reserve_thread_memory( int64_t
   }
 }
 
-char * einsum_ir::binary::ContractionMemoryManager::get_thread_memory( int64_t i_thread_id ){
+char * etops::binary::ContractionMemoryManager::get_thread_memory( int64_t i_thread_id ){
   if( i_thread_id < m_num_threads ){
     return m_aligned_thread_memory[i_thread_id];
   }

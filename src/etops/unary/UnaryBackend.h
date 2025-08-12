@@ -1,17 +1,17 @@
-#ifndef EINSUM_IR_BINARY_UNARY_BACKEND
-#define EINSUM_IR_BINARY_UNARY_BACKEND
+#ifndef ETOPS_BINARY_UNARY_BACKEND
+#define ETOPS_BINARY_UNARY_BACKEND
 
 #include <vector>
 #include "../constants.h"
 
 
-namespace einsum_ir {
+namespace etops {
   namespace binary {
     class UnaryBackend;
   }
 }
 
-class einsum_ir::binary::UnaryBackend {
+class etops::binary::UnaryBackend {
   private:
 
     //! id of the first primitive loop

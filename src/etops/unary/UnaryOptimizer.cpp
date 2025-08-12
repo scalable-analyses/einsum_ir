@@ -1,13 +1,13 @@
 #include "UnaryOptimizer.h"
 #include <algorithm>
 
-void einsum_ir::binary::UnaryOptimizer::init( std::vector< iter_property > * i_iter_space,
-                                                    int64_t                        i_num_threads ){
+void etops::binary::UnaryOptimizer::init( std::vector< iter_property > * i_iter_space,
+                                          int64_t                        i_num_threads ){
   m_iter_space = i_iter_space;
   m_num_threads = i_num_threads;
 }
 
-einsum_ir::err_t einsum_ir::binary::UnaryOptimizer::optimize(){
+etops::err_t etops::binary::UnaryOptimizer::optimize(){
 
   if( m_iter_space->size() == 0 ){
     return err_t::COMPILATION_FAILED;

@@ -1,5 +1,5 @@
-#ifndef EINSUM_IR_BINARY_CONTRACTION_BACKEND
-#define EINSUM_IR_BINARY_CONTRACTION_BACKEND
+#ifndef ETOPS_BINARY_CONTRACTION_BACKEND
+#define ETOPS_BINARY_CONTRACTION_BACKEND
 
 #include <vector>
 
@@ -9,16 +9,16 @@
 #include "../unary/UnaryBackendTpp.h"
 
 
-namespace einsum_ir {
+namespace etops {
   namespace binary {
     class ContractionBackend;
   }
 }
 
-class einsum_ir::binary::ContractionBackend {
+class etops::binary::ContractionBackend {
   private:
     //! Iteration Space for parallel execution
-    einsum_ir::binary::IterationSpace m_iter;
+    etops::binary::IterationSpace m_iter;
 
     //! id of the first parallelized loop
     int64_t m_id_first_parallel_loop = 0;

@@ -2,22 +2,22 @@
 #include "ContractionBackendScalar.h"
 
 template < typename T >
-void einsum_ir::binary::ContractionBackendScalar::kernel_zero( void const *,
-                                                               void       * o_data ) {
+void etops::binary::ContractionBackendScalar::kernel_zero( void const *,
+                                                            void       * o_data ) {
   T * l_data = (T *) o_data;
   *l_data = T(0);
 }
 
 template < typename T >
-void einsum_ir::binary::ContractionBackendScalar::kernel_relu( void const *,
-                                                               void       * io_data ) {
+void etops::binary::ContractionBackendScalar::kernel_relu( void const *,
+                                                           void       * io_data ) {
   T * l_data = (T *) io_data;
   *l_data = std::max( *l_data, T(0) );
 }
 
 template < typename T >
-void einsum_ir::binary::ContractionBackendScalar::kernel_copy( void const * i_data_src,
-                                                               void       * io_data_dst ) {
+void etops::binary::ContractionBackendScalar::kernel_copy( void const * i_data_src,
+                                                           void       * io_data_dst ) {
   T const * l_data_src = (T const *) i_data_src;
   T * l_data_dst = (T *) io_data_dst;
 
@@ -27,9 +27,9 @@ void einsum_ir::binary::ContractionBackendScalar::kernel_copy( void const * i_da
 template < typename T_LEFT,
            typename T_RIGHT,
            typename T_OUT >
-void einsum_ir::binary::ContractionBackendScalar::kernel_madd( void const * i_left,
-                                                               void const * i_right,
-                                                               void       * io_out ) {
+void etops::binary::ContractionBackendScalar::kernel_madd( void const * i_left,
+                                                           void const * i_right,
+                                                           void       * io_out ) {
   T_LEFT  const * l_left  = (T_LEFT  const *) i_left;
   T_RIGHT const * l_right = (T_RIGHT const *) i_right;
   T_OUT         * l_out   = (T_OUT         *) io_out;
@@ -37,14 +37,14 @@ void einsum_ir::binary::ContractionBackendScalar::kernel_madd( void const * i_le
   *l_out += (*l_left) * (*l_right);
 }
 
-einsum_ir::err_t einsum_ir::binary::ContractionBackendScalar::compile_kernels() {
+etops::err_t etops::binary::ContractionBackendScalar::compile_kernels() {
 
   //kernel should be of size 1 for scalar interface
   if(    m_m != 1
       || m_n != 1
       || m_k != 1
       || m_r != 1 ) {
-    return einsum_ir::COMPILATION_FAILED;
+    return err_t::COMPILATION_FAILED;
   }
 
   // determine if all dtypes are FP32 or FP64
@@ -73,7 +73,7 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackendScalar::compile_kernels() 
       m_kernel_first_touch = &kernel_zero< double >;
     }
     else {
-      return einsum_ir::COMPILATION_FAILED;
+      return err_t::COMPILATION_FAILED;
     }
   }
   else if( m_ktype_first_touch == kernel_t::COPY ) {
@@ -84,11 +84,11 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackendScalar::compile_kernels() 
       m_kernel_first_touch = &kernel_copy< double >;
     }
     else {
-      return einsum_ir::COMPILATION_FAILED;
+      return err_t::COMPILATION_FAILED;
     }
   }
   else if( m_ktype_first_touch != kernel_t::UNDEFINED_KTYPE ) {
-    return einsum_ir::COMPILATION_FAILED;
+    return err_t::COMPILATION_FAILED;
   }
 
   // main kernel
@@ -100,11 +100,11 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackendScalar::compile_kernels() 
       m_kernel_main = &kernel_madd< double, double, double >;
     }
     else {
-      return einsum_ir::COMPILATION_FAILED;
+      return err_t::COMPILATION_FAILED;
     }
   }
   else {
-    return einsum_ir::COMPILATION_FAILED;
+    return err_t::COMPILATION_FAILED;
   }
 
   // last-touch kernel
@@ -116,35 +116,35 @@ einsum_ir::err_t einsum_ir::binary::ContractionBackendScalar::compile_kernels() 
       m_kernel_last_touch = &kernel_relu< double >;
     }
     else {
-      return einsum_ir::COMPILATION_FAILED;
+      return err_t::COMPILATION_FAILED;
     }
   }
   else if( m_ktype_last_touch != UNDEFINED_KTYPE ) {
-    return einsum_ir::COMPILATION_FAILED;
+    return err_t::COMPILATION_FAILED;
   }
 
-  return einsum_ir::SUCCESS;
+  return err_t::SUCCESS;
 }
 
 
-void einsum_ir::binary::ContractionBackendScalar::kernel_first_touch( void const * i_out_aux,
-                                                                      void       * io_out ) {
+void etops::binary::ContractionBackendScalar::kernel_first_touch( void const * i_out_aux,
+                                                                  void       * io_out ) {
   if( m_kernel_first_touch != nullptr ) {
     m_kernel_first_touch( i_out_aux,
                           io_out );
   }
 }
 
-void einsum_ir::binary::ContractionBackendScalar::kernel_main( void const * i_left,
-                                                               void const * i_right,
-                                                               void       * io_out ) {
+void etops::binary::ContractionBackendScalar::kernel_main( void const * i_left,
+                                                           void const * i_right,
+                                                           void       * io_out ) {
   m_kernel_main( i_left,
                  i_right,
                  io_out );
 }
 
-void einsum_ir::binary::ContractionBackendScalar::kernel_last_touch( void const * i_out_aux,
-                                                                     void       * io_out ) {
+void etops::binary::ContractionBackendScalar::kernel_last_touch( void const * i_out_aux,
+                                                                 void       * io_out ) {
   if( m_kernel_last_touch != nullptr ) {
     m_kernel_last_touch( i_out_aux,
                          io_out );
