@@ -1,5 +1,5 @@
-#ifndef ETOPS_BINARY_UNARY_BACKEND
-#define ETOPS_BINARY_UNARY_BACKEND
+#ifndef EINSUM_IR_ETOPS_UNARY_BACKEND
+#define EINSUM_IR_ETOPS_UNARY_BACKEND
 
 #include <vector>
 #include "../constants.h"
