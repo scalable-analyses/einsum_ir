@@ -1,5 +1,5 @@
 #include "UnaryTpp.h"
-#include "../etops/unary/UnaryOptimizer.h"
+#include "../basic/unary/UnaryOptimizer.h"
 
 einsum_ir::err_t einsum_ir::backend::UnaryTpp::compile() {
   err_t l_err = Unary::compile_base();
@@ -8,25 +8,25 @@ einsum_ir::err_t einsum_ir::backend::UnaryTpp::compile() {
   }
 
   //lower to UnaryOptimizer data structure
-  std::vector<etops::iter_property> l_loops;
+  std::vector<basic::iter_property> l_loops;
   l_loops.resize(m_num_dims);
   for(std::size_t l_di = 0; l_di < l_loops.size(); l_di++){
-    l_loops[l_di].exec_type      = etops::exec_t::SEQ;
+    l_loops[l_di].exec_type      = basic::exec_t::SEQ;
     l_loops[l_di].size           = m_sizes_out[l_di];
     l_loops[l_di].stride_left    = m_strides_in[l_di];
     l_loops[l_di].stride_out     = m_strides_out[l_di];
   }
 
-  //convert kernel to etops
-  etops::kernel_t l_ktype_main = ce_kernelt_to_etops(m_ktype_main);
+  //convert kernel to basic
+  basic::kernel_t l_ktype_main = ce_kernelt_to_basic(m_ktype_main);
 
   //convert dtype
-  etops::data_t l_dtype_in   = ce_dtype_to_etops(m_dtype_in);
-  etops::data_t l_dtype_comp = ce_dtype_to_etops(m_dtype_comp);
-  etops::data_t l_dtype_out  = ce_dtype_to_etops(m_dtype_out);
+  basic::data_t l_dtype_in   = ce_dtype_to_basic(m_dtype_in);
+  basic::data_t l_dtype_comp = ce_dtype_to_basic(m_dtype_comp);
+  basic::data_t l_dtype_out  = ce_dtype_to_basic(m_dtype_out);
 
   //optimize loops
-  einsum_ir::etops::UnaryOptimizer l_optim;
+  einsum_ir::basic::UnaryOptimizer l_optim;
 
   l_optim.init( &l_loops ,
                 m_num_threads,
@@ -41,7 +41,7 @@ einsum_ir::err_t einsum_ir::backend::UnaryTpp::compile() {
                   l_ktype_main,
                   m_num_threads );
 
-  l_err = ce_etops_err_to_err(m_backend.compile());
+  l_err = ce_basic_err_to_err(m_backend.compile());
   if( l_err != err_t::SUCCESS ) {
     return l_err;
   }

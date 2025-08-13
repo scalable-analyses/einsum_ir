@@ -3,7 +3,7 @@
 
 #include <vector>
 #include "Unary.h"
-#include "../etops/unary/UnaryBackendTpp.h"
+#include "../basic/unary/UnaryBackendTpp.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -14,7 +14,7 @@ namespace einsum_ir {
 class einsum_ir::backend::UnaryTpp: public Unary {
   private:
     //! unary tpp backend
-    etops::UnaryBackendTpp m_backend;
+    basic::UnaryBackendTpp m_backend;
 
   public:
     /**

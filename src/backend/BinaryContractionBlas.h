@@ -2,7 +2,7 @@
 #define EINSUM_IR_BACKEND_BINARY_CONTRACTION_BLAS
 
 #include "BinaryContraction.h"
-#include "../etops/binary/ContractionBackendBlas.h"
+#include "../basic/binary/ContractionBackendBlas.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -22,7 +22,7 @@ class einsum_ir::backend::BinaryContractionBlas: public BinaryContraction {
     int64_t m_target_prim_k = 512;
    
     //! contraction backend
-    einsum_ir::etops::ContractionBackendBlas m_backend;
+    einsum_ir::basic::ContractionBackendBlas m_backend;
 
     /**
      * Helper function for map find with default value

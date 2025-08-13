@@ -4,7 +4,7 @@
 #include <vector>
 #include <list>
 #include "../constants.h"
-#include "../etops/binary/ContractionMemoryManager.h"
+#include "../basic/binary/ContractionMemoryManager.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -39,7 +39,7 @@ class einsum_ir::backend::MemoryManager{
     std::list<int64_t> m_allocated_offset_right;
 
     //! memory manager for contractions
-    einsum_ir::etops::ContractionMemoryManager m_contraction_memory_manager;
+    einsum_ir::basic::ContractionMemoryManager m_contraction_memory_manager;
 
   public:
     //! id of the current layer
@@ -85,7 +85,7 @@ class einsum_ir::backend::MemoryManager{
      *
      * @return pointer to the ContractionMemoryManager
      **/
-    einsum_ir::etops::ContractionMemoryManager * get_contraction_memory_manager();
+    einsum_ir::basic::ContractionMemoryManager * get_contraction_memory_manager();
 
 };
 

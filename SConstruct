@@ -204,7 +204,7 @@ g_env.tests = []
 g_env.exe = {}
 
 Export('g_env')
-SConscript( g_env['build_dir']+'/src/etops/SConscript' )
+SConscript( g_env['build_dir']+'/src/basic/SConscript' )
 SConscript( g_env['build_dir']+'/src/SConscript' )
 Import('g_env')
 

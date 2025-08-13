@@ -2,7 +2,7 @@
 #define EINSUM_IR_CONSTANTS
 
 #include <cstdint>
-#include <etops/constants.h>
+#include <basic/constants.h>
 
 namespace einsum_ir {
   typedef enum {
@@ -86,44 +86,44 @@ namespace einsum_ir {
     UNDEFINED_BACKEND = 99
   } backend_t;
 
-  constexpr etops::dim_t ce_dimt_to_etops( dim_t i_dim ) {
-    if(      i_dim == dim_t::C   ) return etops::dim_t::C;
-    else if( i_dim == dim_t::M   ) return etops::dim_t::M;
-    else if( i_dim == dim_t::N   ) return etops::dim_t::N;
-    else if( i_dim == dim_t::K   ) return etops::dim_t::K;
-    else if( i_dim == dim_t::CPX ) return etops::dim_t::CPX;
-    else if( i_dim == dim_t::I   ) return etops::dim_t::I;
-    else if( i_dim == dim_t::J   ) return etops::dim_t::J;
-    else return etops::dim_t::UNDEFINED_DIM;
+  constexpr basic::dim_t ce_dimt_to_basic( dim_t i_dim ) {
+    if(      i_dim == dim_t::C   ) return basic::dim_t::C;
+    else if( i_dim == dim_t::M   ) return basic::dim_t::M;
+    else if( i_dim == dim_t::N   ) return basic::dim_t::N;
+    else if( i_dim == dim_t::K   ) return basic::dim_t::K;
+    else if( i_dim == dim_t::CPX ) return basic::dim_t::CPX;
+    else if( i_dim == dim_t::I   ) return basic::dim_t::I;
+    else if( i_dim == dim_t::J   ) return basic::dim_t::J;
+    else return basic::dim_t::UNDEFINED_DIM;
     
   }
 
-  constexpr etops::data_t ce_dtype_to_etops( data_t i_dtype ) {
-    if(      i_dtype == FP32 ) return etops::data_t::FP32;
-    else if( i_dtype == FP64 ) return etops::data_t::FP64;
-    else                       return etops::data_t::UNDEFINED_DTYPE;
+  constexpr basic::data_t ce_dtype_to_basic( data_t i_dtype ) {
+    if(      i_dtype == FP32 ) return basic::data_t::FP32;
+    else if( i_dtype == FP64 ) return basic::data_t::FP64;
+    else                       return basic::data_t::UNDEFINED_DTYPE;
   }
 
-  constexpr etops::kernel_t ce_kernelt_to_etops( kernel_t i_ktype ) {
-    if(      i_ktype == ZERO            ) return etops::kernel_t::ZERO;
-    else if( i_ktype == RELU            ) return etops::kernel_t::RELU;
-    else if( i_ktype == ADD             ) return etops::kernel_t::ADD;
-    else if( i_ktype == COPY            ) return etops::kernel_t::COPY;
-    else if( i_ktype == MADD            ) return etops::kernel_t::MADD;
-    else if( i_ktype == CPX_ZERO        ) return etops::kernel_t::CPX_ZERO;
-    else if( i_ktype == CPX_ADD         ) return etops::kernel_t::CPX_ADD;
-    else if( i_ktype == CPX_MADD        ) return etops::kernel_t::CPX_MADD;
-    else if( i_ktype == CPX_COPY        ) return etops::kernel_t::CPX_COPY;
-    else if( i_ktype == BR_MADD         ) return etops::kernel_t::BR_MADD;
-    else if( i_ktype == PACKED_MADD     ) return etops::kernel_t::PACKED_MADD;
-    else if( i_ktype == CPX_PACKED_MADD ) return etops::kernel_t::CPX_PACKED_MADD;
-    else                                 return etops::kernel_t::UNDEFINED_KTYPE;
+  constexpr basic::kernel_t ce_kernelt_to_basic( kernel_t i_ktype ) {
+    if(      i_ktype == ZERO            ) return basic::kernel_t::ZERO;
+    else if( i_ktype == RELU            ) return basic::kernel_t::RELU;
+    else if( i_ktype == ADD             ) return basic::kernel_t::ADD;
+    else if( i_ktype == COPY            ) return basic::kernel_t::COPY;
+    else if( i_ktype == MADD            ) return basic::kernel_t::MADD;
+    else if( i_ktype == CPX_ZERO        ) return basic::kernel_t::CPX_ZERO;
+    else if( i_ktype == CPX_ADD         ) return basic::kernel_t::CPX_ADD;
+    else if( i_ktype == CPX_MADD        ) return basic::kernel_t::CPX_MADD;
+    else if( i_ktype == CPX_COPY        ) return basic::kernel_t::CPX_COPY;
+    else if( i_ktype == BR_MADD         ) return basic::kernel_t::BR_MADD;
+    else if( i_ktype == PACKED_MADD     ) return basic::kernel_t::PACKED_MADD;
+    else if( i_ktype == CPX_PACKED_MADD ) return basic::kernel_t::CPX_PACKED_MADD;
+    else                                 return basic::kernel_t::UNDEFINED_KTYPE;
   }
 
-  constexpr err_t ce_etops_err_to_err( etops::err_t i_err ) {
-    if(      i_err == etops::err_t::SUCCESS                   ) return err_t::SUCCESS;
-    else if( i_err == etops::err_t::COMPILATION_FAILED        ) return err_t::COMPILATION_FAILED;
-    else if( i_err == etops::err_t::INVALID_CPX_DIM           ) return err_t::INVALID_CPX_DIM;
+  constexpr err_t ce_basic_err_to_err( basic::err_t i_err ) {
+    if(      i_err == basic::err_t::SUCCESS                   ) return err_t::SUCCESS;
+    else if( i_err == basic::err_t::COMPILATION_FAILED        ) return err_t::COMPILATION_FAILED;
+    else if( i_err == basic::err_t::INVALID_CPX_DIM           ) return err_t::INVALID_CPX_DIM;
     else                                                        return err_t::UNDEFINED_ERROR;
   }
 

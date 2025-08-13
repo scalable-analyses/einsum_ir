@@ -2,7 +2,7 @@
 #define EINSUM_IR_BACKEND_UNARY_SCALAR
 
 #include "Unary.h"
-#include "../etops/unary/UnaryBackendScalar.h"
+#include "../basic/unary/UnaryBackendScalar.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -13,7 +13,7 @@ namespace einsum_ir {
 class einsum_ir::backend::UnaryScalar: public Unary {
   private:
     //! unary scalar backend
-    etops::UnaryBackendScalar m_backend;
+    basic::UnaryBackendScalar m_backend;
 
   public:
     /**

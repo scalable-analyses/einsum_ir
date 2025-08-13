@@ -21,9 +21,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # ------------------------------------------------------------
 # einsum_ir
 # ------------------------------------------------------------
-message(STATUS "Building einsum_ir from ../src/binary")
+message(STATUS "Building einsum_ir from ../src/basic/binary")
 add_subdirectory(
-    "${CMAKE_CURRENT_LIST_DIR}/../src/binary"
+    "${CMAKE_CURRENT_LIST_DIR}/../src/basic/binary"
     einsum_ir_local
     EXCLUDE_FROM_ALL
 )
@@ -33,7 +33,7 @@ add_subdirectory(
 # ------------------------------------------------------------
 file(
     COPY
-    "${CMAKE_CURRENT_LIST_DIR}/../src/binary"
+    "${CMAKE_CURRENT_LIST_DIR}/../src/basic/binary"
     DESTINATION "${CMAKE_BINARY_DIR}/include/einsum_ir"
 )
 
