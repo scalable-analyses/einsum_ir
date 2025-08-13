@@ -63,6 +63,9 @@ einsum_ir::etops::err_t einsum_ir::etops::ContractionBackendScalar::compile_kern
            && m_dtype_out   == FP64 ) {
     l_dtype_all_fp64 = true;
   }
+  else {
+    return err_t::COMPILATION_FAILED;
+  }
 
   // first-touch kernel
   if( m_ktype_first_touch == kernel_t::ZERO ) {
@@ -72,9 +75,6 @@ einsum_ir::etops::err_t einsum_ir::etops::ContractionBackendScalar::compile_kern
     else if( l_dtype_all_fp64 ) {
       m_kernel_first_touch = &kernel_zero< double >;
     }
-    else {
-      return err_t::COMPILATION_FAILED;
-    }
   }
   else if( m_ktype_first_touch == kernel_t::COPY ) {
     if( l_dtype_all_fp32 ) {
@@ -82,9 +82,6 @@ einsum_ir::etops::err_t einsum_ir::etops::ContractionBackendScalar::compile_kern
     }
     else if( l_dtype_all_fp64 ) {
       m_kernel_first_touch = &kernel_copy< double >;
-    }
-    else {
-      return err_t::COMPILATION_FAILED;
     }
   }
   else if( m_ktype_first_touch != kernel_t::UNDEFINED_KTYPE ) {
@@ -99,9 +96,6 @@ einsum_ir::etops::err_t einsum_ir::etops::ContractionBackendScalar::compile_kern
     else if( l_dtype_all_fp64 ) {
       m_kernel_main = &kernel_madd< double, double, double >;
     }
-    else {
-      return err_t::COMPILATION_FAILED;
-    }
   }
   else {
     return err_t::COMPILATION_FAILED;
@@ -114,9 +108,6 @@ einsum_ir::etops::err_t einsum_ir::etops::ContractionBackendScalar::compile_kern
     }
     else if( l_dtype_all_fp64 ) {
       m_kernel_last_touch = &kernel_relu< double >;
-    }
-    else {
-      return err_t::COMPILATION_FAILED;
     }
   }
   else if( m_ktype_last_touch != UNDEFINED_KTYPE ) {

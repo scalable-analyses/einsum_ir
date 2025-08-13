@@ -1,7 +1,5 @@
 #include "UnaryBackend.h"
 
-#include <iostream>
-
 void einsum_ir::etops::UnaryBackend::init( std::vector< exec_t >  const & i_exec_type,
                                            std::vector< int64_t > const & i_dim_sizes,
                                            std::vector< int64_t > const & i_strides_in,
