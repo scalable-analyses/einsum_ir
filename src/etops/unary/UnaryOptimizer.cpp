@@ -2,9 +2,11 @@
 #include <algorithm>
 
 void einsum_ir::etops::UnaryOptimizer::init( std::vector< iter_property > * i_iter_space,
-                                             int64_t                        i_num_threads ){
+                                             int64_t                        i_num_threads,
+                                             bool                           i_scalar_optim ){
   m_iter_space = i_iter_space;
   m_num_threads = i_num_threads;
+  m_sclar_optim = i_scalar_optim;
 }
 
 einsum_ir::etops::err_t einsum_ir::etops::UnaryOptimizer::optimize(){
@@ -24,32 +26,42 @@ einsum_ir::etops::err_t einsum_ir::etops::UnaryOptimizer::optimize(){
   std::vector<iter_property>::iterator l_iter;
 
   //set first loop to primitive
-  l_iter = m_iter_space->end() - 1;
-  l_iter->exec_type = exec_t::PRIM;
-  if( l_iter->stride_left == 1 ){
-    l_found_stride_one_in = true;
-  }
-  if( l_iter->stride_out == 1 ){
-    l_found_stride_one_out = true;
-  }
-  
-  //set second loop to primitive
-  size_t l_size = m_iter_space->size();
-  if(    l_size > 1 
-      && (m_iter_space->at(l_size - 2).stride_left == 1 || l_found_stride_one_in)
-      && (m_iter_space->at(l_size - 2).stride_out  == 1 || l_found_stride_one_out) ){
-    l_iter = m_iter_space->end() - 2;
-    l_iter->exec_type = exec_t::PRIM;
-  }
-  //create extra loop if no two primitive loops found
-  else{
+  if( m_sclar_optim ){
     iter_property l_new_iter;
     l_new_iter.exec_type = exec_t::PRIM;
     l_new_iter.size = 1;
-    l_new_iter.stride_left = l_iter->size * l_found_stride_one_in  + !l_found_stride_one_in;
-    l_new_iter.stride_out =  l_iter->size * l_found_stride_one_out + !l_found_stride_one_out;
-    m_iter_space->insert(m_iter_space->end() - l_found_stride_one_in, l_new_iter);
+    l_new_iter.stride_left = 1;
+    l_new_iter.stride_out =  1;
+    m_iter_space->insert(m_iter_space->end(), l_new_iter);
+    m_iter_space->insert(m_iter_space->end(), l_new_iter);
   }
-
+  else{
+    l_iter = m_iter_space->end() - 1;
+    l_iter->exec_type = exec_t::PRIM;
+    if( l_iter->stride_left == 1 ){
+      l_found_stride_one_in = true;
+    }
+    if( l_iter->stride_out == 1 ){
+      l_found_stride_one_out = true;
+    }
+    
+    //set second loop to primitive
+    size_t l_size = m_iter_space->size();
+    if(    l_size > 1 
+        && (m_iter_space->at(l_size - 2).stride_left == 1 || l_found_stride_one_in)
+        && (m_iter_space->at(l_size - 2).stride_out  == 1 || l_found_stride_one_out) ){
+      l_iter = m_iter_space->end() - 2;
+      l_iter->exec_type = exec_t::PRIM;
+    }
+    //create extra loop if no two primitive loops found
+    else{
+      iter_property l_new_iter;
+      l_new_iter.exec_type = exec_t::PRIM;
+      l_new_iter.size = 1;
+      l_new_iter.stride_left = l_iter->size * l_found_stride_one_in  + !l_found_stride_one_in;
+      l_new_iter.stride_out =  l_iter->size * l_found_stride_one_out + !l_found_stride_one_out;
+      m_iter_space->insert(m_iter_space->end() - l_found_stride_one_in, l_new_iter);
+    }
+  }
   return err_t::SUCCESS;
 }

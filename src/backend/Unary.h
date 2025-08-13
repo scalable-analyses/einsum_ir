@@ -46,8 +46,8 @@ class einsum_ir::backend::Unary {
     //! type of the main kernel
     kernel_t m_ktype_main = UNDEFINED_KTYPE;
 
-    //! true if the unary operation was compiled
-    bool m_compiled = false;
+    //! number of threads
+    int64_t m_num_threads = 1;
 
     /**
      * Derives the strides based on the sizes of the dimensions in the respective tensors.
@@ -93,6 +93,7 @@ class einsum_ir::backend::Unary {
      * @param i_dtype_comp compute data type.
      * @param i_dtype_out datatype of the output.
      * @param i_ktype_main type of the main kernel.
+     * @param i_num_threads number of threads participating in the unary operation.
      **/
     void init( int64_t                              i_num_dims,
                std::map< int64_t, int64_t > const * i_dim_sizes,
@@ -101,7 +102,8 @@ class einsum_ir::backend::Unary {
                data_t                               i_dtype_in,
                data_t                               i_dtype_comp,
                data_t                               i_dtype_out,
-               kernel_t                             i_ktype_main );
+               kernel_t                             i_ktype_main,
+               int64_t                              i_num_threads );
 
 
     /**
@@ -117,6 +119,7 @@ class einsum_ir::backend::Unary {
      * @param i_dtype_comp compute data type.
      * @param i_dtype_out datatype of the output.
      * @param i_ktype_main type of the main kernel.
+     * @param i_num_threads number of threads participating in the unary operation.
      **/
     void init( int64_t                              i_num_dims,
                std::map< int64_t, int64_t > const * i_dim_sizes,
@@ -127,7 +130,8 @@ class einsum_ir::backend::Unary {
                data_t                               i_dtype_in,
                data_t                               i_dtype_comp,
                data_t                               i_dtype_out,
-               kernel_t                             i_ktype_main );
+               kernel_t                             i_ktype_main,
+               int64_t                              i_num_threads );
 
     /**
      * Compiles the base data of the unary operation.
@@ -151,13 +155,6 @@ class einsum_ir::backend::Unary {
      **/
     virtual void eval( void const * i_tensor_in,
                        void       * io_tensor_out ) = 0;
-
-    /**
-     * Initializes the threading configuration of the unary operation.
-     *
-     * @param i_num_tasks_target number of targeted tasks.
-     **/
-    virtual void threading( int64_t i_num_tasks_target  ) = 0;
 };
 
 #endif

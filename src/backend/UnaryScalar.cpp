@@ -1,73 +1,55 @@
 #include "UnaryScalar.h"
-
-template < typename T >
-void einsum_ir::backend::UnaryScalar::kernel_copy( void const * i_data_src,
-                                                   void       * io_data_dst ) {
-  T const * l_data_src = (T const *) i_data_src;
-  T * l_data_dst = (T *) io_data_dst;
-
-  *l_data_dst = *l_data_src;
-}
+#include "../etops/unary/UnaryOptimizer.h"
 
 einsum_ir::err_t einsum_ir::backend::UnaryScalar::compile() {
-  Unary::compile_base();
-
-  // determine if all dtypes are FP32 or FP64
-  bool l_dtype_all_fp32 = false;
-  bool l_dtype_all_fp64 = false;
-
-  if(    m_dtype_in   == FP32
-      && m_dtype_comp == FP32
-      && m_dtype_out  == FP32 ) {
-    l_dtype_all_fp32 = true;
-  }
-  else if(    m_dtype_in   == FP64
-           && m_dtype_comp == FP64
-           && m_dtype_out  == FP64 ) {
-    l_dtype_all_fp64 = true;
-  }
-
-  // assign kernel
-  if( m_ktype_main == COPY ) {
-    if( l_dtype_all_fp32 ) {
-      m_kernel_main = &kernel_copy< float >;
-    }
-    else if( l_dtype_all_fp64 ) {
-      m_kernel_main = &kernel_copy< double >;
-    }
-    else {
-      return einsum_ir::COMPILATION_FAILED;
-    }
-  }
-  else {
-    return einsum_ir::COMPILATION_FAILED;
-  }
-
-  // init and compile loop interface
-  m_unary_loops.init( m_num_dims,
-                      m_sizes_out.data(),
-                      m_strides_in.data(),
-                      m_strides_out.data(),
-                      ce_n_bytes( m_dtype_in ),
-                      ce_n_bytes( m_dtype_out ),
-                      m_kernel_main );
-
-  einsum_ir::err_t l_err = m_unary_loops.compile();
+  err_t l_err = Unary::compile_base();
   if( l_err != einsum_ir::SUCCESS ) {
     return einsum_ir::COMPILATION_FAILED;
   }
 
-  m_compiled = true;
+  //lower to UnaryOptimizer data structure
+  std::vector<etops::iter_property> l_loops;
+  l_loops.resize(m_num_dims);
+  for(std::size_t l_di = 0; l_di < l_loops.size(); l_di++){
+    l_loops[l_di].exec_type      = etops::exec_t::SEQ;
+    l_loops[l_di].size           = m_sizes_out[l_di];
+    l_loops[l_di].stride_left    = m_strides_in[l_di];
+    l_loops[l_di].stride_out     = m_strides_out[l_di];
+  }
+
+  //convert kernel to etops
+  etops::kernel_t l_ktype_main = ce_kernelt_to_etops(m_ktype_main);
+
+  //convert dtype
+  etops::data_t l_dtype_in   = ce_dtype_to_etops(m_dtype_in);
+  etops::data_t l_dtype_comp = ce_dtype_to_etops(m_dtype_comp);
+  etops::data_t l_dtype_out  = ce_dtype_to_etops(m_dtype_out);
+
+  //optimize loops
+  einsum_ir::etops::UnaryOptimizer l_optim;
+
+  l_optim.init( &l_loops ,
+                m_num_threads,
+                true );
+  l_optim.optimize();
+
+  //setup backend
+  m_backend.init( l_loops,
+                  l_dtype_in,
+                  l_dtype_comp,
+                  l_dtype_out,
+                  l_ktype_main,
+                  m_num_threads );
+
+  l_err = ce_etops_err_to_err(m_backend.compile());
+  if( l_err != err_t::SUCCESS ) {
+    return l_err;
+  }
 
   return err_t::SUCCESS;
 }
 
-void einsum_ir::backend::UnaryScalar::threading( int64_t i_num_tasks_target  ) {
-  m_unary_loops.threading( i_num_tasks_target );
-}
-
 void einsum_ir::backend::UnaryScalar::eval( void const * i_tensor_in,
                                             void       * io_tensor_out ) {
-  m_unary_loops.eval( i_tensor_in,
-                      io_tensor_out );
+  m_backend.contract( i_tensor_in, io_tensor_out );
 }

@@ -18,6 +18,9 @@ class einsum_ir::etops::UnaryOptimizer {
    //! number of threads participating in unary opteration
    int64_t m_num_threads = 1;
 
+  //! true if scalar execution should be generated, false otherwise
+   bool m_sclar_optim = false;
+
 
   public:
    /**
@@ -25,10 +28,11 @@ class einsum_ir::etops::UnaryOptimizer {
      *
      * @param i_iter_space vector of iters corresponding to an unoptimized contraction.
      * @param i_num_threads number of participating threads in contraction.
+     * @param i_scalar_optim true if sclar execution should be generated, false otherwise.
      **/
     void init( std::vector< iter_property > * i_iter_space,
-               int64_t                        i_num_threads
-             );    
+               int64_t                        i_num_threads, 
+               bool                           i_scalar_optim );    
   
    /**
      * Optimizes the iteration space.

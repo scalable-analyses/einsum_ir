@@ -319,6 +319,14 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
   // compile unary copy operation
   m_unary = new UnaryTpp;
 
+  int64_t l_num_threads_unary = 1;
+  if( m_num_tasks_intra_op > 1 ) {
+    // magic number: 64^3
+    if(  m_num_ops_node == 0
+      || m_num_ops_node >= 262144 ) {
+      l_num_threads_unary = m_num_threads;
+    }
+  }
   if( m_children.size() != 1 ) {
     m_unary->init( m_num_dims,
                    m_dim_sizes_outer,
@@ -327,7 +335,8 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
                    m_dtype,
                    m_dtype,
                    m_dtype,
-                   kernel_t::COPY );
+                   kernel_t::COPY,
+                   l_num_threads_unary );
   }
   else {
     m_unary->init( m_num_dims,
@@ -337,7 +346,8 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
                    m_dtype,
                    m_dtype,
                    m_dtype,
-                   kernel_t::COPY );
+                   kernel_t::COPY,
+                   l_num_threads_unary );
   }
 
   l_err = m_unary->compile();
@@ -437,17 +447,6 @@ einsum_ir::err_t einsum_ir::backend::EinsumNode::compile_recursive() {
     m_num_ops_children += m_children[l_ch]->m_num_ops_node;
     m_num_ops_children += m_children[l_ch]->m_num_ops_children;
   }
-
-#ifdef _OPENMP
-  if( m_num_tasks_intra_op > 1 ) {
-    // magic number: 64^3
-    if(  m_num_ops_node == 0
-      || m_num_ops_node >= 262144 ) {
-      // four times overload
-      if( m_unary != nullptr ) m_unary->threading( m_num_threads * 4 );
-    }
-  }
-#endif
 
   m_compiled = true;
 

@@ -259,6 +259,12 @@ int main( int     i_argc,
     l_map_dim_sizes.insert( std::pair< int64_t, int64_t >( l_di, l_dim_sizes[l_di] ) );
   }
 
+    // enable threading
+    int64_t l_num_threads = 1;
+#ifdef _OPENMP
+  l_num_threads = omp_get_max_threads();
+#endif
+
   einsum_ir::backend::UnaryTpp l_unary_tpp;
 
   l_unary_tpp.init( l_num_dims,
@@ -268,19 +274,12 @@ int main( int     i_argc,
                     l_dtype_einsum_ir,
                     l_dtype_einsum_ir,
                     l_dtype_einsum_ir,
-                    einsum_ir::kernel_t::COPY );
+                    einsum_ir::kernel_t::COPY,
+                    l_num_threads );
 
   l_tp0 = std::chrono::steady_clock::now();
   l_unary_tpp.compile();
   l_tp1 = std::chrono::steady_clock::now();
-
-  // enable threading
-#ifdef _OPENMP
-  // four times overload
-  int64_t l_num_tasks = omp_get_max_threads() * 4;
-
-  l_unary_tpp.threading( l_num_tasks );
-#endif
 
   l_dur = std::chrono::duration_cast< std::chrono::duration< double> >( l_tp1 - l_tp0 );
   l_time_compile = l_dur.count();

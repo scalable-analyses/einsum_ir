@@ -533,7 +533,7 @@ einsum_ir::etops::err_t einsum_ir::etops::ContractionBackend::create_packing( in
     }
     //optimize packing iters
     UnaryOptimizer l_unary_opt;
-    l_unary_opt.init( &l_packing_iters, 1 );
+    l_unary_opt.init( &l_packing_iters, 1 , false);
     err_t l_err = err_t::UNDEFINED_ERROR;
     l_err = l_unary_opt.optimize();
     if( l_err != err_t::SUCCESS ) {
