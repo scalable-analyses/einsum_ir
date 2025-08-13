@@ -2,7 +2,7 @@
 #define EINSUM_IR_BASIC_BINARY_CONTRACTION_MEMORY_MANAGER
 
 #include <vector>
-#include "constants.h"
+#include "../constants.h"
 
 namespace einsum_ir {
   namespace basic {
