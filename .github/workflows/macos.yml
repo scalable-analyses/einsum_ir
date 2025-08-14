@@ -74,7 +74,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake ../src/basic/binary -DLIBXSMM_ROOT=${LIBXSMM_PATH} -DEINSUM_IR_AUTO_INSTALL_LIBXSMM=OFF
+          cmake ../src/basic -DLIBXSMM_ROOT=${LIBXSMM_PATH} -DEINSUM_IR_AUTO_INSTALL_LIBXSMM=OFF
           make -j
           cd ..
           cmake --install build --prefix $(pwd)/install
@@ -89,7 +89,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake ../src/basic/binary
+          cmake ../src/basic
           make -j
           cd ..
           cmake --install build --prefix $(pwd)/install

@@ -113,12 +113,17 @@ endif()
 # Sources & target
 # ──────────────────────────────────────────────────────
 set(src
-  ContractionBackend.cpp
-  ContractionBackendScalar.cpp
-  ContractionOptimizer.cpp
-  IterationSpace.cpp)
+  binary/ContractionBackend.cpp
+  binary/ContractionBackendScalar.cpp
+  binary/ContractionOptimizer.cpp
+  binary/IterationSpace.cpp
+  binary/ContractionMemoryManager.cpp
+  unary/UnaryBackend.cpp
+  unary/UnaryBackendScalar.cpp
+  unary/UnaryOptimizer.cpp)
 if(EINSUM_IR_ENABLE_TPP)
-  list(APPEND src ContractionBackendTpp.cpp)
+  list(APPEND src binary/ContractionBackendTpp.cpp)
+  list(APPEND src unary/UnaryBackendTpp.cpp)
 endif()
 
 add_library(einsum_ir ${src})
@@ -195,20 +200,32 @@ endif()
 # Header Installation
 # ──────────────────────────────────────────────────────
 set(binary_headers
-    ContractionBackend.h
-    ContractionBackendScalar.h
-    ContractionOptimizer.h
-    IterationSpace.h)
+    binary/ContractionBackend.h
+    binary/ContractionBackendScalar.h
+    binary/ContractionOptimizer.h
+    binary/IterationSpace.h
+    binary/ContractionMemoryManager.h)
 if(EINSUM_IR_ENABLE_TPP)
-  list(APPEND binary_headers ContractionBackendTpp.h)
+  list(APPEND binary_headers binary/ContractionBackendTpp.h)
+endif()
+
+set(unary_headers
+    unary/UnaryBackend.h
+    unary/UnaryBackendScalar.h
+    unary/UnaryOptimizer.h)
+if(EINSUM_IR_ENABLE_TPP)
+  list(APPEND unary_headers unary/UnaryBackendTpp.h)
 endif()
 
 set(top_level_headers
-  ../constants.h)
+  constants.h)
 
 # Install all headers in one consistent block
 install(FILES ${binary_headers} 
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/einsum_ir/binary)
+
+install(FILES ${unary_headers} 
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/einsum_ir/unary)
 
 install(FILES ${top_level_headers} 
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/einsum_ir)
