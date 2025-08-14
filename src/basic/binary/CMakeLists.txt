@@ -195,7 +195,7 @@ endif()
 # Header Installation
 # ──────────────────────────────────────────────────────
 set(binary_headers
-    constants.h
+    ../constants.h
     ContractionBackend.h
     ContractionBackendScalar.h
     ContractionOptimizer.h
@@ -205,7 +205,7 @@ if(EINSUM_IR_ENABLE_TPP)
 endif()
 
 set(top_level_headers
-  ../constants.h)
+  ../../constants.h)
 
 # Install all headers in one consistent block
 install(FILES ${binary_headers} 

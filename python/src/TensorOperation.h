@@ -3,8 +3,8 @@
 
 #include <cstdint>
 #include <vector>
-#include <einsum_ir/binary/ContractionBackendTpp.h>
-#include <einsum_ir/binary/ContractionOptimizer.h>
+#include <einsum_ir/basic/binary/ContractionBackendTpp.h>
+#include <einsum_ir/basic/binary/ContractionOptimizer.h>
 
 namespace einsum_ir {
   namespace py {
