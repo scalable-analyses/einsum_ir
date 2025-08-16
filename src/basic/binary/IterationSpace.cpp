@@ -1,5 +1,6 @@
 #include "IterationSpace.h"
 #include "../third_party/gilbertSFC.cpp"
+#include <cmath>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -232,4 +233,13 @@ void einsum_ir::basic::IterationSpace::sfc_oracle_2d( int64_t *o_m,
 
   *o_m = l_idx_m;
   *o_n = l_idx_n;
+}
+
+int64_t einsum_ir::basic::IterationSpace::get_caching_size(){
+  if( m_sfc_tasks_m < std::sqrt(m_num_threads) || m_sfc_tasks_n < std::sqrt(m_num_threads)){
+    return 1;
+  }
+  else{
+    return 2;
+  }
 }

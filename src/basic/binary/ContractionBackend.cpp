@@ -164,14 +164,6 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionBackend::compile(){
                   m_packing_strides_right);
   m_size_packing_right *= ce_n_bytes(m_dtype_right);
 
-  //reserve memory for packing
-  int64_t l_reserved_size = m_size_packing_left * m_num_cached_ptrs_left + m_size_packing_right * m_num_cached_ptrs_right;
-  if( m_memory != nullptr ){
-    m_memory->reserve_thread_memory( l_reserved_size, m_num_threads );
-  }else if( l_reserved_size > 0 ){
-    return err_t::COMPILATION_FAILED;
-  }
-
   //multiply strides by size of datatype 
   for(int64_t l_id = 0; l_id < l_num_iters; l_id++){
     m_strides_left[l_id]    *= ce_n_bytes(m_dtype_left );
@@ -195,6 +187,17 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionBackend::compile(){
 
   if( l_err != err_t::SUCCESS ) {
     return l_err;
+  }
+
+  m_num_cached_ptrs_left = m_iter.get_caching_size();
+  m_num_cached_ptrs_right = m_iter.get_caching_size();
+
+  //reserve memory for packing
+  int64_t l_reserved_size = m_size_packing_left * m_num_cached_ptrs_left + m_size_packing_right * m_num_cached_ptrs_right;
+  if( m_memory != nullptr ){
+    m_memory->reserve_thread_memory( l_reserved_size, m_num_threads );
+  }else if( l_reserved_size > 0 ){
+    return err_t::COMPILATION_FAILED;
   }
 
   m_is_compiled = true;

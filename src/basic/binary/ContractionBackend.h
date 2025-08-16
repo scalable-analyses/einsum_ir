@@ -64,9 +64,9 @@ class einsum_ir::basic::ContractionBackend {
     int64_t m_packing_right_id = -1;
 
     //! number of cached pointers for left input tensor
-    const static int64_t m_num_cached_ptrs_left  = 1;
+    int64_t m_num_cached_ptrs_left  = 1;
     //! number of cached pointers for right input tensor
-    const static int64_t m_num_cached_ptrs_right = 1;
+    int64_t m_num_cached_ptrs_right = 1;
 
   protected:
     //! datatype of the left input

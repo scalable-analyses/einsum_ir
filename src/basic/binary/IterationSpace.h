@@ -127,6 +127,14 @@ class einsum_ir::basic::IterationSpace {
                  std::vector< int64_t >   & io_strides_out_aux,
                  std::vector< int64_t >   & io_strides_out,
                  std::vector<thread_info> & io_thread_infos );
+
+    /**
+     * Simple function to determine if caching of values could be advantageous.
+     *
+     * @return 1 (don't use extra memory) if no advantage, 2 (cache two values) otherwise.
+     **/
+    int64_t get_caching_size();
+
 };
 
 #endif
