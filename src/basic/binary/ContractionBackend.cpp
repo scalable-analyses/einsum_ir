@@ -283,7 +283,7 @@ void einsum_ir::basic::ContractionBackend::contract_iter( thread_info   * i_thre
     const char * l_ptr_right_active = i_ptr_right;
     if( m_packing_right_id == l_id_next_loop )  {
       int64_t l_id = l_id_n % m_num_cached_ptrs_right;
-      l_ptr_right_active = i_thread_inf->memory_right + l_id * m_size_packing_left;
+      l_ptr_right_active = i_thread_inf->memory_right + l_id * m_size_packing_right;
       if( i_ptr_right != i_thread_inf->cached_ptrs_right[l_id]){
         m_unary_right.contract(i_ptr_right, (void *)l_ptr_right_active);
         i_thread_inf->cached_ptrs_right[l_id] = i_ptr_right;
