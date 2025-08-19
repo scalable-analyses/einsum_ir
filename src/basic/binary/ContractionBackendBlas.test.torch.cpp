@@ -53,6 +53,7 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction backend implementation
                     kernel_t::ZERO,
                     kernel_t::MADD,
                     kernel_t::UNDEFINED_KTYPE,
+                    2,
                     2 );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
@@ -120,7 +121,8 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction backend implementation
                     kernel_t::ZERO,
                     kernel_t::MADD,
                     kernel_t::UNDEFINED_KTYPE,
-                    3 );                        
+                    3,
+                    2 );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
 
@@ -191,7 +193,8 @@ TEST_CASE( "Simple batched FP64 matmul using the BLAS contraction backend implem
                     kernel_t::UNDEFINED_KTYPE,
                     kernel_t::MADD,
                     kernel_t::UNDEFINED_KTYPE,
-                    4 );                        
+                    4,
+                    1 );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
 
@@ -269,7 +272,8 @@ TEST_CASE( "FP32 tensor contraction using the BLAS contraction backend implement
                     kernel_t::ZERO,
                     kernel_t::MADD,
                     kernel_t::UNDEFINED_KTYPE,
-                    5 );                        
+                    5,
+                    4 );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
 
@@ -340,7 +344,8 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction backend impleme
                     kernel_t::COPY,
                     kernel_t::PACKED_MADD,
                     kernel_t::COPY,
-                    6 );                        
+                    6,
+                    3 );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
 
@@ -422,7 +427,8 @@ TEST_CASE( "FP32 packed tensor contraction using the BLAS contraction backend im
                     kernel_t::ZERO,
                     kernel_t::PACKED_MADD,
                     kernel_t::COPY,
-                    7 );                        
+                    7,
+                    5 );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
   

@@ -54,6 +54,17 @@ class einsum_ir::basic::ContractionOptimizer {
     //! indicates if backend supports packed gemms
     packed_gemm_t m_packed_gemm_support = packed_gemm_t::NONE;
 
+    //! pointer to number of threads in m dimension
+    int64_t * m_num_threads_m = nullptr;
+
+    //! pointer to number of threads in n dimension
+    int64_t * m_num_threads_n = nullptr;
+
+    //! size of the sfc in m dimension
+    int64_t m_size_sfc_m = 1;
+
+    //! size of the sfc in n dimension
+    int64_t m_size_sfc_n = 1;
 
     /**
       * Finds all iters with a specific stride in the iteration space.
@@ -124,8 +135,9 @@ class einsum_ir::basic::ContractionOptimizer {
      * @param i_dim_type dimension type of iters to move.
      * @param i_new_exec_t execution type after moving.
      *
+     * @return returns the size of all moved iters.
      **/
-    void move_iters_until( std::vector<iter_property> * i_dest_iters,
+    int64_t move_iters_until( std::vector<iter_property> * i_dest_iters,
                               int64_t                      i_target_size,
                               dim_t                        i_dim_type,
                               exec_t                       i_new_exec_t );
@@ -155,6 +167,8 @@ class einsum_ir::basic::ContractionOptimizer {
      * @param i_packed_gemm_support indicates the support level for packed gemms
      * @param i_num_bytes_scalar_out number of bytes for scalar data types in output tensor
      * @param i_l2_cache_size size of L2 cache in bytes
+     * @param o_num_threads_m number of threads used for sfc m parallelization.
+     * @param o_num_threads_n number of threads used for sfc n parallelization.
      **/
     void init( std::vector< iter_property > * i_iter_space,
                kernel_t                     * i_ktype_main,
@@ -165,7 +179,9 @@ class einsum_ir::basic::ContractionOptimizer {
                bool                           i_br_gemm_support,
                packed_gemm_t                  i_packed_gemm_support,                  
                int64_t                        i_num_bytes_scalar_out,
-               int64_t                        i_l2_cache_size );    
+               int64_t                        i_l2_cache_size,
+               int64_t                      * o_num_threads_m,
+               int64_t                      * o_num_threads_n  );    
   
     /**
      * Optimizes the iters.

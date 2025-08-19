@@ -1,7 +1,7 @@
 #include "catch.hpp"
 #include "IterationSpace.h"
 
-TEST_CASE( "Threading test for Iteration Space with SFC+OMP, 3 threads and broadcast of scalar value.", "[iter_space_sfc]" ) {
+TEST_CASE( "Threading test for Iteration Space with SFC, 3 threads and broadcast of scalar value.", "[iter_space_sfc]" ) {
   //example: [c1,m2,k2,k1,m1],[c1,n2,k2,n1,k1]->[c1,n2,m2,n1,m1]
   //sizes:   [ 2, 3, 5, 2, 2],[ 2, 4, 5, 2, 2]->[ 2, 4, 3, 2, 2]
   //strides: [60,20, 4, 2, 1],[80,20, 4, 2, 1]->[48,12, 4, 2, 1]
@@ -14,7 +14,7 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP, 3 threads and broad
                                              dim_t::M, 
                                              dim_t::N, 
                                              dim_t::K };
-  std::vector< exec_t > l_loop_exec_type = { exec_t::OMP, 
+  std::vector< exec_t > l_loop_exec_type = { exec_t::SEQ, 
                                              exec_t::SFC, 
                                              exec_t::SFC, 
                                              exec_t::SEQ, 
@@ -34,7 +34,8 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP, 3 threads and broad
   l_iter.init( &l_loop_dim_type,
                &l_loop_exec_type,
                &l_loop_sizes,
-               l_num_threads );     
+               l_num_threads,
+               1 );     
 
   std::vector<thread_info> m_thread_infos;
   err_t l_err = l_iter.setup( l_loop_strides_left,
@@ -49,7 +50,7 @@ TEST_CASE( "Threading test for Iteration Space with SFC+OMP, 3 threads and broad
   for(int64_t l_thread_id = 0; l_thread_id < l_num_threads; l_thread_id++ ){
     l_num_tasks += m_thread_infos[l_thread_id].movement_ids.size();
   } 
-  REQUIRE( l_num_tasks  == 2*3*4);
+  REQUIRE( l_num_tasks  == 3*4);
 
   //create 4 arrays of size 1 to obtain random pointers
   char l_ptr_start_left [] = {0};
@@ -130,7 +131,8 @@ TEST_CASE( "Threading test for OMP only Iteration Space, 5 threads and auxiliary
   l_iter.init( &l_loop_dim_type,
                &l_loop_exec_type,
                &l_loop_sizes,
-               l_num_threads );     
+               l_num_threads,
+               1 );     
 
   std::vector<thread_info> m_thread_infos;
   err_t l_err = l_iter.setup( l_loop_strides_left,
@@ -193,7 +195,7 @@ TEST_CASE( "Threading test for OMP only Iteration Space, 5 threads and auxiliary
   }
 }
 
-TEST_CASE( "Threading test for SFC only Iteration Space with 1 thread and no bias tensor.", "[iter_space_sfc]" ) {
+TEST_CASE( "Threading test for SFC only Iteration Space with 20 thread and no bias tensor.", "[iter_space_sfc]" ) {
   //example: [m2,k2,k1,m1],[n3,n2,k2,n1,k1]->[n3,n2,m2,n1,m1]
   //sizes:   [ 3, 5, 2, 2],[ 2, 4, 5, 2, 2]->[ 2, 4, 3, 2, 2]
   //strides: [20, 4, 2, 1],[80,20, 4, 2, 1]->[48,12, 4, 2, 1]
@@ -221,12 +223,13 @@ TEST_CASE( "Threading test for SFC only Iteration Space with 1 thread and no bia
   std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0, 0, 0, 0 };
   std::vector< int64_t > l_loop_strides_out     = {  4,48,12, 0, 2, 1, 0 };
 
-  int64_t l_num_threads = 1;
+  int64_t l_num_threads = 5*4;
   IterationSpace l_iter;
   l_iter.init( &l_loop_dim_type,
                &l_loop_exec_type,
                &l_loop_sizes,
-               l_num_threads );     
+               5,
+               4 );     
 
   std::vector<thread_info> m_thread_infos;
   err_t l_err = l_iter.setup( l_loop_strides_left,

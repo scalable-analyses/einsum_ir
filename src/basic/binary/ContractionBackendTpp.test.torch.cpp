@@ -45,6 +45,7 @@ TEST_CASE( "Matmul with sequential batch dimension.", "[contraction_backend]" ) 
                kernel_t::ZERO,
                kernel_t::MADD,
                kernel_t::UNDEFINED_KTYPE,
+               2,
                2 );     
                 
   err_t l_err = l_cont.compile();
@@ -105,7 +106,8 @@ TEST_CASE( "Packed Matmul with sequential M dimension.", "[contraction_backend]"
                kernel_t::ZERO,
                kernel_t::PACKED_MADD,
                kernel_t::UNDEFINED_KTYPE,
-               3 );     
+               3,
+               2 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -162,7 +164,8 @@ TEST_CASE( "Matmul with sequential batch dimension and transposed B.", "[contrac
                kernel_t::ZERO,
                kernel_t::MADD,
                kernel_t::UNDEFINED_KTYPE,
-               4 );     
+               4,
+               1 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -220,7 +223,8 @@ TEST_CASE( "Simple Matmul with sequential batch dimension and transposed A.", "[
                kernel_t::ZERO,
                kernel_t::MADD,
                kernel_t::UNDEFINED_KTYPE,
-               5 );     
+               5,
+               4 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -279,7 +283,8 @@ TEST_CASE( "Single call of batch reduce matmul.", "[contraction_backend]" ) {
                kernel_t::ZERO,
                kernel_t::BR_MADD,
                kernel_t::UNDEFINED_KTYPE,
-               6 );     
+               6,
+               3 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -338,7 +343,8 @@ TEST_CASE( "Tensor contraction with omp parallelisation.", "[contraction_backend
                kernel_t::ZERO,
                kernel_t::MADD,
                kernel_t::UNDEFINED_KTYPE,
-               7 );     
+               7,
+               5 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -404,7 +410,8 @@ TEST_CASE( "Blocked matmul with omp parallelisation.", "[contraction_backend]" )
                kernel_t::ZERO,
                kernel_t::MADD,
                kernel_t::UNDEFINED_KTYPE,
-               8 );     
+               8,
+               1 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -464,7 +471,8 @@ TEST_CASE( "Tensor contraction with SFC parallelisation.", "[contraction_backend
                kernel_t::ZERO,
                kernel_t::MADD,
                kernel_t::UNDEFINED_KTYPE,
-               9 );     
+               9,
+               3 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -527,7 +535,8 @@ TEST_CASE( "Tensor contraction with SFC and omp parallelisation.", "[contraction
                kernel_t::ZERO,
                kernel_t::MADD,
                kernel_t::UNDEFINED_KTYPE,
-               10 );     
+               10,
+               2 );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -605,6 +614,7 @@ TEST_CASE( "Tensor contraction with packing of left tensor and SFC parallelisati
                kernel_t::MADD,
                kernel_t::UNDEFINED_KTYPE,
                10,
+               5,
                &l_mem );
       
   err_t l_err = l_cont.compile();
@@ -688,6 +698,7 @@ TEST_CASE( "Tensor contraction with packing of both tensors and SFC parallelisat
                kernel_t::MADD,
                kernel_t::UNDEFINED_KTYPE,
                10,
+               7,
                &l_mem );
       
   err_t l_err = l_cont.compile();

@@ -6,6 +6,8 @@
 #include <omp.h>
 #endif
 
+#include <iostream>
+
 void einsum_ir::basic::ContractionBackend::init( std::vector< dim_t >   const & i_dim_type,
                                                  std::vector< exec_t >  const & i_exec_type,
                                                  std::vector< int64_t > const & i_dim_sizes,
@@ -20,7 +22,8 @@ void einsum_ir::basic::ContractionBackend::init( std::vector< dim_t >   const & 
                                                  kernel_t                       i_ktype_first_touch,
                                                  kernel_t                       i_ktype_main,
                                                  kernel_t                       i_ktype_last_touch,
-                                                 int64_t                        i_num_threads ){
+                                                 int64_t                        i_num_threads_m,
+                                                 int64_t                        i_num_threads_n ){
 
   //copy to local variables
   m_dim_type        = i_dim_type;
@@ -40,7 +43,9 @@ void einsum_ir::basic::ContractionBackend::init( std::vector< dim_t >   const & 
   m_ktype_main        = i_ktype_main;
   m_ktype_last_touch  = i_ktype_last_touch;
 
-  m_num_threads = i_num_threads;
+  m_num_threads_m = i_num_threads_m;
+  m_num_threads_n = i_num_threads_n;
+  m_num_threads = m_num_threads_m * m_num_threads_n;
 
   m_is_compiled = false;
 }
@@ -53,8 +58,10 @@ void einsum_ir::basic::ContractionBackend::init( std::vector< iter_property > co
                                                  kernel_t                             i_ktype_first_touch,
                                                  kernel_t                             i_ktype_main,
                                                  kernel_t                             i_ktype_last_touch,
-                                                 int64_t                              i_num_threads,
+                                                 int64_t                              i_num_threads_m,
+                                                 int64_t                              i_num_threads_n,
                                                  ContractionMemoryManager           * i_contraction_mem ){
+
 
   size_t l_num_iters = i_iterations.size();
   m_dim_type.resize(l_num_iters);
@@ -88,7 +95,10 @@ void einsum_ir::basic::ContractionBackend::init( std::vector< iter_property > co
   m_ktype_main        = i_ktype_main;
   m_ktype_last_touch  = i_ktype_last_touch;
 
-  m_num_threads = i_num_threads;
+  m_num_threads_m = i_num_threads_m;
+  m_num_threads_n = i_num_threads_n;
+  m_num_threads = m_num_threads_m * m_num_threads_n;
+
   m_memory = i_contraction_mem;
 
   m_is_compiled = false;
@@ -176,7 +186,8 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionBackend::compile(){
   m_iter.init( &m_dim_type,
                &m_exec_type,
                &m_dim_sizes,
-               m_num_threads );
+               m_num_threads_m,
+               m_num_threads_n );
 
   // compile iteration spaces
   l_err = m_iter.setup( m_strides_left,
@@ -191,6 +202,8 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionBackend::compile(){
 
   m_num_cached_ptrs_left = m_iter.get_caching_size();
   m_num_cached_ptrs_right = m_iter.get_caching_size();
+  std::cout << "using " << m_num_cached_ptrs_left << " cached pointers for left tensor and "
+            << m_num_cached_ptrs_right << " cached pointers for right tensor." << std::endl;
 
   //reserve memory for packing
   int64_t l_reserved_size = m_size_packing_left * m_num_cached_ptrs_left + m_size_packing_right * m_num_cached_ptrs_right;
@@ -213,6 +226,7 @@ void einsum_ir::basic::ContractionBackend::contract( void const * i_tensor_left,
 #endif
   for( int64_t l_thread_id = 0; l_thread_id < m_num_threads; l_thread_id++ ) {
     thread_info * l_thread_inf = &m_thread_infos[l_thread_id];
+
     //get packing memory
     if( m_size_packing_left || m_size_packing_right ){
       l_thread_inf->memory_left  = m_memory->get_thread_memory( l_thread_id );
@@ -222,14 +236,26 @@ void einsum_ir::basic::ContractionBackend::contract( void const * i_tensor_left,
     }
 
     //contract
-    contract_iter( l_thread_inf,
-                   0,
-                   (char *) i_tensor_left    + l_thread_inf->offset_left,
-                   (char *) i_tensor_right   + l_thread_inf->offset_right,
-                   (char *) i_tensor_out_aux + l_thread_inf->offset_out_aux,
-                   (char *) io_tensor_out    + l_thread_inf->offset_out,
-                   m_has_first_touch,
-                   m_has_last_touch );
+    if( m_id_first_parallel_loop == 0 ){
+      contract_iter_sfc( l_thread_inf,
+                         0,
+                         (char *) i_tensor_left    + l_thread_inf->offset_left,
+                         (char *) i_tensor_right   + l_thread_inf->offset_right,
+                         (char *) i_tensor_out_aux + l_thread_inf->offset_out_aux,
+                         (char *) io_tensor_out    + l_thread_inf->offset_out,
+                         m_has_first_touch,
+                         m_has_last_touch );
+    }
+    else{
+      contract_iter( l_thread_inf,
+                    0,
+                    (char *) i_tensor_left    + l_thread_inf->offset_left,
+                    (char *) i_tensor_right   + l_thread_inf->offset_right,
+                    (char *) i_tensor_out_aux + l_thread_inf->offset_out_aux,
+                    (char *) io_tensor_out    + l_thread_inf->offset_out,
+                    m_has_first_touch,
+                    m_has_last_touch );
+    }
   }
 }
 
@@ -244,32 +270,110 @@ void einsum_ir::basic::ContractionBackend::contract_iter( thread_info   * i_thre
   bool l_first_access = i_first_access;
   bool l_last_access  = i_last_access;
 
-  int64_t l_current_id = i_id_loop;
-  int64_t l_direction = 1;
-
   int64_t l_size = m_dim_sizes[i_id_loop];
   int64_t l_id_next_loop = i_id_loop + 1;
-  if( i_id_loop == m_id_first_parallel_loop ){
-    l_id_next_loop = i_id_loop + m_num_parallel_loops;
-    l_size = i_thread_inf->movement_ids.size();
-  }
-
-  uint64_t l_id_m = 0x7FFFFFFFFFFFFFFF;
-  uint64_t l_id_n = 0x7FFFFFFFFFFFFFFF;
 
   // issue loop iterations
   for( int64_t l_it = 0; l_it < l_size; l_it++ ) {
+
+    //determine if this is the first or last access in the k dimension
     bool l_non_k_loop = m_dim_type[i_id_loop] != dim_t::K;
-    l_first_access = i_first_access && ( l_non_k_loop || l_it == 0 );
+    l_first_access = i_first_access && ( l_non_k_loop || l_it == 0);
     l_last_access  = i_last_access  && ( l_non_k_loop || l_it == m_dim_sizes[i_id_loop] - 1 );
 
-    //calculate sfc current id and direction
-    if( i_id_loop == m_id_first_parallel_loop ){
-      sfc_t l_move =  i_thread_inf->movement_ids[l_it];
-      sfc_t l_sign = (l_move & 1);
-      l_direction  = 1 - ( (int64_t)l_sign << 1); 
-      l_current_id = l_move >> 1;
+    //pack left tensor
+    const char * l_ptr_left_active = i_ptr_left;
+    if( m_packing_left_id == l_id_next_loop )  {
+      l_ptr_left_active = i_thread_inf->memory_left;
+      m_unary_left.contract(i_ptr_left, (void *)l_ptr_left_active);
     }
+
+    //pack right tensor
+    const char * l_ptr_right_active = i_ptr_right;
+    if( m_packing_right_id == l_id_next_loop )  {
+      l_ptr_right_active = i_thread_inf->memory_right;
+      m_unary_right.contract(i_ptr_right, (void *)l_ptr_right_active);
+    }
+  
+    //recursive function call
+    if( l_id_next_loop ==  m_id_first_parallel_loop ){
+      contract_iter_sfc( i_thread_inf,
+                         l_id_next_loop,
+                         i_ptr_left,
+                         i_ptr_right,
+                         i_ptr_out_aux,
+                         i_ptr_out,
+                         l_first_access,
+                         l_last_access );
+    }
+    else if( l_id_next_loop < m_id_first_primitive_dim ) {
+      contract_iter( i_thread_inf,
+                     l_id_next_loop,
+                     l_ptr_left_active,
+                     l_ptr_right_active,
+                     i_ptr_out_aux,
+                     i_ptr_out,
+                     l_first_access,
+                     l_last_access );
+    }
+    // execute main kernel
+    else {
+      if( l_first_access ) {
+        kernel_first_touch( i_ptr_out_aux,
+                            i_ptr_out );
+      }
+
+      kernel_main( l_ptr_left_active,
+                   l_ptr_right_active,
+                   i_ptr_out );
+      
+      if( l_last_access ) {
+        kernel_last_touch( i_ptr_out_aux,
+                           i_ptr_out );
+      }
+    }
+
+    //update pointer
+    i_ptr_left    += m_strides_left[    i_id_loop ];
+    i_ptr_right   += m_strides_right[   i_id_loop ];
+    i_ptr_out_aux += m_strides_out_aux[ i_id_loop ];
+    i_ptr_out     += m_strides_out[     i_id_loop ];
+  }
+}
+
+void einsum_ir::basic::ContractionBackend::contract_iter_sfc( thread_info   * i_thread_inf,
+                                                              int64_t         i_id_loop,
+                                                              char    const * i_ptr_left,
+                                                              char    const * i_ptr_right,
+                                                              char    const * i_ptr_out_aux,
+                                                              char          * i_ptr_out,
+                                                              bool            i_first_access,
+                                                              bool            i_last_access ) {
+  bool l_first_access = i_first_access;
+  bool l_last_access  = i_last_access;
+
+  int64_t l_current_id = i_id_loop;
+  int64_t l_direction = 0;
+
+  int64_t l_id_next_loop = i_id_loop + m_num_parallel_loops;
+  int64_t l_size = i_thread_inf->movement_ids.size();
+
+  // issue loop iterations
+  uint64_t l_id_m = 0;
+  uint64_t l_id_n = 0;
+  for( int64_t l_it = 0; l_it < l_size; l_it++ ) {
+
+    //determine if this is the first or last access in the k dimension
+    l_first_access = i_first_access && ( i_thread_inf->k_count[l_id_m + l_id_n * i_thread_inf->sfc_size_m] == 0 );
+    l_last_access  = i_last_access  && ( i_thread_inf->k_count[l_id_m + l_id_n * i_thread_inf->sfc_size_m] == i_thread_inf->sfc_size_k - 1 );
+    i_thread_inf->k_count[l_id_m + l_id_n * i_thread_inf->sfc_size_m]++;
+    i_thread_inf->k_count[l_id_m + l_id_n * i_thread_inf->sfc_size_m] %= i_thread_inf->sfc_size_k;
+
+    //get dimension and direction from sfc
+    sfc_t l_move =  i_thread_inf->movement_ids[l_it];
+    sfc_t l_sign = (l_move & 1);
+    l_direction  = 1 - ( (int64_t)l_sign << 1); 
+    l_current_id = l_move >> 1;
 
     //pack left tensor
     const char * l_ptr_left_active = i_ptr_left;
@@ -292,7 +396,8 @@ void einsum_ir::basic::ContractionBackend::contract_iter( thread_info   * i_thre
         i_thread_inf->cached_ptrs_right[l_id] = i_ptr_right;
       }
     }
-
+    
+    //recursive function call
     if( l_id_next_loop < m_id_first_primitive_dim ) {
       contract_iter( i_thread_inf,
                      l_id_next_loop,
@@ -303,12 +408,12 @@ void einsum_ir::basic::ContractionBackend::contract_iter( thread_info   * i_thre
                      l_first_access,
                      l_last_access );
     }
+    // execute main kernel
     else {
       if( l_first_access ) {
         kernel_first_touch( i_ptr_out_aux,
                             i_ptr_out );
       }
-      // execute main kernel
       kernel_main( l_ptr_left_active,
                    l_ptr_right_active,
                    i_ptr_out );
@@ -319,17 +424,15 @@ void einsum_ir::basic::ContractionBackend::contract_iter( thread_info   * i_thre
       }
     }
 
+    //update m and n ids
+    l_id_m += l_direction * (m_dim_type[l_current_id] == dim_t::M);
+    l_id_n += l_direction * (m_dim_type[l_current_id] == dim_t::N);
+
     //update pointer
     i_ptr_left    += l_direction * m_strides_left[    l_current_id ];
     i_ptr_right   += l_direction * m_strides_right[   l_current_id ];
     i_ptr_out_aux += l_direction * m_strides_out_aux[ l_current_id];
     i_ptr_out     += l_direction * m_strides_out[     l_current_id ];
-
-    bool l_is_m_loop = m_dim_type[l_current_id] == dim_t::M;
-    bool l_is_n_loop = m_dim_type[l_current_id] == dim_t::N;
-
-    l_id_m += l_direction * l_is_m_loop;
-    l_id_n += l_direction * l_is_n_loop;
   }
 }
 

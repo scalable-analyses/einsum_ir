@@ -51,6 +51,7 @@ TEST_CASE( "Simple FP32 matmul using the Scalar contraction backend implementati
                    kernel_t::UNDEFINED_KTYPE,
                    kernel_t::MADD,
                    kernel_t::UNDEFINED_KTYPE,
+                   2,
                    2 );   
   // data
   at::Tensor l_in_left  = at::rand( {4, 2} );
@@ -121,7 +122,8 @@ TEST_CASE( "Matrix-matrix multiplication with a full-tensor bias using the Scala
                    kernel_t::COPY,
                    kernel_t::MADD,
                    kernel_t::UNDEFINED_KTYPE,
-                   3 );  
+                   3,
+                   2 );  
 
   // data
   at::Tensor l_in_left  = at::rand( {4, 2} );
@@ -195,7 +197,8 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (scalar to matrix bcast) us
                    kernel_t::COPY,
                    kernel_t::MADD,
                    kernel_t::UNDEFINED_KTYPE,
-                   4 );
+                   4,
+                   1 );
 
   // data
   at::Tensor l_in_left  = at::rand( {4, 2} );
@@ -269,7 +272,8 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (row to matrix bcast) using
                    kernel_t::COPY,
                    kernel_t::MADD,
                    kernel_t::UNDEFINED_KTYPE,
-                   5 );
+                   5,
+                   4 );
   // data
   at::Tensor l_in_left  = at::rand( {4, 2} );
   at::Tensor l_in_right = at::rand( {3, 4} );
@@ -342,7 +346,8 @@ TEST_CASE( "Matrix-matrix multiplication with a bias (column to matrix bcast) us
                    kernel_t::COPY,
                    kernel_t::MADD,
                    kernel_t::UNDEFINED_KTYPE,
-                   6 );
+                   6,
+                   3 );
 
   // data
   at::Tensor l_in_left  = at::rand( {4, 2} );
@@ -444,7 +449,8 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions using the Scal
                    kernel_t::UNDEFINED_KTYPE,
                    kernel_t::MADD,
                    kernel_t::UNDEFINED_KTYPE,
-                   7 );
+                   7,
+                   5 );
 
   //                                0  1  2  3  4  5  6
   //                                y  g  c  x  a  e  i
@@ -548,7 +554,8 @@ TEST_CASE( "Binary contraction involving C, M, N and K dimensions using FP64, ze
                    kernel_t::ZERO,
                    kernel_t::MADD,
                    kernel_t::RELU,
-                   8 );
+                   8,
+                   1 );
 
   //                                0  1  2  3  4  5  6
   //                                y  g  c  x  a  e  i

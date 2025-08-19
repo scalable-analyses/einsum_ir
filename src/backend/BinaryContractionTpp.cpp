@@ -1,6 +1,8 @@
 #include "BinaryContractionTpp.h"
 #include "../basic/binary/ContractionOptimizer.h"
 
+#include <iostream>
+
 einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   err_t l_err = err_t::UNDEFINED_ERROR;
 
@@ -79,6 +81,8 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
   //optimize loops
   einsum_ir::basic::ContractionOptimizer l_optim;
 
+  int64_t l_num_threads_m = 1;
+  int64_t l_num_threads_n = 1;
   l_optim.init(&l_loops,
                &l_ktype_main,
                m_num_threads,
@@ -88,13 +92,28 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                true,
                basic::packed_gemm_t::ALL_STRIDE_ONE,
                ce_n_bytes(m_dtype_out),
-               m_l2_cache_size );
+               m_l2_cache_size,
+               &l_num_threads_m,
+               &l_num_threads_n );
   l_optim.optimize();
 
   einsum_ir::basic::ContractionMemoryManager * l_contraction_memory = nullptr;
   if( m_memory != nullptr ){
     l_contraction_memory = m_memory->get_contraction_memory_manager();
   }
+
+  //print optimized loops
+  std::cout << "Optimized loops:" << std::endl;
+  for( const auto & l_loop : l_loops ){
+    std::cout << "  " << l_loop.dim_type << " " 
+              << l_loop.exec_type << " "
+              << l_loop.size << " "
+              << l_loop.stride_left << " "
+              << l_loop.stride_right << " "
+              << l_loop.stride_out_aux << " "
+              << l_loop.stride_out << std::endl;
+  }
+  
 
   //compile backend
   m_backend.init( l_loops,
@@ -105,8 +124,10 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionTpp::compile() {
                   l_ktype_first_touch,
                   l_ktype_main,
                   l_ktype_last_touch,
-                  m_num_threads,
+                  l_num_threads_m,
+                  l_num_threads_n,
                   l_contraction_memory );
+
   
   l_err = ce_basic_err_to_err(m_backend.compile());
   if( l_err != err_t::SUCCESS ) {

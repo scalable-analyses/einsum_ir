@@ -30,7 +30,20 @@ TEST_CASE( "Simple test for Contraction Optimizer", "[contraction_optimizer]" ) 
     }
   }
 
-  l_opt.init( &l_iters, &l_kernel_main, 1, 16, 64, 256, false, packed_gemm_t::ALL_STRIDE_ONE, 4, 1024 * 1024 );  
+  int64_t l_num_threads_m = 0;
+  int64_t l_num_threads_n = 0;
+  l_opt.init( &l_iters, 
+              &l_kernel_main, 
+              1, 
+              16, 
+              64, 
+              256, 
+              false, 
+              packed_gemm_t::ALL_STRIDE_ONE, 
+              4, 
+              1024 * 1024, 
+              &l_num_threads_m, 
+              &l_num_threads_n  );  
 
   l_opt.optimize();
 
@@ -96,7 +109,20 @@ TEST_CASE( "Matmul blocking test for Contraction Optimizer", "[contraction_optim
     }
   }
 
-  l_opt.init( &l_iters, &l_kernel_main, 72, 16, 64, 256, false, packed_gemm_t::NONE, 4, 1024 * 1024 );  
+  int64_t l_num_threads_m = 0;
+  int64_t l_num_threads_n = 0;
+  l_opt.init( &l_iters, 
+              &l_kernel_main, 
+              72, 
+              16, 
+              64, 
+              256, 
+              false, 
+              packed_gemm_t::NONE, 
+              4, 
+              1024 * 1024, 
+              &l_num_threads_m, 
+              &l_num_threads_n  );  
 
   l_opt.optimize();
 
@@ -162,7 +188,20 @@ TEST_CASE( "Test of Contraction Optimizer for transposed kernel", "[contraction_
     }
   }
 
-  l_opt.init( &l_iters, &l_kernel_main, 72, 16, 64, 256, false, packed_gemm_t::OUT_STRIDE_ONE, 4, 1024 * 1024 );  
+  int64_t l_num_threads_m = 0;
+  int64_t l_num_threads_n = 0;
+  l_opt.init( &l_iters, 
+              &l_kernel_main, 
+              72, 
+              16, 
+              64, 
+              256, 
+              false, 
+              packed_gemm_t::OUT_STRIDE_ONE, 
+              4, 
+              1024 * 1024, 
+              &l_num_threads_m, 
+              &l_num_threads_n );  
 
   l_opt.optimize();
 

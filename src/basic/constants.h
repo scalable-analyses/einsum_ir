@@ -70,6 +70,10 @@ namespace einsum_ir {
       char    * memory_left    = nullptr;
       char    * memory_right   = nullptr;
 
+      int64_t sfc_size_m = 0;
+      int64_t sfc_size_n = 0;
+      int64_t sfc_size_k = 0;
+      std::vector<int32_t> k_count;
       std::vector<sfc_t>   movement_ids;
       std::vector<const char *> cached_ptrs_left;
       std::vector<const char *> cached_ptrs_right;

@@ -1,6 +1,7 @@
 #include "ContractionOptimizer.h"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 void einsum_ir::basic::ContractionOptimizer::init( std::vector< iter_property > * i_iter_space,
                                                    kernel_t                     * i_ktype_main,
@@ -11,7 +12,9 @@ void einsum_ir::basic::ContractionOptimizer::init( std::vector< iter_property > 
                                                    bool                           i_br_gemm_support,
                                                    packed_gemm_t                  i_packed_gemm_support,
                                                    int64_t                        i_num_bytes_scalar_out,
-                                                   int64_t                        i_l2_cache_size ){
+                                                   int64_t                        i_l2_cache_size,
+                                                   int64_t                      * o_num_threads_m,
+                                                   int64_t                      * o_num_threads_n ){
   m_iter_space = i_iter_space;
   m_ktype_main = i_ktype_main;
   m_num_threads = i_num_threads;
@@ -28,9 +31,25 @@ void einsum_ir::basic::ContractionOptimizer::init( std::vector< iter_property > 
   m_num_bytes_scalar_out = i_num_bytes_scalar_out;
   m_l2_cache_size = i_l2_cache_size;
 
+  m_num_threads_m = o_num_threads_m;
+  m_num_threads_n = o_num_threads_n;
+
   //small power of 2 to avoid extra overhead and still utilise the stride one dimension to some extend
   //heuristic right now, could choose this parameter architecture dependent
   m_target_extra_packing = 16;
+}
+
+void get_divisors( int64_t i_num, 
+                   std::vector<int64_t> & o_divisors ){
+  o_divisors.clear();
+  for( int64_t l_i = 1; l_i <= (int64_t)std::sqrt(i_num); l_i++ ){
+    if( i_num % l_i == 0 ){
+      o_divisors.push_back(l_i);
+      if( l_i != i_num / l_i ){
+        o_divisors.push_back(i_num / l_i);
+      }
+    }
+  }
 }
 
 einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::optimize(){
@@ -51,6 +70,40 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::optimize(){
 
   // reoders and parallelizes the remaining iteration space
   reorder_and_parallelize_iters();
+
+  std::vector<int64_t> l_divisors;
+  get_divisors( m_num_threads, l_divisors);
+  float l_best_performance = 0;
+  int64_t l_best_threads_m = 1;
+  for( size_t l_id = 0; l_id < l_divisors.size(); l_id++ ){
+    int64_t l_potential_threads_m = l_divisors[l_id];
+    int64_t l_potential_threads_n = m_num_threads / l_potential_threads_m;
+
+    int64_t l_tasks_m = (m_size_sfc_m + l_potential_threads_m - 1) / l_potential_threads_m;
+    int64_t l_tasks_n = (m_size_sfc_n + l_potential_threads_n - 1) / l_potential_threads_n;
+    float l_avg_task_m = m_size_sfc_m / (float)l_potential_threads_m;
+    float l_avg_task_n = m_size_sfc_n / (float)l_potential_threads_n;
+
+    //try to achive equal size of task in n and m dimension
+    //l_performance *= std::min( l_tasks_m / (float)l_tasks_n, l_tasks_n / (float)l_tasks_m );
+    float l_performance = 1 - (std::abs(l_tasks_m -l_tasks_n) / (float)std::max(m_size_sfc_m, m_size_sfc_n));
+
+    //distribute threads to m and n dimension such that the threads have an equal number of tasks
+    l_performance *= l_avg_task_m / l_tasks_m;
+    l_performance *= l_avg_task_n / l_tasks_n;
+
+
+    if(l_best_performance < l_performance){
+      l_best_performance = l_performance;
+      l_best_threads_m = l_potential_threads_m;
+    }
+  }
+  *m_num_threads_m = l_best_threads_m;
+  *m_num_threads_n = m_num_threads / l_best_threads_m;
+  std::cout << "using " << *m_num_threads_m << " threads in m and " 
+            << *m_num_threads_n << " threads in n dimension for contraction with " 
+            << m_num_threads << " threads in total." << std::endl;
+
 
   return err_t::SUCCESS;
 }
@@ -435,6 +488,9 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::set_primitive_it
       && l_potential_kernel_iter[ PRIM_N ]->stride_right % 2048 == 0 ){
     l_packing_right = true;
   }
+  if( l_transpose_a ){
+    l_packing_left = true;
+  }
 
   //addapts the kernel targets depending on the potential kernel size
   set_kernel_targets_heuristic( l_potential_kernel_size, l_kernel_targets, l_iter_required );
@@ -590,18 +646,14 @@ void einsum_ir::basic::ContractionOptimizer::reorder_and_parallelize_iters(){
 
   //add parallel dimension
   std::vector<iter_property> l_blocking_iters;
-  move_iters_until( &l_blocking_iters, 
-                    l_target_parallel_n,
-                    dim_t::N,
-                    exec_t::SFC);
-  move_iters_until( &l_blocking_iters, 
-                    l_target_parallel_m,
-                    dim_t::M,
-                    exec_t::SFC);
-  move_iters_until( &l_blocking_iters, 
-                    l_target_parallel_c,
-                    dim_t::C,
-                    exec_t::OMP);
+  m_size_sfc_n = move_iters_until( &l_blocking_iters, 
+                                   l_target_parallel_n,
+                                   dim_t::N,
+                                   exec_t::SFC);
+  m_size_sfc_m = move_iters_until( &l_blocking_iters, 
+                                   l_target_parallel_m,
+                                   dim_t::M,
+                                   exec_t::SFC);
 
   //add sequential K dimension for L3 blocking
   move_iters_until( &l_blocking_iters, 
@@ -623,11 +675,12 @@ void einsum_ir::basic::ContractionOptimizer::reorder_and_parallelize_iters(){
   m_iter_space->insert(m_iter_space->end(), l_kernel_iters.begin(), l_kernel_iters.end() );
 }
 
-void einsum_ir::basic::ContractionOptimizer::move_iters_until( std::vector<iter_property> * i_dest_iters,
-                                                               int64_t                      i_target_size,
-                                                               dim_t                        i_dim_type, 
-                                                               exec_t                       i_new_exec_t ){
+int64_t einsum_ir::basic::ContractionOptimizer::move_iters_until( std::vector<iter_property> * i_dest_iters,
+                                                                  int64_t                      i_target_size,
+                                                                  dim_t                        i_dim_type, 
+                                                                  exec_t                       i_new_exec_t ){
 
+  int64_t l_size_total = 1;
   int64_t l_target_remaining = i_target_size;
   std::vector<iter_property>::iterator l_it;
   find_iter_with_dimtype( l_it, i_dim_type );
@@ -647,6 +700,7 @@ void einsum_ir::basic::ContractionOptimizer::move_iters_until( std::vector<iter_
     }
 
     //add iter to destination
+    l_size_total *= l_it->size;
     iter_property l_new_iter = *l_it;
     l_new_iter.exec_type = i_new_exec_t;
     i_dest_iters->insert(i_dest_iters->begin(), l_new_iter );
@@ -655,6 +709,8 @@ void einsum_ir::basic::ContractionOptimizer::move_iters_until( std::vector<iter_
 
     find_iter_with_dimtype( l_it, i_dim_type );
   }
+
+  return l_size_total;
 }
 
 void einsum_ir::basic::ContractionOptimizer::split_iter( std::vector<iter_property>::iterator i_iteration,
