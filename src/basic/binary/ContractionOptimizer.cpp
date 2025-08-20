@@ -36,7 +36,7 @@ void einsum_ir::basic::ContractionOptimizer::init( std::vector< iter_property > 
 
   //small power of 2 to avoid extra overhead and still utilise the stride one dimension to some extend
   //heuristic right now, could choose this parameter architecture dependent
-  m_target_extra_packing = 16;
+  m_target_extra_packing = 8;
 }
 
 void get_divisors( int64_t i_num, 
@@ -254,6 +254,13 @@ void einsum_ir::basic::ContractionOptimizer::set_kernel_targets_heuristic( int64
       io_kernel_targets[PRIM_M] /= 2;
     }
   }
+
+  //use extra values for packing if there is no reuse
+  if(   l_size_m / io_kernel_targets[PRIM_M] == 1 
+     || l_size_n / io_kernel_targets[PRIM_N] == 1){
+    m_target_extra_packing *= 2;
+  }
+
 }
 
 
@@ -491,6 +498,8 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::set_primitive_it
   if( l_transpose_a ){
     l_packing_left = true;
   }
+
+  std::cout << l_packing_left << " " << l_packing_right << std::endl;
 
   //addapts the kernel targets depending on the potential kernel size
   set_kernel_targets_heuristic( l_potential_kernel_size, l_kernel_targets, l_iter_required );

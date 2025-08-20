@@ -47,6 +47,11 @@ class einsum_ir::basic::IterationSpace {
     //! number of threads in sfc n dimension
     int64_t m_num_threads_n = 0;
 
+    //number of tasks in m dimension 
+    int64_t m_tasks_per_thread_m;
+    //number of tasks in n dimension 
+    int64_t m_tasks_per_thread_n;
+
     /**
      * Converts strides into offsets for sfc dimensions.
      *

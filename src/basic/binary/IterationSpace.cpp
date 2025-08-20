@@ -77,8 +77,8 @@ einsum_ir::basic::err_t einsum_ir::basic::IterationSpace::setup( std::vector< in
   //create thread infos
   int64_t l_num_threads = m_num_threads_m * m_num_threads_n;
   io_thread_infos.resize( l_num_threads );
-  int64_t l_tasks_per_thread_m   = (m_sfc_tasks_m + m_num_threads_m - 1) / m_num_threads_m;
-  int64_t l_tasks_per_thread_n   = (m_sfc_tasks_n + m_num_threads_n - 1) / m_num_threads_n;
+  m_tasks_per_thread_m   = (m_sfc_tasks_m + m_num_threads_m - 1) / m_num_threads_m;
+  m_tasks_per_thread_n   = (m_sfc_tasks_n + m_num_threads_n - 1) / m_num_threads_n;
   
 #ifdef _OPENMP
 #pragma omp parallel for num_threads(l_num_threads)
@@ -91,15 +91,15 @@ einsum_ir::basic::err_t einsum_ir::basic::IterationSpace::setup( std::vector< in
 
     //calculate begin and end for sfc m dimension 
     int64_t l_begin_m, l_end_m;
-    l_begin_m = l_thread_id_m * l_tasks_per_thread_m;
-    l_end_m   = l_begin_m     + l_tasks_per_thread_m;
+    l_begin_m = l_thread_id_m * m_tasks_per_thread_m;
+    l_end_m   = l_begin_m     + m_tasks_per_thread_m;
     l_begin_m = l_begin_m <= m_sfc_tasks_m ? l_begin_m : m_sfc_tasks_m;
     l_end_m   = l_end_m   <= m_sfc_tasks_m ? l_end_m   : m_sfc_tasks_m;
 
     //calculate begin and end for sfc n dimension 
     int64_t l_begin_n, l_end_n;
-    l_begin_n = l_thread_id_n * l_tasks_per_thread_n;
-    l_end_n   = l_begin_n     + l_tasks_per_thread_n;
+    l_begin_n = l_thread_id_n * m_tasks_per_thread_n;
+    l_end_n   = l_begin_n     + m_tasks_per_thread_n;
     l_begin_n = l_begin_n <= m_sfc_tasks_n ? l_begin_n : m_sfc_tasks_n;
     l_end_n   = l_end_n   <= m_sfc_tasks_n ? l_end_n   : m_sfc_tasks_n;
 
@@ -254,10 +254,14 @@ void einsum_ir::basic::IterationSpace::sfc_oracle_2d( int64_t *o_m,
 }
 
 int64_t einsum_ir::basic::IterationSpace::get_caching_size(){
-  if( m_sfc_tasks_m > m_num_threads_m * 2 && m_sfc_tasks_n > m_num_threads_n * 2){
-    return 2;
-  }
-  return 1;
+
+  //caching more entrys than the number of task in one dimension won't be useful
+  int64_t l_max_cache_size = std::min(m_tasks_per_thread_m, m_tasks_per_thread_n);
+
+  //upper bound to prevent huge memory allocations
+  l_max_cache_size = std::min(l_max_cache_size, (int64_t)8);
+
+  return l_max_cache_size;
 }
 
 
