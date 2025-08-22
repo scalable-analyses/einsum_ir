@@ -64,7 +64,7 @@ jobs:
           cd tblis_src
           git checkout 493c2ad
           git log | head -n 25
-          ./configure --prefix=$(pwd)/../tblis --enable-threading=openmp
+          CXX=g++-14 CC=g++-14 ./configure --prefix=$(pwd)/../tblis --enable-threading=openmp
           sed -i '971d' Makefile
           make -j$(nproc)
           make install
