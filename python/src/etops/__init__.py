@@ -125,13 +125,15 @@ class TensorOperationConfig:
     strides_in0: Sequence[int]
     strides_in1: Sequence[int]
     strides_out: Sequence[int]
+    num_threads_omp: int = 0
+    num_threads_sfc_m: int = 0
+    num_threads_sfc_n: int = 0
 
-    def apply(self, op: _CppOp, num_threads: int = 0) -> None:
+    def apply(self, op: _CppOp) -> None:
         """
         Apply this configuration to a TensorOperation instance.
         Args:
             op: The TensorOperation instance to configure
-            num_threads: Number of threads to use for execution (automatically determined if <1)
         Raises:
             RuntimeError: If the setup fails.
         """
@@ -146,24 +148,25 @@ class TensorOperationConfig:
             tuple(self.strides_in0),
             tuple(self.strides_in1),
             tuple(self.strides_out),
-            num_threads
+            self.num_threads_omp,
+            self.num_threads_sfc_m,
+            self.num_threads_sfc_n
         )
         if err != ErrorType.success:
             raise RuntimeError(f"einsum_ir TensorOperation setup failed: {err}")
 
 class TensorOperation(_CppOp):
-    def __init__(self, config: Union[TensorOperationConfig, None] = None, num_threads: int = 0):
+    def __init__(self, config: Union[TensorOperationConfig, None] = None):
         """
         Create a new tensor operation instance.
         Args:
             config: Optional configuration to apply to the operation
-            num_threads: Number of threads to use for execution (automatically determined if <1)
         Raises:
             RuntimeError: If the setup fails
         """
         super().__init__()
         if config is not None:
-            config.apply(self, num_threads=num_threads)
+            config.apply(self)
 
 def optimize(
     config: TensorOperationConfig,
@@ -171,6 +174,7 @@ def optimize(
     target_n: int,
     target_k: int, 
     num_threads: int = 0,
+    generate_sfc: bool = False,
     br_gemm_support: bool = True,
     packed_gemm_support: bool = True,
     l2_cache_size: int = 0
@@ -184,6 +188,7 @@ def optimize(
         target_n: Target N block size for optimization  
         target_k: Target K block size for optimization
         num_threads: Number of threads for parallel execution automatically determined if <1
+        generate_sfc: Whether to generate a SFC iteration
         br_gemm_support: Whether backend supports batch-reduce GEMM
         packed_gemm_support: Whether backend supports packed GEMM
         l2_cache_size: Size of the L2 cache in bytes (default: 1MiB if <1)
@@ -214,6 +219,9 @@ def optimize(
         target_n,
         target_k,
         num_threads,
+        1,
+        1,
+        generate_sfc,
         br_gemm_support,
         packed_gemm_support,
         l2_cache_size
@@ -230,7 +238,10 @@ def optimize(
      opt_dim_sizes,
      opt_strides_in0,
      opt_strides_in1,
-     opt_strides_out) = result
+     opt_strides_out,
+     opt_num_threads_omp,
+     opt_num_threads_sfc_m,
+     opt_num_threads_sfc_n) = result
     
     # Check for errors
     if err != ErrorType.success:
@@ -247,7 +258,10 @@ def optimize(
         dim_sizes=opt_dim_sizes,
         strides_in0=opt_strides_in0,
         strides_in1=opt_strides_in1,
-        strides_out=opt_strides_out
+        strides_out=opt_strides_out,
+        num_threads_omp=opt_num_threads_omp,
+        num_threads_sfc_m=opt_num_threads_sfc_m,
+        num_threads_sfc_n=opt_num_threads_sfc_n
     )
 
 __all__ = [

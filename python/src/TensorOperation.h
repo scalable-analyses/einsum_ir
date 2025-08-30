@@ -70,7 +70,9 @@ class einsum_ir::py::TensorOperation {
      * @param strides_in0 Strides of the first input tensor.
      * @param strides_in1 Strides of the second input tensor (ignored if unary).
      * @param strides_out Strides of the output tensor.
-     * @param num_threads Number of threads for parallel execution (determined automatically if <1).
+     * @param num_threads_omp  Number of threads to use for normal parallelization.
+     * @param num_threads_sfc_m Number of threads to use for SFC parallelization in M dimension.
+     * @param num_threads_sfc_n Number of threads to use for SFC parallelization in N dimension.
      * @return            Appropiate error code.
      **/
     error_t setup(
@@ -84,7 +86,9 @@ class einsum_ir::py::TensorOperation {
       std::vector< int64_t > const & strides_in0,
       std::vector< int64_t > const & strides_in1,
       std::vector< int64_t > const & strides_out,
-      int64_t                        num_threads
+      int64_t                       num_threads_omp,
+      int64_t                       num_threads_sfc_m,
+      int64_t                       num_threads_sfc_n
     );
 
     /**
@@ -134,7 +138,10 @@ class einsum_ir::py::TensorOperation {
       int64_t                  target_m,
       int64_t                  target_n,
       int64_t                  target_k,
-      int64_t                  num_threads,
+      int64_t                & num_threads_omp,
+      int64_t                & num_threads_sfc_m,
+      int64_t                & num_threads_sfc_n,
+      bool                     generate_sfc,
       bool                     br_gemm_support,
       bool                     packed_gemm_support,
       int64_t                  l2_cache_size

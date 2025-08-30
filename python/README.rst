@@ -134,6 +134,7 @@ Below is a minimal example showing how to configure and execute tensor operation
                                        target_n=12,
                                        target_k=64,
                                        num_threads=1,
+                                       generate_sfc=True,
                                        br_gemm_support=True,
                                        packed_gemm_support=True )
 

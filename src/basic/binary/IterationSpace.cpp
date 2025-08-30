@@ -6,17 +6,18 @@
 #include <omp.h>
 #endif
 
-#include <iostream>
 void einsum_ir::basic::IterationSpace::init( std::vector< dim_t >   const * i_dim_types,
                                              std::vector< exec_t >  const * i_exec_types,
                                              std::vector< int64_t > const * i_sizes,
                                              int64_t                        i_num_threads_m,
-                                             int64_t                        i_num_threads_n ) {
+                                             int64_t                        i_num_threads_n,
+                                             int64_t                        i_num_threads_omp ) {
   m_dim_types  = i_dim_types;
   m_exec_types = i_exec_types;
   m_sizes      = i_sizes;
-  m_num_threads_m = i_num_threads_m;
-  m_num_threads_n = i_num_threads_n;
+  m_num_threads_m   = i_num_threads_m;
+  m_num_threads_n   = i_num_threads_n;
+  m_num_threads_omp = i_num_threads_omp;
 }
 
 einsum_ir::basic::err_t einsum_ir::basic::IterationSpace::setup( std::vector< int64_t >   & io_strides_left,
@@ -29,33 +30,46 @@ einsum_ir::basic::err_t einsum_ir::basic::IterationSpace::setup( std::vector< in
   m_sfc_tasks_m = 1;
   m_sfc_tasks_n = 1;
   m_sfc_tasks_k = 1;
-  int64_t l_num_tasks = 1;
-  int64_t l_num_parallel_loops = 0;
-  int64_t l_last_found_type = 0;
+  m_omp_tasks   = 1;
+  bool l_found_omp = false;
+  int64_t l_num_sfc_loops = 0;
+  int64_t l_num_omp_loops = 0;
+  int64_t l_last_found_sfc_type = 0;
   for( std::size_t l_id = 0; l_id < m_dim_types->size(); l_id++ ){
-    if( m_exec_types->at(l_id) == exec_t::SFC    ){
-      l_num_tasks *= m_sizes->at(l_id);
-      l_num_parallel_loops += 1;
+    if( m_exec_types->at(l_id) == exec_t::OMP ){
+      l_num_omp_loops++;
+      if( l_found_omp == false ){
+        m_omp_loops.begin = l_id;
+        l_found_omp = true;
+      }
+      m_omp_tasks *= m_sizes->at(l_id);
+      m_omp_loops.end = l_id + 1;
+      if( m_dim_types->at(l_id) == dim_t::K ){
+        return err_t::COMPILATION_FAILED;
+      }
+    }
+    if( m_exec_types->at(l_id) == exec_t::SFC ){
+      l_num_sfc_loops++;
       if(m_dim_types->at(l_id)  == dim_t::M) {
-        if( l_last_found_type <= 1 ){
+        if( l_last_found_sfc_type <= 1 ){
           m_sfc_loops_m.begin = l_id;
-          l_last_found_type = 2;
+          l_last_found_sfc_type = 2;
         }
         m_sfc_tasks_m *= m_sizes->at(l_id);
         m_sfc_loops_m.end = l_id + 1;  
       }
       else if(m_dim_types->at(l_id)  == dim_t::N ) {
-        if( l_last_found_type <= 2 ){
+        if( l_last_found_sfc_type <= 2 ){
           m_sfc_loops_n.begin = l_id;
-          l_last_found_type = 3;
+          l_last_found_sfc_type = 3;
         }
         m_sfc_tasks_n *= m_sizes->at(l_id);
         m_sfc_loops_n.end = l_id + 1;
       }
       else if(m_dim_types->at(l_id)  == dim_t::K ) {
-        if( l_last_found_type <= 3 ){
+        if( l_last_found_sfc_type <= 3 ){
           m_sfc_loops_k.begin = l_id;
-          l_last_found_type = 4;
+          l_last_found_sfc_type = 4;
         }
         m_sfc_tasks_k *= m_sizes->at(l_id);
         m_sfc_loops_k.end = l_id + 1;
@@ -70,24 +84,30 @@ einsum_ir::basic::err_t einsum_ir::basic::IterationSpace::setup( std::vector< in
   if( m_sfc_loops_m.end - m_sfc_loops_m.begin +
       m_sfc_loops_n.end - m_sfc_loops_n.begin +
       m_sfc_loops_k.end - m_sfc_loops_k.begin != 
-      l_num_parallel_loops ){
+      l_num_sfc_loops ){
+    return err_t::COMPILATION_FAILED;
+  }
+  if( m_omp_loops.end - m_omp_loops.begin != 
+      l_num_omp_loops ){
     return err_t::COMPILATION_FAILED;
   }
 
   //create thread infos
-  int64_t l_num_threads = m_num_threads_m * m_num_threads_n;
+  int64_t l_num_threads = m_num_threads_m * m_num_threads_n * m_num_threads_omp;
   io_thread_infos.resize( l_num_threads );
-  m_tasks_per_thread_m   = (m_sfc_tasks_m + m_num_threads_m - 1) / m_num_threads_m;
-  m_tasks_per_thread_n   = (m_sfc_tasks_n + m_num_threads_n - 1) / m_num_threads_n;
+  m_tasks_per_thread_m   = (m_sfc_tasks_m + m_num_threads_m   - 1) / m_num_threads_m;
+  m_tasks_per_thread_n   = (m_sfc_tasks_n + m_num_threads_n   - 1) / m_num_threads_n;
+  m_tasks_per_thread_omp = (m_omp_tasks   + m_num_threads_omp - 1) / m_num_threads_omp;
   
 #ifdef _OPENMP
 #pragma omp parallel for num_threads(l_num_threads)
 #endif
   for( int64_t l_thread_id = 0; l_thread_id < l_num_threads; l_thread_id++ ){
     //get thread id in m and n 
-    int64_t l_thread_id_m = l_thread_id % m_num_threads_m;
-    int64_t l_rem         = l_thread_id / m_num_threads_m;
-    int64_t l_thread_id_n = l_rem % m_num_threads_n;
+    int64_t l_thread_id_m   = l_thread_id % m_num_threads_m;
+    int64_t l_rem           = l_thread_id / m_num_threads_m;
+    int64_t l_thread_id_n   = l_rem % m_num_threads_n;
+    int64_t l_thread_id_omp = l_rem / m_num_threads_n;
 
     //calculate begin and end for sfc m dimension 
     int64_t l_begin_m, l_end_m;
@@ -103,6 +123,15 @@ einsum_ir::basic::err_t einsum_ir::basic::IterationSpace::setup( std::vector< in
     l_begin_n = l_begin_n <= m_sfc_tasks_n ? l_begin_n : m_sfc_tasks_n;
     l_end_n   = l_end_n   <= m_sfc_tasks_n ? l_end_n   : m_sfc_tasks_n;
 
+    //calculate begin and end for omp dimension
+    int64_t l_begin_omp, l_end_omp;
+    l_begin_omp = l_thread_id_omp * m_tasks_per_thread_omp;
+    l_end_omp   = l_begin_omp     + m_tasks_per_thread_omp;
+    l_begin_omp = l_begin_omp <= m_omp_tasks ? l_begin_omp : m_omp_tasks;
+    l_end_omp   = l_end_omp   <= m_omp_tasks ? l_end_omp   : m_omp_tasks;
+    io_thread_infos[l_thread_id].id_omp_loop_start = l_begin_omp;
+    io_thread_infos[l_thread_id].id_omp_loop_end   = l_end_omp;
+    
     //set start ids
     int64_t l_id_sfc_m_old = l_begin_m;
     int64_t l_id_sfc_n_old = l_begin_n;

@@ -58,7 +58,9 @@ PYBIND11_MODULE(_etops_core, m) {
         :param strides_in0: Strides of the first input tensor.
         :param strides_in1: Strides of the second input tensor (ignored if unary).
         :param strides_out: Strides of the output tensor.
-        :param num_threads: Number of threads to use for execution.
+        :param num_threads_omp: Number of threads to use for normal parallelization.
+        :param num_threads_sfc_m: Number of threads to use for SFC parallelization in M dimension.
+        :param num_threads_sfc_n: Number of threads to use for SFC parallelization in N dimension.
         :return: Appropiate error code.
       )doc",
       py::arg("dtype"),
@@ -71,7 +73,9 @@ PYBIND11_MODULE(_etops_core, m) {
       py::arg("strides_in0"),
       py::arg("strides_in1"),
       py::arg("strides_out"),
-      py::arg("num_threads")
+      py::arg("num_threads_omp"),
+      py::arg("num_threads_sfc_m"),
+      py::arg("num_threads_sfc_n")
     )
     .def(
       "execute",
@@ -114,7 +118,10 @@ PYBIND11_MODULE(_etops_core, m) {
         int64_t                                target_m,
         int64_t                                target_n,
         int64_t                                target_k,
-        int64_t                                num_threads,
+        int64_t                                num_threads_omp,
+        int64_t                                num_threads_sfc_m,
+        int64_t                                num_threads_sfc_n,
+        bool                                   generate_sfc,
         bool                                   br_gemm_support,
         bool                                   packed_gemm_support,
         int64_t                                l2_cache_size
@@ -134,7 +141,10 @@ PYBIND11_MODULE(_etops_core, m) {
           target_m,
           target_n,
           target_k,
-          num_threads,
+          num_threads_omp,
+          num_threads_sfc_m,
+          num_threads_sfc_n,
+          generate_sfc,
           br_gemm_support,
           packed_gemm_support,
           l2_cache_size
@@ -152,7 +162,10 @@ PYBIND11_MODULE(_etops_core, m) {
           dim_sizes,
           strides_in0,
           strides_in1,
-          strides_out
+          strides_out,
+          num_threads_omp,
+          num_threads_sfc_m,
+          num_threads_sfc_n
         );
       },
       R"doc(
@@ -171,7 +184,10 @@ PYBIND11_MODULE(_etops_core, m) {
         :param target_m: Target size for dimension m.
         :param target_n: Target size for dimension n.
         :param target_k: Target size for dimension k.
-        :param num_threads: Number of threads to use for execution.
+        :param num_threads_omp: Number of threads to use for normal parallelization (modified by optimization).
+        :param num_threads_sfc_m: Number of threads to use for SFC parallelization in M dimension (modified by optimization).
+        :param num_threads_sfc_n: Number of threads to use for SFC parallelization in N dimension (modified by optimization).
+        :param generate_sfc: Whether to generate an SFC iteration.
         :param br_gemm_support: Whether to support BR_GEMM optimizations.
         :param packed_gemm_support: Whether to support packed GEMM optimizations.
         :param l2_cache_size: Size of L2 cache in bytes.
@@ -190,7 +206,10 @@ PYBIND11_MODULE(_etops_core, m) {
       py::arg("target_m"),
       py::arg("target_n"),
       py::arg("target_k"),
-      py::arg("num_threads"),
+      py::arg("num_threads_omp"),
+      py::arg("num_threads_sfc_m"),
+      py::arg("num_threads_sfc_n"),
+      py::arg("generate_sfc"),
       py::arg("br_gemm_support"),
       py::arg("packed_gemm_support"),
       py::arg("l2_cache_size")

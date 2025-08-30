@@ -30,20 +30,22 @@ TEST_CASE( "Simple test for Contraction Optimizer", "[contraction_optimizer]" ) 
     }
   }
 
-  int64_t l_num_threads_m = 0;
-  int64_t l_num_threads_n = 0;
+  int64_t l_num_threads_m = 1;
+  int64_t l_num_threads_n = 1;
+  int64_t l_num_threads_omp = 1;
   l_opt.init( &l_iters, 
               &l_kernel_main, 
-              1, 
               16, 
               64, 
-              256, 
+              256,
+              true,
               false, 
               packed_gemm_t::ALL_STRIDE_ONE, 
               4, 
               1024 * 1024, 
               &l_num_threads_m, 
-              &l_num_threads_n  );  
+              &l_num_threads_n,
+              &l_num_threads_omp  );  
 
   l_opt.optimize();
 
@@ -109,20 +111,22 @@ TEST_CASE( "Matmul blocking test for Contraction Optimizer", "[contraction_optim
     }
   }
 
-  int64_t l_num_threads_m = 0;
-  int64_t l_num_threads_n = 0;
+  int64_t l_num_threads_m = 72;
+  int64_t l_num_threads_n = 1;
+  int64_t l_num_threads_omp = 1;
   l_opt.init( &l_iters, 
               &l_kernel_main, 
-              72, 
               16, 
               64, 
-              256, 
+              256,
+              false,
               false, 
               packed_gemm_t::NONE, 
               4, 
               1024 * 1024, 
               &l_num_threads_m, 
-              &l_num_threads_n  );  
+              &l_num_threads_n,
+              &l_num_threads_omp );  
 
   l_opt.optimize();
 
@@ -188,20 +192,22 @@ TEST_CASE( "Test of Contraction Optimizer for transposed kernel", "[contraction_
     }
   }
 
-  int64_t l_num_threads_m = 0;
-  int64_t l_num_threads_n = 0;
+  int64_t l_num_threads_m = 3;
+  int64_t l_num_threads_n = 15;
+  int64_t l_num_threads_omp = 2;
   l_opt.init( &l_iters, 
               &l_kernel_main, 
-              72, 
               16, 
               64, 
-              256, 
+              256,
+              true,
               false, 
               packed_gemm_t::OUT_STRIDE_ONE, 
               4, 
               1024 * 1024, 
               &l_num_threads_m, 
-              &l_num_threads_n );  
+              &l_num_threads_n,
+              &l_num_threads_omp );  
 
   l_opt.optimize();
 

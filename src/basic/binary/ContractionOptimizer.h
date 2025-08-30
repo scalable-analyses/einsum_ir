@@ -30,8 +30,6 @@ class einsum_ir::basic::ContractionOptimizer {
     int64_t m_target_n  = 0;
     //! targeted size for kernel k dimension
     int64_t m_target_k  = 0;
-    //! targeted number of tasks
-    int64_t m_target_parallel = 0;
 
     //! number of bytes for scalar data types in output tensor
     int64_t m_num_bytes_scalar_out = 0;
@@ -48,6 +46,9 @@ class einsum_ir::basic::ContractionOptimizer {
     //! type of the main kernel
     kernel_t * m_ktype_main = nullptr;
 
+    //! indicates if optimizer should generate sfc dimensions
+    bool m_generate_sfcs = true;
+
     //! indicates if backend supports br gemms
     bool m_br_gemm_support = true;
 
@@ -59,6 +60,9 @@ class einsum_ir::basic::ContractionOptimizer {
 
     //! pointer to number of threads in n dimension
     int64_t * m_num_threads_n = nullptr;
+
+    //! pointer to number of threads in omp dimensions
+    int64_t * m_num_threads_omp = nullptr;
 
     //! size of the sfc in m dimension
     int64_t m_size_sfc_m = 1;
@@ -159,29 +163,31 @@ class einsum_ir::basic::ContractionOptimizer {
      *
      * @param i_iter_space vector of iters corresponding to an unoptimized contraction.
      * @param i_ktype_main execution type of main kernel. Optimizer might change GEMMs to BR_GEMMs
-     * @param i_num_threads number of participating threads in contraction.
      * @param i_target_m target m kernel size
      * @param i_target_n target n kernel size
      * @param i_target_k target k kernel size
+     * @param i_generate_sfcs true if optimizer should generate sfc dimensions
      * @param i_br_gemm_support true if backend supports br gemms
      * @param i_packed_gemm_support indicates the support level for packed gemms
      * @param i_num_bytes_scalar_out number of bytes for scalar data types in output tensor
      * @param i_l2_cache_size size of L2 cache in bytes
-     * @param o_num_threads_m number of threads used for sfc m parallelization.
-     * @param o_num_threads_n number of threads used for sfc n parallelization.
+     * @param io_num_threads_m number of threads used for sfc m parallelization.
+     * @param io_num_threads_n number of threads used for sfc n parallelization.
+     * @param io_num_threads_omp number of threads used for omp parallelization.
      **/
     void init( std::vector< iter_property > * i_iter_space,
                kernel_t                     * i_ktype_main,
-               int64_t                        i_num_threads,
                int64_t                        i_target_m,
                int64_t                        i_target_n,
                int64_t                        i_target_k,
+               bool                           i_generate_sfcs,
                bool                           i_br_gemm_support,
                packed_gemm_t                  i_packed_gemm_support,                  
                int64_t                        i_num_bytes_scalar_out,
                int64_t                        i_l2_cache_size,
-               int64_t                      * o_num_threads_m,
-               int64_t                      * o_num_threads_n  );    
+               int64_t                      * io_num_threads_omp,
+               int64_t                      * io_num_threads_m,
+               int64_t                      * io_num_threads_n );    
   
     /**
      * Optimizes the iters.

@@ -100,18 +100,20 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
 
   int64_t l_num_threads_m = 1;
   int64_t l_num_threads_n = 1;
+  int64_t l_num_threads_omp = m_num_threads;
   l_optim.init(&l_loops,
                &l_ktype_main,
-               m_num_threads,
                m_target_prim_m,
                m_target_prim_n,
                m_target_prim_k,
+               true,
                false,
                basic::packed_gemm_t::OUT_STRIDE_ONE,
                ce_n_bytes(m_dtype_out),
                m_l2_cache_size,
+               &l_num_threads_omp,
                &l_num_threads_m,
-               &l_num_threads_n);
+               &l_num_threads_n );
   l_optim.optimize();
 
   einsum_ir::basic::ContractionMemoryManager * l_contraction_memory = nullptr;
@@ -128,6 +130,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
                   l_ktype_first_touch,
                   l_ktype_main,
                   l_ktype_last_touch,
+                  l_num_threads_omp,
                   l_num_threads_m,
                   l_num_threads_m,
                   l_contraction_memory );

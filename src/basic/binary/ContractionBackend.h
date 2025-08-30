@@ -26,8 +26,11 @@ class einsum_ir::basic::ContractionBackend {
     //! id of the first primitive loop
     int64_t m_id_first_primitive_dim = 0;
 
-    //! number of parallel loops
-    int64_t m_num_parallel_loops = 0;
+    //! number of sfc loops
+    int64_t m_num_sfc_loops = 0;
+
+    //! number of omp loops
+    int64_t m_num_omp_loops = 0;
 
     //! number of threads used for execution
     int64_t m_num_threads = 0;
@@ -36,6 +39,8 @@ class einsum_ir::basic::ContractionBackend {
     int64_t m_num_threads_m = 0;
     //! number of threads used for sfc n dimension
     int64_t m_num_threads_n = 0;
+    //! number of threads used for omp dimension
+    int64_t m_num_threads_omp = 0;
 
     //! indicates existance of first touch kernel
     bool m_has_first_touch = false;
@@ -187,6 +192,7 @@ class einsum_ir::basic::ContractionBackend {
      * @param i_ktype_first_touch type of the first touch kernel.
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
+     * @param i_num_threads_omp number of threads used for omp parallelization.
      * @param i_num_threads_m number of threads used for sfc m parallelization.
      * @param i_num_threads_n number of threads used for sfc n parallelization.
      **/
@@ -204,6 +210,7 @@ class einsum_ir::basic::ContractionBackend {
                kernel_t                       i_ktype_first_touch,
                kernel_t                       i_ktype_main,
                kernel_t                       i_ktype_last_touch,
+               int64_t                        i_num_threads_omp,
                int64_t                        i_num_threads_m,
                int64_t                        i_num_threads_n );
 
@@ -219,7 +226,7 @@ class einsum_ir::basic::ContractionBackend {
      * @param i_ktype_first_touch type of the first touch kernel.
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
-
+     * @param i_num_threads_omp number of threads used for omp parallelization.
      * @param i_num_threads_m number of threads used for sfc m parallelization.
      * @param i_num_threads_n number of threads used for sfc n parallelization.
      * @param i_contraction_mem pointer to the contraction memory manager.
@@ -232,6 +239,7 @@ class einsum_ir::basic::ContractionBackend {
                kernel_t                             i_ktype_first_touch,
                kernel_t                             i_ktype_main,
                kernel_t                             i_ktype_last_touch,
+               int64_t                              i_num_threads_omp,
                int64_t                              i_num_threads_m,
                int64_t                              i_num_threads_n,
                ContractionMemoryManager           * i_contraction_mem );
@@ -277,7 +285,29 @@ class einsum_ir::basic::ContractionBackend {
                         char          * i_ptr_out,
                         bool            i_first_access,
                         bool            i_last_access );
-    
+
+    /**
+     * General purpose loop implementation featuring first and last touch operations.
+     * Threading is applied.
+     *
+     * @param i_thread_inf information for the executing thread.
+     * @param i_id_loop dimension id of the loop which is executed.
+     * @param i_ptr_left pointer to the left tensor's data.
+     * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
+     * @param i_ptr_out pointer to the output tensor's data.
+     * @param i_first_access true if first time accessing this data
+     * @param i_last_access true if last time accessing this data
+     **/
+    void contract_iter_parallel( thread_info   * i_thread_inf,
+                                 int64_t         i_id_loop,
+                                 char    const * i_ptr_left,
+                                 char    const * i_ptr_right,
+                                 char    const * i_ptr_out_aux,
+                                 char          * i_ptr_out,
+                                 bool            i_first_access,
+                                 bool            i_last_access );
+ 
     /**
      * SFC based loop implementation featuring an featuring first and last touch operations.
      *

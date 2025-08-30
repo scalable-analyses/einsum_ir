@@ -5,34 +5,38 @@
 
 void einsum_ir::basic::ContractionOptimizer::init( std::vector< iter_property > * i_iter_space,
                                                    kernel_t                     * i_ktype_main,
-                                                   int64_t                        i_num_threads,
                                                    int64_t                        i_target_m,
                                                    int64_t                        i_target_n,
                                                    int64_t                        i_target_k,
+                                                   bool                           i_generate_sfcs,
                                                    bool                           i_br_gemm_support,
                                                    packed_gemm_t                  i_packed_gemm_support,
                                                    int64_t                        i_num_bytes_scalar_out,
                                                    int64_t                        i_l2_cache_size,
-                                                   int64_t                      * o_num_threads_m,
-                                                   int64_t                      * o_num_threads_n ){
+                                                   int64_t                      * io_num_threads_omp,
+                                                   int64_t                      * io_num_threads_m,
+                                                   int64_t                      * io_num_threads_n ){
   m_iter_space = i_iter_space;
   m_ktype_main = i_ktype_main;
-  m_num_threads = i_num_threads;
+
 
   m_target_m = i_target_m;
   m_target_n = i_target_n;
   m_target_k = i_target_k;
 
+  m_generate_sfcs = i_generate_sfcs;
+
   m_br_gemm_support = i_br_gemm_support;
   m_packed_gemm_support = i_packed_gemm_support;
-
-  m_target_parallel = i_num_threads;
 
   m_num_bytes_scalar_out = i_num_bytes_scalar_out;
   m_l2_cache_size = i_l2_cache_size;
 
-  m_num_threads_m = o_num_threads_m;
-  m_num_threads_n = o_num_threads_n;
+  m_num_threads_m   = io_num_threads_m;
+  m_num_threads_n   = io_num_threads_n;
+  m_num_threads_omp = io_num_threads_omp;
+
+  m_num_threads = *m_num_threads_m * *m_num_threads_n * *m_num_threads_omp;
 
   //small power of 2 to avoid extra overhead and still utilise the stride one dimension to some extend
   //heuristic right now, could choose this parameter architecture dependent
@@ -100,10 +104,10 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::optimize(){
   }
   *m_num_threads_m = l_best_threads_m;
   *m_num_threads_n = m_num_threads / l_best_threads_m;
-  std::cout << "using " << *m_num_threads_m << " threads in m and " 
-            << *m_num_threads_n << " threads in n dimension for contraction with " 
-            << m_num_threads << " threads in total." << std::endl;
 
+  *m_num_threads_m = std::min(*m_num_threads_m, m_size_sfc_m);
+  *m_num_threads_n = std::min(*m_num_threads_n, m_size_sfc_n);
+  *m_num_threads_omp = m_num_threads / (*m_num_threads_m * *m_num_threads_n);
 
   return err_t::SUCCESS;
 }
@@ -655,20 +659,40 @@ void einsum_ir::basic::ContractionOptimizer::reorder_and_parallelize_iters(){
 
   //add parallel dimension
   std::vector<iter_property> l_blocking_iters;
-  m_size_sfc_n = move_iters_until( &l_blocking_iters, 
-                                   l_target_parallel_n,
-                                   dim_t::N,
-                                   exec_t::SFC);
-  m_size_sfc_m = move_iters_until( &l_blocking_iters, 
-                                   l_target_parallel_m,
-                                   dim_t::M,
-                                   exec_t::SFC);
+  if( m_generate_sfcs ) {
+    m_size_sfc_n = move_iters_until( &l_blocking_iters, 
+                                    l_target_parallel_n,
+                                    dim_t::N,
+                                    exec_t::SFC);
+    m_size_sfc_m = move_iters_until( &l_blocking_iters, 
+                                    l_target_parallel_m,
+                                    dim_t::M,
+                                    exec_t::SFC);
+  }
+  else{
+    move_iters_until( &l_blocking_iters, 
+                      l_target_parallel_n,
+                      dim_t::N,
+                      exec_t::OMP);
+    move_iters_until( &l_blocking_iters, 
+                      l_target_parallel_m,
+                      dim_t::M,
+                      exec_t::OMP);
+    m_size_sfc_n = 1;
+    m_size_sfc_m = 1;
+  }
 
   //add sequential K dimension for L3 blocking
   move_iters_until( &l_blocking_iters, 
                     64,
                     dim_t::K,
                     exec_t::SEQ);
+  
+  //add parallel C dimension
+  move_iters_until( &l_blocking_iters, 
+                    l_target_parallel_c,
+                    dim_t::C,
+                    exec_t::OMP);
 
   //sort remaining dimensions by sum of strides
   std::sort( m_iter_space->begin(), m_iter_space->end(), 

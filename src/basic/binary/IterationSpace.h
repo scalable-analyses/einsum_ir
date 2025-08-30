@@ -24,6 +24,8 @@ class einsum_ir::basic::IterationSpace {
     //! vector with the loop sizes
     std::vector< int64_t > const * m_sizes;
 
+    //! number of omp tasks
+    int64_t m_omp_tasks = 1;
     //! number of sfc m tasks
     int64_t m_sfc_tasks_m = 1;
     //! number of sfc n tasks
@@ -31,8 +33,8 @@ class einsum_ir::basic::IterationSpace {
     //! number of sfc k tasks
     int64_t m_sfc_tasks_k = 1;
 
-    //! range of all parallel loops
-    range_t m_parallel_loops; 
+    //! range of all omp loops
+    range_t m_omp_loops; 
     //! range of sfc m loops
     range_t m_sfc_loops_m;
     //! range of sfc n loops
@@ -40,13 +42,15 @@ class einsum_ir::basic::IterationSpace {
     //! range of sfc k loops
     range_t m_sfc_loops_k;
     
-    //! number of threads
-    int64_t m_num_threads = 0;
+    //! number of threads in omp dimensions
+    int64_t m_num_threads_omp = 0;
     //! number of threads in sfc m dimension
     int64_t m_num_threads_m = 0;
     //! number of threads in sfc n dimension
     int64_t m_num_threads_n = 0;
 
+    //number of tasks in omp dimensions
+    int64_t m_tasks_per_thread_omp;
     //number of tasks in m dimension 
     int64_t m_tasks_per_thread_m;
     //number of tasks in n dimension 
@@ -134,12 +138,14 @@ class einsum_ir::basic::IterationSpace {
      * @param i_loop_sizes sizes of the loops.
      * @param i_num_threads_m number of threads in sfc m dimension.
      * @param i_num_threads_n number of threads in sfc n dimension.
+     * @param i_num_threads_omp number of threads in omp dimensions.
     **/
     void init( std::vector< dim_t >   const * i_loop_dim_type,
                std::vector< exec_t >  const * i_loop_exec_type,
                std::vector< int64_t > const * i_loop_sizes,
                int64_t                        i_num_threads_m,
-               int64_t                        i_num_threads_n );
+               int64_t                        i_num_threads_n,
+               int64_t                        i_num_threads_omp );
 
     /**
      * Creates ThreadInfo objects for each thread and changes sfc strides.
