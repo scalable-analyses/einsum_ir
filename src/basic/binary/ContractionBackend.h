@@ -54,8 +54,11 @@ class einsum_ir::basic::ContractionBackend {
     //! indicates if the backend is compiled
     bool m_is_compiled = false;
 
-    //! memory manager for contraction
+    //! pointer to active memory manager for contraction
     ContractionMemoryManager * m_memory = nullptr;
+
+    //! personal memory manager for contraction, used if no external memory manager is given
+    ContractionMemoryManager m_personal_memory;
 
     //! size of packed left input tensor
     int64_t m_size_packing_left  = 0;
@@ -185,6 +188,8 @@ class einsum_ir::basic::ContractionBackend {
      * @param i_strides_right strides in the right input tensor.
      * @param i_strides_out_aux strides in the auxiliary output tensor.
      * @param i_strides_out strides in the output tensor.
+     * @param i_packing_strides_left strides for packing of left input tensor.
+     * @param i_packing_strides_right strides for packing of right input tensor.
      * @param i_dtype_left datatype of left input tensor.
      * @param i_dtype_right datatype of right input tensor.
      * @param i_dtype_comp datatype of computation.
@@ -195,6 +200,7 @@ class einsum_ir::basic::ContractionBackend {
      * @param i_num_threads_omp number of threads used for omp parallelization.
      * @param i_num_threads_m number of threads used for sfc m parallelization.
      * @param i_num_threads_n number of threads used for sfc n parallelization.
+     * @param i_contraction_mem pointer to the contraction memory manager.
      **/
     void init( std::vector< dim_t >   const & i_dim_type,
                std::vector< exec_t >  const & i_exec_type,
@@ -203,6 +209,8 @@ class einsum_ir::basic::ContractionBackend {
                std::vector< int64_t > const & i_strides_right,
                std::vector< int64_t > const & i_strides_out_aux,
                std::vector< int64_t > const & i_strides_out,
+               std::vector< int64_t > const & i_packing_strides_left,
+               std::vector< int64_t > const & i_packing_strides_right,
                data_t                         i_dtype_left,
                data_t                         i_dtype_right,
                data_t                         i_dtype_comp,
@@ -212,7 +220,8 @@ class einsum_ir::basic::ContractionBackend {
                kernel_t                       i_ktype_last_touch,
                int64_t                        i_num_threads_omp,
                int64_t                        i_num_threads_m,
-               int64_t                        i_num_threads_n );
+               int64_t                        i_num_threads_n,
+               ContractionMemoryManager     * i_contraction_mem );
 
 
     /**

@@ -125,6 +125,8 @@ class TensorOperationConfig:
     strides_in0: Sequence[int]
     strides_in1: Sequence[int]
     strides_out: Sequence[int]
+    packing_strides_in0: Sequence[int] = ()
+    packing_strides_in1: Sequence[int] = ()
     num_threads_omp: int = 0
     num_threads_sfc_m: int = 0
     num_threads_sfc_n: int = 0
@@ -148,6 +150,8 @@ class TensorOperationConfig:
             tuple(self.strides_in0),
             tuple(self.strides_in1),
             tuple(self.strides_out),
+            tuple(self.packing_strides_in0),
+            tuple(self.packing_strides_in1),
             self.num_threads_omp,
             self.num_threads_sfc_m,
             self.num_threads_sfc_n
@@ -215,6 +219,8 @@ def optimize(
         config.strides_in0,
         config.strides_in1,
         config.strides_out,
+        config.packing_strides_in0,
+        config.packing_strides_in1,
         target_m,
         target_n,
         target_k,
@@ -239,6 +245,8 @@ def optimize(
      opt_strides_in0,
      opt_strides_in1,
      opt_strides_out,
+     opt_packing_strides_in0,
+     opt_packing_strides_in1,
      opt_num_threads_omp,
      opt_num_threads_sfc_m,
      opt_num_threads_sfc_n) = result
@@ -259,6 +267,8 @@ def optimize(
         strides_in0=opt_strides_in0,
         strides_in1=opt_strides_in1,
         strides_out=opt_strides_out,
+        packing_strides_in0=opt_packing_strides_in0,
+        packing_strides_in1=opt_packing_strides_in1,
         num_threads_omp=opt_num_threads_omp,
         num_threads_sfc_m=opt_num_threads_sfc_m,
         num_threads_sfc_n=opt_num_threads_sfc_n

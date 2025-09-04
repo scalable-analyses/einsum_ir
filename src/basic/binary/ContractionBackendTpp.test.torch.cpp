@@ -17,12 +17,14 @@ TEST_CASE( "Matmul with sequential batch dimension.", "[contraction_backend]" ) 
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                 c1,m1,n1,k1
-  std::vector< int64_t > l_loop_sizes           = {  17,20,47,13 };  
-  std::vector< int64_t > l_loop_strides_left    = { 260, 1, 0,20 };
-  std::vector< int64_t > l_loop_strides_right   = { 611, 0,13, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux = {   0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = { 940, 1,20, 0 };
+  //                                                  c1,m1,n1,k1
+  std::vector< int64_t > l_loop_sizes            = {  17,20,47,13 };  
+  std::vector< int64_t > l_loop_strides_left     = { 260, 1, 0,20 };
+  std::vector< int64_t > l_loop_strides_right    = { 611, 0,13, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {   0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = { 940, 1,20, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
   at::Tensor l_left    = at::randn( { 17,13,20 } );
   at::Tensor l_right   = at::randn( { 17,47,13 } );
@@ -38,6 +40,8 @@ TEST_CASE( "Matmul with sequential batch dimension.", "[contraction_backend]" ) 
                l_loop_strides_right,
                l_loop_strides_out_aux,
                l_loop_strides_out,
+               l_packing_strides_left,
+               l_packing_strides_right,
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
@@ -47,7 +51,8 @@ TEST_CASE( "Matmul with sequential batch dimension.", "[contraction_backend]" ) 
                kernel_t::UNDEFINED_KTYPE,
                2,
                2,
-               2 );     
+               2,
+               nullptr );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -79,12 +84,14 @@ TEST_CASE( "Packed Matmul with sequential M dimension.", "[contraction_backend]"
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                   m2, c1, m1, n1, k1
-  std::vector< int64_t > l_loop_sizes           = {     5, 17, 20, 47, 13 };  
-  std::vector< int64_t > l_loop_strides_left    = {  4420,  1, 17,  0,340 };
-  std::vector< int64_t > l_loop_strides_right   = {     0,  1,  0,221, 17 };
-  std::vector< int64_t > l_loop_strides_out_aux = {     0,  0,  0,  0,  0 };
-  std::vector< int64_t > l_loop_strides_out     = { 15980,  1, 17,340,  0 };
+  //                                                    m2, c1, m1, n1, k1
+  std::vector< int64_t > l_loop_sizes            = {     5, 17, 20, 47, 13 };  
+  std::vector< int64_t > l_loop_strides_left     = {  4420,  1, 17,  0,340 };
+  std::vector< int64_t > l_loop_strides_right    = {     0,  1,  0,221, 17 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {     0,  0,  0,  0,  0 };
+  std::vector< int64_t > l_loop_strides_out      = { 15980,  1, 17,340,  0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
   at::Tensor l_left    = at::randn( { 5,13,20,17 } );
   at::Tensor l_right   = at::randn( {   47,13,17 } );
@@ -100,6 +107,8 @@ TEST_CASE( "Packed Matmul with sequential M dimension.", "[contraction_backend]"
                l_loop_strides_right,
                l_loop_strides_out_aux,
                l_loop_strides_out,
+               l_packing_strides_left,
+               l_packing_strides_right,
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
@@ -109,7 +118,8 @@ TEST_CASE( "Packed Matmul with sequential M dimension.", "[contraction_backend]"
                kernel_t::UNDEFINED_KTYPE,
                3,
                2,
-               4 );     
+               4,
+               nullptr );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -138,12 +148,14 @@ TEST_CASE( "Matmul with sequential batch dimension and transposed B.", "[contrac
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                c1,m1,n1,k1
-  std::vector< int64_t > l_loop_sizes           = {  5, 2, 4, 3 };  
-  std::vector< int64_t > l_loop_strides_left    = {  6, 1, 0, 2 };
-  std::vector< int64_t > l_loop_strides_right   = { 12, 0, 1, 4 };
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = {  8, 1, 2, 0 };
+  //                                                 c1,m1,n1,k1
+  std::vector< int64_t > l_loop_sizes            = {  5, 2, 4, 3 };  
+  std::vector< int64_t > l_loop_strides_left     = {  6, 1, 0, 2 };
+  std::vector< int64_t > l_loop_strides_right    = { 12, 0, 1, 4 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {  0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = {  8, 1, 2, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
   at::Tensor l_left    = at::randn( { 5,3,2 } );
   at::Tensor l_right   = at::randn( { 5,3,4 } );
@@ -159,6 +171,8 @@ TEST_CASE( "Matmul with sequential batch dimension and transposed B.", "[contrac
                l_loop_strides_right,
                l_loop_strides_out_aux,
                l_loop_strides_out,
+               l_packing_strides_left,
+               l_packing_strides_right,
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
@@ -168,7 +182,8 @@ TEST_CASE( "Matmul with sequential batch dimension and transposed B.", "[contrac
                kernel_t::UNDEFINED_KTYPE,
                4,
                1,
-               1 );     
+               1,
+               nullptr );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -198,12 +213,14 @@ TEST_CASE( "Simple Matmul with sequential batch dimension and transposed A.", "[
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                c1,m1,n1,k1
-  std::vector< int64_t > l_loop_sizes           = {  5, 2, 4, 3 };  
-  std::vector< int64_t > l_loop_strides_left    = {  6, 3, 0, 1 };
-  std::vector< int64_t > l_loop_strides_right   = { 12, 0, 3, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = {  8, 1, 2, 0 };
+  //                                                 c1,m1,n1,k1
+  std::vector< int64_t > l_loop_sizes            = {  5, 2, 4, 3 };  
+  std::vector< int64_t > l_loop_strides_left     = {  6, 3, 0, 1 };
+  std::vector< int64_t > l_loop_strides_right    = { 12, 0, 3, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {  0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = {  8, 1, 2, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
   at::Tensor l_left    = at::randn( { 5,2,3 } );
   at::Tensor l_right   = at::randn( { 5,4,3 } );
@@ -219,6 +236,8 @@ TEST_CASE( "Simple Matmul with sequential batch dimension and transposed A.", "[
                l_loop_strides_right,
                l_loop_strides_out_aux,
                l_loop_strides_out,
+               l_packing_strides_left,
+               l_packing_strides_right,
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
@@ -228,7 +247,8 @@ TEST_CASE( "Simple Matmul with sequential batch dimension and transposed A.", "[
                kernel_t::UNDEFINED_KTYPE,
                5,
                4,
-               3 );     
+               3,
+               nullptr );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -259,12 +279,14 @@ TEST_CASE( "Single call of batch reduce matmul.", "[contraction_backend]" ) {
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                k2,m1,n1,k1
-  std::vector< int64_t > l_loop_sizes           = {  3, 5, 4, 7 };  
-  std::vector< int64_t > l_loop_strides_left    = { 35, 1, 0, 5 };
-  std::vector< int64_t > l_loop_strides_right   = { 28, 0, 7, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = {  0, 1, 5, 0 };
+  //                                                 k2,m1,n1,k1
+  std::vector< int64_t > l_loop_sizes            = {  3, 5, 4, 7 };  
+  std::vector< int64_t > l_loop_strides_left     = { 35, 1, 0, 5 };
+  std::vector< int64_t > l_loop_strides_right    = { 28, 0, 7, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {  0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = {  0, 1, 5, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
   at::Tensor l_left    = at::randn( {  3, 7, 5 } );
   at::Tensor l_right   = at::randn( {  3, 4, 7 } );
@@ -280,6 +302,8 @@ TEST_CASE( "Single call of batch reduce matmul.", "[contraction_backend]" ) {
                l_loop_strides_right,
                l_loop_strides_out_aux,
                l_loop_strides_out,
+               l_packing_strides_left,
+               l_packing_strides_right,
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
@@ -289,7 +313,8 @@ TEST_CASE( "Single call of batch reduce matmul.", "[contraction_backend]" ) {
                kernel_t::UNDEFINED_KTYPE,
                6,
                3,
-               5 );     
+               5,
+               nullptr );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -320,12 +345,14 @@ TEST_CASE( "Tensor contraction with omp parallelisation.", "[contraction_backend
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                   n2, m2,m1,n1,k1
-  std::vector< int64_t > l_loop_sizes           = {     8, 17,20,47,13 };  
-  std::vector< int64_t > l_loop_strides_left    = {     0,260, 1, 0,20 };
-  std::vector< int64_t > l_loop_strides_right   = {   611,  0, 0,13, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux = {     0,  0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = { 15980,940, 1,20, 0 };
+  //                                                    n2, m2,m1,n1,k1
+  std::vector< int64_t > l_loop_sizes            = {     8, 17,20,47,13 };  
+  std::vector< int64_t > l_loop_strides_left     = {     0,260, 1, 0,20 };
+  std::vector< int64_t > l_loop_strides_right    = {   611,  0, 0,13, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {     0,  0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = { 15980,940, 1,20, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
   at::Tensor l_left    = at::randn( {   17,13,20 } );
   at::Tensor l_right   = at::randn( {    8,47,13 } );
@@ -341,6 +368,8 @@ TEST_CASE( "Tensor contraction with omp parallelisation.", "[contraction_backend
                l_loop_strides_right,
                l_loop_strides_out_aux,
                l_loop_strides_out,
+               l_packing_strides_left,
+               l_packing_strides_right,
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
@@ -350,7 +379,8 @@ TEST_CASE( "Tensor contraction with omp parallelisation.", "[contraction_backend
                kernel_t::UNDEFINED_KTYPE,
                7,
                5,
-               1 );     
+               1,
+               nullptr );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -385,12 +415,14 @@ TEST_CASE( "Blocked matmul with omp parallelisation.", "[contraction_backend]" )
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                    n2,   m2,  k2,m1,n1,k1
-  std::vector< int64_t > l_loop_sizes           = {     32,   32,   8,64,64,64 };  
-  std::vector< int64_t > l_loop_strides_left    = {      0,32768,4096, 1, 0,64 };
-  std::vector< int64_t > l_loop_strides_right   = {  32768,    0,4096, 0,64, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux = {      0,    0,   0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = { 131072, 4096,   0, 1,64, 0 };
+  //                                                     n2,   m2,  k2,m1,n1,k1
+  std::vector< int64_t > l_loop_sizes            = {     32,   32,   8,64,64,64 };  
+  std::vector< int64_t > l_loop_strides_left     = {      0,32768,4096, 1, 0,64 };
+  std::vector< int64_t > l_loop_strides_right    = {  32768,    0,4096, 0,64, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {      0,    0,   0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = { 131072, 4096,   0, 1,64, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
   at::Tensor l_left    = at::randn( { 32, 8,64,64 },
                                     at::dtype( at::kDouble ) );
@@ -409,6 +441,8 @@ TEST_CASE( "Blocked matmul with omp parallelisation.", "[contraction_backend]" )
                l_loop_strides_right,
                l_loop_strides_out_aux,
                l_loop_strides_out,
+               l_packing_strides_left,
+               l_packing_strides_right,
                data_t::FP64,
                data_t::FP64,
                data_t::FP64,
@@ -418,7 +452,8 @@ TEST_CASE( "Blocked matmul with omp parallelisation.", "[contraction_backend]" )
                kernel_t::UNDEFINED_KTYPE,
                8,
                1,
-               7 );     
+               7,
+               nullptr );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -450,12 +485,14 @@ TEST_CASE( "Tensor contraction with SFC parallelisation.", "[contraction_backend
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                 m2,   n2,m1,n1,k1
-  std::vector< int64_t > l_loop_sizes           = {  17,    8,20,47,13 };  
-  std::vector< int64_t > l_loop_strides_left    = { 260,    0, 1, 0,20 };
-  std::vector< int64_t > l_loop_strides_right   = {   0,  611, 0,13, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux = {   0,    0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = { 940,15980, 1,20, 0 };
+  //                                                  m2,   n2,m1,n1,k1
+  std::vector< int64_t > l_loop_sizes            = {  17,    8,20,47,13 };  
+  std::vector< int64_t > l_loop_strides_left     = { 260,    0, 1, 0,20 };
+  std::vector< int64_t > l_loop_strides_right    = {   0,  611, 0,13, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {   0,    0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = { 940,15980, 1,20, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
   at::Tensor l_left    = at::randn( {   17,13,20 } );
   at::Tensor l_right   = at::randn( {    8,47,13 } );
@@ -471,6 +508,8 @@ TEST_CASE( "Tensor contraction with SFC parallelisation.", "[contraction_backend
                l_loop_strides_right,
                l_loop_strides_out_aux,
                l_loop_strides_out,
+               l_packing_strides_left,
+               l_packing_strides_right,
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
@@ -480,7 +519,8 @@ TEST_CASE( "Tensor contraction with SFC parallelisation.", "[contraction_backend
                kernel_t::UNDEFINED_KTYPE,
                9,
                3,
-               4 );     
+               4,
+               nullptr );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -515,12 +555,14 @@ TEST_CASE( "Tensor contraction with SFC and omp parallelisation.", "[contraction
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                    c1,  m2,   n2,m1,n1,k1
-  std::vector< int64_t > l_loop_sizes           = {      5, 17,    8,20,47,13 };  
-  std::vector< int64_t > l_loop_strides_left    = {   4420,260,    0, 1, 0,20 };
-  std::vector< int64_t > l_loop_strides_right   = {   4888,  0,  611, 0,13, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux = {      0,  0,    0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = { 127840,940,15980, 1,20, 0 };
+  //                                                     c1,  m2,   n2,m1,n1,k1
+  std::vector< int64_t > l_loop_sizes            = {      5, 17,    8,20,47,13 };  
+  std::vector< int64_t > l_loop_strides_left     = {   4420,260,    0, 1, 0,20 };
+  std::vector< int64_t > l_loop_strides_right    = {   4888,  0,  611, 0,13, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {      0,  0,    0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = { 127840,940,15980, 1,20, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
   at::Tensor l_left    = at::randn( {   5,17,13,20 } );
   at::Tensor l_right   = at::randn( {   5, 8,47,13 } );
@@ -536,6 +578,8 @@ TEST_CASE( "Tensor contraction with SFC and omp parallelisation.", "[contraction
                l_loop_strides_right,
                l_loop_strides_out_aux,
                l_loop_strides_out,
+               l_packing_strides_left,
+               l_packing_strides_right,
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
@@ -545,7 +589,8 @@ TEST_CASE( "Tensor contraction with SFC and omp parallelisation.", "[contraction
                kernel_t::UNDEFINED_KTYPE,
                10,
                2,
-               3 );     
+               3,
+               nullptr );     
                 
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
@@ -580,41 +625,31 @@ TEST_CASE( "Tensor contraction with packing of left tensor and SFC parallelisati
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                       c1,  m2,   n2,m1,n1,k1
-  std::vector< int64_t > l_loop_sizes              = {      5, 17,    8,20,47,13 };  
-  std::vector< int64_t > l_loop_strides_left       = {   4420,260,    0,13, 0, 1 };
-  std::vector< int64_t > l_loop_strides_right      = {   4888,  0,  611, 0,13, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux    = {      0,  0,    0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out        = { 127840,940,15980, 1,20, 0 };
-
-  std::vector< int64_t > l_loop_strides_left_packed = {     0,  0,    0, 1, 0,20 };
-
-  std::vector< iter_property > l_iter_props;
-  
-  for( size_t l_id = 0; l_id < l_loop_dim_type.size(); l_id++ ) {
-    iter_property l_iter_prop;
-    l_iter_prop.dim_type            = l_loop_dim_type[l_id];
-    l_iter_prop.exec_type           = l_loop_exec_type[l_id];
-    l_iter_prop.size                = l_loop_sizes[l_id];
-    l_iter_prop.stride_left         = l_loop_strides_left[l_id];
-    l_iter_prop.stride_right        = l_loop_strides_right[l_id];
-    l_iter_prop.stride_out_aux      = l_loop_strides_out_aux[l_id];
-    l_iter_prop.stride_out          = l_loop_strides_out[l_id];
-    l_iter_prop.packing_stride_left = l_loop_strides_left_packed[l_id];
-    l_iter_props.push_back( l_iter_prop );
-  }
-
-
+  //                                                     c1,  m2,   n2,m1,n1,k1
+  std::vector< int64_t > l_loop_sizes            = {      5, 17,    8,20,47,13 };  
+  std::vector< int64_t > l_loop_strides_left     = {   4420,260,    0,13, 0, 1 };
+  std::vector< int64_t > l_loop_strides_right    = {   4888,  0,  611, 0,13, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {      0,  0,    0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = { 127840,940,15980, 1,20, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {      0,  0,    0, 1, 0,20 };
+  std::vector< int64_t > l_packing_strides_right = {};
 
   at::Tensor l_left    = at::randn( {   5,17,13,20 } );
   at::Tensor l_right   = at::randn( {   5, 8,47,13 } );
   at::Tensor l_out     = at::zeros( { 5,8,17,47,20 } );
   at::Tensor l_out_ref = l_out.clone();
 
-  ContractionMemoryManager l_mem;
   ContractionBackendTpp l_cont;
 
-  l_cont.init( l_iter_props,
+  l_cont.init( l_loop_dim_type,
+               l_loop_exec_type,
+               l_loop_sizes,
+               l_loop_strides_left,
+               l_loop_strides_right,
+               l_loop_strides_out_aux,
+               l_loop_strides_out,
+               l_packing_strides_left,
+               l_packing_strides_right,
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,
@@ -625,12 +660,10 @@ TEST_CASE( "Tensor contraction with packing of left tensor and SFC parallelisati
                10,
                5,
                4,
-               &l_mem );
+               nullptr );
       
   err_t l_err = l_cont.compile();
   REQUIRE( l_err == err_t::SUCCESS );
-
-  l_mem.alloc_all_memory();
 
   l_cont.contract( l_left.data_ptr(),
                    l_right.data_ptr(),
@@ -663,33 +696,14 @@ TEST_CASE( "Tensor contraction with packing of both tensors and SFC parallelisat
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                       c1,  m2,   n2,m1,n1,k1
-  std::vector< int64_t > l_loop_sizes               = {      5, 17,    8,20,47,13 };  
-  std::vector< int64_t > l_loop_strides_left        = {   4420,260,    0,13, 0, 1 };
-  std::vector< int64_t > l_loop_strides_right       = {   4888,  0,  611, 0, 1,47 };
-  std::vector< int64_t > l_loop_strides_out_aux     = {      0,  0,    0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out         = { 127840,940,15980, 1,20, 0 };
-
-  std::vector< int64_t > l_loop_strides_left_packed  = {     0,  0,    0, 1, 0,20 };
-  std::vector< int64_t > l_loop_strides_right_packed = {     0,  0,    0, 0,13, 1 };
-
-  std::vector< iter_property > l_iter_props;
-  
-  for( size_t l_id = 0; l_id < l_loop_dim_type.size(); l_id++ ) {
-    iter_property l_iter_prop;
-    l_iter_prop.dim_type            = l_loop_dim_type[l_id];
-    l_iter_prop.exec_type           = l_loop_exec_type[l_id];
-    l_iter_prop.size                = l_loop_sizes[l_id];
-    l_iter_prop.stride_left         = l_loop_strides_left[l_id];
-    l_iter_prop.stride_right        = l_loop_strides_right[l_id];
-    l_iter_prop.stride_out_aux      = l_loop_strides_out_aux[l_id];
-    l_iter_prop.stride_out          = l_loop_strides_out[l_id];
-    l_iter_prop.packing_stride_left = l_loop_strides_left_packed[l_id];
-    l_iter_prop.packing_stride_right = l_loop_strides_right_packed[l_id];
-    l_iter_props.push_back( l_iter_prop );
-  }
-
-
+  //                                                     c1,  m2,   n2,m1,n1,k1
+  std::vector< int64_t > l_loop_sizes            = {      5, 17,    8,20,47,13 };  
+  std::vector< int64_t > l_loop_strides_left     = {   4420,260,    0,13, 0, 1 };
+  std::vector< int64_t > l_loop_strides_right    = {   4888,  0,  611, 0, 1,47 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {      0,  0,    0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = { 127840,940,15980, 1,20, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {      0,  0,    0, 1, 0,20 };
+  std::vector< int64_t > l_packing_strides_right = {      0,  0,    0, 0,13, 1 };
 
   at::Tensor l_left    = at::randn( {   5,17,13,20 } );
   at::Tensor l_right   = at::randn( {   5, 8,47,13 } );
@@ -699,7 +713,15 @@ TEST_CASE( "Tensor contraction with packing of both tensors and SFC parallelisat
   ContractionMemoryManager l_mem;
   ContractionBackendTpp l_cont;
 
-  l_cont.init( l_iter_props,
+  l_cont.init( l_loop_dim_type,
+               l_loop_exec_type,
+               l_loop_sizes,
+               l_loop_strides_left,
+               l_loop_strides_right,
+               l_loop_strides_out_aux,
+               l_loop_strides_out,
+               l_packing_strides_left,
+               l_packing_strides_right,
                data_t::FP32,
                data_t::FP32,
                data_t::FP32,

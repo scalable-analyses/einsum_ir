@@ -58,6 +58,8 @@ PYBIND11_MODULE(_etops_core, m) {
         :param strides_in0: Strides of the first input tensor.
         :param strides_in1: Strides of the second input tensor (ignored if unary).
         :param strides_out: Strides of the output tensor.
+        :param packing_strides_in0 Strides for packing of the first input tensor (ignored if unary).
+        :param packing_strides_in1 Strides for packing of the second input tensor (ignored if unary).
         :param num_threads_omp: Number of threads to use for normal parallelization.
         :param num_threads_sfc_m: Number of threads to use for SFC parallelization in M dimension.
         :param num_threads_sfc_n: Number of threads to use for SFC parallelization in N dimension.
@@ -73,6 +75,8 @@ PYBIND11_MODULE(_etops_core, m) {
       py::arg("strides_in0"),
       py::arg("strides_in1"),
       py::arg("strides_out"),
+      py::arg("packing_strides_in0"),
+      py::arg("packing_strides_in1"),
       py::arg("num_threads_omp"),
       py::arg("num_threads_sfc_m"),
       py::arg("num_threads_sfc_n")
@@ -115,6 +119,8 @@ PYBIND11_MODULE(_etops_core, m) {
         std::vector<int64_t>                 & strides_in0,
         std::vector<int64_t>                 & strides_in1,
         std::vector<int64_t>                 & strides_out,
+        std::vector<int64_t>                 & packing_strides_in0,
+        std::vector<int64_t>                 & packing_strides_in1,
         int64_t                                target_m,
         int64_t                                target_n,
         int64_t                                target_k,
@@ -138,6 +144,8 @@ PYBIND11_MODULE(_etops_core, m) {
           strides_in0,
           strides_in1,
           strides_out,
+          packing_strides_in0,
+          packing_strides_in1,
           target_m,
           target_n,
           target_k,
@@ -163,6 +171,8 @@ PYBIND11_MODULE(_etops_core, m) {
           strides_in0,
           strides_in1,
           strides_out,
+          packing_strides_in0,
+          packing_strides_in1,
           num_threads_omp,
           num_threads_sfc_m,
           num_threads_sfc_n
@@ -181,12 +191,14 @@ PYBIND11_MODULE(_etops_core, m) {
         :param strides_in0: Strides of the first input tensor.
         :param strides_in1: Strides of the second input tensor (ignored if unary).
         :param strides_out: Strides of the output tensor.
+        :param packing_strides_in0 Strides for packing of the first input tensor (ignored if unary).
+        :param packing_strides_in1 Strides for packing of the second input tensor (ignored if unary).
         :param target_m: Target size for dimension m.
         :param target_n: Target size for dimension n.
         :param target_k: Target size for dimension k.
-        :param num_threads_omp: Number of threads to use for normal parallelization (modified by optimization).
-        :param num_threads_sfc_m: Number of threads to use for SFC parallelization in M dimension (modified by optimization).
-        :param num_threads_sfc_n: Number of threads to use for SFC parallelization in N dimension (modified by optimization).
+        :param num_threads_omp: Number of threads to use for normal parallelization.
+        :param num_threads_sfc_m: Number of threads to use for SFC parallelization in M dimension.
+        :param num_threads_sfc_n: Number of threads to use for SFC parallelization in N dimension.
         :param generate_sfc: Whether to generate an SFC iteration.
         :param br_gemm_support: Whether to support BR_GEMM optimizations.
         :param packed_gemm_support: Whether to support packed GEMM optimizations.
@@ -203,6 +215,8 @@ PYBIND11_MODULE(_etops_core, m) {
       py::arg("strides_in0"),
       py::arg("strides_in1"),
       py::arg("strides_out"),
+      py::arg("packing_strides_in0"),
+      py::arg("packing_strides_in1"),
       py::arg("target_m"),
       py::arg("target_n"),
       py::arg("target_k"),

@@ -64,15 +64,17 @@ class einsum_ir::py::TensorOperation {
      * @param prim_first  Type of the first touch primitive.
      * @param prim_main   Type of the main primitive.
      * @param prim_last   Type of the last touch primitive.
-     * @param dim_types   Dimension types (c, m, n, or k).
+     * @param dim_types   Dimension types (c, m, n, or k) (ignored if unary).
      * @param exec_types  Execution type of the dimensions (prim, seq, shared, or sfc).
      * @param dim_sizes   Sizes of the dimensions.
      * @param strides_in0 Strides of the first input tensor.
      * @param strides_in1 Strides of the second input tensor (ignored if unary).
      * @param strides_out Strides of the output tensor.
+     * @param packing_strides_in0 Strides for packing of the first input tensor (ignored if unary).
+     * @param packing_strides_in1 Strides for packing of the second input tensor (ignored if unary).
      * @param num_threads_omp  Number of threads to use for normal parallelization.
-     * @param num_threads_sfc_m Number of threads to use for SFC parallelization in M dimension.
-     * @param num_threads_sfc_n Number of threads to use for SFC parallelization in N dimension.
+     * @param num_threads_sfc_m Number of threads to use for SFC parallelization in M dimension (ignored if unary).
+     * @param num_threads_sfc_n Number of threads to use for SFC parallelization in N dimension (ignored if unary).
      * @return            Appropiate error code.
      **/
     error_t setup(
@@ -86,6 +88,8 @@ class einsum_ir::py::TensorOperation {
       std::vector< int64_t > const & strides_in0,
       std::vector< int64_t > const & strides_in1,
       std::vector< int64_t > const & strides_out,
+      std::vector< int64_t > const & packing_strides_in0,
+      std::vector< int64_t > const & packing_strides_in1,
       int64_t                       num_threads_omp,
       int64_t                       num_threads_sfc_m,
       int64_t                       num_threads_sfc_n
@@ -115,6 +119,8 @@ class einsum_ir::py::TensorOperation {
      * @param strides_in0         Strides of the first input tensor (modified by optimization).
      * @param strides_in1         Strides of the second input tensor (modified by optimization).
      * @param strides_out         Strides of the output tensor (modified by optimization).
+     * @param packing_strides_in0 Strides for packing of the first input tensor (modified by optimization).
+     * @param packing_strides_in1 Strides for packing of the second input tensor (modified by optimization).
      * @param target_m            Target M block size for optimization.
      * @param target_n            Target N block size for optimization.
      * @param target_k            Target K block size for optimization.
@@ -135,6 +141,8 @@ class einsum_ir::py::TensorOperation {
       std::vector< int64_t > & strides_in0,
       std::vector< int64_t > & strides_in1,
       std::vector< int64_t > & strides_out,
+      std::vector<int64_t>   & packing_strides_in1,
+      std::vector<int64_t>   & packing_strides_in2,
       int64_t                  target_m,
       int64_t                  target_n,
       int64_t                  target_k,
@@ -211,22 +219,26 @@ class einsum_ir::py::TensorOperation {
     /**
      * Helper function to update parameters from optimized iter_property vector.
      *
-     * @param iters       Optimized iteration properties vector.
-     * @param dim_types   Output dimension types vector.
-     * @param exec_types  Output execution types vector.
-     * @param dim_sizes   Output dimension sizes vector.
-     * @param strides_in0 Output strides for first input tensor.
-     * @param strides_in1 Output strides for second input tensor.
-     * @param strides_out Output strides for output tensor.
+     * @param iters               Optimized iteration properties vector.
+     * @param dim_types           Output dimension types vector.
+     * @param exec_types          Output execution types vector.
+     * @param dim_sizes           Output dimension sizes vector.
+     * @param strides_in0         Output strides for first input tensor.
+     * @param strides_in1         Output strides for second input tensor.
+     * @param strides_out         Output strides for output tensor.
+     * @param packing_strides_in0 Output strides for packing of first input tensor.
+     * @param packing_strides_in1 Output strides for packing of second input tensor.
      **/
     static inline void update_parameters_from_iters(
       std::vector<einsum_ir::basic::iter_property> const & iters,
-      std::vector<dim_t>                                  & dim_types,
-      std::vector<exec_t>                                 & exec_types,
-      std::vector<int64_t>                                & dim_sizes,
-      std::vector<int64_t>                                & strides_in0,
-      std::vector<int64_t>                                & strides_in1,
-      std::vector<int64_t>                                & strides_out
+      std::vector<dim_t>                                 & dim_types,
+      std::vector<exec_t>                                & exec_types,
+      std::vector<int64_t>                               & dim_sizes,
+      std::vector<int64_t>                               & strides_in0,
+      std::vector<int64_t>                               & strides_in1,
+      std::vector<int64_t>                               & strides_out,
+      std::vector<int64_t>                               & packing_strides_in1,
+      std::vector<int64_t>                               & packing_strides_in2
     );
 
     /**

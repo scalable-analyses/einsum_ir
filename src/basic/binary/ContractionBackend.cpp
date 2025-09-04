@@ -13,6 +13,8 @@ void einsum_ir::basic::ContractionBackend::init( std::vector< dim_t >   const & 
                                                  std::vector< int64_t > const & i_strides_right,
                                                  std::vector< int64_t > const & i_strides_out_aux,
                                                  std::vector< int64_t > const & i_strides_out,
+                                                 std::vector< int64_t > const & i_packing_strides_left,
+                                                 std::vector< int64_t > const & i_packing_strides_right,
                                                  data_t                         i_dtype_left,
                                                  data_t                         i_dtype_right,
                                                  data_t                         i_dtype_comp,
@@ -22,7 +24,8 @@ void einsum_ir::basic::ContractionBackend::init( std::vector< dim_t >   const & 
                                                  kernel_t                       i_ktype_last_touch,
                                                  int64_t                        i_num_threads_omp,
                                                  int64_t                        i_num_threads_m,
-                                                 int64_t                        i_num_threads_n ){
+                                                 int64_t                        i_num_threads_n,
+                                                 ContractionMemoryManager     * i_contraction_mem ){
 
   //copy to local variables
   m_dim_type        = i_dim_type;
@@ -32,6 +35,19 @@ void einsum_ir::basic::ContractionBackend::init( std::vector< dim_t >   const & 
   m_strides_right   = i_strides_right;
   m_strides_out     = i_strides_out;
   m_strides_out_aux = i_strides_out_aux;
+
+  if(i_packing_strides_left.size() != 0){
+    m_packing_strides_left = i_packing_strides_left;
+  }
+  else{
+    m_packing_strides_left.resize(m_dim_type.size(), 0);
+  }
+  if(i_packing_strides_right.size() != 0){
+    m_packing_strides_right = i_packing_strides_right;
+  }
+  else{
+    m_packing_strides_right.resize(m_dim_type.size(), 0);
+  }
   
   m_dtype_left  = i_dtype_left;
   m_dtype_right = i_dtype_right;
@@ -45,6 +61,8 @@ void einsum_ir::basic::ContractionBackend::init( std::vector< dim_t >   const & 
   m_num_threads_m   = i_num_threads_m;
   m_num_threads_n   = i_num_threads_n;
   m_num_threads_omp = i_num_threads_omp;
+
+  m_memory = i_contraction_mem;
 
   m_is_compiled = false;
 }
@@ -211,12 +229,15 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionBackend::compile(){
 
   //reserve memory for packing
   int64_t l_reserved_size = m_size_packing_left * m_num_cached_ptrs_left + m_size_packing_right * m_num_cached_ptrs_right;
-  if( m_memory != nullptr ){
+  if( m_memory == nullptr ){
+    m_memory = &m_personal_memory;
     m_memory->reserve_thread_memory( l_reserved_size, m_num_threads );
-  }else if( l_reserved_size > 0 ){
-    return err_t::COMPILATION_FAILED;
+    m_memory->alloc_all_memory();
   }
-
+  else{
+    m_memory->reserve_thread_memory( l_reserved_size, m_num_threads );
+  }
+  std::cout << m_packing_left_id << std::endl;
   m_is_compiled = true;
   return err_t::SUCCESS;
 }
