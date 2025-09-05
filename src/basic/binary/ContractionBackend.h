@@ -79,7 +79,7 @@ class einsum_ir::basic::ContractionBackend {
     //! number of cached pointers for left input tensor
     int64_t m_num_cached_ptrs_left  = 1;
     //! number of cached pointers for right input tensor
-    int64_t m_num_cached_ptrs_right = 1;
+    int64_t m_num_cached_ptrs_right = 1;  
 
   protected:
     //! datatype of the left input
@@ -176,6 +176,16 @@ class einsum_ir::basic::ContractionBackend {
     bool m_trans_a = false;
     //! indicates if kernel should transpose B
     bool m_trans_b = false;
+
+    //! vector of function pointers to the loop implementations
+    std::vector<void (ContractionBackend::*)( thread_info *,
+                                              int64_t,
+                                              char const  *,
+                                              char const  *,
+                                              char const  *,
+                                              char        *,
+                                              bool,
+                                              bool) > m_loop_functs;
     
   public:
     /**
@@ -337,6 +347,27 @@ class einsum_ir::basic::ContractionBackend {
                             char          * i_ptr_out,
                             bool            i_first_access,
                             bool            i_last_access );
+
+    /**
+     * Inner most loop implementation based on kernel call featuring first and last touch operations.
+     *
+     * @param i_thread_inf information for the executing thread.
+     * @param i_id_loop dimension id of the loop which is executed.
+     * @param i_ptr_left pointer to the left tensor's data.
+     * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
+     * @param i_ptr_out pointer to the output tensor's data.
+     * @param i_first_access true if first time accessing this data
+     * @param i_last_access true if last time accessing this data
+     **/
+    void contract_iter_kernel( thread_info   * i_thread_inf,
+                               int64_t         i_id_loop,
+                               char    const * i_ptr_left,
+                               char    const * i_ptr_right,
+                               char    const * i_ptr_out_aux,
+                               char          * i_ptr_out,
+                               bool            i_first_access,
+                               bool            i_last_access );
 
     /**
      * calculates the shape of the kernel i.e. m, n, k, lda, ldb, ldc, ...

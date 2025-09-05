@@ -1,7 +1,6 @@
 #include "ContractionOptimizer.h"
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 
 void einsum_ir::basic::ContractionOptimizer::init( std::vector< iter_property > * i_iter_space,
                                                    kernel_t                     * i_ktype_main,
@@ -502,8 +501,6 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::set_primitive_it
   if( l_transpose_a ){
     l_packing_left = true;
   }
-
-  std::cout << l_packing_left << " " << l_packing_right << std::endl;
 
   //addapts the kernel targets depending on the potential kernel size
   set_kernel_targets_heuristic( l_potential_kernel_size, l_kernel_targets, l_iter_required );
