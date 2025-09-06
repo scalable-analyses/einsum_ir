@@ -15,7 +15,7 @@ namespace einsum_ir {
 class einsum_ir::backend::MemoryManager{
   private:
     //! alignment of memory to cache lines in bytes 
-    int64_t m_alignment_line = 64;
+    int64_t m_alignment_line = 128;
     //! alignment of memory to pages in bytes 
     int64_t m_alignment_page = 4096;
 

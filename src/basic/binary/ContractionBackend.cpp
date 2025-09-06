@@ -251,8 +251,8 @@ void einsum_ir::basic::ContractionBackend::contract_iter( thread_info   * i_thre
     l_size = i_thread_inf->movement_ids.size();
   }
 
-  uint64_t l_id_m = 0x7FFFFFFFFFFFFFFF;
-  uint64_t l_id_n = 0x7FFFFFFFFFFFFFFF;
+  uint64_t l_id_m = 0;
+  uint64_t l_id_n = 0;
 
   // issue loop iterations
   for( int64_t l_it = 0; l_it < l_size; l_it++ ) {
@@ -274,7 +274,7 @@ void einsum_ir::basic::ContractionBackend::contract_iter( thread_info   * i_thre
       int64_t l_id = l_id_m % m_num_cached_ptrs_left;
       l_ptr_left_active = i_thread_inf->memory_left + l_id * m_size_packing_left;
       if( i_ptr_left != i_thread_inf->cached_ptrs_left[l_id] ){
-        m_unary_left.contract(i_ptr_left, (void *)l_ptr_left_active);
+        m_unary_left.eval(i_ptr_left, (void *)l_ptr_left_active);
         i_thread_inf->cached_ptrs_left[l_id] = i_ptr_left;
       }
     }
@@ -285,7 +285,7 @@ void einsum_ir::basic::ContractionBackend::contract_iter( thread_info   * i_thre
       int64_t l_id = l_id_n % m_num_cached_ptrs_right;
       l_ptr_right_active = i_thread_inf->memory_right + l_id * m_size_packing_right;
       if( i_ptr_right != i_thread_inf->cached_ptrs_right[l_id]){
-        m_unary_right.contract(i_ptr_right, (void *)l_ptr_right_active);
+        m_unary_right.eval(i_ptr_right, (void *)l_ptr_right_active);
         i_thread_inf->cached_ptrs_right[l_id] = i_ptr_right;
       }
     }

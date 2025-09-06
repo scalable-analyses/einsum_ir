@@ -1,5 +1,5 @@
-#ifndef EINSUM_IR_BINARY_CONSTANTS
-#define EINSUM_IR_BINARY_CONSTANTS
+#ifndef EINSUM_IR_BASIC_CONSTANTS
+#define EINSUM_IR_BASIC_CONSTANTS
 
 #include <cstdint>
 #include <vector>

@@ -19,20 +19,20 @@ void einsum_ir::basic::UnaryBackendTpp::kernel_main( void const * i_out_aux,
     l_param.out.primary =          io_out;
     m_xmm_kernel_unary( &l_param );
   }
-  /*else if( m_xmm_kernel_binary != nullptr ) {
+  else if( m_xmm_kernel_binary != nullptr ) {
     libxsmm_meltw_binary_param l_param;
     l_param.in0.primary = (void *) io_out;
     l_param.in1.primary = (void *) i_out_aux;
     l_param.out.primary =          io_out;
     m_xmm_kernel_binary( &l_param );
-  }*/
+  }
 }
 
 einsum_ir::basic::err_t einsum_ir::basic::UnaryBackendTpp::compile_kernels(){
 
   // libxsmm data types
-  libxsmm_datatype l_xmm_dtype_in   = dtype_to_libxsmm( m_dtype_in  );
-  libxsmm_datatype l_xmm_dtype_out  = dtype_to_libxsmm( m_dtype_out   );
+  libxsmm_datatype l_xmm_dtype_in   = dtype_to_libxsmm( m_dtype_in   );
+  libxsmm_datatype l_xmm_dtype_out  = dtype_to_libxsmm( m_dtype_out  );
   libxsmm_datatype l_xmm_dtype_comp = dtype_to_libxsmm( m_dtype_comp );
 
   if(    l_xmm_dtype_in   == libxsmm_datatype::LIBXSMM_DATATYPE_UNSUPPORTED

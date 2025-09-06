@@ -36,8 +36,8 @@ TEST_CASE( "Scalar vector copy through the unary backend using FP64 data.", "[un
   at::Tensor l_t1 = at::zeros( {3},
                                at::ScalarType::Double );
 
-  l_unary_scalar.contract( l_t0.data_ptr(),
-                        l_t1.data_ptr() );
+  l_unary_scalar.eval( l_t0.data_ptr(),
+                       l_t1.data_ptr() );
 
   REQUIRE( at::equal( l_t0 , l_t1 ) );
 }
@@ -77,8 +77,8 @@ TEST_CASE( "Scalar small tensor transposition through the unary backend using FP
   at::Tensor l_t1 = at::zeros( {4, 5, 3},
                                at::ScalarType::Double );
 
-  l_unary_scalar.contract( l_t0.data_ptr(),
-                        l_t1.data_ptr() );
+  l_unary_scalar.eval( l_t0.data_ptr(),
+                       l_t1.data_ptr() );
 
   REQUIRE( at::equal( l_t0.permute( {2, 1, 0} ), l_t1 ) );
 }
@@ -129,8 +129,8 @@ TEST_CASE( "Scalar large tensor transposition through the unary backend using FP
   at::Tensor l_t1 = at::randn( {4, 5, 2, 3, 5, 8, 7, 6, 3},
                                at::ScalarType::Float );
 
-  l_unary_scalar.contract( l_t0.data_ptr(),
-                        l_t1.data_ptr() );
+  l_unary_scalar.eval( l_t0.data_ptr(),
+                       l_t1.data_ptr() );
 
   REQUIRE( at::equal( l_t0.permute( {2, 1, 4, 0, 5, 7, 3, 8, 6} ), l_t1 ) );
 }
@@ -181,8 +181,8 @@ TEST_CASE( "Scalar large tensor transposition through the unary backend with par
   at::Tensor l_t1 = at::randn( {4, 5, 2, 3, 5, 8, 7, 6, 3},
                                at::ScalarType::Float );
 
-  l_unary_scalar.contract( l_t0.data_ptr(),
-                        l_t1.data_ptr() );
+  l_unary_scalar.eval( l_t0.data_ptr(),
+                       l_t1.data_ptr() );
 
   REQUIRE( at::equal( l_t0.permute( {2, 1, 4, 0, 5, 7, 3, 8, 6} ), l_t1 ) );
 }

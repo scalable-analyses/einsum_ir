@@ -95,7 +95,6 @@ namespace einsum_ir {
     else if( i_dim == dim_t::I   ) return basic::dim_t::I;
     else if( i_dim == dim_t::J   ) return basic::dim_t::J;
     else return basic::dim_t::UNDEFINED_DIM;
-    
   }
 
   constexpr basic::data_t ce_dtype_to_basic( data_t i_dtype ) {
@@ -117,7 +116,7 @@ namespace einsum_ir {
     else if( i_ktype == BR_MADD         ) return basic::kernel_t::BR_MADD;
     else if( i_ktype == PACKED_MADD     ) return basic::kernel_t::PACKED_MADD;
     else if( i_ktype == CPX_PACKED_MADD ) return basic::kernel_t::CPX_PACKED_MADD;
-    else                                 return basic::kernel_t::UNDEFINED_KTYPE;
+    else                                  return basic::kernel_t::UNDEFINED_KTYPE;
   }
 
   constexpr err_t ce_basic_err_to_err( basic::err_t i_err ) {

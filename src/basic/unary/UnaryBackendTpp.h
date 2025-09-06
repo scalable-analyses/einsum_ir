@@ -12,22 +12,18 @@ namespace einsum_ir {
 
 class einsum_ir::basic::UnaryBackendTpp: public UnaryBackend {
   private:
-
     //! LIBXSMM-based unary TPP
     libxsmm_meltwfunction_unary m_xmm_kernel_unary = nullptr;
 
     //! LIBXSMM-based binary TPP
     libxsmm_meltwfunction_binary m_xmm_kernel_binary = nullptr;
 
-
     /**
-     * coverts internal datatypes to libxsmm datatypes
+     * converts internal datatypes to libxsmm datatypes
      *
      * @return libxsmm datatype.
      **/
     libxsmm_datatype dtype_to_libxsmm( data_t i_dtype );
-
-
 
     /**
      * Kernel called in the innermost loop.
