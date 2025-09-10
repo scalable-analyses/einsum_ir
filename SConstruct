@@ -93,7 +93,10 @@ if 'san' in  g_env['mode']:
                                     '-fsanitize=undefined'] )
 
 # enable c++17
-g_env.AppendUnique( CXXFLAGS = [ '-std=c++17' ] )
+if g_env['CXX'].startswith("g++"):
+  g_env.AppendUnique( CXXFLAGS = [ '-std=gnu++17' ] )
+else:
+  g_env.AppendUnique( CXXFLAGS = [ '-std=c++17' ] )
 
 # enable omp
 if 'omp' in g_env['parallel']:
@@ -204,7 +207,7 @@ g_env.tests = []
 g_env.exe = {}
 
 Export('g_env')
-SConscript( g_env['build_dir']+'/src/binary/SConscript' )
+SConscript( g_env['build_dir']+'/src/basic/SConscript' )
 SConscript( g_env['build_dir']+'/src/SConscript' )
 Import('g_env')
 

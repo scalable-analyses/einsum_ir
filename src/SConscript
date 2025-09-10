@@ -37,8 +37,6 @@ if g_env['blas'] != False:
 # default files
 l_sources = [ 'backend/Tensor.cpp',
               'backend/IterationSpaces.cpp',
-              'backend/UnaryLoops.cpp',
-              'backend/UnaryLoopsSimple.cpp',
               'backend/Unary.cpp',
               'backend/UnaryScalar.cpp',
               'backend/BinaryContraction.cpp',
@@ -52,10 +50,8 @@ l_sources = [ 'backend/Tensor.cpp',
               'frontend/EinsumTreeAscii.cpp' ]
 
 if g_env['libxsmm'] != False:
-  l_sources += [ 'backend/UnaryLoopsTpp.cpp',
-                 'backend/UnaryTpp.cpp',
-                 'backend/BinaryContractionTpp.cpp',
-                 'backend/ContractionPackingTpp.cpp', ]
+  l_sources += [ 'backend/UnaryTpp.cpp',
+                 'backend/BinaryContractionTpp.cpp' ]
 
 if g_env['tblis'] != False:
   l_sources += [ 'backend/BinaryContractionTblis.cpp' ]
@@ -69,8 +65,7 @@ l_tests = [ 'tests.cpp',
             'frontend/EinsumExpressionAscii.test.cpp' ]
 
 if g_env['libtorch'] != False:
-  l_tests += [ 'backend/UnaryLoopsSimple.test.torch.cpp',
-               'backend/UnaryScalar.test.torch.cpp',
+  l_tests += [ 'backend/UnaryScalar.test.torch.cpp',
                'backend/BinaryContractionScalar.test.torch.cpp',
                'backend/EinsumNode.test.torch.cpp',
                'frontend/EinsumExpression.test.torch.cpp',

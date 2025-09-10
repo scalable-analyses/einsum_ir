@@ -2,7 +2,7 @@
 #define EINSUM_IR_BACKEND_BINARY_CONTRACTION_TPP
 
 #include "BinaryContraction.h"
-#include "../binary/ContractionBackendTpp.h"
+#include "../basic/binary/ContractionBackendTpp.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -22,7 +22,7 @@ class einsum_ir::backend::BinaryContractionTpp: public BinaryContraction {
     int64_t m_target_prim_k = 256;
    
     //! contraction backend
-    einsum_ir::binary::ContractionBackendTpp m_backend;
+    einsum_ir::basic::ContractionBackendTpp m_backend;
 
     /**
      * Helper function for map find with default value

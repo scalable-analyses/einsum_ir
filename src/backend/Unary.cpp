@@ -37,7 +37,8 @@ void einsum_ir::backend::Unary::init( int64_t                              i_num
                                       data_t                               i_dtype_in,
                                       data_t                               i_dtype_comp,
                                       data_t                               i_dtype_out,
-                                      kernel_t                             i_ktype_main ) {
+                                      kernel_t                             i_ktype_main,
+                                      int64_t                              i_num_threads ) {
   m_num_dims    = i_num_dims;
   m_dim_sizes   = i_dim_sizes;
   m_dim_ids_in  = i_dim_ids_in;
@@ -46,6 +47,7 @@ void einsum_ir::backend::Unary::init( int64_t                              i_num
   m_dtype_comp  = i_dtype_comp;
   m_dtype_out   = i_dtype_out;
   m_ktype_main  = i_ktype_main;
+  m_num_threads = i_num_threads;
 }
 
 void einsum_ir::backend::Unary::init( int64_t                              i_num_dims,
@@ -57,7 +59,8 @@ void einsum_ir::backend::Unary::init( int64_t                              i_num
                                       data_t                               i_dtype_in,
                                       data_t                               i_dtype_comp,
                                       data_t                               i_dtype_out,
-                                      kernel_t                             i_ktype_main ) {
+                                      kernel_t                             i_ktype_main,
+                                      int64_t                              i_num_threads ) {
   m_num_dims    = i_num_dims;
   m_dim_sizes   = i_dim_sizes;
   m_dim_ids_in  = i_dim_ids_in;
@@ -66,6 +69,7 @@ void einsum_ir::backend::Unary::init( int64_t                              i_num
   m_dtype_comp  = i_dtype_comp;
   m_dtype_out   = i_dtype_out;
   m_ktype_main  = i_ktype_main;
+  m_num_threads = i_num_threads;
 
   if(i_strides_in != nullptr){
     m_strides_in  = std::vector<int64_t>(i_strides_in, i_strides_in + i_num_dims);

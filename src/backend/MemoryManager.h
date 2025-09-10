@@ -4,6 +4,7 @@
 #include <vector>
 #include <list>
 #include "../constants.h"
+#include "../basic/binary/ContractionMemoryManager.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -12,46 +13,37 @@ namespace einsum_ir {
 }
 
 class einsum_ir::backend::MemoryManager{
-  public:
+  private:
+    //! alignment of memory to cache lines in bytes 
+    int64_t m_alignment_line = 128;
+    //! alignment of memory to pages in bytes 
+    int64_t m_alignment_page = 4096;
+
     //! pointer to the start of all allocated memory
     char * m_memory_ptr = nullptr;
-
     //! pointer to the start of aligend memory
     char * m_aligned_memory_ptr = nullptr;
-
-    //! vector with thread specific allocated memory
-    std::vector<char *> m_thread_memory;
-
-    //! vector with thread specific aligned memory
-    std::vector<char *> m_aligned_thread_memory;
-
     //! the required memory for all data
     int64_t m_req_mem = 0;
-
-    //! required memory per thread
-    int64_t m_req_thread_mem = 0;
 
     //! last id given to any tensor
     int64_t m_last_id = 0;
 
-    // id of the current layer
-    int64_t m_layer_id = 0;
-
-    // alignment of memory to cache lines in bytes 
-    int64_t m_alignment_line = 64;
-
-    // alignment of memory to pages in bytes 
-    int64_t m_alignment_page = 4096;
-
-    //offset of the tensor for pointer calculation
+    //! offset of the tensor for pointer calculation
     std::vector<int64_t> m_tensor_offset;
 
-    //propertys of allocated memory
+    //! propertys of allocated memory
     std::list<int64_t> m_allocated_id_left;
     std::list<int64_t> m_allocated_id_right;
     std::list<int64_t> m_allocated_offset_left;
     std::list<int64_t> m_allocated_offset_right;
-    
+
+    //! memory manager for contractions
+    einsum_ir::basic::ContractionMemoryManager m_contraction_memory_manager;
+
+  public:
+    //! id of the current layer
+    int64_t m_layer_id = 0;
 
     /**
      * Destructor.
@@ -65,14 +57,14 @@ class einsum_ir::backend::MemoryManager{
      * 
      * @return id of the memory reservation.
      **/
-    int64_t reserve_memory(int64_t i_size);
+    int64_t reserve_memory( int64_t i_size );
 
     /**
      * removes a memory reservation.
      *
      * @param i_id id of the memory reservation.
      **/
-    void remove_reservation(int64_t i_size);
+    void remove_reservation( int64_t i_size );
 
     /**
      * Allocates the required memory.
@@ -86,21 +78,15 @@ class einsum_ir::backend::MemoryManager{
      * 
      * @return pointer to requested memory
      **/
-    void * get_mem_ptr(int64_t i_id);
+    void * get_mem_ptr( int64_t i_id );
 
     /**
-     * reserves thread specific memory for intermediate data in contractions. 
+     * retruns a poiner to the ContractionMemoryManager
      *
-     * @param i_size size of reserved memory.
+     * @return pointer to the ContractionMemoryManager
      **/
-    void reserve_thread_memory(int64_t i_size);
+    einsum_ir::basic::ContractionMemoryManager * get_contraction_memory_manager();
 
-    /**
-     * returns a pointer to thread specific memory
-     *
-     * @return pointer to requested memory
-     **/
-    void * get_thread_memory();
 };
 
 #endif

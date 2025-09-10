@@ -2,7 +2,7 @@
 #define EINSUM_IR_BACKEND_UNARY_SCALAR
 
 #include "Unary.h"
-#include "UnaryLoopsSimple.h"
+#include "../basic/unary/UnaryBackendScalar.h"
 
 namespace einsum_ir {
   namespace backend {
@@ -12,23 +12,8 @@ namespace einsum_ir {
 
 class einsum_ir::backend::UnaryScalar: public Unary {
   private:
-    //! unary loop interface
-    UnaryLoopsSimple m_unary_loops;
-
-    /**
-     * Compiler-based copy kernel.
-     *
-     * @param_t T datatype.
-     * @param i_data_src source of the copy operation.
-     * @param io_data_dst destination of the copy operation.
-     **/
-    template < typename T >
-    static void kernel_copy( void const * i_data_src,
-                             void       * io_data_dst );
-
-    //! main kernel
-    void (* m_kernel_main)( void const *,
-                            void       * ) = nullptr;
+    //! unary scalar backend
+    basic::UnaryBackendScalar m_backend;
 
   public:
     /**
@@ -37,13 +22,6 @@ class einsum_ir::backend::UnaryScalar: public Unary {
      * @return SUCCESS if successful, error code otherwise.
      **/
     err_t compile();
-
-    /**
-     * Initializes the threading configuration of the contraction.
-     *
-     * @param i_num_tasks_target number of targeted tasks.
-     **/
-    void threading( int64_t i_num_tasks_target  );
 
     /**
      * Evaluates the unary operation on the given data.

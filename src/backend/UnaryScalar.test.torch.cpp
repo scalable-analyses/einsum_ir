@@ -20,7 +20,8 @@ TEST_CASE( "Small tensor transposition through the scalar unary interface using 
                        einsum_ir::data_t::FP64,
                        einsum_ir::data_t::FP64,
                        einsum_ir::data_t::FP64,
-                       einsum_ir::kernel_t::COPY );
+                       einsum_ir::kernel_t::COPY,
+                       1 );
 
   l_unary_scalar.compile();
 
@@ -60,7 +61,8 @@ TEST_CASE( "Large tensor transposition through the scalar unary interface using 
                        einsum_ir::data_t::FP32,
                        einsum_ir::data_t::FP32,
                        einsum_ir::data_t::FP32,
-                       einsum_ir::kernel_t::COPY );
+                       einsum_ir::kernel_t::COPY,
+                       9 );
 
   l_unary_scalar.compile();
 

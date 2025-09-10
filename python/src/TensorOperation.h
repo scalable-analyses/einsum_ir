@@ -3,8 +3,8 @@
 
 #include <cstdint>
 #include <vector>
-#include <einsum_ir/binary/ContractionBackendTpp.h>
-#include <einsum_ir/binary/ContractionOptimizer.h>
+#include <einsum_ir/basic/binary/ContractionBackendTpp.h>
+#include <einsum_ir/basic/binary/ContractionOptimizer.h>
 
 namespace einsum_ir {
   namespace py {
@@ -55,7 +55,7 @@ class einsum_ir::py::TensorOperation {
       compilation_failed = 1
     };
 
-    einsum_ir::binary::ContractionBackendTpp m_backend;
+    einsum_ir::basic::ContractionBackendTpp m_backend;
 
     /**
      * Setup for a binary tensor contraction or a unary tensor operation.
@@ -147,7 +147,7 @@ class einsum_ir::py::TensorOperation {
      * @param exec_type TensorOperation execution type.
      * @return          Backend execution type.
      **/
-    static inline einsum_ir::binary::exec_t convert_exec_type( exec_t exec_type );
+    static inline einsum_ir::basic::exec_t convert_exec_type( exec_t exec_type );
 
     /**
      * Helper function to convert backend execution types back to TensorOperation execution types.
@@ -155,7 +155,7 @@ class einsum_ir::py::TensorOperation {
      * @param exec_type Backend execution type.
      * @return          TensorOperation execution type.
      **/
-    static inline exec_t convert_exec_type_back( einsum_ir::binary::exec_t exec_type );
+    static inline exec_t convert_exec_type_back( einsum_ir::basic::exec_t exec_type );
 
     /**
      * Helper function to convert TensorOperation dimension types to backend dimension types.
@@ -163,7 +163,7 @@ class einsum_ir::py::TensorOperation {
      * @param dim_type TensorOperation dimension type.
      * @return         Backend dimension type.
      **/
-    static inline einsum_ir::dim_t convert_dim_type( dim_t dim_type );
+    static inline einsum_ir::basic::dim_t convert_dim_type( dim_t dim_type );
 
     /**
      * Helper function to convert backend dimension types back to TensorOperation dimension types.
@@ -171,7 +171,7 @@ class einsum_ir::py::TensorOperation {
      * @param dim_type Backend dimension type.
      * @return         TensorOperation dimension type.
      **/
-    static inline dim_t convert_dim_type_back( einsum_ir::dim_t dim_type );
+    static inline dim_t convert_dim_type_back( einsum_ir::basic::dim_t dim_type );
 
     /**
      * Helper function to convert primitive types to backend kernel types.
@@ -179,7 +179,7 @@ class einsum_ir::py::TensorOperation {
      * @param prim_type TensorOperation primitive type.
      * @return          Backend kernel type.
      **/
-    static inline einsum_ir::kernel_t convert_prim_to_kernel( prim_t prim_type );
+    static inline einsum_ir::basic::kernel_t convert_prim_to_kernel( prim_t prim_type );
 
     /**
      * Helper function to create iter_property vector from input parameters.
@@ -192,7 +192,7 @@ class einsum_ir::py::TensorOperation {
      * @param strides_out Strides for output tensor.
      * @return            Vector of iteration properties.
      **/
-    static inline std::vector<einsum_ir::binary::iter_property> create_iter_properties(
+    static inline std::vector<einsum_ir::basic::iter_property> create_iter_properties(
       std::vector<dim_t>   const & dim_types,
       std::vector<exec_t>  const & exec_types,
       std::vector<int64_t> const & dim_sizes,
@@ -213,7 +213,7 @@ class einsum_ir::py::TensorOperation {
      * @param strides_out Output strides for output tensor.
      **/
     static inline void update_parameters_from_iters(
-      std::vector<einsum_ir::binary::iter_property> const & iters,
+      std::vector<einsum_ir::basic::iter_property> const & iters,
       std::vector<dim_t>                                  & dim_types,
       std::vector<exec_t>                                 & exec_types,
       std::vector<int64_t>                                & dim_sizes,

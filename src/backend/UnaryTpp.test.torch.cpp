@@ -18,7 +18,8 @@ TEST_CASE( "TPP-based vector copy through the unary interface using FP64 data.",
                     einsum_ir::data_t::FP64,
                     einsum_ir::data_t::FP64,
                     einsum_ir::data_t::FP64,
-                    einsum_ir::kernel_t::COPY );
+                    einsum_ir::kernel_t::COPY,
+                    1 );
 
   einsum_ir::err_t l_err = l_unary_tpp.compile();
   REQUIRE( l_err == einsum_ir::err_t::SUCCESS );
@@ -53,7 +54,8 @@ TEST_CASE( "TPP-based small tensor transposition through the unary interface usi
                     einsum_ir::data_t::FP64,
                     einsum_ir::data_t::FP64,
                     einsum_ir::data_t::FP64,
-                    einsum_ir::kernel_t::COPY );
+                    einsum_ir::kernel_t::COPY,
+                    3 );
 
   einsum_ir::err_t l_err = l_unary_tpp.compile();
   REQUIRE( l_err == einsum_ir::err_t::SUCCESS );
@@ -94,7 +96,8 @@ TEST_CASE( "TPP-based large tensor transposition through the unary interface usi
                     einsum_ir::data_t::FP32,
                     einsum_ir::data_t::FP32,
                     einsum_ir::data_t::FP32,
-                    einsum_ir::kernel_t::COPY );
+                    einsum_ir::kernel_t::COPY,
+                    24 );
 
   l_unary_tpp.compile();
 
@@ -135,7 +138,8 @@ TEST_CASE( "TPP-based large tensor transposition with the same fast dimensions f
                     einsum_ir::data_t::FP32,
                     einsum_ir::data_t::FP32,
                     einsum_ir::data_t::FP32,
-                    einsum_ir::kernel_t::COPY );
+                    einsum_ir::kernel_t::COPY,
+                    16 );
 
   l_unary_tpp.compile();
 
@@ -177,7 +181,8 @@ TEST_CASE( "TPP-based small tensor transposition with strides through the unary 
                     einsum_ir::data_t::FP32,
                     einsum_ir::data_t::FP32,
                     einsum_ir::data_t::FP32,
-                    einsum_ir::kernel_t::COPY );
+                    einsum_ir::kernel_t::COPY,
+                    13 );
 
   l_unary_tpp.compile();
 

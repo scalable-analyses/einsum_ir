@@ -1,0 +1,56 @@
+Import('g_env')
+
+# special defines for blas binary contraction backend
+if g_env['blas'] != False:
+  if 'CPPDEFINES' in g_env:
+      l_bin_cont_blas_defines = g_env['CPPDEFINES'].copy()
+  else:
+      l_bin_cont_blas_defines = []
+  if( g_env['blas_has_imatcopy'] != False ):
+    l_bin_cont_blas_defines.append( 'PP_EINSUM_IR_HAS_BLAS_IMATCOPY' )
+  if( g_env['blas'] == 'nvpl' ):
+    l_bin_cont_blas_defines.append( 'PP_EINSUM_IR_HAS_BLAS_NVPL' )
+
+  l_bin_cont_blas_sources = [ 'binary/ContractionBackendBlas.cpp' ]
+
+  for l_source in l_bin_cont_blas_sources:
+    g_env.sources.append( g_env.Object( l_source,
+                                        CPPDEFINES = l_bin_cont_blas_defines ) )
+
+# default files
+l_sources = [ 'binary/IterationSpace.cpp',
+              'binary/ContractionBackend.cpp',
+              'binary/ContractionBackendScalar.cpp',
+              'binary/ContractionOptimizer.cpp',
+              'binary/ContractionMemoryManager.cpp',
+              'unary/UnaryBackend.cpp', 
+              'unary/UnaryOptimizer.cpp',
+              'unary/UnaryBackendScalar.cpp' ]
+
+if g_env['libxsmm'] != False:
+  l_sources += [ 'binary/ContractionBackendTpp.cpp',
+                 'unary/UnaryBackendTpp.cpp' ]
+
+
+l_tests = [ 'binary/IterationSpace.test.cpp',
+            'binary/ContractionOptimizer.test.cpp']
+
+if g_env['libtorch'] != False:
+  l_tests += [ 'binary/ContractionBackendScalar.test.torch.cpp',
+               'unary/UnaryBackendScalar.test.torch.cpp' ]
+
+if g_env['libxsmm'] != False and g_env['libtorch'] != False:
+  l_tests += [ 'binary/ContractionBackendTpp.test.torch.cpp',
+               'unary/UnaryBackendTpp.test.torch.cpp' ]
+
+if g_env['blas'] != False and g_env['libtorch'] != False:
+  l_tests += [ 'binary/ContractionBackendBlas.test.torch.cpp' ]
+
+
+for l_source in l_sources:
+  g_env.sources.append( g_env.Object( l_source ) )
+
+for l_test in l_tests:
+  g_env.tests.append( g_env.Object( l_test ) )
+
+Export('g_env')

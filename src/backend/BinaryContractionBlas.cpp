@@ -1,5 +1,5 @@
 #include "BinaryContractionBlas.h"
-#include "../binary/ContractionOptimizer.h"
+#include "../basic/binary/ContractionOptimizer.h"
 
 einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
   err_t l_err = err_t::UNDEFINED_ERROR;
@@ -51,13 +51,13 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
 
 
   //lower to ContractionOptimizer data structure
-  std::vector<binary::iter_property> l_loops;
+  std::vector<basic::iter_property> l_loops;
   l_loops.resize(l_all_dim_ids.size());
 
   for(std::size_t l_id = 0; l_id < l_all_dim_ids.size(); l_id++){
     int64_t l_dim_id = l_all_dim_ids[l_id];
-    l_loops[l_id].dim_type       = m_dim_types[l_dim_id];
-    l_loops[l_id].exec_type      = binary::exec_t::SEQ;
+    l_loops[l_id].dim_type       = ce_dimt_to_basic(m_dim_types[l_dim_id]);
+    l_loops[l_id].exec_type      = basic::exec_t::SEQ;
     l_loops[l_id].size           = m_dim_sizes_inner->at(l_dim_id);
     l_loops[l_id].stride_left    = map_find_default<int64_t>(&l_strides_left,    l_dim_id, 0);
     l_loops[l_id].stride_right   = map_find_default<int64_t>(&l_strides_right,   l_dim_id, 0);
@@ -81,36 +81,53 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
 
   // set CPX dimension correctly
   if( m_ktype_main == einsum_ir::kernel_t::CPX_MADD ) {
-    l_loops[0].dim_type = CPX;
+    l_loops[0].dim_type = basic::dim_t::CPX;
   }
 
+  //convert kernel to basic
+  basic::kernel_t l_ktype_first_touch = ce_kernelt_to_basic(m_ktype_first_touch);
+  basic::kernel_t l_ktype_main        = ce_kernelt_to_basic(m_ktype_main);
+  basic::kernel_t l_ktype_last_touch  = ce_kernelt_to_basic(m_ktype_last_touch);
+
+  //convert dtype
+  basic::data_t l_dtype_left  = ce_dtype_to_basic(m_dtype_left);
+  basic::data_t l_dtype_right = ce_dtype_to_basic(m_dtype_right);
+  basic::data_t l_dtype_comp  = ce_dtype_to_basic(m_dtype_comp);
+  basic::data_t l_dtype_out   = ce_dtype_to_basic(m_dtype_out);
+
   //optimize loops
-  einsum_ir::binary::ContractionOptimizer l_optim;
+  einsum_ir::basic::ContractionOptimizer l_optim;
 
   l_optim.init(&l_loops,
-               &m_ktype_main,
+               &l_ktype_main,
                m_num_threads,
                m_target_prim_m,
                m_target_prim_n,
                m_target_prim_k,
                false,
-               true,
+               basic::packed_gemm_t::OUT_STRIDE_ONE,
                ce_n_bytes(m_dtype_out),
                m_l2_cache_size);
   l_optim.optimize();
 
+  einsum_ir::basic::ContractionMemoryManager * l_contraction_memory = nullptr;
+  if( m_memory != nullptr ){
+    l_contraction_memory = m_memory->get_contraction_memory_manager();
+  }
+
   //compile backend
   m_backend.init( l_loops,
-                  m_dtype_left,
-                  m_dtype_right,
-                  m_dtype_comp,
-                  m_dtype_out,
-                  m_ktype_first_touch,
-                  m_ktype_main,
-                  m_ktype_last_touch,
-                  m_num_threads );
+                  l_dtype_left,
+                  l_dtype_right,
+                  l_dtype_comp,
+                  l_dtype_out,
+                  l_ktype_first_touch,
+                  l_ktype_main,
+                  l_ktype_last_touch,
+                  m_num_threads,
+                  l_contraction_memory);
   
-  l_err = m_backend.compile();
+  l_err = ce_basic_err_to_err(m_backend.compile());
   if( l_err != err_t::SUCCESS ) {
     return l_err;
   }
