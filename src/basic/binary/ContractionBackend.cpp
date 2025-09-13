@@ -6,8 +6,6 @@
 #include <omp.h>
 #endif
 
-#include <iostream>
-
 void einsum_ir::basic::ContractionBackend::init( std::vector< dim_t >   const & i_dim_type,
                                                  std::vector< exec_t >  const & i_exec_type,
                                                  std::vector< int64_t > const & i_dim_sizes,
@@ -262,7 +260,6 @@ void einsum_ir::basic::ContractionBackend::contract( void const * i_tensor_left,
 #endif
   for( int64_t l_thread_id = 0; l_thread_id < m_num_threads; l_thread_id++ ) {
     thread_info * l_thread_inf = &m_thread_infos[l_thread_id];
-
     //get packing memory
     if( m_size_packing_left || m_size_packing_right ){
       l_thread_inf->memory_left  = m_memory->get_thread_memory( l_thread_id );
@@ -280,13 +277,13 @@ void einsum_ir::basic::ContractionBackend::contract( void const * i_tensor_left,
 
     //pack left tensor
     if( m_packing_left_id == 0)  {
-      m_unary_left.contract(l_tensor_left, l_thread_inf->memory_left);
+      m_unary_left.eval(l_tensor_left, l_thread_inf->memory_left);
        l_tensor_left = l_thread_inf->memory_left;
     }
 
     //pack right tensor
     if( m_packing_right_id == 0 )  {
-      m_unary_right.contract(l_tensor_right, l_thread_inf->memory_right);
+      m_unary_right.eval(l_tensor_right, l_thread_inf->memory_right);
       l_tensor_right = l_thread_inf->memory_right;
     }
 
@@ -328,14 +325,14 @@ void einsum_ir::basic::ContractionBackend::contract_iter( thread_info   * i_thre
     const char * l_ptr_left_active = i_ptr_left;
     if( m_packing_left_id == l_id_next_loop )  {
       l_ptr_left_active = i_thread_inf->memory_left;
-      m_unary_left.contract(i_ptr_left, (void *)l_ptr_left_active);
+      m_unary_left.eval(i_ptr_left, (void *)l_ptr_left_active);
     }
 
     //pack right tensor
     const char * l_ptr_right_active = i_ptr_right;
     if( m_packing_right_id == l_id_next_loop )  {
       l_ptr_right_active = i_thread_inf->memory_right;
-      m_unary_right.contract(i_ptr_right, (void *)l_ptr_right_active);
+      m_unary_right.eval(i_ptr_right, (void *)l_ptr_right_active);
     }
   
     //recursive function call
@@ -392,7 +389,7 @@ void einsum_ir::basic::ContractionBackend::contract_iter_parallel( thread_info  
     //pack left tensor
     if( m_packing_left_id == l_id_next_loop )  {
       if( l_ptr_left != i_thread_inf->cached_ptrs_left[0] ){
-        m_unary_left.contract(l_ptr_left, i_thread_inf->memory_left);
+        m_unary_left.eval(l_ptr_left, i_thread_inf->memory_left);
         i_thread_inf->cached_ptrs_left[0] = l_ptr_left;
       }
       l_ptr_left = i_thread_inf->memory_left;
@@ -401,7 +398,7 @@ void einsum_ir::basic::ContractionBackend::contract_iter_parallel( thread_info  
     //pack right tensor
     if( m_packing_right_id == l_id_next_loop )  {
       if( l_ptr_right != i_thread_inf->cached_ptrs_right[0]){
-        m_unary_right.contract(l_ptr_right, i_thread_inf->memory_right);
+        m_unary_right.eval(l_ptr_right, i_thread_inf->memory_right);
         i_thread_inf->cached_ptrs_right[0] = l_ptr_right;
       }
       l_ptr_right = i_thread_inf->memory_right;
@@ -460,7 +457,7 @@ void einsum_ir::basic::ContractionBackend::contract_iter_sfc( thread_info   * i_
       int64_t l_id = l_id_m % m_num_cached_ptrs_left;
       l_ptr_left_active = i_thread_inf->memory_left + l_id * m_size_packing_left;
       if( i_ptr_left != i_thread_inf->cached_ptrs_left[l_id] ){
-        m_unary_left.contract(i_ptr_left, (void *)l_ptr_left_active);
+        m_unary_left.eval(i_ptr_left, (void *)l_ptr_left_active);
         i_thread_inf->cached_ptrs_left[l_id] = i_ptr_left;
       }
     }
@@ -471,7 +468,7 @@ void einsum_ir::basic::ContractionBackend::contract_iter_sfc( thread_info   * i_
       int64_t l_id = l_id_n % m_num_cached_ptrs_right;
       l_ptr_right_active = i_thread_inf->memory_right + l_id * m_size_packing_right;
       if( i_ptr_right != i_thread_inf->cached_ptrs_right[l_id]){
-        m_unary_right.contract(i_ptr_right, (void *)l_ptr_right_active);
+        m_unary_right.eval(i_ptr_right, (void *)l_ptr_right_active);
         i_thread_inf->cached_ptrs_right[l_id] = i_ptr_right;
       }
     }

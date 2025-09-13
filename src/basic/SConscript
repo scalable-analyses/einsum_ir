@@ -31,7 +31,6 @@ if g_env['libxsmm'] != False:
   l_sources += [ 'binary/ContractionBackendTpp.cpp',
                  'unary/UnaryBackendTpp.cpp' ]
 
-
 l_tests = [ 'binary/ContractionOptimizer.test.cpp']
 
 if g_env['libtorch'] != False:

@@ -13,7 +13,7 @@ namespace einsum_ir {
 class einsum_ir::basic::ContractionMemoryManager{
   private:
     // alignment of memory to cache lines in bytes 
-    int64_t m_alignment_line = 64;
+    int64_t m_alignment_line = 128;
 
     //! vector with thread specific allocated memory
     std::vector<char *> m_thread_memory;
@@ -37,16 +37,7 @@ class einsum_ir::basic::ContractionMemoryManager{
     void alloc_all_memory();
 
     /**
-     * returns a pointer to requested memory
-     *
-     * @param i_id id of the memory request.
-     * 
-     * @return pointer to requested memory
-     **/
-    void * get_mem_ptr( int64_t i_id );
-
-    /**
-     * reserves thread specific memory for intermediate data in contractions. 
+     * Reserves thread specific memory for intermediate data in contractions. 
      *
      * @param i_size size of reserved memory.
      **/
@@ -54,7 +45,7 @@ class einsum_ir::basic::ContractionMemoryManager{
                                 int64_t i_num_threads );
 
     /**
-     * returns a pointer to thread specific memory
+     * Returns a pointer to thread specific memory
      *
      * @return pointer to requested memory
      **/

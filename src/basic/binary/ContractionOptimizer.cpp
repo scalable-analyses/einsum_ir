@@ -42,19 +42,6 @@ void einsum_ir::basic::ContractionOptimizer::init( std::vector< iter_property > 
   m_target_extra_packing = 8;
 }
 
-void get_divisors( int64_t i_num, 
-                   std::vector<int64_t> & o_divisors ){
-  o_divisors.clear();
-  for( int64_t l_i = 1; l_i <= (int64_t)std::sqrt(i_num); l_i++ ){
-    if( i_num % l_i == 0 ){
-      o_divisors.push_back(l_i);
-      if( l_i != i_num / l_i ){
-        o_divisors.push_back(i_num / l_i);
-      }
-    }
-  }
-}
-
 einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::optimize(){
   // removes size 1 iters
   remove_empty_iters();
@@ -498,9 +485,6 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::set_primitive_it
       && l_potential_kernel_iter[ PRIM_N ]->stride_right % 2048 == 0 ){
     l_packing_right = true;
   }
-  if( l_transpose_a ){
-    l_packing_left = true;
-  }
 
   //addapts the kernel targets depending on the potential kernel size
   set_kernel_targets_heuristic( l_potential_kernel_size, l_kernel_targets, l_iter_required );
@@ -766,27 +750,37 @@ void einsum_ir::basic::ContractionOptimizer::split_iter( std::vector<iter_proper
   i_iteration->stride_out     *= l_split;                        
 }
 
-int64_t einsum_ir::basic::ContractionOptimizer::find_split( int64_t i_dim_size,
-                                                            int64_t i_target_size ){
-  //factorization of number
-  int64_t l_best_factor = i_dim_size;
-  double l_best_distance = std::abs(std::log((double)i_dim_size/i_target_size));
-
-  for(int64_t l_i = 1; l_i <= (int64_t)std::sqrt(i_dim_size); l_i++){
-    if(i_dim_size % l_i == 0){
-      double l_distance_i = std::abs(std::log((double)l_i/i_target_size));
-      if(l_best_distance > l_distance_i){
-        l_best_factor = l_i;
-        l_best_distance = l_distance_i;
-      }
-      int64_t l_other = i_dim_size / l_i;
-      l_distance_i = std::abs(std::log((double)l_other/i_target_size));
-      if(l_best_distance > l_distance_i){
-        l_best_factor = l_other;
-        l_best_distance = l_distance_i;
+void einsum_ir::basic::ContractionOptimizer::get_divisors( int64_t i_num, 
+                                                           std::vector<int64_t> & o_divisors ){
+  o_divisors.clear();
+  for( int64_t l_i = 1; l_i <= (int64_t)std::sqrt(i_num); l_i++ ){
+    if( i_num % l_i == 0 ){
+      o_divisors.push_back(l_i);
+      if( l_i != i_num / l_i ){
+        o_divisors.push_back(i_num / l_i);
       }
     }
   }
+}
+
+int64_t einsum_ir::basic::ContractionOptimizer::find_split( int64_t i_dim_size,
+                                                            int64_t i_target_size ){
+
+  //get all divisors
+  std::vector<int64_t> l_divisors;
+  get_divisors( i_dim_size, l_divisors);
+
+  //find divisor that is closest to target size in log space
+  int64_t l_best_divisor = i_dim_size;
+  double l_best_distance = std::abs(std::log((double)i_dim_size/i_target_size));
+  for( size_t l_id = 0; l_id < l_divisors.size(); l_id++){
+    int64_t l_divisor = l_divisors[l_id];
+    double l_distance = std::abs(std::log((double)l_divisor/i_target_size));
+    if(l_best_distance > l_distance){
+        l_best_divisor = l_divisor;
+        l_best_distance = l_distance;
+      }
+  }
   
-  return l_best_factor;
+  return l_best_divisor;
 }

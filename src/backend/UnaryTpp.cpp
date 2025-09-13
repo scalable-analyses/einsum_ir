@@ -11,10 +11,10 @@ einsum_ir::err_t einsum_ir::backend::UnaryTpp::compile() {
   std::vector<basic::iter_property> l_loops;
   l_loops.resize(m_num_dims);
   for(std::size_t l_di = 0; l_di < l_loops.size(); l_di++){
-    l_loops[l_di].exec_type      = basic::exec_t::SEQ;
-    l_loops[l_di].size           = m_sizes_out[l_di];
-    l_loops[l_di].stride_left    = m_strides_in[l_di];
-    l_loops[l_di].stride_out     = m_strides_out[l_di];
+    l_loops[l_di].exec_type   = basic::exec_t::SEQ;
+    l_loops[l_di].size        = m_sizes_out[l_di];
+    l_loops[l_di].stride_left = m_strides_in[l_di];
+    l_loops[l_di].stride_out  = m_strides_out[l_di];
   }
 
   //convert kernel to basic
@@ -51,5 +51,5 @@ einsum_ir::err_t einsum_ir::backend::UnaryTpp::compile() {
 
 void einsum_ir::backend::UnaryTpp::eval( void const * i_tensor_in,
                                          void       * io_tensor_out ) {
-  m_backend.contract( i_tensor_in, io_tensor_out );
+  m_backend.eval( i_tensor_in, io_tensor_out );
 }

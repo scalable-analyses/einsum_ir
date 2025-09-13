@@ -1,6 +1,5 @@
 clang
 cmake
 g++
-g++-14
 gfortran
 scons

@@ -51,5 +51,5 @@ einsum_ir::err_t einsum_ir::backend::UnaryScalar::compile() {
 
 void einsum_ir::backend::UnaryScalar::eval( void const * i_tensor_in,
                                             void       * io_tensor_out ) {
-  m_backend.contract( i_tensor_in, io_tensor_out );
+  m_backend.eval( i_tensor_in, io_tensor_out );
 }

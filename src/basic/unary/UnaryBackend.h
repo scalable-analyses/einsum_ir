@@ -14,7 +14,7 @@ namespace einsum_ir {
 class einsum_ir::basic::UnaryBackend {
   private:
 
-    //! id of the first primitive loop
+    //! id of the first primitive dimension
     int64_t m_id_first_primitive_dim = 0;
 
     //! number of threads used for execution
@@ -37,10 +37,10 @@ class einsum_ir::basic::UnaryBackend {
     data_t m_dtype_comp = UNDEFINED_DTYPE;
 
 
-    //! vector with execution types of all loops
-    std::vector< exec_t >   m_exec_type;
+    //! vector with execution types of all axes
+    std::vector< exec_t > m_exec_types;
 
-    //! vector with sizes of all loops
+    //! vector with sizes of all axes
     std::vector< int64_t > m_dim_sizes;
 
     //! vector with the strides of the  input tensor
@@ -70,7 +70,7 @@ class einsum_ir::basic::UnaryBackend {
     /**
      * Initializes the class.
      *
-     * @param i_exec_type execution types.
+     * @param i_exec_types execution types.
      * @param i_dim_sizes sizes of the dimensions.
      * @param i_strides_in strides in the input tensor.
      * @param i_strides_out strides in the output tensor.
@@ -78,9 +78,9 @@ class einsum_ir::basic::UnaryBackend {
      * @param i_dtype_comp datatype of computation.
      * @param i_dtype_out datatype of output tensor.
      * @param i_ktype type of the kernel.
-     * @param i_num_threads number of threads used for contraction.
+     * @param i_num_threads number of threads for unary operation.
      **/
-    void init( std::vector< exec_t >  const & i_exec_type,
+    void init( std::vector< exec_t >  const & i_exec_types,
                std::vector< int64_t > const & i_dim_sizes,
                std::vector< int64_t > const & i_strides_in,
                std::vector< int64_t > const & i_strides_out,
@@ -99,7 +99,7 @@ class einsum_ir::basic::UnaryBackend {
      * @param i_dtype_comp datatype of computation.
      * @param i_dtype_out datatype of output tensor.
      * @param i_ktype type of the kernel.
-     * @param i_num_threads number of threads used for contraction.
+     * @param i_num_threads number of threads used for unary operation.
      **/
     void init( std::vector< iter_property > const & i_iterations,
                data_t                               i_dtype_in,
@@ -109,7 +109,7 @@ class einsum_ir::basic::UnaryBackend {
                int64_t                              i_num_threads );
 
     /**
-     * Compiles the contraction loop interface.
+     * Compiles the unary backend.
      *
      * @return SUCCESS if the compilation was successful, otherwise an appropiate error code.
      **/
@@ -117,13 +117,13 @@ class einsum_ir::basic::UnaryBackend {
 
 
     /**
-     * Contracts the two tensors.
+     * Evaluates the unary operation.
      *
      * @param i_tensor_in input tensor.
      * @param io_tensor_out output tensor.
      **/
-    void contract( void const * i_tensor_in,
-                   void       * io_tensor_out );
+    void eval( void const * i_tensor_in,
+               void       * io_tensor_out );
     
     /**
      * General purpose loop implementation featuring first and last touch operations.
@@ -133,9 +133,9 @@ class einsum_ir::basic::UnaryBackend {
      * @param i_ptr_in pointer to the input tensor's data.
      * @param i_ptr_out pointer to the output tensor's data.
      **/
-    void contract_iter( int64_t         i_id_loop,
-                        char    const * i_ptr_in,
-                        char          * i_ptr_out );
+    void eval_iter( int64_t         i_id_loop,
+                    char    const * i_ptr_in,
+                    char          * i_ptr_out );
 
     /**
      * General purpose loop implementation featuring first and last touch operations.
@@ -145,16 +145,16 @@ class einsum_ir::basic::UnaryBackend {
      * @param i_ptr_in pointer to the input tensor's data.
      * @param i_ptr_out pointer to the output tensor's data.
      **/
-    void contract_iter_parallel( int64_t         i_id_loop,
-                                 char    const * i_ptr_in,
-                                 char          * i_ptr_out );
+    void eval_iter_parallel( int64_t         i_id_loop,
+                             char    const * i_ptr_in,
+                             char          * i_ptr_out );
 
     /**
-     * calculates the shape of the kernel i.e. m, n, k, lda, ldb, ldc, ...
+     * calculates the properies of the kernel i.e. m, n, lda, ldb ...
      *
      * @return SUCCESS if the shape matches with the main primitive, otherwise an appropiate error code.
      **/
-    err_t set_kernel_shape( );
+    err_t set_kernel_properties( );
 
     /**
      * Kernel called in the innermost loop.

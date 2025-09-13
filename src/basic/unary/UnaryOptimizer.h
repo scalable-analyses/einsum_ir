@@ -26,9 +26,9 @@ class einsum_ir::basic::UnaryOptimizer {
    /**
      * Initializes the unary optimizer.
      *
-     * @param i_iter_space vector of iters corresponding to an unoptimized contraction.
-     * @param i_num_threads number of participating threads in contraction.
-     * @param i_scalar_optim true if sclar execution should be generated, false otherwise.
+     * @param i_iter_space vector of iters corresponding to an unoptimized unary operation.
+     * @param i_num_threads number of participating threads for unary operation.
+     * @param i_scalar_optim true if scalar execution should be generated, false otherwise.
      **/
     void init( std::vector< iter_property > * i_iter_space,
                int64_t                        i_num_threads, 

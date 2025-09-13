@@ -18,7 +18,7 @@ einsum_ir::basic::err_t einsum_ir::basic::UnaryOptimizer::optimize(){
   //optimize unary packing kernel
   std::sort(m_iter_space->begin(), m_iter_space->end(),
             [](iter_property const & a, iter_property const & b) {
-              return std::min((double)a.stride_left, a.stride_out + 0.1) > std::min((double)b.stride_left, b.stride_out + 0.1);
+              return std::min(2*a.stride_left, 2*a.stride_out + 1) > std::min(2*b.stride_left, 2*b.stride_out + 1);
             });
 
   bool l_found_stride_one_in  = false;

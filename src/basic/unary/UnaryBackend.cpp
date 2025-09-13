@@ -1,6 +1,6 @@
 #include "UnaryBackend.h"
 
-void einsum_ir::basic::UnaryBackend::init( std::vector< exec_t >  const & i_exec_type,
+void einsum_ir::basic::UnaryBackend::init( std::vector< exec_t >  const & i_exec_types,
                                            std::vector< int64_t > const & i_dim_sizes,
                                            std::vector< int64_t > const & i_strides_in,
                                            std::vector< int64_t > const & i_strides_out,
@@ -11,7 +11,7 @@ void einsum_ir::basic::UnaryBackend::init( std::vector< exec_t >  const & i_exec
                                            int64_t                        i_num_threads ){
 
   //copy to local variables
-  m_exec_type = i_exec_type;
+  m_exec_types = i_exec_types;
   m_dim_sizes = i_dim_sizes;
 
   m_strides_in  = i_strides_in;
@@ -34,13 +34,13 @@ void einsum_ir::basic::UnaryBackend::init( std::vector< iter_property > const & 
                                            int64_t                              i_num_threads ){
 
   int64_t l_num_iters = i_iterations.size();
-  m_exec_type.resize(l_num_iters);
+  m_exec_types.resize(l_num_iters);
   m_dim_sizes.resize(l_num_iters); 
   m_strides_in.resize(l_num_iters);
   m_strides_out.resize(l_num_iters);
 
   for(int64_t l_id = 0; l_id < l_num_iters; l_id++){
-    m_exec_type[   l_id] = i_iterations[l_id].exec_type;
+    m_exec_types[  l_id] = i_iterations[l_id].exec_type;
     m_dim_sizes[   l_id] = i_iterations[l_id].size;
     m_strides_in[  l_id] = i_iterations[l_id].stride_left;
     m_strides_out[ l_id] = i_iterations[l_id].stride_out;  
@@ -59,7 +59,7 @@ einsum_ir::basic::err_t einsum_ir::basic::UnaryBackend::compile(){
   err_t l_err = err_t::UNDEFINED_ERROR;
 
   // get kernel shape
-  l_err = set_kernel_shape();
+  l_err = set_kernel_properties();
   if( l_err != err_t::SUCCESS ) {
     return l_err;
   }
@@ -74,15 +74,15 @@ einsum_ir::basic::err_t einsum_ir::basic::UnaryBackend::compile(){
   m_id_first_parallel_loop = -1;
   m_id_first_primitive_dim = -1;
   m_num_parallel_loops = 0;
-  int64_t l_num_iters = m_exec_type.size();
+  int64_t l_num_iters = m_exec_types.size();
   for(int64_t l_id = 0; l_id < l_num_iters; l_id++){
-    if( m_exec_type.at(l_id) == exec_t::OMP ){
+    if( m_exec_types.at(l_id) == exec_t::OMP ){
       if( m_id_first_parallel_loop == -1 ){
           m_id_first_parallel_loop = l_id;
       }
       m_num_parallel_loops++;
     }
-    if( m_exec_type.at(l_id) == exec_t::PRIM ){
+    if( m_exec_types.at(l_id) == exec_t::PRIM ){
       m_id_first_primitive_dim = l_id;
       break;
     }
@@ -102,37 +102,37 @@ einsum_ir::basic::err_t einsum_ir::basic::UnaryBackend::compile(){
   return err_t::SUCCESS;
 }
 
-void einsum_ir::basic::UnaryBackend::contract( void const * i_tensor_in,
-                                               void       * io_tensor_out ) {
+void einsum_ir::basic::UnaryBackend::eval( void const * i_tensor_in,
+                                           void       * io_tensor_out ) {
   if(m_id_first_primitive_dim == 0){
     kernel_main( (char *) i_tensor_in,
                  (char *) io_tensor_out );
   }
   else if(m_id_first_parallel_loop == 0){
-    contract_iter_parallel( 0,
-                            (char *) i_tensor_in,
-                            (char *) io_tensor_out );
+    eval_iter_parallel( 0,
+                        (char *) i_tensor_in,
+                        (char *) io_tensor_out );
   }
   else{
-    contract_iter( 0,
-                   (char *) i_tensor_in,
-                   (char *) io_tensor_out );
+    eval_iter( 0,
+               (char *) i_tensor_in,
+               (char *) io_tensor_out );
   }
 }
 
 
-void einsum_ir::basic::UnaryBackend::contract_iter( int64_t         i_id_loop,
-                                                    char    const * i_ptr_in,
-                                                    char          * i_ptr_out ) {
+void einsum_ir::basic::UnaryBackend::eval_iter( int64_t         i_id_loop,
+                                                char    const * i_ptr_in,
+                                                char          * i_ptr_out ) {
 
   int64_t l_size = m_dim_sizes[i_id_loop];
 
   // issue loop iterations
   for( int64_t l_it = 0; l_it < l_size; l_it++ ) {
     if( i_id_loop + 1 < m_id_first_primitive_dim ) {
-      contract_iter( i_id_loop+1,
-                     i_ptr_in,
-                     i_ptr_out );
+      eval_iter( i_id_loop+1,
+                 i_ptr_in,
+                 i_ptr_out );
     }
     else {
       // execute main kernel
@@ -144,9 +144,9 @@ void einsum_ir::basic::UnaryBackend::contract_iter( int64_t         i_id_loop,
   }
 }
 
-void einsum_ir::basic::UnaryBackend::contract_iter_parallel( int64_t         i_id_loop,
-                                                             char    const * i_ptr_in,
-                                                             char          * i_ptr_out ) {
+void einsum_ir::basic::UnaryBackend::eval_iter_parallel( int64_t         i_id_loop,
+                                                         char    const * i_ptr_in,
+                                                         char          * i_ptr_out ) {
 
   int64_t l_all_size = 1;
   for( int64_t l_loop = 0; l_loop < m_num_parallel_loops; l_loop++ ) {
@@ -175,9 +175,9 @@ void einsum_ir::basic::UnaryBackend::contract_iter_parallel( int64_t         i_i
     }
 
     if( i_id_loop + 1 < m_id_first_primitive_dim ) {
-      contract_iter( i_id_loop+1,
-                     l_ptr_in,
-                     l_ptr_out );
+      eval_iter( i_id_loop+1,
+                 l_ptr_in,
+                 l_ptr_out );
     }
     else {
       // execute main kernel
@@ -187,13 +187,13 @@ void einsum_ir::basic::UnaryBackend::contract_iter_parallel( int64_t         i_i
   }
 }
 
-einsum_ir::basic::err_t einsum_ir::basic::UnaryBackend::set_kernel_shape( ){
+einsum_ir::basic::err_t einsum_ir::basic::UnaryBackend::set_kernel_properties( ){
 
   //check that there are enough primitive dimensions
   int64_t l_size = m_dim_sizes.size();
   int64_t l_num_prims = 0;
   for( int64_t l_id = l_size - 1; l_id >= 0; l_id-- ){
-    if( m_exec_type[l_id] != exec_t::PRIM ){
+    if( m_exec_types[l_id] != exec_t::PRIM ){
       break;
     }
     l_num_prims++;

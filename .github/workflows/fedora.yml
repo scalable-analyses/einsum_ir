@@ -62,9 +62,9 @@ jobs:
         run: |
           for i in {1..5}; do git clone https://github.com/devinamatthews/tblis.git tblis_src && break || { [ $i -eq 5 ] && exit 1 || sleep 15; }; done
           cd tblis_src
-          git checkout 2cbdd21
+          git checkout 493c2ad
           git log | head -n 25
-          ./configure --prefix=$(pwd)/../tblis --enable-thread-model=openmp
+          CXX=clang++ CC=clang ./configure --prefix=$(pwd)/../tblis --enable-threading=openmp
           sed -i '971d' Makefile
           make -j$(nproc)
           make install
@@ -84,7 +84,7 @@ jobs:
         run: |
           wget https://github.com/catchorg/Catch2/releases/download/v2.13.10/catch.hpp
 
-          CXX=g++-14 CC=g++-14 scons libtorch=$(pwd)/venv_pytorch/lib/python3.10/site-packages/torch blas=$(pwd)/openblas tblis=$(pwd)/tblis libxsmm=$(pwd)/libxsmm -j$(nproc)
+          scons libtorch=$(pwd)/venv_pytorch/lib/python3.10/site-packages/torch blas=$(pwd)/openblas tblis=$(pwd)/tblis libxsmm=$(pwd)/libxsmm -j$(nproc)
           mv build build_gcc
 
           CXX=clang++ CC=clang scons libtorch=$(pwd)/venv_pytorch/lib/python3.10/site-packages/torch blas=$(pwd)/openblas tblis=$(pwd)/tblis libxsmm=$(pwd)/libxsmm -j$(nproc)

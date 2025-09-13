@@ -29,7 +29,7 @@ class einsum_ir::basic::ContractionBackendTpp: public ContractionBackend {
     libxsmm_meltwfunction_binary m_xmm_kernel_last_touch_binary = nullptr;
 
     /**
-     * coverts internal datatypes to libxsmm datatypes
+     * converts internal datatypes to libxsmm datatypes
      *
      * @return libxsmm datatype.
      **/

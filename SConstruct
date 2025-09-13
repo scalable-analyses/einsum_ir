@@ -93,7 +93,10 @@ if 'san' in  g_env['mode']:
                                     '-fsanitize=undefined'] )
 
 # enable c++17
-g_env.AppendUnique( CXXFLAGS = [ '-std=c++17' ] )
+if g_env['CXX'].startswith("g++"):
+  g_env.AppendUnique( CXXFLAGS = [ '-std=gnu++17' ] )
+else:
+  g_env.AppendUnique( CXXFLAGS = [ '-std=c++17' ] )
 
 # enable omp
 if 'omp' in g_env['parallel']:
