@@ -358,7 +358,7 @@ int main( int     i_argc,
   l_time_total = l_time_compile + l_time_eval;
   l_gflops_total = 1.0E-9 * l_num_flops / (l_time_total);
 
-  std::cout << "  #flops:         " << l_num_flops << std::endl;\
+  std::cout << "  #flops:         " << l_num_flops << std::endl;
   std::cout << "  time (compile): " << l_time_compile << std::endl;
   std::cout << "  time (eval):    " << l_time_eval << std::endl;
   std::cout << "  gflops (eval):  " << l_gflops_eval << std::endl;
@@ -396,7 +396,6 @@ int main( int     i_argc,
     l_out_aten = at::einsum( l_expression_string_schar,
                              l_data_in,
                              l_path );
-
     l_tp0 = std::chrono::steady_clock::now();
     l_out_aten = at::einsum( l_expression_string_schar,
                             l_data_in,
