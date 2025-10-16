@@ -70,8 +70,8 @@ namespace einsum_ir {
       char    * memory_left    = nullptr;
       char    * memory_right   = nullptr;
 
-      int64_t id_omp_loop_start = 0;
-      int64_t id_omp_loop_end   = 0;
+      int64_t id_shared_loop_start = 0;
+      int64_t id_shared_loop_end   = 0;
 
       int64_t sfc_size_m = 0;
       int64_t sfc_size_n = 0;

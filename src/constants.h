@@ -94,7 +94,7 @@ namespace einsum_ir {
     else if( i_dim == dim_t::CPX ) return basic::dim_t::CPX;
     else if( i_dim == dim_t::I   ) return basic::dim_t::I;
     else if( i_dim == dim_t::J   ) return basic::dim_t::J;
-    else return basic::dim_t::UNDEFINED_DIM;  
+    else return basic::dim_t::UNDEFINED_DIM;
   }
 
   constexpr basic::data_t ce_dtype_to_basic( data_t i_dtype ) {

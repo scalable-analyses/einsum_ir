@@ -186,7 +186,7 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
   std::vector< int64_t> const & strides_out,
   std::vector< int64_t> const & packing_strides_in0,
   std::vector< int64_t> const & packing_strides_in1,
-  int64_t                       num_threads_omp,
+  int64_t                       num_threads_shared,
   int64_t                       num_threads_sfc_m,
   int64_t                       num_threads_sfc_n
 ) {
@@ -231,18 +231,18 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
   std::vector<int64_t> strides_out_aux(dim_sizes.size(), 0);
 
   // set number of threads
-  int64_t l_num_threads = num_threads_omp * num_threads_sfc_m * num_threads_sfc_n;
+  int64_t l_num_threads = num_threads_shared * num_threads_sfc_m * num_threads_sfc_n;
 #if defined(_OPENMP)
   if (l_num_threads <= 0) {
-    num_threads_omp = omp_get_max_threads();
+    num_threads_shared = omp_get_max_threads();
     num_threads_sfc_m = 1;
     num_threads_sfc_n = 1;
   }
 #else
   if( l_num_threads <= 0 ) {
-    num_threads_omp = 1;
-    num_threads_sfc_m = 1;
-    num_threads_sfc_n = 1;
+    num_threads_shared = 1;
+    num_threads_sfc_m  = 1;
+    num_threads_sfc_n  = 1;
   }
 #endif
 
@@ -263,7 +263,7 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
                   l_ktype_first,
                   l_ktype_main,
                   l_ktype_last,
-                  num_threads_omp,
+                  num_threads_shared,
                   num_threads_sfc_m,
                   num_threads_sfc_n,
                   nullptr );
@@ -301,7 +301,7 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
                                                                                   int64_t                target_m,
                                                                                   int64_t                target_n,
                                                                                   int64_t                target_k,
-                                                                                  int64_t              & num_threads_omp,
+                                                                                  int64_t              & num_threads_shared,
                                                                                   int64_t              & num_threads_sfc_m,
                                                                                   int64_t              & num_threads_sfc_n,
                                                                                   bool                   generate_sfc,
@@ -321,7 +321,7 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
   // Convert main primitive type to kernel type  
   einsum_ir::basic::kernel_t l_kernel_main = convert_prim_to_kernel(prim_main);
   
-  int64_t l_num_threads = num_threads_omp * num_threads_sfc_m * num_threads_sfc_n;
+  int64_t l_num_threads = num_threads_shared * num_threads_sfc_m * num_threads_sfc_n;
 #if defined(_OPENMP)
   if (l_num_threads <= 0) {
     l_num_threads = omp_get_max_threads();
@@ -331,9 +331,9 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
     l_num_threads = 1;
   }
 #endif
-  num_threads_omp = l_num_threads;
-  num_threads_sfc_m = 1;
-  num_threads_sfc_n = 1;
+  num_threads_shared = l_num_threads;
+  num_threads_sfc_m  = 1;
+  num_threads_sfc_n  = 1;
 
   int64_t l_num_bytes = dtype_to_num_bytes(dtype);
 
@@ -354,7 +354,7 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
                     l_packed_support,
                     l_num_bytes,
                     l2_cache_size,
-                    &num_threads_omp,
+                    &num_threads_shared,
                     &num_threads_sfc_m,
                     &num_threads_sfc_n );
   

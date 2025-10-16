@@ -24,8 +24,8 @@ class einsum_ir::basic::IterationSpace {
     //! vector with the loop sizes
     std::vector< int64_t > const * m_sizes;
 
-    //! number of omp tasks
-    int64_t m_omp_tasks = 1;
+    //! number of shared tasks
+    int64_t m_shared_tasks = 1;
     //! number of sfc m tasks
     int64_t m_sfc_tasks_m = 1;
     //! number of sfc n tasks
@@ -33,8 +33,8 @@ class einsum_ir::basic::IterationSpace {
     //! number of sfc k tasks
     int64_t m_sfc_tasks_k = 1;
 
-    //! range of all omp loops
-    range_t m_omp_loops; 
+    //! range of all shared loops
+    range_t m_shared_loops; 
     //! range of sfc m loops
     range_t m_sfc_loops_m;
     //! range of sfc n loops
@@ -42,18 +42,18 @@ class einsum_ir::basic::IterationSpace {
     //! range of sfc k loops
     range_t m_sfc_loops_k;
     
-    //! number of threads in omp dimensions
-    int64_t m_num_threads_omp = 0;
+    //! number of threads in shared dimensions
+    int64_t m_num_threads_shared = 0;
     //! number of threads in sfc m dimension
     int64_t m_num_threads_m = 0;
     //! number of threads in sfc n dimension
     int64_t m_num_threads_n = 0;
 
-    //number of tasks in omp dimensions
-    int64_t m_tasks_per_thread_omp;
-    //number of tasks in m dimension 
+    //! number of tasks in shared dimensions
+    int64_t m_tasks_per_thread_shared;
+    //! number of tasks in m dimension 
     int64_t m_tasks_per_thread_m;
-    //number of tasks in n dimension 
+    //! number of tasks in n dimension 
     int64_t m_tasks_per_thread_n;
 
     /**
@@ -92,35 +92,36 @@ class einsum_ir::basic::IterationSpace {
     /**
      * Calculates the position in a 2d SFC from the given id.
      *
-     * @param i_m sfc m id.
-     * @param i_n sfc n id.
      * @param i_idx task id.
      * @param i_sfc_size_m size of sfc in m direction.
      * @param i_sfc_size_n size of sfc in n direction.
+     * @param o_m sfc m id.
+     * @param o_n sfc n id.
      **/
-    void sfc_oracle_2d( int64_t *o_m, 
-                        int64_t *o_n, 
-                        int64_t  i_idx,
+    void sfc_oracle_2d( int64_t  i_idx,
                         int64_t  i_sfc_size_m,
-                        int64_t  i_sfc_size_n);
+                        int64_t  i_sfc_size_n,
+                        int64_t *o_m, 
+                        int64_t *o_n);
     
     /**
-     * Calculates the position in a 2d SFC from the given id.
+     * Calculates the position in a semi 3d SFC by combining two 2d SFCs.
      *
-     * @param i_m sfc m id.
-     * @param i_n sfc n id.
      * @param i_idx task id.
      * @param i_sfc_size_m size of sfc in m direction.
      * @param i_sfc_size_n size of sfc in n direction.
      * @param i_sfc_size_k size of sfc in k direction.
+     * @param o_m sfc m id.
+     * @param o_n sfc n id.
+     * @param o_k sfc k id.
      **/
-    void sfc_oracle_3d( int64_t *o_m, 
-                        int64_t *o_n,
-                        int64_t *o_k,
-                        int64_t  i_idx,
+    void sfc_oracle_3d( int64_t  i_idx,
                         int64_t  i_sfc_size_m,
                         int64_t  i_sfc_size_n,
-                        int64_t  i_sfc_size_k );
+                        int64_t  i_sfc_size_k,
+                        int64_t *o_m, 
+                        int64_t *o_n,
+                        int64_t *o_k );
 
   public:
     /**
@@ -138,14 +139,14 @@ class einsum_ir::basic::IterationSpace {
      * @param i_loop_sizes sizes of the loops.
      * @param i_num_threads_m number of threads in sfc m dimension.
      * @param i_num_threads_n number of threads in sfc n dimension.
-     * @param i_num_threads_omp number of threads in omp dimensions.
+     * @param i_num_threads_shared number of threads in shared dimensions.
     **/
     void init( std::vector< dim_t >   const * i_loop_dim_type,
                std::vector< exec_t >  const * i_loop_exec_type,
                std::vector< int64_t > const * i_loop_sizes,
                int64_t                        i_num_threads_m,
                int64_t                        i_num_threads_n,
-               int64_t                        i_num_threads_omp );
+               int64_t                        i_num_threads_shared );
 
     /**
      * Creates ThreadInfo objects for each thread and changes sfc strides.

@@ -63,7 +63,7 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::optimize(){
 
   std::vector<int64_t> l_divisors;
   get_divisors( m_num_threads, l_divisors);
-  float l_best_performance = 0;
+  double l_best_performance = 0;
   int64_t l_best_threads_m = 1;
   for( size_t l_id = 0; l_id < l_divisors.size(); l_id++ ){
     int64_t l_potential_threads_m = l_divisors[l_id];
@@ -71,12 +71,11 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::optimize(){
 
     int64_t l_tasks_m = (m_size_sfc_m + l_potential_threads_m - 1) / l_potential_threads_m;
     int64_t l_tasks_n = (m_size_sfc_n + l_potential_threads_n - 1) / l_potential_threads_n;
-    float l_avg_task_m = m_size_sfc_m / (float)l_potential_threads_m;
-    float l_avg_task_n = m_size_sfc_n / (float)l_potential_threads_n;
+    double l_avg_task_m = m_size_sfc_m / (double)l_potential_threads_m;
+    double l_avg_task_n = m_size_sfc_n / (double)l_potential_threads_n;
 
-    //try to achive equal size of task in n and m dimension
-    //l_performance *= std::min( l_tasks_m / (float)l_tasks_n, l_tasks_n / (float)l_tasks_m );
-    float l_performance = 1 - (std::abs(l_tasks_m -l_tasks_n) / (float)std::max(m_size_sfc_m, m_size_sfc_n));
+    //try to achieve equal size of task in n and m dimension
+    double l_performance = 1 - (std::abs(l_tasks_m -l_tasks_n) / (double)std::max(m_size_sfc_m, m_size_sfc_n));
 
     //distribute threads to m and n dimension such that the threads have an equal number of tasks
     l_performance *= l_avg_task_m / l_tasks_m;
@@ -750,7 +749,7 @@ void einsum_ir::basic::ContractionOptimizer::split_iter( std::vector<iter_proper
   i_iteration->stride_out     *= l_split;                        
 }
 
-void einsum_ir::basic::ContractionOptimizer::get_divisors( int64_t i_num, 
+void einsum_ir::basic::ContractionOptimizer::get_divisors( int64_t                i_num, 
                                                            std::vector<int64_t> & o_divisors ){
   o_divisors.clear();
   for( int64_t l_i = 1; l_i <= (int64_t)std::sqrt(i_num); l_i++ ){

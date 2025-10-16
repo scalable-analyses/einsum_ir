@@ -11,13 +11,13 @@ void einsum_ir::basic::IterationSpace::init( std::vector< dim_t >   const * i_di
                                              std::vector< int64_t > const * i_sizes,
                                              int64_t                        i_num_threads_m,
                                              int64_t                        i_num_threads_n,
-                                             int64_t                        i_num_threads_omp ) {
+                                             int64_t                        i_num_threads_shared ) {
   m_dim_types  = i_dim_types;
   m_exec_types = i_exec_types;
   m_sizes      = i_sizes;
   m_num_threads_m   = i_num_threads_m;
   m_num_threads_n   = i_num_threads_n;
-  m_num_threads_omp = i_num_threads_omp;
+  m_num_threads_shared = i_num_threads_shared;
 }
 
 einsum_ir::basic::err_t einsum_ir::basic::IterationSpace::setup( std::vector< int64_t >   & io_strides_left,
@@ -26,24 +26,24 @@ einsum_ir::basic::err_t einsum_ir::basic::IterationSpace::setup( std::vector< in
                                                                  std::vector< int64_t >   & io_strides_out, 
                                                                  std::vector<thread_info> & io_thread_infos ) {
                 
-  //calculate number of tasks and assigns parallel dimensions to three types omp, sfc_n, sfc_m
+  //calculate number of tasks and assigns parallel dimensions to three types shared, sfc_n, sfc_m
   m_sfc_tasks_m = 1;
   m_sfc_tasks_n = 1;
   m_sfc_tasks_k = 1;
-  m_omp_tasks   = 1;
-  bool l_found_omp = false;
+  m_shared_tasks   = 1;
+  bool l_found_shared = false;
   int64_t l_num_sfc_loops = 0;
-  int64_t l_num_omp_loops = 0;
+  int64_t l_num_shared_loops = 0;
   int64_t l_last_found_sfc_type = 0;
   for( std::size_t l_id = 0; l_id < m_dim_types->size(); l_id++ ){
     if( m_exec_types->at(l_id) == exec_t::OMP ){
-      l_num_omp_loops++;
-      if( l_found_omp == false ){
-        m_omp_loops.begin = l_id;
-        l_found_omp = true;
+      l_num_shared_loops++;
+      if( l_found_shared == false ){
+        m_shared_loops.begin = l_id;
+        l_found_shared = true;
       }
-      m_omp_tasks *= m_sizes->at(l_id);
-      m_omp_loops.end = l_id + 1;
+      m_shared_tasks *= m_sizes->at(l_id);
+      m_shared_loops.end = l_id + 1;
       if( m_dim_types->at(l_id) == dim_t::K ){
         return err_t::COMPILATION_FAILED;
       }
@@ -87,27 +87,27 @@ einsum_ir::basic::err_t einsum_ir::basic::IterationSpace::setup( std::vector< in
       l_num_sfc_loops ){
     return err_t::COMPILATION_FAILED;
   }
-  if( m_omp_loops.end - m_omp_loops.begin != 
-      l_num_omp_loops ){
+  if( m_shared_loops.end - m_shared_loops.begin != 
+      l_num_shared_loops ){
     return err_t::COMPILATION_FAILED;
   }
 
   //create thread infos
-  int64_t l_num_threads = m_num_threads_m * m_num_threads_n * m_num_threads_omp;
+  int64_t l_num_threads = m_num_threads_m * m_num_threads_n * m_num_threads_shared;
   io_thread_infos.resize( l_num_threads );
-  m_tasks_per_thread_m   = (m_sfc_tasks_m + m_num_threads_m   - 1) / m_num_threads_m;
-  m_tasks_per_thread_n   = (m_sfc_tasks_n + m_num_threads_n   - 1) / m_num_threads_n;
-  m_tasks_per_thread_omp = (m_omp_tasks   + m_num_threads_omp - 1) / m_num_threads_omp;
+  m_tasks_per_thread_m      = (m_sfc_tasks_m  + m_num_threads_m      - 1) / m_num_threads_m;
+  m_tasks_per_thread_n      = (m_sfc_tasks_n  + m_num_threads_n      - 1) / m_num_threads_n;
+  m_tasks_per_thread_shared = (m_shared_tasks + m_num_threads_shared - 1) / m_num_threads_shared;
   
 #ifdef _OPENMP
 #pragma omp parallel for num_threads(l_num_threads)
 #endif
   for( int64_t l_thread_id = 0; l_thread_id < l_num_threads; l_thread_id++ ){
     //get thread id in m and n 
-    int64_t l_thread_id_m   = l_thread_id % m_num_threads_m;
-    int64_t l_rem           = l_thread_id / m_num_threads_m;
-    int64_t l_thread_id_n   = l_rem % m_num_threads_n;
-    int64_t l_thread_id_omp = l_rem / m_num_threads_n;
+    int64_t l_thread_id_m      = l_thread_id % m_num_threads_m;
+    int64_t l_rem              = l_thread_id / m_num_threads_m;
+    int64_t l_thread_id_n      = l_rem % m_num_threads_n;
+    int64_t l_thread_id_shared = l_rem / m_num_threads_n;
 
     //calculate begin and end for sfc m dimension 
     int64_t l_begin_m, l_end_m;
@@ -123,14 +123,14 @@ einsum_ir::basic::err_t einsum_ir::basic::IterationSpace::setup( std::vector< in
     l_begin_n = l_begin_n <= m_sfc_tasks_n ? l_begin_n : m_sfc_tasks_n;
     l_end_n   = l_end_n   <= m_sfc_tasks_n ? l_end_n   : m_sfc_tasks_n;
 
-    //calculate begin and end for omp dimension
-    int64_t l_begin_omp, l_end_omp;
-    l_begin_omp = l_thread_id_omp * m_tasks_per_thread_omp;
-    l_end_omp   = l_begin_omp     + m_tasks_per_thread_omp;
-    l_begin_omp = l_begin_omp <= m_omp_tasks ? l_begin_omp : m_omp_tasks;
-    l_end_omp   = l_end_omp   <= m_omp_tasks ? l_end_omp   : m_omp_tasks;
-    io_thread_infos[l_thread_id].id_omp_loop_start = l_begin_omp;
-    io_thread_infos[l_thread_id].id_omp_loop_end   = l_end_omp;
+    //calculate begin and end for shared dimension
+    int64_t l_begin_shared, l_end_shared;
+    l_begin_shared = l_thread_id_shared * m_tasks_per_thread_shared;
+    l_end_shared   = l_begin_shared     + m_tasks_per_thread_shared;
+    l_begin_shared = l_begin_shared <= m_shared_tasks ? l_begin_shared : m_shared_tasks;
+    l_end_shared   = l_end_shared   <= m_shared_tasks ? l_end_shared   : m_shared_tasks;
+    io_thread_infos[l_thread_id].id_shared_loop_start = l_begin_shared;
+    io_thread_infos[l_thread_id].id_shared_loop_end   = l_end_shared;
     
     //set start ids
     int64_t l_id_sfc_m_old = l_begin_m;
@@ -161,7 +161,7 @@ einsum_ir::basic::err_t einsum_ir::basic::IterationSpace::setup( std::vector< in
     for( int64_t l_id = 0; l_id < l_size; l_id++ ){
       //determine new SFC position
       int64_t l_id_sfc_m_new, l_id_sfc_n_new, l_id_sfc_k_new; 
-      sfc_oracle_3d( &l_id_sfc_m_new, &l_id_sfc_n_new, &l_id_sfc_k_new, l_id+1, l_end_m - l_begin_m, l_end_n - l_begin_n, m_sfc_tasks_k );
+      sfc_oracle_3d( l_id+1, l_end_m - l_begin_m, l_end_n - l_begin_n, m_sfc_tasks_k, &l_id_sfc_m_new, &l_id_sfc_n_new, &l_id_sfc_k_new );
       l_id_sfc_m_new += l_begin_m;
       l_id_sfc_n_new += l_begin_n;
 
@@ -219,7 +219,7 @@ int64_t einsum_ir::basic::IterationSpace::calculate_offset( int64_t i_id_sfc_m,
 
 void einsum_ir::basic::IterationSpace::convert_strides_to_offsets( std::vector< int64_t > & io_strides) {
 
-  int64_t l_id_sfc_m, l_id_sfc_n, l_id_omp;
+  int64_t l_id_sfc_m, l_id_sfc_n, l_id_shared;
   int64_t l_all_offsets_sfc_m = 0;
   int64_t l_all_offsets_sfc_n = 0;
   int64_t l_all_offsets_sfc_k = 0;
@@ -266,11 +266,11 @@ einsum_ir::basic::sfc_t einsum_ir::basic::IterationSpace::get_max_dim_jump( rang
 }
 
 
-void einsum_ir::basic::IterationSpace::sfc_oracle_2d( int64_t *o_m, 
-                                                      int64_t *o_n,
-                                                      int64_t  i_idx,
+void einsum_ir::basic::IterationSpace::sfc_oracle_2d( int64_t  i_idx,
                                                       int64_t  i_sfc_size_m,
-                                                      int64_t  i_sfc_size_n ) {
+                                                      int64_t  i_sfc_size_n,
+                                                      int64_t *o_m, 
+                                                      int64_t *o_n ) {
   
   int l_w = i_sfc_size_m;
   int l_h = i_sfc_size_n;
@@ -284,7 +284,7 @@ void einsum_ir::basic::IterationSpace::sfc_oracle_2d( int64_t *o_m,
 
 int64_t einsum_ir::basic::IterationSpace::get_caching_size(){
 
-  //caching more entrys than the number of task in one dimension won't be useful
+  //caching more entries than the number of task in one dimension won't be useful
   int64_t l_max_cache_size = std::min(m_tasks_per_thread_m, m_tasks_per_thread_n);
 
   //upper bound to prevent huge memory allocations
@@ -294,13 +294,13 @@ int64_t einsum_ir::basic::IterationSpace::get_caching_size(){
 }
 
 
-void einsum_ir::basic::IterationSpace::sfc_oracle_3d( int64_t *o_m, 
-                                                      int64_t *o_n,
-                                                      int64_t *o_k,
-                                                      int64_t  i_idx,
+void einsum_ir::basic::IterationSpace::sfc_oracle_3d( int64_t  i_idx,
                                                       int64_t  i_sfc_size_m,
                                                       int64_t  i_sfc_size_n,
-                                                      int64_t  i_sfc_size_k ) {
+                                                      int64_t  i_sfc_size_k,
+                                                      int64_t *o_m, 
+                                                      int64_t *o_n,
+                                                      int64_t *o_k ) {
 
   int l_w = i_sfc_size_m;
   int l_h = i_sfc_size_n;

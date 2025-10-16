@@ -72,9 +72,9 @@ class einsum_ir::py::TensorOperation {
      * @param strides_out Strides of the output tensor.
      * @param packing_strides_in0 Strides for packing of the first input tensor (ignored if unary).
      * @param packing_strides_in1 Strides for packing of the second input tensor (ignored if unary).
-     * @param num_threads_omp  Number of threads to use for normal parallelization.
-     * @param num_threads_sfc_m Number of threads to use for SFC parallelization in M dimension (ignored if unary).
-     * @param num_threads_sfc_n Number of threads to use for SFC parallelization in N dimension (ignored if unary).
+     * @param num_threads_shared Number of threads to use for normal parallelization.
+     * @param num_threads_sfc_m  Number of threads to use for SFC parallelization in M dimension (ignored if unary).
+     * @param num_threads_sfc_n  Number of threads to use for SFC parallelization in N dimension (ignored if unary).
      * @return            Appropiate error code.
      **/
     error_t setup(
@@ -90,7 +90,7 @@ class einsum_ir::py::TensorOperation {
       std::vector< int64_t > const & strides_out,
       std::vector< int64_t > const & packing_strides_in0,
       std::vector< int64_t > const & packing_strides_in1,
-      int64_t                       num_threads_omp,
+      int64_t                       num_threads_shared,
       int64_t                       num_threads_sfc_m,
       int64_t                       num_threads_sfc_n
     );
@@ -146,7 +146,7 @@ class einsum_ir::py::TensorOperation {
       int64_t                  target_m,
       int64_t                  target_n,
       int64_t                  target_k,
-      int64_t                & num_threads_omp,
+      int64_t                & num_threads_shared,
       int64_t                & num_threads_sfc_m,
       int64_t                & num_threads_sfc_n,
       bool                     generate_sfc,

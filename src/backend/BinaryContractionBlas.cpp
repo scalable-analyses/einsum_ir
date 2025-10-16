@@ -132,7 +132,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
                   l_ktype_last_touch,
                   l_num_threads_omp,
                   l_num_threads_m,
-                  l_num_threads_m,
+                  l_num_threads_n,
                   l_contraction_memory );
 
   l_err = ce_basic_err_to_err(m_backend.compile());
