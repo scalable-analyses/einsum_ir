@@ -12,9 +12,9 @@ void einsum_ir::basic::ContractionOptimizer::init( std::vector< iter_property > 
                                                    packed_gemm_t                  i_packed_gemm_support,
                                                    int64_t                        i_num_bytes_scalar_out,
                                                    int64_t                        i_l2_cache_size,
-                                                   int64_t                      * io_num_threads_omp,
-                                                   int64_t                      * io_num_threads_m,
-                                                   int64_t                      * io_num_threads_n ){
+                                                   int64_t                      * io_num_threads_shared,
+                                                   int64_t                      * io_num_threads_sfc_m,
+                                                   int64_t                      * io_num_threads_sfc_n ){
   m_iter_space = i_iter_space;
   m_ktype_main = i_ktype_main;
 
@@ -31,11 +31,11 @@ void einsum_ir::basic::ContractionOptimizer::init( std::vector< iter_property > 
   m_num_bytes_scalar_out = i_num_bytes_scalar_out;
   m_l2_cache_size = i_l2_cache_size;
 
-  m_num_threads_m   = io_num_threads_m;
-  m_num_threads_n   = io_num_threads_n;
-  m_num_threads_omp = io_num_threads_omp;
+  m_num_threads_sfc_m   = io_num_threads_sfc_m;
+  m_num_threads_sfc_n   = io_num_threads_sfc_n;
+  m_num_threads_shared = io_num_threads_shared;
 
-  m_num_threads = *m_num_threads_m * *m_num_threads_n * *m_num_threads_omp;
+  m_num_threads = *m_num_threads_sfc_m * *m_num_threads_sfc_n * *m_num_threads_shared;
 
   //small power of 2 to avoid extra overhead and still utilise the stride one dimension to some extend
   //heuristic right now, could choose this parameter architecture dependent
@@ -75,7 +75,7 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::optimize(){
     double l_avg_task_n = m_size_sfc_n / (double)l_potential_threads_n;
 
     //try to achieve equal size of task in n and m dimension
-    double l_performance = 1 - (std::abs(l_tasks_m -l_tasks_n) / (double)std::max(m_size_sfc_m, m_size_sfc_n));
+    double l_performance = 1 - (std::abs(l_tasks_m - l_tasks_n) / (double)std::max(m_size_sfc_m, m_size_sfc_n));
 
     //distribute threads to m and n dimension such that the threads have an equal number of tasks
     l_performance *= l_avg_task_m / l_tasks_m;
@@ -87,12 +87,12 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::optimize(){
       l_best_threads_m = l_potential_threads_m;
     }
   }
-  *m_num_threads_m = l_best_threads_m;
-  *m_num_threads_n = m_num_threads / l_best_threads_m;
+  *m_num_threads_sfc_m = l_best_threads_m;
+  *m_num_threads_sfc_n = m_num_threads / l_best_threads_m;
 
-  *m_num_threads_m = std::min(*m_num_threads_m, m_size_sfc_m);
-  *m_num_threads_n = std::min(*m_num_threads_n, m_size_sfc_n);
-  *m_num_threads_omp = m_num_threads / (*m_num_threads_m * *m_num_threads_n);
+  *m_num_threads_sfc_m = std::min(*m_num_threads_sfc_m, m_size_sfc_m);
+  *m_num_threads_sfc_n = std::min(*m_num_threads_sfc_n, m_size_sfc_n);
+  *m_num_threads_shared = m_num_threads / (*m_num_threads_sfc_m * *m_num_threads_sfc_n);
 
   return err_t::SUCCESS;
 }
@@ -752,7 +752,7 @@ void einsum_ir::basic::ContractionOptimizer::split_iter( std::vector<iter_proper
 void einsum_ir::basic::ContractionOptimizer::get_divisors( int64_t                i_num, 
                                                            std::vector<int64_t> & o_divisors ){
   o_divisors.clear();
-  for( int64_t l_i = 1; l_i <= (int64_t)std::sqrt(i_num); l_i++ ){
+  for( int64_t l_i = 1; l_i * l_i <= i_num; l_i++ ){
     if( i_num % l_i == 0 ){
       o_divisors.push_back(l_i);
       if( l_i != i_num / l_i ){

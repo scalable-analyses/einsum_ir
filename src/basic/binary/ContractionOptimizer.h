@@ -56,13 +56,13 @@ class einsum_ir::basic::ContractionOptimizer {
     packed_gemm_t m_packed_gemm_support = packed_gemm_t::NONE;
 
     //! pointer to number of threads in m dimension
-    int64_t * m_num_threads_m = nullptr;
+    int64_t * m_num_threads_sfc_m = nullptr;
 
     //! pointer to number of threads in n dimension
-    int64_t * m_num_threads_n = nullptr;
+    int64_t * m_num_threads_sfc_n = nullptr;
 
-    //! pointer to number of threads in omp dimensions
-    int64_t * m_num_threads_omp = nullptr;
+    //! pointer to number of threads in shared dimensions
+    int64_t * m_num_threads_shared = nullptr;
 
     //! size of the sfc in m dimension
     int64_t m_size_sfc_m = 1;
@@ -180,9 +180,9 @@ class einsum_ir::basic::ContractionOptimizer {
      * @param i_packed_gemm_support indicates the support level for packed gemms
      * @param i_num_bytes_scalar_out number of bytes for scalar data types in output tensor
      * @param i_l2_cache_size size of L2 cache in bytes
-     * @param io_num_threads_m number of threads used for sfc m parallelization.
-     * @param io_num_threads_n number of threads used for sfc n parallelization.
-     * @param io_num_threads_omp number of threads used for omp parallelization.
+     * @param io_num_threads_shared number of threads used for shared parallelization.
+     * @param io_num_threads_sfc_m number of threads used for sfc m parallelization.
+     * @param io_num_threads_sfc_n number of threads used for sfc n parallelization.
      **/
     void init( std::vector< iter_property > * i_iter_space,
                kernel_t                     * i_ktype_main,
@@ -194,9 +194,9 @@ class einsum_ir::basic::ContractionOptimizer {
                packed_gemm_t                  i_packed_gemm_support,                  
                int64_t                        i_num_bytes_scalar_out,
                int64_t                        i_l2_cache_size,
-               int64_t                      * io_num_threads_omp,
-               int64_t                      * io_num_threads_m,
-               int64_t                      * io_num_threads_n );    
+               int64_t                      * io_num_threads_shared,
+               int64_t                      * io_num_threads_sfc_m,
+               int64_t                      * io_num_threads_sfc_n );    
   
     /**
      * Optimizes the iters.

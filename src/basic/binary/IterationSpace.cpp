@@ -283,7 +283,6 @@ void einsum_ir::basic::IterationSpace::sfc_oracle_2d( int64_t  i_idx,
 }
 
 int64_t einsum_ir::basic::IterationSpace::get_caching_size(){
-
   //caching more entries than the number of task in one dimension won't be useful
   int64_t l_max_cache_size = std::min(m_tasks_per_thread_m, m_tasks_per_thread_n);
 

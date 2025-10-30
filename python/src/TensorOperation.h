@@ -90,9 +90,9 @@ class einsum_ir::py::TensorOperation {
       std::vector< int64_t > const & strides_out,
       std::vector< int64_t > const & packing_strides_in0,
       std::vector< int64_t > const & packing_strides_in1,
-      int64_t                       num_threads_shared,
-      int64_t                       num_threads_sfc_m,
-      int64_t                       num_threads_sfc_n
+      int64_t                        num_threads_shared,
+      int64_t                        num_threads_sfc_m,
+      int64_t                        num_threads_sfc_n
     );
 
     /**
@@ -141,8 +141,8 @@ class einsum_ir::py::TensorOperation {
       std::vector< int64_t > & strides_in0,
       std::vector< int64_t > & strides_in1,
       std::vector< int64_t > & strides_out,
+      std::vector<int64_t>   & packing_strides_in0,
       std::vector<int64_t>   & packing_strides_in1,
-      std::vector<int64_t>   & packing_strides_in2,
       int64_t                  target_m,
       int64_t                  target_n,
       int64_t                  target_k,
@@ -237,8 +237,8 @@ class einsum_ir::py::TensorOperation {
       std::vector<int64_t>                               & strides_in0,
       std::vector<int64_t>                               & strides_in1,
       std::vector<int64_t>                               & strides_out,
-      std::vector<int64_t>                               & packing_strides_in1,
-      std::vector<int64_t>                               & packing_strides_in2
+      std::vector<int64_t>                               & packing_strides_in0,
+      std::vector<int64_t>                               & packing_strides_in1
     );
 
     /**

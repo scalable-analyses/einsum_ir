@@ -168,7 +168,7 @@ class einsum_ir::basic::IterationSpace {
     /**
      * Simple function to determine if caching of values could be advantageous.
      *
-     * @return 1 (don't use extra memory) if no advantage, 2 (cache two values) otherwise.
+     * @return 1 (don't use extra memory) if no advantage, higher number of cached values otherwise.
      **/
     int64_t get_caching_size();
 

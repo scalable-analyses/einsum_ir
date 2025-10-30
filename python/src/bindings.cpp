@@ -58,8 +58,8 @@ PYBIND11_MODULE(_etops_core, m) {
         :param strides_in0: Strides of the first input tensor.
         :param strides_in1: Strides of the second input tensor (ignored if unary).
         :param strides_out: Strides of the output tensor.
-        :param packing_strides_in0 Strides for packing of the first input tensor (ignored if unary).
-        :param packing_strides_in1 Strides for packing of the second input tensor (ignored if unary).
+        :param packing_strides_in0: Strides for packing of the first input tensor (ignored if unary).
+        :param packing_strides_in1: Strides for packing of the second input tensor (ignored if unary).
         :param num_threads_omp: Number of threads to use for normal parallelization.
         :param num_threads_sfc_m: Number of threads to use for SFC parallelization in M dimension.
         :param num_threads_sfc_n: Number of threads to use for SFC parallelization in N dimension.
@@ -191,8 +191,8 @@ PYBIND11_MODULE(_etops_core, m) {
         :param strides_in0: Strides of the first input tensor.
         :param strides_in1: Strides of the second input tensor (ignored if unary).
         :param strides_out: Strides of the output tensor.
-        :param packing_strides_in0 Strides for packing of the first input tensor (ignored if unary).
-        :param packing_strides_in1 Strides for packing of the second input tensor (ignored if unary).
+        :param packing_strides_in0: Strides for packing of the first input tensor (ignored if unary).
+        :param packing_strides_in1: Strides for packing of the second input tensor (ignored if unary).
         :param target_m: Target size for dimension m.
         :param target_n: Target size for dimension n.
         :param target_k: Target size for dimension k.
