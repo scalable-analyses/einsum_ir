@@ -290,10 +290,10 @@ void einsum_ir::basic::ContractionBackend::contract( void const * i_tensor_left,
     //contract
     (this->*(m_loop_functs[0]))( l_thread_inf,
                                  0,
-                                 (char *) i_tensor_left    + l_thread_inf->offset_left,
-                                 (char *) i_tensor_right   + l_thread_inf->offset_right,
-                                 (char *) i_tensor_out_aux + l_thread_inf->offset_out_aux,
-                                 (char *) io_tensor_out    + l_thread_inf->offset_out,
+                                 l_tensor_left,
+                                 l_tensor_right,
+                                 l_tensor_out_aux,
+                                 l_tensor_out,
                                  m_has_first_touch,
                                  m_has_last_touch );
   }
