@@ -29,23 +29,27 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction backend implementation
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                 m, n, k
-  std::vector< int64_t > m_loop_sizes           = {  5, 7, 8 };  
-  std::vector< int64_t > l_loop_strides_left    = {  1, 0, 5 };
-  std::vector< int64_t > l_loop_strides_right   = {  0, 8, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = {  1, 5, 0 };
+  //                                                  m, n, k
+  std::vector< int64_t > l_loop_sizes            = {  5, 7, 8 };  
+  std::vector< int64_t > l_loop_strides_left     = {  1, 0, 5 };
+  std::vector< int64_t > l_loop_strides_right    = {  0, 8, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {  0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = {  1, 5, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
 
   ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
-                    m_loop_sizes,
+                    l_loop_sizes,
                     l_loop_strides_left,
                     l_loop_strides_right,
                     l_loop_strides_out_aux,
                     l_loop_strides_out,
+                    l_packing_strides_left,
+                    l_packing_strides_right,
                     data_t::FP32,
                     data_t::FP32,
                     data_t::FP32,
@@ -53,7 +57,10 @@ TEST_CASE( "Simple FP32 matmul using the BLAS contraction backend implementation
                     kernel_t::ZERO,
                     kernel_t::MADD,
                     kernel_t::UNDEFINED_KTYPE,
-                    2 );                        
+                    2,
+                    2,
+                    2,
+                    nullptr );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
 
@@ -96,23 +103,27 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction backend implementation
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                 m, n, k
-  std::vector< int64_t > m_loop_sizes           = {  5, 7, 8 };  
-  std::vector< int64_t > l_loop_strides_left    = {  1, 0, 5 };
-  std::vector< int64_t > l_loop_strides_right   = {  0, 8, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = {  1, 5, 0 };
+  //                                                  m, n, k
+  std::vector< int64_t > l_loop_sizes            = {  5, 7, 8 };  
+  std::vector< int64_t > l_loop_strides_left     = {  1, 0, 5 };
+  std::vector< int64_t > l_loop_strides_right    = {  0, 8, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {  0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = {  1, 5, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
 
   ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
-                    m_loop_sizes,
+                    l_loop_sizes,
                     l_loop_strides_left,
                     l_loop_strides_right,
                     l_loop_strides_out_aux,
                     l_loop_strides_out,
+                    l_packing_strides_left,
+                    l_packing_strides_right,
                     data_t::FP64,
                     data_t::FP64,
                     data_t::FP64,
@@ -120,7 +131,10 @@ TEST_CASE( "Simple FP64 matmul using the BLAS contraction backend implementation
                     kernel_t::ZERO,
                     kernel_t::MADD,
                     kernel_t::UNDEFINED_KTYPE,
-                    3 );                        
+                    3,
+                    2,
+                    4,
+                    nullptr );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
 
@@ -167,23 +181,27 @@ TEST_CASE( "Simple batched FP64 matmul using the BLAS contraction backend implem
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                 c, m, n, k
-  std::vector< int64_t > m_loop_sizes           = {  3, 5, 7, 8 };  
-  std::vector< int64_t > l_loop_strides_left    = { 40, 1, 0, 5 };
-  std::vector< int64_t > l_loop_strides_right   = { 56, 0, 8, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = { 35, 1, 5, 0 };
+  //                                                  c, m, n, k
+  std::vector< int64_t > l_loop_sizes            = {  3, 5, 7, 8 };  
+  std::vector< int64_t > l_loop_strides_left     = { 40, 1, 0, 5 };
+  std::vector< int64_t > l_loop_strides_right    = { 56, 0, 8, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {  0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = { 35, 1, 5, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
 
   ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
-                    m_loop_sizes,
+                    l_loop_sizes,
                     l_loop_strides_left,
                     l_loop_strides_right,
                     l_loop_strides_out_aux,
                     l_loop_strides_out,
+                    l_packing_strides_left,
+                    l_packing_strides_right,
                     data_t::FP64,
                     data_t::FP64,
                     data_t::FP64,
@@ -191,7 +209,10 @@ TEST_CASE( "Simple batched FP64 matmul using the BLAS contraction backend implem
                     kernel_t::UNDEFINED_KTYPE,
                     kernel_t::MADD,
                     kernel_t::UNDEFINED_KTYPE,
-                    4 );                        
+                    4,
+                    1,
+                    1,
+                    nullptr );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
 
@@ -245,23 +266,27 @@ TEST_CASE( "FP32 tensor contraction using the BLAS contraction backend implement
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                  a,  b,  c,  d, g, f, e
-  std::vector< int64_t > m_loop_sizes           = {   5,  2,  8,  3,12, 7, 9 };  
-  std::vector< int64_t > l_loop_strides_left    = { 648,324,  0,108, 1, 0,12 };
-  std::vector< int64_t > l_loop_strides_right   = {1512,  0,189, 63, 0, 9, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux = {   0,  0,  0,  0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = {1344,672, 84,  0, 1,12, 0 };
+  //                                                   a,  b,  c,  d, g, f, e
+  std::vector< int64_t > l_loop_sizes            = {   5,  2,  8,  3,12, 7, 9 };  
+  std::vector< int64_t > l_loop_strides_left     = { 648,324,  0,108, 1, 0,12 };
+  std::vector< int64_t > l_loop_strides_right    = {1512,  0,189, 63, 0, 9, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {   0,  0,  0,  0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = {1344,672, 84,  0, 1,12, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
 
   ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
-                    m_loop_sizes,
+                    l_loop_sizes,
                     l_loop_strides_left,
                     l_loop_strides_right,
                     l_loop_strides_out_aux,
                     l_loop_strides_out,
+                    l_packing_strides_left,
+                    l_packing_strides_right,
                     data_t::FP32,
                     data_t::FP32,
                     data_t::FP32,
@@ -269,7 +294,10 @@ TEST_CASE( "FP32 tensor contraction using the BLAS contraction backend implement
                     kernel_t::ZERO,
                     kernel_t::MADD,
                     kernel_t::UNDEFINED_KTYPE,
-                    5 );                        
+                    5,
+                    4,
+                    2,
+                    nullptr );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
 
@@ -316,23 +344,27 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction backend impleme
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                 c, m, n, k
-  std::vector< int64_t > m_loop_sizes           = {  3, 5, 7, 8 };  
-  std::vector< int64_t > l_loop_strides_left    = { 40, 1, 0, 5 };
-  std::vector< int64_t > l_loop_strides_right   = { 56, 0, 8, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux = {  0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = {  1, 3,15, 0 };
+  //                                                  c, m, n, k
+  std::vector< int64_t > l_loop_sizes            = {  3, 5, 7, 8 };  
+  std::vector< int64_t > l_loop_strides_left     = { 40, 1, 0, 5 };
+  std::vector< int64_t > l_loop_strides_right    = { 56, 0, 8, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {  0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = {  1, 3,15, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
 
   ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
-                    m_loop_sizes,
+                    l_loop_sizes,
                     l_loop_strides_left,
                     l_loop_strides_right,
                     l_loop_strides_out_aux,
                     l_loop_strides_out,
+                    l_packing_strides_left,
+                    l_packing_strides_right,
                     data_t::FP64,
                     data_t::FP64,
                     data_t::FP64,
@@ -340,7 +372,10 @@ TEST_CASE( "Simple packed FP64 matmul using the BLAS contraction backend impleme
                     kernel_t::COPY,
                     kernel_t::PACKED_MADD,
                     kernel_t::COPY,
-                    6 );                        
+                    6,
+                    3,
+                    5,
+                    nullptr );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
 
@@ -398,23 +433,27 @@ TEST_CASE( "FP32 packed tensor contraction using the BLAS contraction backend im
                                              exec_t::PRIM, 
                                              exec_t::PRIM };
 
-  //                                                  a,   b,  c,  d,  h, g, f, e
-  std::vector< int64_t > m_loop_sizes           = {   5,   2,  8,  3,  4,12, 7, 9 };  
-  std::vector< int64_t > l_loop_strides_left    = {2592,1296,  0,432,108, 1, 0,12 };
-  std::vector< int64_t > l_loop_strides_right   = {6048,   0,756,252, 63, 0, 9, 1 };
-  std::vector< int64_t > l_loop_strides_out_aux = {   0,   0,  0,  0,  0, 0, 0, 0 };
-  std::vector< int64_t > l_loop_strides_out     = {5376,2688,336,  0,  1, 4,48, 0 };
+  //                                                   a,   b,  c,  d,  h, g, f, e
+  std::vector< int64_t > l_loop_sizes            = {   5,   2,  8,  3,  4,12, 7, 9 };  
+  std::vector< int64_t > l_loop_strides_left     = {2592,1296,  0,432,108, 1, 0,12 };
+  std::vector< int64_t > l_loop_strides_right    = {6048,   0,756,252, 63, 0, 9, 1 };
+  std::vector< int64_t > l_loop_strides_out_aux  = {   0,   0,  0,  0,  0, 0, 0, 0 };
+  std::vector< int64_t > l_loop_strides_out      = {5376,2688,336,  0,  1, 4,48, 0 };
+  std::vector< int64_t > l_packing_strides_left  = {};
+  std::vector< int64_t > l_packing_strides_right = {};
 
 
   ContractionBackendBlas l_cont_blas;
 
   l_cont_blas.init( l_loop_dim_type,
                     l_loop_exec_type,
-                    m_loop_sizes,
+                    l_loop_sizes,
                     l_loop_strides_left,
                     l_loop_strides_right,
                     l_loop_strides_out_aux,
                     l_loop_strides_out,
+                    l_packing_strides_left,
+                    l_packing_strides_right,
                     data_t::FP32,
                     data_t::FP32,
                     data_t::FP32,
@@ -422,7 +461,10 @@ TEST_CASE( "FP32 packed tensor contraction using the BLAS contraction backend im
                     kernel_t::ZERO,
                     kernel_t::PACKED_MADD,
                     kernel_t::COPY,
-                    7 );                        
+                    7,
+                    5,
+                    1,
+                    nullptr );                        
   err_t l_err = l_cont_blas.compile();
   REQUIRE(l_err == err_t::SUCCESS );
   

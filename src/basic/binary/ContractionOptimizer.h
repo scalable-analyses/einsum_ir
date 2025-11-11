@@ -30,8 +30,6 @@ class einsum_ir::basic::ContractionOptimizer {
     int64_t m_target_n  = 0;
     //! targeted size for kernel k dimension
     int64_t m_target_k  = 0;
-    //! targeted number of tasks
-    int64_t m_target_parallel = 0;
 
     //! number of bytes for scalar data types in output tensor
     int64_t m_num_bytes_scalar_out = 0;
@@ -48,12 +46,32 @@ class einsum_ir::basic::ContractionOptimizer {
     //! type of the main kernel
     kernel_t * m_ktype_main = nullptr;
 
+    //! indicates if optimizer should generate sfc dimensions
+    bool m_generate_sfcs = true;
+
     //! indicates if backend supports br gemms
     bool m_br_gemm_support = true;
+
+    //! indicates if backend supports packing
+    bool m_packing_support = true;
 
     //! indicates if backend supports packed gemms
     packed_gemm_t m_packed_gemm_support = packed_gemm_t::NONE;
 
+    //! pointer to number of threads in m dimension
+    int64_t * m_num_threads_sfc_m = nullptr;
+
+    //! pointer to number of threads in n dimension
+    int64_t * m_num_threads_sfc_n = nullptr;
+
+    //! pointer to number of threads in shared dimensions
+    int64_t * m_num_threads_shared = nullptr;
+
+    //! size of the sfc in m dimension
+    int64_t m_size_sfc_m = 1;
+
+    //! size of the sfc in n dimension
+    int64_t m_size_sfc_n = 1;
 
     /**
       * Finds all iters with a specific stride in the iteration space.
@@ -124,12 +142,22 @@ class einsum_ir::basic::ContractionOptimizer {
      * @param i_dim_type dimension type of iters to move.
      * @param i_new_exec_t execution type after moving.
      *
+     * @return returns the size of all moved iters.
      **/
-    void move_iters_until( std::vector<iter_property> * i_dest_iters,
+    int64_t move_iters_until( std::vector<iter_property> * i_dest_iters,
                               int64_t                      i_target_size,
                               dim_t                        i_dim_type,
                               exec_t                       i_new_exec_t );
     
+    /**
+     * Finds all divisors of a number.
+     *
+     * @param i_num number to find divisors for.
+     * @param o_divisors output vector of divisors.
+     **/                  
+    void get_divisors( int64_t                i_num, 
+                       std::vector<int64_t> & o_divisors );
+
     /**
      * Determines a good integer splitt for a dimension size to be close to the target size.
      *
@@ -147,25 +175,33 @@ class einsum_ir::basic::ContractionOptimizer {
      *
      * @param i_iter_space vector of iters corresponding to an unoptimized contraction.
      * @param i_ktype_main execution type of main kernel. Optimizer might change GEMMs to BR_GEMMs
-     * @param i_num_threads number of participating threads in contraction.
      * @param i_target_m target m kernel size
      * @param i_target_n target n kernel size
      * @param i_target_k target k kernel size
+     * @param i_generate_sfcs true if optimizer should generate sfc dimensions
      * @param i_br_gemm_support true if backend supports br gemms
+     * @param i_packing_support true if backend supports packing
      * @param i_packed_gemm_support indicates the support level for packed gemms
      * @param i_num_bytes_scalar_out number of bytes for scalar data types in output tensor
      * @param i_l2_cache_size size of L2 cache in bytes
+     * @param io_num_threads_shared number of threads used for shared parallelization.
+     * @param io_num_threads_sfc_m number of threads used for sfc m parallelization.
+     * @param io_num_threads_sfc_n number of threads used for sfc n parallelization.
      **/
     void init( std::vector< iter_property > * i_iter_space,
                kernel_t                     * i_ktype_main,
-               int64_t                        i_num_threads,
                int64_t                        i_target_m,
                int64_t                        i_target_n,
                int64_t                        i_target_k,
+               bool                           i_generate_sfcs,
                bool                           i_br_gemm_support,
+               bool                           i_packing_support,
                packed_gemm_t                  i_packed_gemm_support,                  
                int64_t                        i_num_bytes_scalar_out,
-               int64_t                        i_l2_cache_size );    
+               int64_t                        i_l2_cache_size,
+               int64_t                      * io_num_threads_shared,
+               int64_t                      * io_num_threads_sfc_m,
+               int64_t                      * io_num_threads_sfc_n );    
   
     /**
      * Optimizes the iters.

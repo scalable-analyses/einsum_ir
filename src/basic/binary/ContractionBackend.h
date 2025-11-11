@@ -26,11 +26,21 @@ class einsum_ir::basic::ContractionBackend {
     //! id of the first primitive loop
     int64_t m_id_first_primitive_dim = 0;
 
-    //! number of parallel loops
-    int64_t m_num_parallel_loops = 0;
+    //! number of sfc loops
+    int64_t m_num_sfc_loops = 0;
+
+    //! number of shared loops
+    int64_t m_num_shared_loops = 0;
 
     //! number of threads used for execution
     int64_t m_num_threads = 0;
+
+    //! number of threads used for sfc m dimension
+    int64_t m_num_threads_sfc_m = 0;
+    //! number of threads used for sfc n dimension
+    int64_t m_num_threads_sfc_n = 0;
+    //! number of threads used for shared dimension
+    int64_t m_num_threads_shared = 0;
 
     //! indicates existance of first touch kernel
     bool m_has_first_touch = false;
@@ -44,8 +54,11 @@ class einsum_ir::basic::ContractionBackend {
     //! indicates if the backend is compiled
     bool m_is_compiled = false;
 
-    //! memory manager for contraction
+    //! pointer to active memory manager for contraction
     ContractionMemoryManager * m_memory = nullptr;
+
+    //! personal memory manager for contraction, used if no external memory manager is given
+    ContractionMemoryManager m_personal_memory;
 
     //! size of packed left input tensor
     int64_t m_size_packing_left  = 0;
@@ -64,9 +77,9 @@ class einsum_ir::basic::ContractionBackend {
     int64_t m_packing_right_id = -1;
 
     //! number of cached pointers for left input tensor
-    const static int64_t m_num_cached_ptrs_left  = 1;
+    int64_t m_num_cached_ptrs_left  = 1;
     //! number of cached pointers for right input tensor
-    const static int64_t m_num_cached_ptrs_right = 1;
+    int64_t m_num_cached_ptrs_right = 1;
 
   protected:
     //! datatype of the left input
@@ -163,6 +176,16 @@ class einsum_ir::basic::ContractionBackend {
     bool m_trans_a = false;
     //! indicates if kernel should transpose B
     bool m_trans_b = false;
+
+    //! vector of function pointers to the loop implementations, set once during compielation and used in contraction
+    std::vector<void (ContractionBackend::*)( thread_info *,
+                                              int64_t,
+                                              char const  *,
+                                              char const  *,
+                                              char const  *,
+                                              char        *,
+                                              bool,
+                                              bool) > m_loop_functs;
     
   public:
     /**
@@ -175,6 +198,8 @@ class einsum_ir::basic::ContractionBackend {
      * @param i_strides_right strides in the right input tensor.
      * @param i_strides_out_aux strides in the auxiliary output tensor.
      * @param i_strides_out strides in the output tensor.
+     * @param i_packing_strides_left strides for packing of left input tensor.
+     * @param i_packing_strides_right strides for packing of right input tensor.
      * @param i_dtype_left datatype of left input tensor.
      * @param i_dtype_right datatype of right input tensor.
      * @param i_dtype_comp datatype of computation.
@@ -182,7 +207,10 @@ class einsum_ir::basic::ContractionBackend {
      * @param i_ktype_first_touch type of the first touch kernel.
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
-     * @param i_num_threads number of threads used for contraction.
+     * @param i_num_threads_shared number of threads used for shared dimension parallelization.
+     * @param i_num_threads_sfc_m number of threads used for sfc m parallelization.
+     * @param i_num_threads_sfc_n number of threads used for sfc n parallelization.
+     * @param i_contraction_mem pointer to the contraction memory manager.
      **/
     void init( std::vector< dim_t >   const & i_dim_type,
                std::vector< exec_t >  const & i_exec_type,
@@ -191,6 +219,8 @@ class einsum_ir::basic::ContractionBackend {
                std::vector< int64_t > const & i_strides_right,
                std::vector< int64_t > const & i_strides_out_aux,
                std::vector< int64_t > const & i_strides_out,
+               std::vector< int64_t > const & i_packing_strides_left,
+               std::vector< int64_t > const & i_packing_strides_right,
                data_t                         i_dtype_left,
                data_t                         i_dtype_right,
                data_t                         i_dtype_comp,
@@ -198,7 +228,10 @@ class einsum_ir::basic::ContractionBackend {
                kernel_t                       i_ktype_first_touch,
                kernel_t                       i_ktype_main,
                kernel_t                       i_ktype_last_touch,
-               int64_t                        i_num_threads );
+               int64_t                        i_num_threads_shared,
+               int64_t                        i_num_threads_sfc_m,
+               int64_t                        i_num_threads_sfc_n,
+               ContractionMemoryManager     * i_contraction_mem );
 
 
     /**
@@ -212,8 +245,10 @@ class einsum_ir::basic::ContractionBackend {
      * @param i_ktype_first_touch type of the first touch kernel.
      * @param i_ktype_main type of the main kernel.
      * @param i_ktype_last_touch type of the last touch kernel.
-     * @param i_num_threads number of threads used for contraction.
-      * @param i_contraction_mem pointer to the contraction memory manager.
+     * @param i_num_threads_shared number of threads used for omp parallelization.
+     * @param i_num_threads_sfc_m number of threads used for sfc m parallelization.
+     * @param i_num_threads_sfc_n number of threads used for sfc n parallelization.
+     * @param i_contraction_mem pointer to the contraction memory manager.
      **/
     void init( std::vector< iter_property > const & i_iterations,
                data_t                               i_dtype_left,
@@ -223,7 +258,9 @@ class einsum_ir::basic::ContractionBackend {
                kernel_t                             i_ktype_first_touch,
                kernel_t                             i_ktype_main,
                kernel_t                             i_ktype_last_touch,
-               int64_t                              i_num_threads,
+               int64_t                              i_num_threads_shared,
+               int64_t                              i_num_threads_sfc_m,
+               int64_t                              i_num_threads_sfc_n,
                ContractionMemoryManager           * i_contraction_mem );
 
     /**
@@ -232,7 +269,6 @@ class einsum_ir::basic::ContractionBackend {
      * @return SUCCESS if the compilation was successful, otherwise an appropiate error code.
      **/
     err_t compile();
-
 
     /**
      * Contracts the two tensors.
@@ -251,7 +287,7 @@ class einsum_ir::basic::ContractionBackend {
      * General purpose loop implementation featuring first and last touch operations.
      * No threading is applied.
      *
-     * @param i_thread_inf information for the executing thread.
+     * @param i_thread_info information for the executing thread.
      * @param i_id_loop dimension id of the loop which is executed.
      * @param i_ptr_left pointer to the left tensor's data.
      * @param i_ptr_right pointer to the right tensor's data.
@@ -260,7 +296,7 @@ class einsum_ir::basic::ContractionBackend {
      * @param i_first_access true if first time accessing this data
      * @param i_last_access true if last time accessing this data
      **/
-    void contract_iter( thread_info   * i_thread_inf,
+    void contract_iter( thread_info   * i_thread_info,
                         int64_t         i_id_loop,
                         char    const * i_ptr_left,
                         char    const * i_ptr_right,
@@ -268,6 +304,70 @@ class einsum_ir::basic::ContractionBackend {
                         char          * i_ptr_out,
                         bool            i_first_access,
                         bool            i_last_access );
+
+    /**
+     * General purpose loop implementation featuring first and last touch operations.
+     * Threading is applied.
+     *
+     * @param i_thread_info information for the executing thread.
+     * @param i_id_loop dimension id of the loop which is executed.
+     * @param i_ptr_left pointer to the left tensor's data.
+     * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
+     * @param i_ptr_out pointer to the output tensor's data.
+     * @param i_first_access true if first time accessing this data.
+     * @param i_last_access true if last time accessing this data.
+     **/
+    void contract_iter_shared( thread_info   * i_thread_info,
+                               int64_t         i_id_loop,
+                               char    const * i_ptr_left,
+                               char    const * i_ptr_right,
+                               char    const * i_ptr_out_aux,
+                               char          * i_ptr_out,
+                               bool            i_first_access,
+                               bool            i_last_access );
+ 
+    /**
+     * SFC based loop implementation featuring first and last touch operations.
+     *
+     * @param i_thread_info information for the executing thread.
+     * @param i_id_loop dimension id of the loop which is executed.
+     * @param i_ptr_left pointer to the left tensor's data.
+     * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
+     * @param i_ptr_out pointer to the output tensor's data.
+     * @param i_first_access true if first time accessing this data
+     * @param i_last_access true if last time accessing this data
+     **/
+    void contract_iter_sfc( thread_info   * i_thread_info,
+                            int64_t         i_id_loop,
+                            char    const * i_ptr_left,
+                            char    const * i_ptr_right,
+                            char    const * i_ptr_out_aux,
+                            char          * i_ptr_out,
+                            bool            i_first_access,
+                            bool            i_last_access );
+
+    /**
+     * Inner most loop implementation based on kernel call featuring first and last touch operations.
+     *
+     * @param i_thread_info information for the executing thread.
+     * @param i_id_loop dimension id of the loop which is executed.
+     * @param i_ptr_left pointer to the left tensor's data.
+     * @param i_ptr_right pointer to the right tensor's data.
+     * @param i_ptr_out_aux pointer to the auxiliary output tensor's data.
+     * @param i_ptr_out pointer to the output tensor's data.
+     * @param i_first_access true if first time accessing this data
+     * @param i_last_access true if last time accessing this data
+     **/
+    void contract_iter_kernel( thread_info   * i_thread_info,
+                               int64_t         i_id_loop,
+                               char    const * i_ptr_left,
+                               char    const * i_ptr_right,
+                               char    const * i_ptr_out_aux,
+                               char          * i_ptr_out,
+                               bool            i_first_access,
+                               bool            i_last_access );
 
     /**
      * calculates the shape of the kernel i.e. m, n, k, lda, ldb, ldc, ...

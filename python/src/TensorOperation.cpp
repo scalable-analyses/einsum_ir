@@ -124,12 +124,14 @@ std::vector<einsum_ir::basic::iter_property> einsum_ir::py::TensorOperation::cre
 
 void einsum_ir::py::TensorOperation::update_parameters_from_iters(
   std::vector<einsum_ir::basic::iter_property> const & iters,
-  std::vector<dim_t>                                  & dim_types,
-  std::vector<exec_t>                                 & exec_types,
-  std::vector<int64_t>                                & dim_sizes,
-  std::vector<int64_t>                                & strides_in0,
-  std::vector<int64_t>                                & strides_in1,
-  std::vector<int64_t>                                & strides_out
+  std::vector<dim_t>                                 & dim_types,
+  std::vector<exec_t>                                & exec_types,
+  std::vector<int64_t>                               & dim_sizes,
+  std::vector<int64_t>                               & strides_in0,
+  std::vector<int64_t>                               & strides_in1,
+  std::vector<int64_t>                               & strides_out,
+  std::vector<int64_t>                               & packing_strides_in0,
+  std::vector<int64_t>                               & packing_strides_in1
 ) {
   
   size_t num_iters = iters.size();
@@ -139,6 +141,8 @@ void einsum_ir::py::TensorOperation::update_parameters_from_iters(
   strides_in0.clear();
   strides_in1.clear();
   strides_out.clear();
+  packing_strides_in0.clear();
+  packing_strides_in1.clear();
   
   dim_types.reserve(num_iters);
   exec_types.reserve(num_iters);
@@ -146,6 +150,8 @@ void einsum_ir::py::TensorOperation::update_parameters_from_iters(
   strides_in0.reserve(num_iters);
   strides_in1.reserve(num_iters);
   strides_out.reserve(num_iters);
+  packing_strides_in0.reserve(num_iters);
+  packing_strides_in1.reserve(num_iters);
   
   for (const auto & l_iter : iters) {
     dim_types.push_back(convert_dim_type_back(l_iter.dim_type));
@@ -154,6 +160,8 @@ void einsum_ir::py::TensorOperation::update_parameters_from_iters(
     strides_in0.push_back(l_iter.stride_left);
     strides_in1.push_back(l_iter.stride_right);
     strides_out.push_back(l_iter.stride_out);
+    packing_strides_in0.push_back(l_iter.packing_stride_left);
+    packing_strides_in1.push_back(l_iter.packing_stride_right);
   }
 }
 
@@ -176,7 +184,11 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
   std::vector< int64_t> const & strides_in0,
   std::vector< int64_t> const & strides_in1,
   std::vector< int64_t> const & strides_out,
-  int64_t                       num_threads
+  std::vector< int64_t> const & packing_strides_in0,
+  std::vector< int64_t> const & packing_strides_in1,
+  int64_t                       num_threads_shared,
+  int64_t                       num_threads_sfc_m,
+  int64_t                       num_threads_sfc_n
 ) {
   // backend enums
   std::vector<einsum_ir::basic::dim_t> l_dim_types;
@@ -219,14 +231,18 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
   std::vector<int64_t> strides_out_aux(dim_sizes.size(), 0);
 
   // set number of threads
-  int64_t l_num_threads = num_threads;
+  int64_t l_num_threads = num_threads_shared * num_threads_sfc_m * num_threads_sfc_n;
 #if defined(_OPENMP)
   if (l_num_threads <= 0) {
-    l_num_threads = omp_get_max_threads();
+    num_threads_shared = omp_get_max_threads();
+    num_threads_sfc_m = 1;
+    num_threads_sfc_n = 1;
   }
 #else
   if( l_num_threads <= 0 ) {
-    l_num_threads = 1;
+    num_threads_shared = 1;
+    num_threads_sfc_m  = 1;
+    num_threads_sfc_n  = 1;
   }
 #endif
 
@@ -238,6 +254,8 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
                   strides_in1,
                   strides_out_aux,
                   strides_out,
+                  packing_strides_in0,
+                  packing_strides_in1,
                   l_dtype_left,
                   l_dtype_right,
                   l_dtype_comp,
@@ -245,7 +263,10 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
                   l_ktype_first,
                   l_ktype_main,
                   l_ktype_last,
-                  l_num_threads );
+                  num_threads_shared,
+                  num_threads_sfc_m,
+                  num_threads_sfc_n,
+                  nullptr );
 
   // compile backend 
   einsum_ir::basic::err_t l_err = m_backend.compile();
@@ -275,11 +296,17 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
                                                                                   std::vector<int64_t> & strides_in0,
                                                                                   std::vector<int64_t> & strides_in1,
                                                                                   std::vector<int64_t> & strides_out,
+                                                                                  std::vector<int64_t> & packing_strides_in0,
+                                                                                  std::vector<int64_t> & packing_strides_in1,
                                                                                   int64_t                target_m,
                                                                                   int64_t                target_n,
                                                                                   int64_t                target_k,
-                                                                                  int64_t                num_threads,
+                                                                                  int64_t              & num_threads_shared,
+                                                                                  int64_t              & num_threads_sfc_m,
+                                                                                  int64_t              & num_threads_sfc_n,
+                                                                                  bool                   generate_sfc,
                                                                                   bool                   br_gemm_support,
+                                                                                  bool                   packing_support,
                                                                                   bool                   packed_gemm_support,
                                                                                   int64_t                l2_cache_size ) {
   // Create loop properties from input parameters
@@ -295,16 +322,17 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
   // Convert main primitive type to kernel type  
   einsum_ir::basic::kernel_t l_kernel_main = convert_prim_to_kernel(prim_main);
   
-  int64_t l_num_threads = num_threads;
 #if defined(_OPENMP)
-  if (l_num_threads <= 0) {
-    l_num_threads = omp_get_max_threads();
+  if (num_threads_shared <= 0) {
+    num_threads_shared = omp_get_max_threads();
   }
 #else
-  if( l_num_threads <= 0 ) {
-    l_num_threads = 1;
+  if( num_threads_shared <= 0 ) {
+    num_threads_shared = 1;
   }
 #endif
+  num_threads_sfc_m  = 1;
+  num_threads_sfc_n  = 1;
 
   int64_t l_num_bytes = dtype_to_num_bytes(dtype);
 
@@ -317,14 +345,18 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
   einsum_ir::basic::ContractionOptimizer l_optimizer;
   l_optimizer.init( &l_iters,
                     &l_kernel_main,
-                    l_num_threads,
                     target_m,
                     target_n,
                     target_k,
+                    generate_sfc,
                     br_gemm_support,
+                    packing_support,
                     l_packed_support,
                     l_num_bytes,
-                    l2_cache_size );
+                    l2_cache_size,
+                    &num_threads_shared,
+                    &num_threads_sfc_m,
+                    &num_threads_sfc_n );
   
   // Run optimization
   l_optimizer.optimize();
@@ -337,7 +369,9 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
     dim_sizes,
     strides_in0,
     strides_in1,
-    strides_out
+    strides_out,
+    packing_strides_in0,
+    packing_strides_in1
   );
   
   // Update main primitive if kernel type changed (e.g., GEMM -> BR_GEMM)
