@@ -306,6 +306,7 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
                                                                                   int64_t              & num_threads_sfc_n,
                                                                                   bool                   generate_sfc,
                                                                                   bool                   br_gemm_support,
+                                                                                  bool                   packing_support,
                                                                                   bool                   packed_gemm_support,
                                                                                   int64_t                l2_cache_size ) {
   // Create loop properties from input parameters
@@ -321,17 +322,15 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
   // Convert main primitive type to kernel type  
   einsum_ir::basic::kernel_t l_kernel_main = convert_prim_to_kernel(prim_main);
   
-  int64_t l_num_threads = num_threads_shared * num_threads_sfc_m * num_threads_sfc_n;
 #if defined(_OPENMP)
-  if (l_num_threads <= 0) {
-    l_num_threads = omp_get_max_threads();
+  if (num_threads_shared <= 0) {
+    num_threads_shared = omp_get_max_threads();
   }
 #else
-  if( l_num_threads <= 0 ) {
-    l_num_threads = 1;
+  if( num_threads_shared <= 0 ) {
+    num_threads_shared = 1;
   }
 #endif
-  num_threads_shared = l_num_threads;
   num_threads_sfc_m  = 1;
   num_threads_sfc_n  = 1;
 
@@ -351,6 +350,7 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
                     target_k,
                     generate_sfc,
                     br_gemm_support,
+                    packing_support,
                     l_packed_support,
                     l_num_bytes,
                     l2_cache_size,

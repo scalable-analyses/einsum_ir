@@ -124,8 +124,12 @@ class einsum_ir::py::TensorOperation {
      * @param target_m            Target M block size for optimization.
      * @param target_n            Target N block size for optimization.
      * @param target_k            Target K block size for optimization.
-     * @param num_threads         Number of threads for parallel execution (determined automatically if <1).
+     * @param num_threads_shared  Number of threads for parallel execution (distributed between sfc and shared by optimization).
+     * @param num_threads_sfc_m   Number of SFC threads in M dimensions (modified by optimization).
+     * @param num_threads_sfc_n   Number of SFC threads in N dimensions (modified by optimization).
+     * @param generate_sfc        Whether backend should generate sfc iterations.
      * @param br_gemm_support     Whether backend supports batch-reduce GEMM.
+     * @param packing_support     Whether backend supports packing.
      * @param packed_gemm_support Whether backend supports packed GEMM.
      * @param l2_cache_size       Size of L2 cache in bytes.
      * @return                    Appropriate error code.
@@ -151,6 +155,7 @@ class einsum_ir::py::TensorOperation {
       int64_t                & num_threads_sfc_n,
       bool                     generate_sfc,
       bool                     br_gemm_support,
+      bool                     packing_support,
       bool                     packed_gemm_support,
       int64_t                  l2_cache_size
     );

@@ -52,6 +52,9 @@ class einsum_ir::basic::ContractionOptimizer {
     //! indicates if backend supports br gemms
     bool m_br_gemm_support = true;
 
+    //! indicates if backend supports packing
+    bool m_packing_support = true;
+
     //! indicates if backend supports packed gemms
     packed_gemm_t m_packed_gemm_support = packed_gemm_t::NONE;
 
@@ -177,6 +180,7 @@ class einsum_ir::basic::ContractionOptimizer {
      * @param i_target_k target k kernel size
      * @param i_generate_sfcs true if optimizer should generate sfc dimensions
      * @param i_br_gemm_support true if backend supports br gemms
+     * @param i_packing_support true if backend supports packing
      * @param i_packed_gemm_support indicates the support level for packed gemms
      * @param i_num_bytes_scalar_out number of bytes for scalar data types in output tensor
      * @param i_l2_cache_size size of L2 cache in bytes
@@ -191,6 +195,7 @@ class einsum_ir::basic::ContractionOptimizer {
                int64_t                        i_target_k,
                bool                           i_generate_sfcs,
                bool                           i_br_gemm_support,
+               bool                           i_packing_support,
                packed_gemm_t                  i_packed_gemm_support,                  
                int64_t                        i_num_bytes_scalar_out,
                int64_t                        i_l2_cache_size,

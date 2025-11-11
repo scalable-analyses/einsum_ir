@@ -177,7 +177,7 @@ class einsum_ir::basic::ContractionBackend {
     //! indicates if kernel should transpose B
     bool m_trans_b = false;
 
-    //! vector of function pointers to the loop implementations
+    //! vector of function pointers to the loop implementations, set once during compielation and used in contraction
     std::vector<void (ContractionBackend::*)( thread_info *,
                                               int64_t,
                                               char const  *,

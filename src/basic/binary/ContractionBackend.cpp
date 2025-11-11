@@ -440,10 +440,12 @@ void einsum_ir::basic::ContractionBackend::contract_iter_sfc( thread_info   * i_
   for( int64_t l_it = 0; l_it < l_size; l_it++ ) {
 
     //determine if this is the first or last access in the k dimension
-    l_first_access = i_first_access && ( i_thread_info->k_count[l_id_m + l_id_n * i_thread_info->sfc_size_m] == 0 );
-    l_last_access  = i_last_access  && ( i_thread_info->k_count[l_id_m + l_id_n * i_thread_info->sfc_size_m] == i_thread_info->sfc_size_k - 1 );
-    i_thread_info->k_count[l_id_m + l_id_n * i_thread_info->sfc_size_m]++;
-    i_thread_info->k_count[l_id_m + l_id_n * i_thread_info->sfc_size_m] %= i_thread_info->sfc_size_k;
+    int64_t l_id_k_count = l_id_m + l_id_n * i_thread_info->sfc_size_m;
+    l_first_access = i_first_access && ( i_thread_info->k_count[l_id_k_count] == 0 );
+    i_thread_info->k_count[l_id_k_count]++;
+    i_thread_info->k_count[l_id_k_count] %= i_thread_info->sfc_size_k;
+    l_last_access  = i_last_access  && ( i_thread_info->k_count[l_id_k_count] == 0 );
+
 
     //get dimension and direction from sfc
     sfc_t l_move =  i_thread_info->movement_ids[l_it];

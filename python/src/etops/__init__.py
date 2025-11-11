@@ -180,6 +180,7 @@ def optimize(
     num_threads: int = 0,
     generate_sfc: bool = False,
     br_gemm_support: bool = True,
+    packing_support: bool = False,
     packed_gemm_support: bool = True,
     l2_cache_size: int = 0
 ) -> TensorOperationConfig:
@@ -194,6 +195,7 @@ def optimize(
         num_threads: Number of threads for parallel execution automatically determined if <1
         generate_sfc: Whether to generate a SFC iteration
         br_gemm_support: Whether backend supports batch-reduce GEMM
+        packing_support: Whether backend supports packing
         packed_gemm_support: Whether backend supports packed GEMM
         l2_cache_size: Size of the L2 cache in bytes (default: 1MiB if <1)
         
@@ -225,10 +227,9 @@ def optimize(
         target_n,
         target_k,
         num_threads,
-        1,
-        1,
         generate_sfc,
         br_gemm_support,
+        packing_support,
         packed_gemm_support,
         l2_cache_size
     )

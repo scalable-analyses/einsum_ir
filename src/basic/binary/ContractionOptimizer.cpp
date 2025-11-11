@@ -9,6 +9,7 @@ void einsum_ir::basic::ContractionOptimizer::init( std::vector< iter_property > 
                                                    int64_t                        i_target_k,
                                                    bool                           i_generate_sfcs,
                                                    bool                           i_br_gemm_support,
+                                                   bool                           i_packing_support,
                                                    packed_gemm_t                  i_packed_gemm_support,
                                                    int64_t                        i_num_bytes_scalar_out,
                                                    int64_t                        i_l2_cache_size,
@@ -26,6 +27,7 @@ void einsum_ir::basic::ContractionOptimizer::init( std::vector< iter_property > 
   m_generate_sfcs = i_generate_sfcs;
 
   m_br_gemm_support = i_br_gemm_support;
+  m_packing_support = i_packing_support;
   m_packed_gemm_support = i_packed_gemm_support;
 
   m_num_bytes_scalar_out = i_num_bytes_scalar_out;
@@ -338,10 +340,10 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::set_primitive_it
     bool l_requires_new_right = false;
     if( m_packed_gemm_support == packed_gemm_t::ALL_STRIDE_ONE ){
       if(l_small_stride_left != l_small_stride_out){
-        l_packing_left = true;
+        l_packing_left = m_packing_support;
       }
       if(l_small_stride_right != l_small_stride_out){
-        l_packing_right = true;
+        l_packing_right = m_packing_support;
       }
       l_requires_new_left  = !l_packing_left;
       l_requires_new_right = !l_packing_right;
@@ -388,11 +390,15 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::set_primitive_it
   if(    !l_transpose_b 
       && l_small_stride_right != m_iter_space->end()
       && l_small_stride_right->dim_type == dim_t::K ){
-    l_potential_kernel_iter[ PRIM_K ] = l_small_stride_right;
-    l_potential_kernel_size[ PRIM_K ] = l_small_stride_right->size;
-    if(    l_transpose_a 
-        && l_small_stride_left != l_small_stride_right ){
-      l_packing_left = true;
+    if(    !l_transpose_a
+        || l_small_stride_left == l_small_stride_right ){
+      l_potential_kernel_iter[ PRIM_K ] = l_small_stride_right;
+      l_potential_kernel_size[ PRIM_K ] = l_small_stride_right->size;
+    }
+    else if( m_packing_support ){
+      l_potential_kernel_iter[ PRIM_K ] = l_small_stride_right;
+      l_potential_kernel_size[ PRIM_K ] = l_small_stride_right->size;
+      l_packing_left = m_packing_support;
       l_extra_packing_iter_left = l_small_stride_left;
     }
   }
@@ -400,10 +406,14 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::set_primitive_it
   else if(    l_transpose_a 
            && l_small_stride_left != m_iter_space->end() 
            && l_small_stride_left->dim_type == dim_t::K ){
-    l_potential_kernel_iter[ PRIM_K ] = l_small_stride_left;
-    l_potential_kernel_size[ PRIM_K ] = l_small_stride_left->size;
-    if( !l_transpose_b ){
-      l_packing_right = true;
+    if( l_transpose_b ) {
+      l_potential_kernel_iter[ PRIM_K ] = l_small_stride_left;
+      l_potential_kernel_size[ PRIM_K ] = l_small_stride_left->size;
+    }
+    else if( m_packing_support ){
+      l_potential_kernel_iter[ PRIM_K ] = l_small_stride_left;
+      l_potential_kernel_size[ PRIM_K ] = l_small_stride_left->size;
+      l_packing_right = m_packing_support;
       l_extra_packing_iter_right = l_small_stride_right;
     }
   }
@@ -412,15 +422,21 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::set_primitive_it
     std::vector<iter_property>::iterator l_iter;
     find_iter_with_dimtype( l_iter, dim_t::K );
     if( l_iter != m_iter_space->end() ){
-      l_potential_kernel_iter[ PRIM_K ] = l_iter;
-      l_potential_kernel_size[ PRIM_K ] = l_iter->size;
-      if( l_transpose_a ){
-        l_packing_left = true;
-        l_extra_packing_iter_left = l_small_stride_left;
+      if( !l_transpose_a || l_transpose_b ){
+        l_potential_kernel_iter[ PRIM_K ] = l_iter;
+        l_potential_kernel_size[ PRIM_K ] = l_iter->size;
       }
-      if( !l_transpose_b ){
-        l_packing_right = true;
-        l_extra_packing_iter_right = l_small_stride_right;
+      else if( m_packing_support){
+        l_potential_kernel_iter[ PRIM_K ] = l_iter;
+        l_potential_kernel_size[ PRIM_K ] = l_iter->size;
+        if( l_transpose_a ){
+          l_packing_left = m_packing_support;
+          l_extra_packing_iter_left = l_small_stride_left;
+        }
+        if( !l_transpose_b ){
+          l_packing_right = m_packing_support;
+          l_extra_packing_iter_right = l_small_stride_right;
+        }
       }
     }
   }
@@ -457,10 +473,10 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::set_primitive_it
   }
 
   if( l_extra_packing_iter_left != m_iter_space->end() ){
-    l_extra_packing_left_required = true;
+    l_extra_packing_left_required = m_packing_support;
   }
   if( l_extra_packing_iter_right != m_iter_space->end() ){
-    l_extra_packing_right_required = true;
+    l_extra_packing_right_required = m_packing_support;
   }
 
   //---------------------------------
@@ -470,19 +486,19 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::set_primitive_it
   // optimization to prevent misses caused by mapping to the same cache lane
   if(    l_potential_kernel_size[ PRIM_K ] > 1
       && l_potential_kernel_iter[ PRIM_K ]->stride_left % 2048 == 0 ){
-    l_packing_left = true;
+    l_packing_left = m_packing_support;
   }
   if(    l_potential_kernel_size[ PRIM_M ] > 1
       && l_potential_kernel_iter[ PRIM_M ]->stride_left % 2048 == 0 ){
-    l_packing_left = true;
+    l_packing_left = m_packing_support;
   }
   if(    l_potential_kernel_size[ PRIM_K ] > 1
       && l_potential_kernel_iter[ PRIM_K ]->stride_right % 2048 == 0 ){
-    l_packing_right = true;
+    l_packing_right = m_packing_support;
   }
   if(    l_potential_kernel_size[ PRIM_N ] > 1
       && l_potential_kernel_iter[ PRIM_N ]->stride_right % 2048 == 0 ){
-    l_packing_right = true;
+    l_packing_right = m_packing_support;
   }
 
   //addapts the kernel targets depending on the potential kernel size

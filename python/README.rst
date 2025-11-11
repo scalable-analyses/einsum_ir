@@ -179,6 +179,7 @@ Below is a minimal example showing how to configure and execute tensor operation
                                        num_threads=1,
                                        generate_sfc=True,
                                        br_gemm_support=True,
+                                       packing_support=True,
                                        packed_gemm_support=True )
 
     # Create the optimized TensorOperation instance

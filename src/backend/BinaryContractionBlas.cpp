@@ -108,6 +108,7 @@ einsum_ir::err_t einsum_ir::backend::BinaryContractionBlas::compile() {
                m_target_prim_k,
                true,
                false,
+               false,
                basic::packed_gemm_t::OUT_STRIDE_ONE,
                ce_n_bytes(m_dtype_out),
                m_l2_cache_size,
