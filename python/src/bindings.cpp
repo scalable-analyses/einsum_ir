@@ -9,8 +9,8 @@ using einsum_ir::py::TensorOperation;
 PYBIND11_MODULE(_etops_core, m) {
   py::enum_<TensorOperation::error_t>(m, "ErrorType")
     .value("success", TensorOperation::error_t::success)
+    .value("compilation_failed", TensorOperation::error_t::compilation_failed)
     .export_values();
-
 
   py::enum_<TensorOperation::dtype_t>(m, "DataType" )
     .value("float32",  TensorOperation::dtype_t::fp32)
@@ -47,23 +47,36 @@ PYBIND11_MODULE(_etops_core, m) {
       &TensorOperation::setup,
       R"doc(
         Setup for a binary tensor contraction or a unary tensor operation.
-        
+
+        The operation type is automatically determined from prim_main:
+        - Binary contractions: prim_main is 'gemm' or 'brgemm'
+        - Unary operations: prim_main is 'copy' or 'zero'
+
+        Binary Contractions (GEMM/BRGEMM):
+          - prim_main: gemm or brgemm
+          - dim_types: use m, n, k, c as appropriate for contraction semantics
+          - prim_first: zero or none (first touch operation)
+          - prim_last: relu or none (last touch operation)
+
+        Unary Operations (permutation or zero):
+          - prim_main: copy or zero
+          - dim_types: must be 'c' for all dimensions
+          - prim_first: must be 'none'
+          - prim_last: must be 'none'
+          - strides_in1: ignored (can be empty or arbitrary values)
+
         :param dtype: Datatype of all tensor elements.
         :param prim_first: Type of the first touch primitive.
-        :param prim_main: Type of the main primitive.
+        :param prim_main: Type of the main primitive (determines operation type).
         :param prim_last: Type of the last touch primitive.
-        :param dim_types: Dimension types (c, m, n, or k).
+        :param dim_types: Dimension types provided by user.
         :param exec_types: Execution types of the dimensions (prim, seq, shared, or sfc).
         :param dim_sizes: Sizes of the dimensions.
         :param strides_in0: Strides of the first input tensor.
-        :param strides_in1: Strides of the second input tensor (ignored if unary).
+        :param strides_in1: Strides of the second input tensor (ignored for unary).
         :param strides_out: Strides of the output tensor.
-        :param packing_strides_in0: Strides for packing of the first input tensor (ignored if unary).
-        :param packing_strides_in1: Strides for packing of the second input tensor (ignored if unary).
-        :param num_threads_omp: Number of threads to use for normal parallelization.
-        :param num_threads_sfc_m: Number of threads to use for SFC parallelization in M dimension.
-        :param num_threads_sfc_n: Number of threads to use for SFC parallelization in N dimension.
-        :return: Appropiate error code.
+        :param num_threads: Number of threads to use for execution.
+        :return: Appropriate error code.
       )doc",
       py::arg("dtype"),
       py::arg("prim_first"),
@@ -75,11 +88,7 @@ PYBIND11_MODULE(_etops_core, m) {
       py::arg("strides_in0"),
       py::arg("strides_in1"),
       py::arg("strides_out"),
-      py::arg("packing_strides_in0"),
-      py::arg("packing_strides_in1"),
-      py::arg("num_threads_omp"),
-      py::arg("num_threads_sfc_m"),
-      py::arg("num_threads_sfc_n")
+      py::arg("num_threads")
     )
     .def(
       "execute",
@@ -97,10 +106,13 @@ PYBIND11_MODULE(_etops_core, m) {
       },
       R"doc(
         Execute the tensor operation.
-        
-        :param in0: Pointer to the first input tensor data.
-        :param in1: Pointer to the second input tensor data (ignored if unary).
-        :param out: Pointer to the output tensor data.
+
+        For binary operations: provide all three tensor arguments.
+        For unary operations: pass None for in1 argument.
+
+        :param in0: First input tensor data.
+        :param in1: Second input tensor data (pass None for unary operations).
+        :param out: Output tensor data.
       )doc",
       py::arg("in0"),
       py::arg("in1") = py::none(),
@@ -119,23 +131,14 @@ PYBIND11_MODULE(_etops_core, m) {
         std::vector<int64_t>                 & strides_in0,
         std::vector<int64_t>                 & strides_in1,
         std::vector<int64_t>                 & strides_out,
-        std::vector<int64_t>                 & packing_strides_in0,
-        std::vector<int64_t>                 & packing_strides_in1,
         int64_t                                target_m,
         int64_t                                target_n,
         int64_t                                target_k,
         int64_t                                num_threads,
-        bool                                   generate_sfc,
         bool                                   br_gemm_support,
-        bool                                   packing_support,
         bool                                   packed_gemm_support,
         int64_t                                l2_cache_size
       ) -> py::tuple {
-
-        int64_t num_threads_shared = num_threads;
-        int64_t num_threads_sfc_m  = 1;
-        int64_t num_threads_sfc_n  = 1;
-
         // Call the static optimize function with references
         TensorOperation::error_t err = TensorOperation::optimize(
           dtype,
@@ -148,17 +151,11 @@ PYBIND11_MODULE(_etops_core, m) {
           strides_in0,
           strides_in1,
           strides_out,
-          packing_strides_in0,
-          packing_strides_in1,
           target_m,
           target_n,
           target_k,
-          num_threads_shared,
-          num_threads_sfc_m,
-          num_threads_sfc_n,
-          generate_sfc,
+          num_threads,
           br_gemm_support,
-          packing_support,
           packed_gemm_support,
           l2_cache_size
         );
@@ -175,37 +172,37 @@ PYBIND11_MODULE(_etops_core, m) {
           dim_sizes,
           strides_in0,
           strides_in1,
-          strides_out,
-          packing_strides_in0,
-          packing_strides_in1,
-          num_threads_shared,
-          num_threads_sfc_m,
-          num_threads_sfc_n
+          strides_out
         );
       },
       R"doc(
         Optimize the tensor operation parameters.
-        
+
+        The operation type is automatically determined from prim_main.
+
+        Binary contractions:
+          Uses ContractionOptimizer with provided target sizes and GEMM support flags.
+
+        Unary operations:
+          Uses UnaryOptimizer. The target_m, target_n, target_k, br_gemm_support,
+          and packed_gemm_support parameters are ignored for unary operations.
+
         :param dtype: Datatype of all tensor elements.
         :param prim_first: Type of the first touch primitive.
-        :param prim_main: Type of the main primitive.
+        :param prim_main: Type of the main primitive (determines operation type).
         :param prim_last: Type of the last touch primitive.
-        :param dim_types: Dimension types (c, m, n, or k).
+        :param dim_types: Dimension types.
         :param exec_types: Execution types of the dimensions (prim, seq, shared, or sfc).
         :param dim_sizes: Sizes of the dimensions.
         :param strides_in0: Strides of the first input tensor.
-        :param strides_in1: Strides of the second input tensor (ignored if unary).
+        :param strides_in1: Strides of the second input tensor (ignored for unary).
         :param strides_out: Strides of the output tensor.
-        :param packing_strides_in0: Strides for packing of the first input tensor (ignored if unary).
-        :param packing_strides_in1: Strides for packing of the second input tensor (ignored if unary).
-        :param target_m: Target size for dimension m.
-        :param target_n: Target size for dimension n.
-        :param target_k: Target size for dimension k.
-        :param num_threads: Number of threads to use for parallelization.
-        :param generate_sfc: Whether to generate an SFC iteration.
-        :param br_gemm_support: Whether to support BR_GEMM optimizations.
-        :param packing_support: Whether to support packing optimizations.
-        :param packed_gemm_support: Whether to support packed GEMM optimizations.
+        :param target_m: Target size for dimension m (ignored for unary).
+        :param target_n: Target size for dimension n (ignored for unary).
+        :param target_k: Target size for dimension k (ignored for unary).
+        :param num_threads: Number of threads to use for execution.
+        :param br_gemm_support: Whether to support BR_GEMM optimizations (ignored for unary).
+        :param packed_gemm_support: Whether to support packed GEMM optimizations (ignored for unary).
         :param l2_cache_size: Size of L2 cache in bytes.
         :return: Tuple containing error code and optimized parameters.
       )doc",
@@ -219,15 +216,11 @@ PYBIND11_MODULE(_etops_core, m) {
       py::arg("strides_in0"),
       py::arg("strides_in1"),
       py::arg("strides_out"),
-      py::arg("packing_strides_in0"),
-      py::arg("packing_strides_in1"),
       py::arg("target_m"),
       py::arg("target_n"),
       py::arg("target_k"),
       py::arg("num_threads"),
-      py::arg("generate_sfc"),
       py::arg("br_gemm_support"),
-      py::arg("packing_support"),
       py::arg("packed_gemm_support"),
       py::arg("l2_cache_size")
     );
