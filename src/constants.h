@@ -2,7 +2,7 @@
 #define EINSUM_IR_CONSTANTS
 
 #include <cstdint>
-#include <basic/constants.h>
+#include "basic/constants.h"
 
 namespace einsum_ir {
   typedef enum {
