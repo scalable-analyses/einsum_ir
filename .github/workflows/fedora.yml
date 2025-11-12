@@ -195,7 +195,7 @@ jobs:
             xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
           done
 
-      - name: Install Binary Contraction Library
+      - name: Install Unary Operation / Binary Contraction Library
         run: |
           mkdir build
           cd build
