@@ -226,8 +226,54 @@ Below are some examples showing how to configure and execute binary tensor opera
     print(f"  Max absolute error: {error_abs:.6e}")
     print(f"  Max relative error: {error_rel:.6e}")
 
-    # -----------------------------------------------
+    #------------------------------------------------
     # Third example:
+    #   GEMM operation with row-major first input
+    #   packed to column-mayor
+    #   Compares the result with NumPy's einsum
+    # -----------------------------------------------
+
+    # Define a row-major GEMM configuration with packing
+    top_config = etops.TensorOperationConfig(
+        data_type  =   etops.float32,
+        prim_first =   etops.prim.zero,
+        prim_main  =   etops.prim.gemm,
+        prim_last  =   etops.prim.none,
+        dim_types  =   (etops.dim.m,     etops.dim.n,     etops.dim.k    ),
+        exec_types =   (etops.exec.prim, etops.exec.prim, etops.exec.prim),
+        dim_sizes  =   (64,              32,              128            ),
+        strides    = (((1,               0,               64             ), # in 0
+                       (128,             0,               1              )),
+                      ((0,               128,             1              ), # in 1
+                       (0,               0,               0              )),
+                      ((1,               64,              0              ), # out
+                       (0,               0,               0              )))
+    )
+
+    # Create the TensorOperation instance
+    top = etops.TensorOperation(top_config)
+
+    # Create input and output arrays
+    import numpy as np
+    A = np.random.randn(64,128).astype(np.float32)
+    B = np.random.randn(32,128).astype(np.float32)
+    C = np.random.randn(32, 64).astype(np.float32)
+
+    # Execute the operation
+    top.execute(A, B, C)
+
+    A_T = np.transpose(A)
+    C_np = np.einsum("km,nk->nm", A_T, B)
+
+    # Compute absolute and relative errors
+    error_abs = np.max( np.abs(C - C_np) )
+    error_rel = np.max( np.abs(C - C_np) / (np.abs(C_np) + 1e-8) )
+    print("GEMM operation with packing:")
+    print(f"  Max absolute error: {error_abs:.6e}")
+    print(f"  Max relative error: {error_rel:.6e}")
+
+    # -----------------------------------------------
+    # Fourth example:
     #   Batch-reduce GEMM operation with optimization
     #   Compares the result with torch's einsum
     # -----------------------------------------------
