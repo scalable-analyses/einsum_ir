@@ -236,6 +236,22 @@ class einsum_ir::basic::ContractionOptimizer {
      * Reorders iters, splits iters and determines parallel iters.
      **/
     void reorder_and_parallelize_iters();
+
+    /**
+     * Redistributes threads between sfc and shared 
+     *
+     * @param i_size_sfc_m combined size of all m dimensions in sfc
+     * @param i_size_sfc_n combined size of all n dimensions in sfc
+     * @param io_num_threads_shared number of threads used for shared parallelization.
+     * @param io_num_threads_sfc_m number of threads used for sfc m parallelization.
+     * @param io_num_threads_sfc_n number of threads used for sfc n parallelization.
+     **/
+    void set_num_threads_sfc( int64_t   i_size_sfc_m, 
+                              int64_t   i_size_sfc_n,
+                              int64_t * io_num_threads_shared,
+                              int64_t * io_num_threads_sfc_m,
+                              int64_t * io_num_threads_sfc_n
+                              );
 };
 
 #endif
