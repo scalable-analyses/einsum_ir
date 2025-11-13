@@ -1,7 +1,7 @@
 etops
 =====
 
-The `etops` package provides a Python interface for einsum tree operations. It enables users to define, configure, optimize, and execute complex tensor contractions and elementwise operations. The package is built on top of the einsum_ir C++ backend and exposes advanced features such as dimension fusion, dimension splitting, and backend-specific optimizations.
+The `etops` package provides a Python interface for the Tiled Execution IR (TEIR). It enables users to define, configure, optimize, and execute complex tensor contractions and elementwise operations. The package is built on top of the einsum_ir C++ backend and exposes advanced features such as dimension fusion, dimension splitting, and backend-specific optimizations.
 
 Main Features
 -------------
@@ -21,9 +21,126 @@ Install the package using pip:
 
     pip install etops
 
-Quick Example
--------------
-Below is a minimal example showing how to configure and execute tensor operations:
+Unary Examples
+--------------
+Below are some examples showing how to configure and execute unary tensor operations:
+
+.. code-block:: python
+
+    import etops
+
+    # ---------------------------------------
+    # First example:
+    #   Matrix transpose using copy primitive
+    #   Compares the result with NumPy
+    # ---------------------------------------
+    # Define a transpose configuration
+    top_config = etops.TensorOperationConfig(
+        data_type  =   etops.float32,
+        prim_first =   etops.prim.none,
+        prim_main  =   etops.prim.copy,
+        prim_last  =   etops.prim.none,
+        dim_types  =   (etops.dim.c,     etops.dim.c    ),
+        exec_types =   (etops.exec.prim, etops.exec.prim),
+        dim_sizes  =   (3,               4              ),
+        strides    = (((4,               1              ),), # in
+                      ((1,               3              ),)  # out
+        )
+    )
+
+    # Create the TensorOperation instance
+    top = etops.TensorOperation(top_config)
+
+    # Create input and output arrays
+    import numpy as np
+    A = np.random.randn(3,4).astype(np.float32)
+    B = np.random.randn(4,3).astype(np.float32)
+
+    top.execute(A, None, B)
+
+    B_np = np.einsum("ij->ji", A)
+
+    # Check correctness
+    error_abs = np.max( np.abs(B - B_np) )
+    print("Matrix Transpose using copy primitive:")
+    print(f"  Max absolute error: {error_abs:.6e}")
+
+    # -------------------------------------------------
+    # Second example:
+    #   Permutation of a 4D tensor using copy primitive
+    #   Compares the result with NumPy
+    # -------------------------------------------------
+    # Define a permutation configuration
+    perm_config = etops.TensorOperationConfig(
+        data_type   =   etops.float32,
+        prim_first  =   etops.prim.none,
+        prim_main   =   etops.prim.copy,
+        prim_last   =   etops.prim.none,
+        dim_types   =   (etops.dim.c,    etops.dim.c,     etops.dim.c,     etops.dim.c    ),
+        exec_types  =   (etops.exec.seq, etops.exec.seq,  etops.exec.prim, etops.exec.prim),
+        dim_sizes   =   (2,              4,               3,               5              ),
+        strides     = (((3*4*5,          5,               4*5,             1              ),), # in
+                       ((3,              2*3,             1,               4*2*3          ),)  # out
+        )
+    )
+
+    # Create the TensorOperation instance
+    perm_op = etops.TensorOperation(perm_config)
+
+    # Create input and output arrays
+    A = np.random.randn(2,3,4,5).astype(np.float32)
+    B = np.random.randn(5,4,2,3).astype(np.float32)
+
+    perm_op.execute(A, None, B)
+
+    B_np = np.einsum("abcd->dcab", A)
+
+    # Check correctness
+    error_abs = np.max( np.abs(B - B_np) )
+    print("4D Tensor Permutation using copy primitive:")
+    print(f"  Max absolute error: {error_abs:.6e}")
+
+    # -------------------------------------------------
+    # Third example:
+    #   Permutation of a 4D tensor using copy primitive
+    #   Uses the built-in optimization routine
+    #   Compares the result with NumPy
+    # -------------------------------------------------
+    perm_config = etops.TensorOperationConfig(
+        data_type   =   etops.float32,
+        prim_first  =   etops.prim.none,
+        prim_main   =   etops.prim.copy,
+        prim_last   =   etops.prim.none,
+        dim_types   =   (etops.dim.c,    etops.dim.c,     etops.dim.c,    etops.dim.c   ),
+        exec_types  =   (etops.exec.seq, etops.exec.seq,  etops.exec.seq, etops.exec.seq),
+        dim_sizes   =   (2,              4,               3,              5             ),
+        strides     = (((3*4*5,          5,               4*5,            1             ),), # in
+                       ((3,              2*3,             1,              4*2*3         ),)  # out
+        )
+    )
+
+    optimized_config = etops.optimize(perm_config)
+
+    # Create the TensorOperation instance
+    perm_op = etops.TensorOperation(optimized_config)
+
+    # Create input and output arrays
+    A = np.random.randn(2,3,4,5).astype(np.float32)
+    B = np.random.randn(5,4,2,3).astype(np.float32)
+
+    # Execute the operation
+    perm_op.execute(A, None, B)
+
+    B_np = np.einsum("abcd->dcab", A)
+
+    # Check correctness
+    error_abs = np.max( np.abs(B - B_np) )
+    print("4D Tensor Permutation using optimized copy primitive:")
+    print(f"  Max absolute error: {error_abs:.6e}")
+
+Binary Examples
+---------------
+Below are some examples showing how to configure and execute binary tensor operations:
 
 .. code-block:: python
 
@@ -36,16 +153,16 @@ Below is a minimal example showing how to configure and execute tensor operation
     # -----------------------------------------
     # Define a column-major GEMM configuration
     top_config = etops.TensorOperationConfig(
-        data_type  = etops.float32,
-        prim_first = etops.prim.zero,
-        prim_main  = etops.prim.gemm,
-        prim_last  = etops.prim.none,
-        dim_types  = (etops.dim.m,     etops.dim.n,     etops.dim.k    ),
-        exec_types = (etops.exec.prim, etops.exec.prim, etops.exec.prim),
-        dim_sizes  = (64,              32,              128            ),
-        strides_in0= (1,               0,               64             ),
-        strides_in1= (0,               128,             1              ),
-        strides_out= (1,               64,              0              )
+        data_type  =   etops.float32,
+        prim_first =   etops.prim.zero,
+        prim_main  =   etops.prim.gemm,
+        prim_last  =   etops.prim.none,
+        dim_types  =   (etops.dim.m,     etops.dim.n,     etops.dim.k    ),
+        exec_types =   (etops.exec.prim, etops.exec.prim, etops.exec.prim),
+        dim_sizes  =   (64,              32,              128            ),
+        strides    = (((1,               0,               64             ),), # in0
+                      ((0,               128,             1              ),), # in1
+                      ((1,               64,              0              ),)) # out
     )
 
     # Create the TensorOperation instance
@@ -75,17 +192,17 @@ Below is a minimal example showing how to configure and execute tensor operation
     #   Compares the result with torch's einsum
     # -----------------------------------------
     # Define a batched GEMM configuration
-    batched_config = etops.TensorOperationConfig(
-        data_type  = etops.float32,
-        prim_first = etops.prim.zero,
-        prim_main  = etops.prim.gemm,
-        prim_last  = etops.prim.none,
-        dim_types  = (etops.dim.c,       etops.dim.m,     etops.dim.n,     etops.dim.k    ),
-        exec_types = (etops.exec.shared, etops.exec.prim, etops.exec.prim, etops.exec.prim),
-        dim_sizes  = (48,                64,              32,              128            ),
-        strides_in0= (128*64,            1,               0,               64             ),
-        strides_in1= (32*128,            0,               128,             1              ),
-        strides_out= (32*64,             1,               64,              0              )
+    batched_config =    etops.TensorOperationConfig(
+        data_type  =    etops.float32,
+        prim_first =    etops.prim.zero,
+        prim_main  =    etops.prim.gemm,
+        prim_last  =    etops.prim.none,
+        dim_types  =   (etops.dim.c,       etops.dim.m,     etops.dim.n,     etops.dim.k    ),
+        exec_types =   (etops.exec.shared, etops.exec.prim, etops.exec.prim, etops.exec.prim),
+        dim_sizes  =   (48,                64,              32,              128            ),
+        strides    = (((128*64,            1,               0,               64             ),), # in0
+                      ((32*128,            0,               128,             1              ),), # in1
+                      ((32*64,             1,               64,              0              ),)) # out
     )
     # Create the batched TensorOperation instance
     top = etops.TensorOperation(batched_config)
@@ -115,17 +232,17 @@ Below is a minimal example showing how to configure and execute tensor operation
     #   Compares the result with torch's einsum
     # -----------------------------------------------
     # Define a batch-reduce GEMM configuration
-    batched_config = etops.TensorOperationConfig(
-        data_type  = etops.float32,
-        prim_first = etops.prim.zero,
-        prim_main  = etops.prim.gemm,
-        prim_last  = etops.prim.none,
-        dim_types  = (etops.dim.k,    etops.dim.m,    etops.dim.n,    etops.dim.k   ),
-        exec_types = (etops.exec.seq, etops.exec.seq, etops.exec.seq, etops.exec.seq),
-        dim_sizes  = (48,             64,             32,             128           ),
-        strides_in0= (128*64,         1,              0,              64            ),
-        strides_in1= (32*128,         0,              128,            1             ),
-        strides_out= (0,              1,              64,             0             )
+    batched_config =   etops.TensorOperationConfig(
+        data_type  =   etops.float32,
+        prim_first =   etops.prim.zero,
+        prim_main  =   etops.prim.gemm,
+        prim_last  =   etops.prim.none,
+        dim_types  =   (etops.dim.k,    etops.dim.m,    etops.dim.n,    etops.dim.k   ),
+        exec_types =   (etops.exec.seq, etops.exec.seq, etops.exec.seq, etops.exec.seq),
+        dim_sizes  =   (48,             64,             32,             128           ),
+        strides    = (((128*64,         1,              0,              64            ),),  # in0
+                      ((32*128,         0,              128,            1             ),),  # in1
+                      ((0,              1,              64,             0             ),))  # out
     )
 
     # Optimize the configuration

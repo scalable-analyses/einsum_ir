@@ -1,5 +1,6 @@
 #include "TensorOperation.h"
 #include <cstdint>
+#include <tuple>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -160,7 +161,9 @@ void einsum_ir::py::TensorOperation::update_parameters_from_iters(
   std::vector<int64_t>                               & dim_sizes,
   std::vector<int64_t>                               & strides_in0,
   std::vector<int64_t>                               & strides_in1,
-  std::vector<int64_t>                               & strides_out
+  std::vector<int64_t>                               & strides_out,
+  std::vector<int64_t>                               & packing_in0,
+  std::vector<int64_t>                               & packing_in1
 ) {
   
   size_t num_iters = iters.size();
@@ -170,6 +173,8 @@ void einsum_ir::py::TensorOperation::update_parameters_from_iters(
   strides_in0.clear();
   strides_in1.clear();
   strides_out.clear();
+  packing_in0.clear();
+  packing_in1.clear();
   
   dim_types.reserve(num_iters);
   exec_types.reserve(num_iters);
@@ -177,6 +182,8 @@ void einsum_ir::py::TensorOperation::update_parameters_from_iters(
   strides_in0.reserve(num_iters);
   strides_in1.reserve(num_iters);
   strides_out.reserve(num_iters);
+  packing_in0.reserve(num_iters);
+  packing_in1.reserve(num_iters);
   
   for (const auto & l_iter : iters) {
     dim_types.push_back(convert_dim_type_back(l_iter.dim_type));
@@ -185,6 +192,8 @@ void einsum_ir::py::TensorOperation::update_parameters_from_iters(
     strides_in0.push_back(l_iter.stride_left);
     strides_in1.push_back(l_iter.stride_right);
     strides_out.push_back(l_iter.stride_out);
+    packing_in0.push_back(l_iter.packing_stride_left);
+    packing_in1.push_back(l_iter.packing_stride_right);
   }
 }
 
@@ -197,17 +206,15 @@ int64_t einsum_ir::py::TensorOperation::dtype_to_num_bytes( dtype_t dtype ) {
 }
 
 einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
-  dtype_t                       dtype,
-  prim_t                        prim_first,
-  prim_t                        prim_main,
-  prim_t                        prim_last,
-  std::vector< dim_t>   const & dim_types,
-  std::vector< exec_t>  const & exec_types,
-  std::vector< int64_t> const & dim_sizes,
-  std::vector< int64_t> const & strides_in0,
-  std::vector< int64_t> const & strides_in1,
-  std::vector< int64_t> const & strides_out,
-  int64_t                       num_threads
+  dtype_t                                                      dtype,
+  prim_t                                                       prim_first,
+  prim_t                                                       prim_main,
+  prim_t                                                       prim_last,
+  std::vector< dim_t >                                 const & dim_types,
+  std::vector< exec_t >                                const & exec_types,
+  std::vector< int64_t >                               const & dim_sizes,
+  std::vector< std::vector< std::vector< int64_t > > > const & strides,
+  int64_t                                                      num_threads
 ) {
   int64_t l_num_threads[3] = {1, 1, 1};
   l_num_threads[0] = get_num_threads(num_threads);
@@ -218,19 +225,52 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
     return error_t::compilation_failed;
   }
 
-  if (m_op_type == op_type_t::unary) {
-    // Validate: prim_first and prim_last must be 'none'
+  // Validate stride dimensions based on operation type
+  size_t expected_tensors = (m_op_type == op_type_t::binary) ? 3 : 2;
+  if (strides.size() != expected_tensors) {
+    return error_t::invalid_stride_shape;
+  }
+
+  // Extract level 0 strides from each tensor
+  std::vector<int64_t> l_strides_in0, l_strides_in1, l_strides_out;
+
+  // Validate and extract in0 strides
+  if (strides[0].size() == 0 || strides[0][0].size() != dim_sizes.size()) {
+    return error_t::invalid_stride_shape;
+  }
+  l_strides_in0 = strides[0][0];
+
+  if (m_op_type == op_type_t::binary) {
+    // Binary operation: validate and extract in1 and out strides
+    if (strides[1].size() == 0 || strides[1][0].size() != dim_sizes.size()) {
+      return error_t::invalid_stride_shape;
+    }
+    l_strides_in1 = strides[1][0];
+
+    if (strides[2].size() == 0 || strides[2][0].size() != dim_sizes.size()) {
+      return error_t::invalid_stride_shape;
+    }
+    l_strides_out = strides[2][0];
+
+    return setup_binary(dtype, prim_first, prim_main, prim_last,
+                        dim_types, exec_types, dim_sizes,
+                        strides, l_num_threads);
+  }
+  else {
+    // Unary operation: validate and extract out strides, dummy strides for in1
+    if (strides[1].size() == 0 || strides[1][0].size() != dim_sizes.size()) {
+      return error_t::invalid_stride_shape;
+    }
+    l_strides_out = strides[1][0];
+    l_strides_in1 = std::vector<int64_t>(dim_sizes.size(), 0);
+
+    // Validate: prim_first and prim_last must be 'none' for unary
     if (prim_first != prim_t::none || prim_last != prim_t::none) {
       return error_t::compilation_failed;
     }
 
     return setup_unary(dtype, prim_main, exec_types,
-                       dim_sizes, strides_in0, strides_out, l_num_threads[0]);
-  }
-  else { // binary
-    return setup_binary(dtype, prim_first, prim_main, prim_last,
-                        dim_types, exec_types, dim_sizes,
-                        strides_in0, strides_in1, strides_out, l_num_threads);
+                       dim_sizes, l_strides_in0, l_strides_out, l_num_threads[0]);
   }
 }
 
@@ -278,18 +318,37 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup_un
 }
 
 einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup_binary(
-  dtype_t                       dtype,
-  prim_t                        prim_first,
-  prim_t                        prim_main,
-  prim_t                        prim_last,
-  std::vector< dim_t>   const & dim_types,
-  std::vector< exec_t>  const & exec_types,
-  std::vector< int64_t> const & dim_sizes,
-  std::vector< int64_t> const & strides_in0,
-  std::vector< int64_t> const & strides_in1,
-  std::vector< int64_t> const & strides_out,
-  int64_t                       num_threads[3]
+  dtype_t                                                      dtype,
+  prim_t                                                       prim_first,
+  prim_t                                                       prim_main,
+  prim_t                                                       prim_last,
+  std::vector< dim_t >                                 const & dim_types,
+  std::vector< exec_t >                                const & exec_types,
+  std::vector< int64_t >                               const & dim_sizes,
+  std::vector< std::vector< std::vector< int64_t > > > const & strides,
+  int64_t                                                      num_threads[3]
 ) {
+  // Extract level 0 strides (already validated in setup())
+  std::vector<int64_t> l_strides_in0 = strides[0][0];
+  std::vector<int64_t> l_strides_in1 = strides[1][0];
+  std::vector<int64_t> l_strides_out = strides[2][0];
+
+  // Extract level 1 (packing) strides if available, otherwise use dummy zeros
+  std::vector<int64_t> l_packing_strides_left;
+  std::vector<int64_t> l_packing_strides_right;
+
+  if (strides[0].size() > 1 && strides[0][1].size() == dim_sizes.size()) {
+    l_packing_strides_left = strides[0][1];
+  } else {
+    l_packing_strides_left = std::vector<int64_t>(dim_sizes.size(), 0);
+  }
+
+  if (strides[1].size() > 1 && strides[1][1].size() == dim_sizes.size()) {
+    l_packing_strides_right = strides[1][1];
+  } else {
+    l_packing_strides_right = std::vector<int64_t>(dim_sizes.size(), 0);
+  }
+
   // backend enums
   std::vector<einsum_ir::basic::dim_t> l_dim_types;
   std::vector<einsum_ir::basic::exec_t> l_exec_types;
@@ -328,22 +387,18 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup_bi
   l_ktype_last = convert_prim_to_kernel(prim_last);
 
   // dummy strides for auxiliary output tensor
-  std::vector<int64_t> strides_out_aux(dim_sizes.size(), 0);
-
-  // dummy strides for packing
-  std::vector<int64_t> packing_strides_left(dim_sizes.size(), 0);
-  std::vector<int64_t> packing_strides_right(dim_sizes.size(), 0);
+  std::vector<int64_t> l_strides_out_aux(dim_sizes.size(), 0);
 
   // init backend
   m_backend_binary.init( l_dim_types,
                          l_exec_types,
                          dim_sizes,
-                         strides_in0,
-                         strides_in1,
-                         strides_out_aux,
-                         strides_out,
-                         packing_strides_left,
-                         packing_strides_right,
+                         l_strides_in0,
+                         l_strides_in1,
+                         l_strides_out_aux,
+                         l_strides_out,
+                         l_packing_strides_left,
+                         l_packing_strides_right,
                          l_dtype_left,
                          l_dtype_right,
                          l_dtype_comp,
@@ -376,44 +431,138 @@ void einsum_ir::py::TensorOperation::execute( void const * tensor_in0,
   }
 }
 
-einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize( dtype_t                dtype,
-                                                                                  prim_t               & prim_first,
-                                                                                  prim_t               & prim_main,
-                                                                                  prim_t               & prim_last,
-                                                                                  std::vector<dim_t>   & dim_types,
-                                                                                  std::vector<exec_t>  & exec_types,
-                                                                                  std::vector<int64_t> & dim_sizes,
-                                                                                  std::vector<int64_t> & strides_in0,
-                                                                                  std::vector<int64_t> & strides_in1,
-                                                                                  std::vector<int64_t> & strides_out,
-                                                                                  int64_t                target_m,
-                                                                                  int64_t                target_n,
-                                                                                  int64_t                target_k,
-                                                                                  int64_t                num_threads,
-                                                                                  bool                   br_gemm_support,
-                                                                                  bool                   packed_gemm_support,
-                                                                                  int64_t                l2_cache_size ) {
+std::tuple<
+  einsum_ir::py::TensorOperation::error_t,
+  einsum_ir::py::TensorOperation::dtype_t,
+  einsum_ir::py::TensorOperation::prim_t,
+  einsum_ir::py::TensorOperation::prim_t,
+  einsum_ir::py::TensorOperation::prim_t,
+  std::vector< einsum_ir::py::TensorOperation::dim_t >,
+  std::vector< einsum_ir::py::TensorOperation::exec_t >,
+  std::vector< int64_t >,
+  std::vector< std::vector< std::vector< int64_t > > >
+> einsum_ir::py::TensorOperation::optimize(
+  dtype_t                                                      dtype,
+  prim_t                                                       prim_first,
+  prim_t                                                       prim_main,
+  prim_t                                                       prim_last,
+  std::vector< dim_t >                                 const & dim_types,
+  std::vector< exec_t >                                const & exec_types,
+  std::vector< int64_t >                               const & dim_sizes,
+  std::vector< std::vector< std::vector< int64_t > > > const & strides,
+  int64_t                                                      target_m,
+  int64_t                                                      target_n,
+  int64_t                                                      target_k,
+  int64_t                                                      num_threads,
+  bool                                                         br_gemm_support,
+  bool                                                         packed_gemm_support,
+  int64_t                                                      l2_cache_size
+) {
   int64_t l_num_threads[3] = {1, 1, 1};
   l_num_threads[0] = get_num_threads(num_threads);
 
-  op_type_t op_type = determine_op_type(prim_main);
+  op_type_t l_op_type = determine_op_type(prim_main);
 
-  if (op_type == op_type_t::undefined) {
-    return error_t::compilation_failed;
+  // Validate stride dimensions based on operation type
+  size_t l_expected_tensors = (l_op_type == op_type_t::binary) ? 3 : 2;
+  std::vector< std::vector< std::vector< int64_t > > > l_empty_strides;
+
+  if (l_op_type == op_type_t::undefined) {
+    return std::make_tuple(error_t::compilation_failed, dtype, prim_first,
+                           prim_main, prim_last, dim_types, exec_types,
+                           dim_sizes, l_empty_strides);
   }
 
-  if (op_type == op_type_t::unary) {
-    return optimize_unary(dtype, prim_main, dim_types, exec_types,
-                          dim_sizes, strides_in0, strides_out,
-                          l_num_threads[0]);
+  if (strides.size() != l_expected_tensors) {
+    return std::make_tuple(error_t::invalid_stride_shape, dtype, prim_first,
+                           prim_main, prim_last, dim_types, exec_types,
+                           dim_sizes, l_empty_strides);
   }
-  else { // binary
-    return optimize_binary(dtype, prim_first, prim_main, prim_last,
-                           dim_types, exec_types, dim_sizes,
-                           strides_in0, strides_in1, strides_out,
-                           target_m, target_n, target_k, l_num_threads,
-                           br_gemm_support, packed_gemm_support, l2_cache_size);
+
+  // Validate that at least one level exists for each tensor
+  for (size_t t = 0; t < l_expected_tensors; ++t) {
+    if (strides[t].size() == 0 || strides[t][0].size() != dim_sizes.size()) {
+      return std::make_tuple(error_t::invalid_stride_shape, dtype, prim_first,
+                             prim_main, prim_last, dim_types, exec_types,
+                             dim_sizes, l_empty_strides);
+    }
   }
+
+  // Extract level 0 strides
+  std::vector<int64_t> l_strides_in0 = strides[0][0];
+  std::vector<int64_t> l_strides_in1 = (l_op_type == op_type_t::binary) ? strides[1][0] 
+                                                                      : std::vector<int64_t>(dim_sizes.size(), 0);
+  std::vector<int64_t> l_strides_out = (l_op_type == op_type_t::binary) ? strides[2][0] : strides[1][0];
+
+  // Make copies of input parameters for optimization
+  std::vector<dim_t> l_opt_dim_types = dim_types;
+  std::vector<exec_t> l_opt_exec_types = exec_types;
+  std::vector<int64_t> l_opt_dim_sizes = dim_sizes;
+  std::vector<int64_t> l_opt_strides_in0 = l_strides_in0;
+  std::vector<int64_t> l_opt_strides_in1 = l_strides_in1;
+  std::vector<int64_t> l_opt_strides_out = l_strides_out;
+  std::vector<int64_t> l_opt_packing_in0;
+  std::vector<int64_t> l_opt_packing_in1;
+  prim_t l_opt_prim_main = prim_main;
+
+  error_t l_err = error_t::success;
+
+  if (l_op_type == op_type_t::unary) {
+    // Unary optimization
+    l_err = optimize_unary(dtype, l_opt_prim_main, l_opt_dim_types, l_opt_exec_types,
+                           l_opt_dim_sizes, l_opt_strides_in0, l_opt_strides_out,
+                           l_num_threads[0]);
+  } else {
+    // Binary optimization
+    l_err = optimize_binary(dtype, l_opt_prim_main, l_opt_dim_types, l_opt_exec_types,
+                            l_opt_dim_sizes, l_opt_strides_in0, l_opt_strides_in1,
+                            l_opt_strides_out, l_opt_packing_in0, l_opt_packing_in1,
+                            target_m, target_n, target_k, l_num_threads,
+                            br_gemm_support, packed_gemm_support, l2_cache_size);
+  }
+
+  if (l_err != error_t::success) {
+    return std::make_tuple(l_err, dtype, prim_first, l_opt_prim_main, prim_last,
+                           l_opt_dim_types, l_opt_exec_types, l_opt_dim_sizes, l_empty_strides);
+  }
+
+  // Build output 3D strides
+  std::vector< std::vector< std::vector< int64_t > > > opt_strides;
+
+  if (l_op_type == op_type_t::binary) {
+    // Check if packing strides are all zero
+    bool l_has_packing = false;
+    for (size_t i = 0; i < l_opt_packing_in0.size() && !l_has_packing; ++i) {
+      if (l_opt_packing_in0[i] != 0 || l_opt_packing_in1[i] != 0) {
+        l_has_packing = true;
+      }
+    }
+
+    if (l_has_packing) {
+      // Return with 2 levels: level 0 (primary) and level 1 (packing)
+      opt_strides = {
+        {l_opt_strides_in0, l_opt_packing_in0},
+        {l_opt_strides_in1, l_opt_packing_in1},
+        {l_opt_strides_out, std::vector<int64_t>(l_opt_strides_out.size(), 0)}  // out has no packing
+      };
+    } else {
+      // Return with single level only
+      opt_strides = {
+        {l_opt_strides_in0},
+        {l_opt_strides_in1},
+        {l_opt_strides_out}
+      };
+    }
+  } else {
+    // Unary: single level only
+    opt_strides = {
+      {l_opt_strides_in0},
+      {l_opt_strides_out}
+    };
+  }
+
+  return std::make_tuple(l_err, dtype, prim_first, l_opt_prim_main, prim_last,
+                         l_opt_dim_types, l_opt_exec_types, l_opt_dim_sizes, opt_strides);
 }
 
 einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize_unary(
@@ -480,15 +629,15 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
 
 einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize_binary(
   dtype_t                  dtype,
-  prim_t                 & prim_first,
   prim_t                 & prim_main,
-  prim_t                 & prim_last,
   std::vector< dim_t >   & dim_types,
   std::vector< exec_t >  & exec_types,
   std::vector< int64_t > & dim_sizes,
   std::vector< int64_t > & strides_in0,
   std::vector< int64_t > & strides_in1,
   std::vector< int64_t > & strides_out,
+  std::vector< int64_t > & packing_in0,
+  std::vector< int64_t > & packing_in1,
   int64_t                  target_m,
   int64_t                  target_n,
   int64_t                  target_k,
@@ -497,7 +646,7 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
   bool                     packed_gemm_support,
   int64_t                  l2_cache_size
 ) {
-  // Create loop properties from input parameters
+  // Create iter_properties from input parameters
   std::vector<einsum_ir::basic::iter_property> l_iters = create_iter_properties(
     dim_types,
     exec_types,
@@ -509,9 +658,7 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
   
   // Convert main primitive type to kernel type  
   einsum_ir::basic::kernel_t l_kernel_main = convert_prim_to_kernel(prim_main);
-
   int64_t l_num_bytes = dtype_to_num_bytes(dtype);
-
   einsum_ir::basic::packed_gemm_t l_packed_gemm_support =
     packed_gemm_support ? einsum_ir::basic::packed_gemm_t::NONE
                         : einsum_ir::basic::packed_gemm_t::ALL_STRIDE_ONE;
@@ -536,7 +683,7 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
   // Run optimization
   l_optimizer.optimize();
   
-  // Update output parameters from optimized loops
+  // Extract optimized parameters including packing strides
   update_parameters_from_iters(
     l_iters,
     dim_types,
@@ -544,16 +691,17 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
     dim_sizes,
     strides_in0,
     strides_in1,
-    strides_out
+    strides_out,
+    packing_in0,
+    packing_in1
   );
   
-  // Update main primitive if kernel type changed (e.g., GEMM -> BR_GEMM)
+  // Update primitive type if changed
   if (l_kernel_main == einsum_ir::basic::kernel_t::BR_MADD) {
     prim_main = prim_t::brgemm;
   } else if (l_kernel_main == einsum_ir::basic::kernel_t::MADD) {
     prim_main = prim_t::gemm;
   }
-  // Note: other primitive types (first, last) don't change during optimization
   
   return error_t::success;
 }

@@ -60,8 +60,9 @@ class einsum_ir::py::TensorOperation {
 
     /// error codes
     enum class error_t : int32_t {
-      success            = 0,
-      compilation_failed = 1
+      success              = 0,
+      compilation_failed   = 1,
+      invalid_stride_shape = 2
     };
 
     op_type_t m_op_type = op_type_t::undefined;
@@ -71,31 +72,30 @@ class einsum_ir::py::TensorOperation {
     /**
      * Setup for a binary tensor contraction or a unary tensor operation.
      *
-     * @param dtype       Datatype of all tensor elements.
-     * @param prim_first  Type of the first touch primitive.
-     * @param prim_main   Type of the main primitive.
-     * @param prim_last   Type of the last touch primitive.
-     * @param dim_types   Dimension types (c, m, n, or k; ignored if unary).
-     * @param exec_types  Execution type of the dimensions (prim, seq, shared, or sfc).
-     * @param dim_sizes   Sizes of the dimensions.
-     * @param strides_in0 Strides of the first input tensor.
-     * @param strides_in1 Strides of the second input tensor (ignored if unary).
-     * @param strides_out Strides of the output tensor.
+     * @param dtype      Datatype of all tensor elements.
+     * @param prim_first Type of the first touch primitive.
+     * @param prim_main  Type of the main primitive (determines operation type).
+     * @param prim_last  Type of the last touch primitive.
+     * @param dim_types  Dimension types.
+     * @param exec_types Execution type of the dimensions (prim, seq, shared, or sfc).
+     * @param dim_sizes  Sizes of the dimensions.
+     * @param strides    3D stride tensor: [TENSOR][LEVEL][DIMENSION]
+     *                   - TENSOR: 0=in0, 1=in1, 2=out (binary) or 0=in, 1=out (unary)
+     *                   - LEVEL: 0=primary layout, 1=packing, 2+=reserved
+     *                   - DIMENSION: dimension index
      * @param num_threads Number of threads for parallel execution (determined automatically if <1).
-     * @return            Appropiate error code.
+     * @return           Appropriate error code.
      **/
     error_t setup(
-      dtype_t                        dtype,
-      prim_t                         prim_first,
-      prim_t                         prim_main,
-      prim_t                         prim_last,
-      std::vector< dim_t >   const & dim_types,
-      std::vector< exec_t >  const & exec_types,
-      std::vector< int64_t > const & dim_sizes,
-      std::vector< int64_t > const & strides_in0,
-      std::vector< int64_t > const & strides_in1,
-      std::vector< int64_t > const & strides_out,
-      int64_t                        num_threads
+      dtype_t                                                      dtype,
+      prim_t                                                       prim_first,
+      prim_t                                                       prim_main,
+      prim_t                                                       prim_last,
+      std::vector< dim_t >                                 const & dim_types,
+      std::vector< exec_t >                                const & exec_types,
+      std::vector< int64_t >                               const & dim_sizes,
+      std::vector< std::vector< std::vector< int64_t > > > const & strides,
+      int64_t                                                      num_threads
     );
 
     /**
@@ -110,45 +110,56 @@ class einsum_ir::py::TensorOperation {
                   void       * tensor_out );
 
     /**
-     * Optimizes a tensor operation configuration using ContractionOptimizer.
+     * Optimizes a tensor operation configuration.
+     *
+     * The operation type is automatically determined from prim_main.
+     * For binary operations, may add packing levels if optimization determines it beneficial.
+     * For unary operations, returns single level.
      *
      * @param dtype               Datatype of all tensor elements.
      * @param prim_first          Type of the first touch primitive.
-     * @param prim_main           Type of the main primitive (modified by optimization).
+     * @param prim_main           Type of the main primitive.
      * @param prim_last           Type of the last touch primitive.
-     * @param dim_types           Dimension type (modified by optimization).
-     * @param exec_types          Execution type of the dimensions (modified by optimization).
-     * @param dim_sizes           Sizes of the dimensions (modified by optimization).
-     * @param strides_in0         Strides of the first input tensor (modified by optimization).
-     * @param strides_in1         Strides of the second input tensor (modified by optimization).
-     * @param strides_out         Strides of the output tensor (modified by optimization).
+     * @param dim_types           Dimension types.
+     * @param exec_types          Execution type of the dimensions.
+     * @param dim_sizes           Sizes of the dimensions.
+     * @param strides             3D stride tensor: [TENSOR][LEVEL][DIMENSION]
      * @param target_m            Target M block size for optimization.
      * @param target_n            Target N block size for optimization.
      * @param target_k            Target K block size for optimization.
-     * @param num_threads         Number of threads for parallel execution (determined automatically if <1).
+     * @param num_threads         Number of threads for parallel execution.
      * @param br_gemm_support     Whether backend supports batch-reduce GEMM.
      * @param packed_gemm_support Whether backend supports packed GEMM.
      * @param l2_cache_size       Size of L2 cache in bytes.
-     * @return                    Appropriate error code.
+     * @return                    Tuple of (error, dtype, prim_first, prim_main, prim_last,
+     *                            dim_types, exec_types, dim_sizes, optimized_strides).
      **/
-    error_t static optimize(
-      dtype_t                  dtype,
-      prim_t                 & prim_first,
-      prim_t                 & prim_main,
-      prim_t                 & prim_last,
-      std::vector< dim_t >   & dim_types,
-      std::vector< exec_t >  & exec_types,
-      std::vector< int64_t > & dim_sizes,
-      std::vector< int64_t > & strides_in0,
-      std::vector< int64_t > & strides_in1,
-      std::vector< int64_t > & strides_out,
-      int64_t                  target_m,
-      int64_t                  target_n,
-      int64_t                  target_k,
-      int64_t                  num_threads,
-      bool                     br_gemm_support,
-      bool                     packed_gemm_support,
-      int64_t                  l2_cache_size
+    static std::tuple<
+      error_t,
+      dtype_t,
+      prim_t,
+      prim_t,
+      prim_t,
+      std::vector< dim_t >,
+      std::vector< exec_t >,
+      std::vector< int64_t >,
+      std::vector< std::vector< std::vector< int64_t > > >
+    > optimize(
+      dtype_t                                                      dtype,
+      prim_t                                                       prim_first,
+      prim_t                                                       prim_main,
+      prim_t                                                       prim_last,
+      std::vector< dim_t >                                 const & dim_types,
+      std::vector< exec_t >                                const & exec_types,
+      std::vector< int64_t >                               const & dim_sizes,
+      std::vector< std::vector< std::vector< int64_t > > > const & strides,
+      int64_t                                                      target_m,
+      int64_t                                                      target_n,
+      int64_t                                                      target_k,
+      int64_t                                                      num_threads,
+      bool                                                         br_gemm_support,
+      bool                                                         packed_gemm_support,
+      int64_t                                                      l2_cache_size
     );
 
   private:
@@ -222,6 +233,8 @@ class einsum_ir::py::TensorOperation {
      * @param strides_in0 Output strides for first input tensor.
      * @param strides_in1 Output strides for second input tensor.
      * @param strides_out Output strides for output tensor.
+     * @param packing_in0 Output packing strides for first input tensor.
+     * @param packing_in1 Output packing strides for second input tensor.
      **/
     static inline void update_parameters_from_iters(
       std::vector<einsum_ir::basic::iter_property> const & iters,
@@ -230,7 +243,9 @@ class einsum_ir::py::TensorOperation {
       std::vector<int64_t>                                & dim_sizes,
       std::vector<int64_t>                                & strides_in0,
       std::vector<int64_t>                                & strides_in1,
-      std::vector<int64_t>                                & strides_out
+      std::vector<int64_t>                                & strides_out,
+      std::vector<int64_t>                                & packing_in0,
+      std::vector<int64_t>                                & packing_in1
     );
 
     /**
@@ -289,24 +304,20 @@ class einsum_ir::py::TensorOperation {
      * @param dim_types   Dimension types.
      * @param exec_types  Execution types.
      * @param dim_sizes   Sizes of dimensions.
-     * @param strides_in0 Strides of first input tensor.
-     * @param strides_in1 Strides of second input tensor.
-     * @param strides_out Strides of output tensor.
+     * @param strides     3D stride tensor [TENSOR][LEVEL][DIMENSION].
      * @param num_threads Number of threads: [0]: shared, [1]: SFC M, [2]: SFC N.
      * @return            Appropriate error code.
      **/
     error_t setup_binary(
-      dtype_t                        dtype,
-      prim_t                         prim_first,
-      prim_t                         prim_main,
-      prim_t                         prim_last,
-      std::vector< dim_t >   const & dim_types,
-      std::vector< exec_t >  const & exec_types,
-      std::vector< int64_t > const & dim_sizes,
-      std::vector< int64_t > const & strides_in0,
-      std::vector< int64_t > const & strides_in1,
-      std::vector< int64_t > const & strides_out,
-      int64_t                        num_threads[3]
+      dtype_t                                                      dtype,
+      prim_t                                                       prim_first,
+      prim_t                                                       prim_main,
+      prim_t                                                       prim_last,
+      std::vector< dim_t >                                 const & dim_types,
+      std::vector< exec_t >                                const & exec_types,
+      std::vector< int64_t >                               const & dim_sizes,
+      std::vector< std::vector< std::vector< int64_t > > > const & strides,
+      int64_t                                                      num_threads[3]
     );
 
     /**
@@ -346,6 +357,8 @@ class einsum_ir::py::TensorOperation {
      * @param strides_in0         Strides of first input tensor.
      * @param strides_in1         Strides of second input tensor.
      * @param strides_out         Strides of output tensor.
+     * @param packing_in0         Packing strides for first input tensor (output).
+     * @param packing_in1         Packing strides for second input tensor (output).
      * @param target_m            Target M block size.
      * @param target_n            Target N block size.
      * @param target_k            Target K block size.
@@ -357,15 +370,15 @@ class einsum_ir::py::TensorOperation {
      **/
     static error_t optimize_binary(
       dtype_t                  dtype,
-      prim_t                 & prim_first,
       prim_t                 & prim_main,
-      prim_t                 & prim_last,
       std::vector< dim_t >   & dim_types,
       std::vector< exec_t >  & exec_types,
       std::vector< int64_t > & dim_sizes,
       std::vector< int64_t > & strides_in0,
       std::vector< int64_t > & strides_in1,
       std::vector< int64_t > & strides_out,
+      std::vector< int64_t > & packing_in0,
+      std::vector< int64_t > & packing_in1,
       int64_t                  target_m,
       int64_t                  target_n,
       int64_t                  target_k,

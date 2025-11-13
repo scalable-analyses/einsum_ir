@@ -121,20 +121,36 @@ class TensorOperationConfig:
     Supports both binary contractions and unary operations.
     The operation type is automatically determined from prim_main.
 
+    The strides parameter is a 3D tensor with shape [TENSOR][LEVEL][DIMENSION]:
+
+    TENSOR dimension (axis 0):
+      - Binary operations: [0]=in0, [1]=in1, [2]=out
+      - Unary operations: [0]=in, [1]=out
+
+    LEVEL dimension (axis 1):
+      - [0] = Primary memory layout strides
+      - [1] = Secondary level (e.g., packing strides, L1 cache)
+      - [2+] = Additional levels (e.g., L2, L3 cache)
+
+      For user input, typically only level 0 is provided.
+      The optimizer may add additional levels (e.g., packing).
+
+    DIMENSION dimension (axis 2):
+      - Corresponds to dimension indices
+
     Binary Contractions:
       - prim_main: etops.prim.gemm or etops.prim.brgemm
       - dim_types: combination of etops.dim.m, .n, .k, .c
       - prim_first: etops.prim.zero or .none (optional first touch)
       - prim_last: etops.prim.relu or .none (optional last touch)
-      - strides_in0, strides_in1, strides_out: all required
+      - strides: shape [3][1 or more][num_dims]
 
     Unary Operations:
-      - prim_main: etops.prim.copy, or .zero
+      - prim_main: etops.prim.copy or .zero
       - dim_types: must be etops.dim.c for all dimensions
       - prim_first: must be etops.prim.none
       - prim_last: must be etops.prim.none
-      - strides_in0, strides_out: required
-      - strides_in1: ignored (can be empty tuple or dummy values)
+      - strides: shape [2][1][num_dims]
     """
     data_type: _DataType
     prim_first: _PrimType
@@ -143,9 +159,7 @@ class TensorOperationConfig:
     dim_types: Sequence[_DimType]
     exec_types: Sequence[_ExecType]
     dim_sizes: Sequence[int]
-    strides_in0: Sequence[int]
-    strides_in1: Sequence[int]
-    strides_out: Sequence[int]
+    strides: Sequence[Sequence[Sequence[int]]]  # [TENSOR][LEVEL][DIMENSION]
 
     def apply(self, op: _CppOp, num_threads: int = 0) -> None:
         """
@@ -164,9 +178,7 @@ class TensorOperationConfig:
             tuple(self.dim_types),
             tuple(self.exec_types),
             tuple(self.dim_sizes),
-            tuple(self.strides_in0),
-            tuple(self.strides_in1),
-            tuple(self.strides_out),
+            tuple(tuple(tuple(level) for level in tensor) for tensor in self.strides),
             num_threads
         )
         if err != ErrorType.success:
@@ -203,23 +215,26 @@ def optimize(
 
     Binary contractions:
       Uses ContractionOptimizer with provided target sizes and GEMM support flags.
+      If packing is added by optimization, the returned strides will have 2 levels
+      instead of 1. Otherwise returns 1 level.
 
     Unary operations:
       Uses UnaryOptimizer. The target_m, target_n, target_k, br_gemm_support,
       and packed_gemm_support parameters are ignored for unary operations.
+      Typically returns 1 level in strides.
 
     Args:
         config: The original tensor operation configuration
         target_m: Target M block size for optimization (ignored for unary operations)
         target_n: Target N block size for optimization (ignored for unary operations)
-        target_k: Target K block size for optimization ((ignored for unary operations)
+        target_k: Target K block size for optimization (ignored for unary operations)
         num_threads: Number of threads for parallel execution (auto-determined if <1)
         br_gemm_support: Whether backend supports batch-reduce GEMM (ignored for unary operations)
         packed_gemm_support: Whether backend supports packed GEMM (ignored for unary operations)
         l2_cache_size: Size of the L2 cache in bytes (default: 1MiB if <1)
 
     Returns:
-        Optimized configuration.
+        Optimized configuration with potentially modified strides.
 
     Raises:
         RuntimeError: If optimization fails
@@ -237,9 +252,7 @@ def optimize(
         config.dim_types,
         config.exec_types,
         config.dim_sizes,
-        config.strides_in0,
-        config.strides_in1,
-        config.strides_out,
+        tuple(tuple(tuple(level) for level in tensor) for tensor in config.strides),
         target_m,
         target_n,
         target_k,
@@ -258,15 +271,13 @@ def optimize(
      opt_dim_types,
      opt_exec_types,
      opt_dim_sizes,
-     opt_strides_in0,
-     opt_strides_in1,
-     opt_strides_out) = result
+     opt_strides) = result
     
     # Check for errors
     if err != ErrorType.success:
         raise RuntimeError(f"einsum_ir TensorOperation optimization failed: {err}")
     
-    # Return new optimized Config
+    # Return new optimized Config with 3D strides
     return TensorOperationConfig(
         data_type=opt_data_type,
         prim_first=opt_prim_first,
@@ -275,9 +286,7 @@ def optimize(
         dim_types=opt_dim_types,
         exec_types=opt_exec_types,
         dim_sizes=opt_dim_sizes,
-        strides_in0=opt_strides_in0,
-        strides_in1=opt_strides_in1,
-        strides_out=opt_strides_out
+        strides=opt_strides
     )
 
 __all__ = [
