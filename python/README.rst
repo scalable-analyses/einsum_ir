@@ -43,9 +43,8 @@ Below are some examples showing how to configure and execute unary tensor operat
         dim_types  =   (etops.dim.c,     etops.dim.c    ),
         exec_types =   (etops.exec.prim, etops.exec.prim),
         dim_sizes  =   (3,               4              ),
-        strides    = (((4,               1              ),), # in
-                      ((1,               3              ),)  # out
-        )
+        strides    = (((4,               1               ),   # in
+                       (1,               3               )),) # out
     )
 
     # Create the TensorOperation instance
@@ -79,9 +78,8 @@ Below are some examples showing how to configure and execute unary tensor operat
         dim_types   =   (etops.dim.c,    etops.dim.c,     etops.dim.c,     etops.dim.c    ),
         exec_types  =   (etops.exec.seq, etops.exec.seq,  etops.exec.prim, etops.exec.prim),
         dim_sizes   =   (2,              4,               3,               5              ),
-        strides     = (((3*4*5,          5,               4*5,             1              ),), # in
-                       ((3,              2*3,             1,               4*2*3          ),)  # out
-        )
+        strides     = (((3*4*5,          5,               4*5,             1              ),   # in
+                        (3,              2*3,             1,               4*2*3          )),) # out
     )
 
     # Create the TensorOperation instance
@@ -114,9 +112,8 @@ Below are some examples showing how to configure and execute unary tensor operat
         dim_types   =   (etops.dim.c,    etops.dim.c,     etops.dim.c,    etops.dim.c   ),
         exec_types  =   (etops.exec.seq, etops.exec.seq,  etops.exec.seq, etops.exec.seq),
         dim_sizes   =   (2,              4,               3,              5             ),
-        strides     = (((3*4*5,          5,               4*5,            1             ),), # in
-                       ((3,              2*3,             1,              4*2*3         ),)  # out
-        )
+        strides     = (((3*4*5,          5,               4*5,            1             ),   # in
+                        (3,              2*3,             1,              4*2*3         )),) # out
     )
 
     optimized_config = etops.optimize(perm_config)
@@ -160,9 +157,9 @@ Below are some examples showing how to configure and execute binary tensor opera
         dim_types  =   (etops.dim.m,     etops.dim.n,     etops.dim.k    ),
         exec_types =   (etops.exec.prim, etops.exec.prim, etops.exec.prim),
         dim_sizes  =   (64,              32,              128            ),
-        strides    = (((1,               0,               64             ),), # in0
-                      ((0,               128,             1              ),), # in1
-                      ((1,               64,              0              ),)) # out
+        strides    = (((1,               0,               64             ),   # in0
+                       (0,               128,             1              ),   # in1
+                       (1,               64,              0              )),) # out
     )
 
     # Create the TensorOperation instance
@@ -200,9 +197,9 @@ Below are some examples showing how to configure and execute binary tensor opera
         dim_types  =   (etops.dim.c,       etops.dim.m,     etops.dim.n,     etops.dim.k    ),
         exec_types =   (etops.exec.shared, etops.exec.prim, etops.exec.prim, etops.exec.prim),
         dim_sizes  =   (48,                64,              32,              128            ),
-        strides    = (((128*64,            1,               0,               64             ),), # in0
-                      ((32*128,            0,               128,             1              ),), # in1
-                      ((32*64,             1,               64,              0              ),)) # out
+        strides    = (((128*64,            1,               0,               64             ),   # in0
+                       (32*128,            0,               128,             1              ),   # in1
+                       (32*64,             1,               64,              0              )),) # out
     )
     # Create the batched TensorOperation instance
     top = etops.TensorOperation(batched_config)
@@ -242,12 +239,12 @@ Below are some examples showing how to configure and execute binary tensor opera
         dim_types  =   (etops.dim.m,     etops.dim.n,     etops.dim.k    ),
         exec_types =   (etops.exec.prim, etops.exec.prim, etops.exec.prim),
         dim_sizes  =   (64,              32,              128            ),
-        strides    = (((1,               0,               64             ), # in 0
-                       (128,             0,               1              )),
-                      ((0,               128,             1              ), # in 1
-                       (0,               0,               0              )),
-                      ((1,               64,              0              ), # out
-                       (0,               0,               0              )))
+        strides    = (((1,               0,               64             ),   # in 0
+                       (0,               128,             1              ),   # in 1
+                       (1,               64,              0              )),  # out
+                      ((128,             0,               1              ),   # packing in 0
+                       (0,               0,               0              ),   # packing in 1
+                       (0,               0,               0              )),) # packing out
     )
 
     # Create the TensorOperation instance
@@ -286,9 +283,9 @@ Below are some examples showing how to configure and execute binary tensor opera
         dim_types  =   (etops.dim.k,    etops.dim.m,    etops.dim.n,    etops.dim.k   ),
         exec_types =   (etops.exec.seq, etops.exec.seq, etops.exec.seq, etops.exec.seq),
         dim_sizes  =   (48,             64,             32,             128           ),
-        strides    = (((128*64,         1,              0,              64            ),),  # in0
-                      ((32*128,         0,              128,            1             ),),  # in1
-                      ((0,              1,              64,             0             ),))  # out
+        strides    = (((128*64,         1,              0,              64            ),   # in0
+                       (32*128,         0,              128,            1             ),   # in1
+                       (0,              1,              64,             0             )),) # out
     )
 
     # Optimize the configuration
