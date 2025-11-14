@@ -79,9 +79,9 @@ class einsum_ir::py::TensorOperation {
      * @param dim_types  Dimension types.
      * @param exec_types Execution type of the dimensions (prim, seq, shared, or sfc).
      * @param dim_sizes  Sizes of the dimensions.
-     * @param strides    3D stride tensor: [TENSOR][LEVEL][DIMENSION]
-     *                   - TENSOR: 0=in0, 1=in1, 2=out (binary) or 0=in, 1=out (unary)
+     * @param strides    3D stride tensor: [LEVEL][TENSOR][DIMENSION]
      *                   - LEVEL: 0=primary layout, 1=packing, 2+=reserved
+     *                   - TENSOR: 0=in0, 1=in1, 2=out (binary) or 0=in, 1=out (unary)
      *                   - DIMENSION: dimension index
      * @param num_threads Number of threads for parallel execution (determined automatically if <1).
      * @return           Appropriate error code.
@@ -123,7 +123,7 @@ class einsum_ir::py::TensorOperation {
      * @param dim_types           Dimension types.
      * @param exec_types          Execution type of the dimensions.
      * @param dim_sizes           Sizes of the dimensions.
-     * @param strides             3D stride tensor: [TENSOR][LEVEL][DIMENSION]
+     * @param strides             3D stride tensor: [LEVEL][TENSOR][DIMENSION]
      * @param target_m            Target M block size for optimization.
      * @param target_n            Target N block size for optimization.
      * @param target_k            Target K block size for optimization.

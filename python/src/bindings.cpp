@@ -58,18 +58,18 @@ PYBIND11_MODULE(_etops_core, m) {
           - dim_types: use m, n, k, c as appropriate for contraction semantics
           - prim_first: zero or none (first touch operation)
           - prim_last: relu or none (last touch operation)
-          - strides: [3][LEVEL][DIMENSION] tensor (3 tensors: in0, in1, out)
+          - strides: [LEVEL][3][DIMENSION] tensor (each level has 3 tensors: in0, in1, out)
 
         Unary Operations (permutation or zero):
           - prim_main: copy or zero
           - dim_types: must be 'c' for all dimensions
           - prim_first: must be 'none'
           - prim_last: must be 'none'
-          - strides: [2][LEVEL][DIMENSION] tensor (2 tensors: in, out)
+          - strides: [LEVEL][2][DIMENSION] tensor (each level has 2 tensors: in, out)
 
-        Strides 3D tensor structure [TENSOR][LEVEL][DIMENSION]:
-          TENSOR: 0=in0, 1=in1, 2=out (binary) or 0=in, 1=out (unary)
+        Strides 3D tensor structure [LEVEL][TENSOR][DIMENSION]:
           LEVEL: 0=primary layout, 1=packing, 2+=reserved for future
+          TENSOR: 0=in0, 1=in1, 2=out (binary) or 0=in, 1=out (unary)
           DIMENSION: index corresponding to dim_types/dim_sizes
 
         :param dtype: Datatype of all tensor elements.
@@ -79,7 +79,7 @@ PYBIND11_MODULE(_etops_core, m) {
         :param dim_types: Dimension types provided by user.
         :param exec_types: Execution types of the dimensions (prim, seq, shared, or sfc).
         :param dim_sizes: Sizes of the dimensions.
-        :param strides: 3D stride tensor [TENSOR][LEVEL][DIMENSION].
+        :param strides: 3D stride tensor [LEVEL][TENSOR][DIMENSION].
         :param num_threads: Number of threads to use for execution.
         :return: Appropriate error code.
       )doc",
@@ -195,7 +195,7 @@ PYBIND11_MODULE(_etops_core, m) {
         :param dim_types: Dimension types.
         :param exec_types: Execution types of the dimensions (prim, seq, shared, or sfc).
         :param dim_sizes: Sizes of the dimensions.
-        :param strides: 3D stride tensor [TENSOR][LEVEL][DIMENSION].
+        :param strides: 3D stride tensor [LEVEL][TENSOR][DIMENSION].
         :param target_m: Target size for dimension m (ignored for unary).
         :param target_n: Target size for dimension n (ignored for unary).
         :param target_k: Target size for dimension k (ignored for unary).

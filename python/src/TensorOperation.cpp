@@ -225,9 +225,14 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
     return error_t::compilation_failed;
   }
 
-  // Validate stride dimensions based on operation type
-  size_t expected_tensors = (m_op_type == op_type_t::binary) ? 3 : 2;
-  if (strides.size() != expected_tensors) {
+  // Validate stride dimensions: must have at least level 0
+  if (strides.size() == 0) {
+    return error_t::invalid_stride_shape;
+  }
+
+  // Validate level 0 has correct number of tensors
+  size_t l_expected_tensors = (m_op_type == op_type_t::binary) ? 3 : 2;
+  if (strides[0].size() != l_expected_tensors) {
     return error_t::invalid_stride_shape;
   }
 
@@ -235,22 +240,22 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
   std::vector<int64_t> l_strides_in0, l_strides_in1, l_strides_out;
 
   // Validate and extract in0 strides
-  if (strides[0].size() == 0 || strides[0][0].size() != dim_sizes.size()) {
+  if (strides[0][0].size() != dim_sizes.size()) {
     return error_t::invalid_stride_shape;
   }
   l_strides_in0 = strides[0][0];
 
   if (m_op_type == op_type_t::binary) {
     // Binary operation: validate and extract in1 and out strides
-    if (strides[1].size() == 0 || strides[1][0].size() != dim_sizes.size()) {
+    if (strides[0][1].size() != dim_sizes.size()) {
       return error_t::invalid_stride_shape;
     }
-    l_strides_in1 = strides[1][0];
+    l_strides_in1 = strides[0][1];
 
-    if (strides[2].size() == 0 || strides[2][0].size() != dim_sizes.size()) {
+    if (strides[0][2].size() != dim_sizes.size()) {
       return error_t::invalid_stride_shape;
     }
-    l_strides_out = strides[2][0];
+    l_strides_out = strides[0][2];
 
     return setup_binary(dtype, prim_first, prim_main, prim_last,
                         dim_types, exec_types, dim_sizes,
@@ -258,10 +263,10 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
   }
   else {
     // Unary operation: validate and extract out strides, dummy strides for in1
-    if (strides[1].size() == 0 || strides[1][0].size() != dim_sizes.size()) {
+    if (strides[0][1].size() != dim_sizes.size()) {
       return error_t::invalid_stride_shape;
     }
-    l_strides_out = strides[1][0];
+    l_strides_out = strides[0][1];
     l_strides_in1 = std::vector<int64_t>(dim_sizes.size(), 0);
 
     // Validate: prim_first and prim_last must be 'none' for unary
@@ -330,26 +335,29 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup_bi
 ) {
   // Extract level 0 strides (already validated in setup())
   std::vector<int64_t> l_strides_in0 = strides[0][0];
-  std::vector<int64_t> l_strides_in1 = strides[1][0];
-  std::vector<int64_t> l_strides_out = strides[2][0];
+  std::vector<int64_t> l_strides_in1 = strides[0][1];
+  std::vector<int64_t> l_strides_out = strides[0][2];
 
   // Extract level 1 (packing) strides if available, otherwise use dummy zeros
   std::vector<int64_t> l_packing_strides_left;
   std::vector<int64_t> l_packing_strides_right;
 
-  if (strides[0].size() > 1 && strides[0][1].size() == dim_sizes.size()) {
-    l_packing_strides_left = strides[0][1];
+  if (strides.size() > 1 && strides[1].size() == 3) {
+    if (strides[1][0].size() == dim_sizes.size()) {
+      l_packing_strides_left = strides[1][0];
+    } else {
+      l_packing_strides_left = std::vector<int64_t>(dim_sizes.size(), 0);
+    }
+
+    if (strides[1][1].size() == dim_sizes.size()) {
+      l_packing_strides_right = strides[1][1];
+    } else {
+      l_packing_strides_right = std::vector<int64_t>(dim_sizes.size(), 0);
+    }
   } else {
     l_packing_strides_left = std::vector<int64_t>(dim_sizes.size(), 0);
-  }
-
-  if (strides[1].size() > 1 && strides[1][1].size() == dim_sizes.size()) {
-    l_packing_strides_right = strides[1][1];
-  } else {
     l_packing_strides_right = std::vector<int64_t>(dim_sizes.size(), 0);
-  }
-
-  // backend enums
+  }  // backend enums
   std::vector<einsum_ir::basic::dim_t> l_dim_types;
   std::vector<einsum_ir::basic::exec_t> l_exec_types;
 
@@ -473,15 +481,23 @@ std::tuple<
                            dim_sizes, l_empty_strides);
   }
 
-  if (strides.size() != l_expected_tensors) {
+  // Validate stride dimensions: must have at least level 0
+  if (strides.size() == 0) {
     return std::make_tuple(error_t::invalid_stride_shape, dtype, prim_first,
                            prim_main, prim_last, dim_types, exec_types,
                            dim_sizes, l_empty_strides);
   }
 
-  // Validate that at least one level exists for each tensor
+  // Validate level 0 has correct number of tensors
+  if (strides[0].size() != l_expected_tensors) {
+    return std::make_tuple(error_t::invalid_stride_shape, dtype, prim_first,
+                           prim_main, prim_last, dim_types, exec_types,
+                           dim_sizes, l_empty_strides);
+  }
+
+  // Validate that level 0 has proper dimensions for each tensor
   for (size_t t = 0; t < l_expected_tensors; ++t) {
-    if (strides[t].size() == 0 || strides[t][0].size() != dim_sizes.size()) {
+    if (strides[0][t].size() != dim_sizes.size()) {
       return std::make_tuple(error_t::invalid_stride_shape, dtype, prim_first,
                              prim_main, prim_last, dim_types, exec_types,
                              dim_sizes, l_empty_strides);
@@ -490,9 +506,9 @@ std::tuple<
 
   // Extract level 0 strides
   std::vector<int64_t> l_strides_in0 = strides[0][0];
-  std::vector<int64_t> l_strides_in1 = (l_op_type == op_type_t::binary) ? strides[1][0] 
+  std::vector<int64_t> l_strides_in1 = (l_op_type == op_type_t::binary) ? strides[0][1]
                                                                       : std::vector<int64_t>(dim_sizes.size(), 0);
-  std::vector<int64_t> l_strides_out = (l_op_type == op_type_t::binary) ? strides[2][0] : strides[1][0];
+  std::vector<int64_t> l_strides_out = (l_op_type == op_type_t::binary) ? strides[0][2] : strides[0][1];
 
   // Make copies of input parameters for optimization
   std::vector<dim_t> l_opt_dim_types = dim_types;
@@ -526,7 +542,7 @@ std::tuple<
                            l_opt_dim_types, l_opt_exec_types, l_opt_dim_sizes, l_empty_strides);
   }
 
-  // Build output 3D strides
+  // Build output 3D strides with [LEVEL][TENSOR][DIMENSION] order
   std::vector< std::vector< std::vector< int64_t > > > opt_strides;
 
   if (l_op_type == op_type_t::binary) {
@@ -541,23 +557,19 @@ std::tuple<
     if (l_has_packing) {
       // Return with 2 levels: level 0 (primary) and level 1 (packing)
       opt_strides = {
-        {l_opt_strides_in0, l_opt_packing_in0},
-        {l_opt_strides_in1, l_opt_packing_in1},
-        {l_opt_strides_out, std::vector<int64_t>(l_opt_strides_out.size(), 0)}  // out has no packing
+        {l_opt_strides_in0, l_opt_strides_in1, l_opt_strides_out},  // level 0
+        {l_opt_packing_in0, l_opt_packing_in1, std::vector<int64_t>(l_opt_strides_out.size(), 0)}  // level 1 (out has no packing)
       };
     } else {
       // Return with single level only
       opt_strides = {
-        {l_opt_strides_in0},
-        {l_opt_strides_in1},
-        {l_opt_strides_out}
+        {l_opt_strides_in0, l_opt_strides_in1, l_opt_strides_out}  // level 0
       };
     }
   } else {
     // Unary: single level only
     opt_strides = {
-      {l_opt_strides_in0},
-      {l_opt_strides_out}
+      {l_opt_strides_in0, l_opt_strides_out}  // level 0
     };
   }
 

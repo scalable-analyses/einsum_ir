@@ -121,19 +121,19 @@ class TensorOperationConfig:
     Supports both binary contractions and unary operations.
     The operation type is automatically determined from prim_main.
 
-    The strides parameter is a 3D tensor with shape [TENSOR][LEVEL][DIMENSION]:
+    The strides parameter is a 3D tensor with shape [LEVEL][TENSOR][DIMENSION]:
 
-    TENSOR dimension (axis 0):
-      - Binary operations: [0]=in0, [1]=in1, [2]=out
-      - Unary operations: [0]=in, [1]=out
-
-    LEVEL dimension (axis 1):
+    LEVEL dimension (axis 0):
       - [0] = Primary memory layout strides
       - [1] = Secondary level (e.g., packing strides, L1 cache)
       - [2+] = Additional levels (e.g., L2, L3 cache)
 
       For user input, typically only level 0 is provided.
       The optimizer may add additional levels (e.g., packing).
+
+    TENSOR dimension (axis 1):
+      - Binary operations: [0]=in0, [1]=in1, [2]=out
+      - Unary operations: [0]=in, [1]=out
 
     DIMENSION dimension (axis 2):
       - Corresponds to dimension indices
@@ -143,14 +143,14 @@ class TensorOperationConfig:
       - dim_types: combination of etops.dim.m, .n, .k, .c
       - prim_first: etops.prim.zero or .none (optional first touch)
       - prim_last: etops.prim.relu or .none (optional last touch)
-      - strides: shape [3][1 or more][num_dims]
+      - strides: shape [1 or more][3][num_dims]
 
     Unary Operations:
       - prim_main: etops.prim.copy or .zero
       - dim_types: must be etops.dim.c for all dimensions
       - prim_first: must be etops.prim.none
       - prim_last: must be etops.prim.none
-      - strides: shape [2][1][num_dims]
+      - strides: shape [1][2][num_dims]
     """
     data_type: _DataType
     prim_first: _PrimType
@@ -159,7 +159,7 @@ class TensorOperationConfig:
     dim_types: Sequence[_DimType]
     exec_types: Sequence[_ExecType]
     dim_sizes: Sequence[int]
-    strides: Sequence[Sequence[Sequence[int]]]  # [TENSOR][LEVEL][DIMENSION]
+    strides: Sequence[Sequence[Sequence[int]]]  # [LEVEL][TENSOR][DIMENSION]
 
     def apply(self, op: _CppOp, num_threads: int = 0) -> None:
         """
@@ -178,7 +178,7 @@ class TensorOperationConfig:
             tuple(self.dim_types),
             tuple(self.exec_types),
             tuple(self.dim_sizes),
-            tuple(tuple(tuple(level) for level in tensor) for tensor in self.strides),
+            tuple(tuple(tuple(tensor) for tensor in level) for level in self.strides),
             num_threads
         )
         if err != ErrorType.success:
@@ -252,7 +252,7 @@ def optimize(
         config.dim_types,
         config.exec_types,
         config.dim_sizes,
-        tuple(tuple(tuple(level) for level in tensor) for tensor in config.strides),
+        tuple(tuple(tuple(tensor) for tensor in level) for level in config.strides),
         target_m,
         target_n,
         target_k,
