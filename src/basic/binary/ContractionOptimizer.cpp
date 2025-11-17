@@ -63,38 +63,12 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::optimize(){
   // reoders and parallelizes the remaining iteration space
   reorder_and_parallelize_iters();
 
-  std::vector<int64_t> l_divisors;
-  get_divisors( m_num_threads, l_divisors);
-  double l_best_performance = 0;
-  int64_t l_best_threads_m = 1;
-  for( size_t l_id = 0; l_id < l_divisors.size(); l_id++ ){
-    int64_t l_potential_threads_m = l_divisors[l_id];
-    int64_t l_potential_threads_n = m_num_threads / l_potential_threads_m;
-
-    int64_t l_tasks_m = (m_size_sfc_m + l_potential_threads_m - 1) / l_potential_threads_m;
-    int64_t l_tasks_n = (m_size_sfc_n + l_potential_threads_n - 1) / l_potential_threads_n;
-    double l_avg_task_m = m_size_sfc_m / (double)l_potential_threads_m;
-    double l_avg_task_n = m_size_sfc_n / (double)l_potential_threads_n;
-
-    //try to achieve equal size of task in n and m dimension
-    double l_performance = 1 - (std::abs(l_tasks_m - l_tasks_n) / (double)std::max(m_size_sfc_m, m_size_sfc_n));
-
-    //distribute threads to m and n dimension such that the threads have an equal number of tasks
-    l_performance *= l_avg_task_m / l_tasks_m;
-    l_performance *= l_avg_task_n / l_tasks_n;
-
-
-    if(l_best_performance < l_performance){
-      l_best_performance = l_performance;
-      l_best_threads_m = l_potential_threads_m;
-    }
-  }
-  *m_num_threads_sfc_m = l_best_threads_m;
-  *m_num_threads_sfc_n = m_num_threads / l_best_threads_m;
-
-  *m_num_threads_sfc_m = std::min(*m_num_threads_sfc_m, m_size_sfc_m);
-  *m_num_threads_sfc_n = std::min(*m_num_threads_sfc_n, m_size_sfc_n);
-  *m_num_threads_shared = m_num_threads / (*m_num_threads_sfc_m * *m_num_threads_sfc_n);
+  set_num_threads_sfc( m_size_sfc_m, 
+                       m_size_sfc_n,
+                       m_num_threads_shared,
+                       m_num_threads_sfc_m,
+                       m_num_threads_sfc_n
+                      );
 
   return err_t::SUCCESS;
 }
@@ -702,6 +676,48 @@ void einsum_ir::basic::ContractionOptimizer::reorder_and_parallelize_iters(){
   //add iterations from local data structures
   m_iter_space->insert(m_iter_space->end(), l_blocking_iters.begin(), l_blocking_iters.end() );
   m_iter_space->insert(m_iter_space->end(), l_kernel_iters.begin(), l_kernel_iters.end() );
+}
+
+void einsum_ir::basic::ContractionOptimizer::set_num_threads_sfc( int64_t   i_size_sfc_m, 
+                                                                  int64_t   i_size_sfc_n,
+                                                                  int64_t * io_num_threads_shared,
+                                                                  int64_t * io_num_threads_sfc_m,
+                                                                  int64_t * io_num_threads_sfc_n
+                                                                  ){
+  
+  int64_t l_num_threads = *io_num_threads_sfc_m * *io_num_threads_sfc_n * *io_num_threads_shared;
+  std::vector<int64_t> l_divisors;
+  get_divisors( l_num_threads, l_divisors);
+  double l_best_performance = 0;
+  int64_t l_best_threads_m = 1;
+  for( size_t l_id = 0; l_id < l_divisors.size(); l_id++ ){
+    int64_t l_potential_threads_m = l_divisors[l_id];
+    int64_t l_potential_threads_n = l_num_threads / l_potential_threads_m;
+
+    int64_t l_tasks_m = (i_size_sfc_m + l_potential_threads_m - 1) / l_potential_threads_m;
+    int64_t l_tasks_n = (i_size_sfc_n + l_potential_threads_n - 1) / l_potential_threads_n;
+    double l_avg_task_m = i_size_sfc_m / (double)l_potential_threads_m;
+    double l_avg_task_n = i_size_sfc_n / (double)l_potential_threads_n;
+
+    //try to achieve equal size of task in n and m dimension
+    double l_performance = 1 - (std::abs(l_tasks_m - l_tasks_n) / (double)std::max(i_size_sfc_m, i_size_sfc_n));
+
+    //distribute threads to m and n dimension such that the threads have an equal number of tasks
+    l_performance *= l_avg_task_m / l_tasks_m;
+    l_performance *= l_avg_task_n / l_tasks_n;
+
+
+    if(l_best_performance < l_performance){
+      l_best_performance = l_performance;
+      l_best_threads_m = l_potential_threads_m;
+    }
+  }
+  *io_num_threads_sfc_m = l_best_threads_m;
+  *io_num_threads_sfc_n = l_num_threads / l_best_threads_m;
+
+  *io_num_threads_sfc_m = std::min(*io_num_threads_sfc_m, i_size_sfc_m);
+  *io_num_threads_sfc_n = std::min(*io_num_threads_sfc_n, i_size_sfc_n);
+  *io_num_threads_shared = l_num_threads / (*io_num_threads_sfc_m * *io_num_threads_sfc_n);
 }
 
 int64_t einsum_ir::basic::ContractionOptimizer::move_iters_until( std::vector<iter_property> * i_dest_iters,
