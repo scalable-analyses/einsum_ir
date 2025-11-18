@@ -299,7 +299,7 @@ class _TPPBackend:
     name: str = "tpp"
 
     @staticmethod
-    def get_default_optimization_config() -> dict[str, int | bool]:
+    def get_default_optimization_config() -> Dict[str, Union[int, bool]]:
         """Get default optimization configuration for TPP backend.
 
         Returns:

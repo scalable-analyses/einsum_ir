@@ -228,12 +228,12 @@ Below are some examples showing how to configure and execute binary tensor opera
     print(f"  Max absolute error: {error_abs:.6e}")
     print(f"  Max relative error: {error_rel:.6e}")
 
-    #------------------------------------------------
+    #--------------------------------------------
     # Third example:
     #   GEMM operation with row-major first input
-    #   packed to column-mayor
+    #   packed to column-major
     #   Compares the result with NumPy's einsum
-    # -----------------------------------------------
+    # -------------------------------------------
 
     # Define a row-major GEMM configuration with packing
     top_config = etops.TensorOperationConfig(
