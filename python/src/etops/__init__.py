@@ -111,7 +111,7 @@ class dim:
 
 # Helpers
 from dataclasses import dataclass
-from typing import Sequence, Union
+from typing import Sequence, Union, Optional, Dict
 
 @dataclass(frozen=True)
 class TensorOperationConfig:
@@ -162,7 +162,7 @@ class TensorOperationConfig:
     exec_types: Sequence[_ExecType]
     dim_sizes:  Sequence[int]
     strides:    Sequence[Sequence[Sequence[int]]]  # [LEVEL][TENSOR][DIMENSION]
-    backend:    str | None = None
+    backend:    Optional[str] = None
 
     def __post_init__(self):
         """Validate configuration at creation time."""
@@ -322,7 +322,7 @@ class backend:
 
 def optimize(
     config: TensorOperationConfig,
-    optimization_config: dict[str, int | bool] | None = None
+    optimization_config: Optional[Dict[str, Union[int, bool]]] = None
 ) -> TensorOperationConfig:
     """
     Optimize a tensor operation configuration.
