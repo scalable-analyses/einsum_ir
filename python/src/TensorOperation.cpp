@@ -733,8 +733,8 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
   einsum_ir::basic::kernel_t l_kernel_main = convert_prim_to_kernel(prim_main);
   int64_t l_num_bytes = dtype_to_num_bytes(dtype);
   einsum_ir::basic::packed_gemm_t l_packed_gemm_support =
-    packed_gemm_support ? einsum_ir::basic::packed_gemm_t::NONE
-                        : einsum_ir::basic::packed_gemm_t::ALL_STRIDE_ONE;
+    packed_gemm_support ? einsum_ir::basic::packed_gemm_t::ALL_STRIDE_ONE
+                        : einsum_ir::basic::packed_gemm_t::NONE;
 
   // Initialize optimizer
   einsum_ir::basic::ContractionOptimizer l_optimizer;
