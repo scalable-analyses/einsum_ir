@@ -36,6 +36,7 @@ Below are some examples showing how to configure and execute unary tensor operat
     # ---------------------------------------
     # Define a transpose configuration
     top_config = etops.TensorOperationConfig(
+        backend    =   "tpp",
         data_type  =   etops.float32,
         prim_first =   etops.prim.none,
         prim_main  =   etops.prim.copy,
@@ -71,6 +72,7 @@ Below are some examples showing how to configure and execute unary tensor operat
     # -------------------------------------------------
     # Define a permutation configuration
     perm_config = etops.TensorOperationConfig(
+        backend     =   "tpp",
         data_type   =   etops.float32,
         prim_first  =   etops.prim.none,
         prim_main   =   etops.prim.copy,
@@ -116,6 +118,7 @@ Below are some examples showing how to configure and execute unary tensor operat
                         (3,              2*3,             1,              4*2*3         )),) # out
     )
 
+    # Use default optimization config
     optimized_config = etops.optimize(perm_config)
 
     # Create the TensorOperation instance
@@ -150,6 +153,7 @@ Below are some examples showing how to configure and execute binary tensor opera
     # -----------------------------------------
     # Define a column-major GEMM configuration
     top_config = etops.TensorOperationConfig(
+        backend    =   "tpp",
         data_type  =   etops.float32,
         prim_first =   etops.prim.zero,
         prim_main  =   etops.prim.gemm,
@@ -190,6 +194,7 @@ Below are some examples showing how to configure and execute binary tensor opera
     # -----------------------------------------
     # Define a batched GEMM configuration
     batched_config =    etops.TensorOperationConfig(
+        backend    =    "tpp",
         data_type  =    etops.float32,
         prim_first =    etops.prim.zero,
         prim_main  =    etops.prim.gemm,
@@ -232,6 +237,7 @@ Below are some examples showing how to configure and execute binary tensor opera
 
     # Define a row-major GEMM configuration with packing
     top_config = etops.TensorOperationConfig(
+        backend    =   "tpp",
         data_type  =   etops.float32,
         prim_first =   etops.prim.zero,
         prim_main  =   etops.prim.gemm,
@@ -289,13 +295,17 @@ Below are some examples showing how to configure and execute binary tensor opera
     )
 
     # Optimize the configuration
-    optimized_config = etops.optimize( batched_config,
-                                       target_m=16,
-                                       target_n=12,
-                                       target_k=64,
-                                       num_threads=1,
-                                       br_gemm_support=True,
-                                       packed_gemm_support=True )
+    optimized_config = etops.optimize(
+        batched_config,
+        {
+            "target_m":            16,
+            "target_n":            12,
+            "target_k":            64,
+            "num_threads":         4,
+            "br_gemm_support":     True,
+            "packed_gemm_support": True
+        }
+    )
 
     # Create the optimized TensorOperation instance
     top = etops.TensorOperation(optimized_config)

@@ -1,6 +1,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <set>
 #include "TensorOperation.h"
 
 namespace py  = pybind11;
@@ -11,6 +12,7 @@ PYBIND11_MODULE(_etops_core, m) {
     .value("success", TensorOperation::error_t::success)
     .value("compilation_failed", TensorOperation::error_t::compilation_failed)
     .value("invalid_stride_shape", TensorOperation::error_t::invalid_stride_shape)
+    .value("invalid_optimization_config", TensorOperation::error_t::invalid_optimization_config)
     .export_values();
 
   py::enum_<TensorOperation::dtype_t>(m, "DataType" )
@@ -45,20 +47,33 @@ PYBIND11_MODULE(_etops_core, m) {
     .def(py::init<>())
     .def(
       "setup",
-      &TensorOperation::setup,
+      [](
+        TensorOperation                                      & self,
+        std::string                                    const & backend,
+        TensorOperation::dtype_t                               dtype,
+        TensorOperation::prim_t                                prim_first,
+        TensorOperation::prim_t                                prim_main,
+        TensorOperation::prim_t                                prim_last,
+        std::vector<TensorOperation::dim_t>            const & dim_types,
+        std::vector<TensorOperation::exec_t>           const & exec_types,
+        std::vector<int64_t>                           const & dim_sizes,
+        std::vector<std::vector<std::vector<int64_t>>> const & strides
+      ) -> TensorOperation::error_t {
+        // Validate backend
+        if (backend != "tpp") {
+          return TensorOperation::error_t::compilation_failed;
+        }
+
+        // Call TensorOperation setup (TPP backend)
+        return self.setup(dtype, prim_first, prim_main, prim_last,
+                         dim_types, exec_types, dim_sizes, strides);
+      },
       R"doc(
-        Setup for a binary tensor contraction or a unary tensor operation.
+        Setup for a unary tensor operation or a binary tensor contraction.
 
         The operation type is automatically determined from prim_main:
-        - Binary contractions: prim_main is 'gemm' or 'brgemm'
         - Unary operations: prim_main is 'copy' or 'zero'
-
-        Binary Contractions (GEMM/BRGEMM):
-          - prim_main: gemm or brgemm
-          - dim_types: use m, n, k, c as appropriate for contraction semantics
-          - prim_first: zero or none (first touch operation)
-          - prim_last: relu or none (last touch operation)
-          - strides: [LEVEL][3][DIMENSION] tensor (each level has 3 tensors: in0, in1, out)
+        - Binary contractions: prim_main is 'gemm' or 'brgemm'
 
         Unary Operations (permutation or zero):
           - prim_main: copy or zero
@@ -67,11 +82,19 @@ PYBIND11_MODULE(_etops_core, m) {
           - prim_last: must be 'none'
           - strides: [LEVEL][2][DIMENSION] tensor (each level has 2 tensors: in, out)
 
+        Binary Contractions (GEMM/BRGEMM):
+          - prim_main: gemm or brgemm
+          - dim_types: use m, n, k, c as appropriate for contraction semantics
+          - prim_first: zero or none (first touch operation)
+          - prim_last: relu or none (last touch operation)
+          - strides: [LEVEL][3][DIMENSION] tensor (each level has 3 tensors: in0, in1, out)
+
         Strides 3D tensor structure [LEVEL][TENSOR][DIMENSION]:
           LEVEL: 0=primary layout, 1=packing, 2+=reserved for future
           TENSOR: 0=in0, 1=in1, 2=out (binary) or 0=in, 1=out (unary)
           DIMENSION: index corresponding to dim_types/dim_sizes
 
+        :param backend: Backend identifier (currently only "tpp" is supported).
         :param dtype: Datatype of all tensor elements.
         :param prim_first: Type of the first touch primitive.
         :param prim_main: Type of the main primitive (determines operation type).
@@ -80,9 +103,9 @@ PYBIND11_MODULE(_etops_core, m) {
         :param exec_types: Execution types of the dimensions (prim, seq, shared, or sfc).
         :param dim_sizes: Sizes of the dimensions.
         :param strides: 3D stride tensor [LEVEL][TENSOR][DIMENSION].
-        :param num_threads: Number of threads to use for execution.
         :return: Appropriate error code.
       )doc",
+      py::arg("backend"),
       py::arg("dtype"),
       py::arg("prim_first"),
       py::arg("prim_main"),
@@ -90,8 +113,7 @@ PYBIND11_MODULE(_etops_core, m) {
       py::arg("dim_types"),
       py::arg("exec_types"),
       py::arg("dim_sizes"),
-      py::arg("strides"),
-      py::arg("num_threads")
+      py::arg("strides")
     )
     .def(
       "execute",
@@ -124,6 +146,7 @@ PYBIND11_MODULE(_etops_core, m) {
     .def_static(
       "optimize",
       [](
+        std::string                                    const & backend,
         TensorOperation::dtype_t                               dtype,
         TensorOperation::prim_t                                prim_first,
         TensorOperation::prim_t                                prim_main,
@@ -132,15 +155,85 @@ PYBIND11_MODULE(_etops_core, m) {
         std::vector<TensorOperation::exec_t>           const & exec_types,
         std::vector<int64_t>                           const & dim_sizes,
         std::vector<std::vector<std::vector<int64_t>>> const & strides,
-        int64_t                                                target_m,
-        int64_t                                                target_n,
-        int64_t                                                target_k,
-        int64_t                                                num_threads,
-        bool                                                   br_gemm_support,
-        bool                                                   packed_gemm_support,
-        int64_t                                                l2_cache_size
+        py::dict                                       const & optimization_config_dict
       ) -> py::tuple {
-        // Call the static optimize function
+        // Validate backend
+        if( backend != "tpp") {
+          std::vector<std::vector<std::vector<int64_t>>> empty_strides;
+          return py::make_tuple(
+            TensorOperation::error_t::compilation_failed,
+            dtype, prim_first, prim_main, prim_last,
+            dim_types, exec_types, dim_sizes, empty_strides
+          );
+        }
+
+        // Parse the Python dict and create OptimizationConfig struct
+        einsum_ir::py::OptimizationConfig l_optimization_config;
+
+        // Get defaults first
+        l_optimization_config = TensorOperation::get_default_optimization_config();
+
+        // Valid keys for TPP backend
+        std::set<std::string> valid_keys = {
+          "target_m", "target_n", "target_k", "num_threads",
+          "br_gemm_support", "packed_gemm_support", "packing_support",
+          "sfc_support", "l2_cache_size"
+        };
+
+        try {
+          // Check for unknown keys
+          for (auto item : optimization_config_dict) {
+            std::string key = item.first.cast<std::string>();
+            if (valid_keys.find(key) == valid_keys.end()) {
+              // Return error for unknown key
+              std::vector<std::vector<std::vector<int64_t>>> empty_strides;
+              return py::make_tuple(
+                TensorOperation::error_t::invalid_optimization_config,
+                dtype, prim_first, prim_main, prim_last,
+                dim_types, exec_types, dim_sizes, empty_strides
+              );
+            }
+          }
+
+          // Override defaults with provided values
+          if (optimization_config_dict.contains("target_m")) {
+            l_optimization_config.target_m = optimization_config_dict["target_m"].cast<int64_t>();
+          }
+          if (optimization_config_dict.contains("target_n")) {
+            l_optimization_config.target_n = optimization_config_dict["target_n"].cast<int64_t>();
+          }
+          if (optimization_config_dict.contains("target_k")) {
+            l_optimization_config.target_k = optimization_config_dict["target_k"].cast<int64_t>();
+          }
+          if (optimization_config_dict.contains("num_threads")) {
+            l_optimization_config.num_threads = optimization_config_dict["num_threads"].cast<int64_t>();
+          }
+          if (optimization_config_dict.contains("packed_gemm_support")) {
+            l_optimization_config.packed_gemm_support = optimization_config_dict["packed_gemm_support"].cast<bool>();
+          }
+          if (optimization_config_dict.contains("br_gemm_support")) {
+            l_optimization_config.br_gemm_support = optimization_config_dict["br_gemm_support"].cast<bool>();
+          }
+          if (optimization_config_dict.contains("packing_support")) {
+            l_optimization_config.packing_support = optimization_config_dict["packing_support"].cast<bool>();
+          }
+          if (optimization_config_dict.contains("sfc_support")) {
+            l_optimization_config.sfc_support = optimization_config_dict["sfc_support"].cast<bool>();
+          }
+          if (optimization_config_dict.contains("l2_cache_size")) {
+            l_optimization_config.l2_cache_size = optimization_config_dict["l2_cache_size"].cast<int64_t>();
+          }
+        } catch (...) {
+          // Type casting failed
+          std::vector<std::vector<std::vector<int64_t>>> empty_strides;
+          return py::make_tuple(
+            TensorOperation::error_t::invalid_optimization_config,
+            dtype, prim_first, prim_main, prim_last,
+            dim_types, exec_types, dim_sizes, empty_strides
+          );
+        }
+
+        // Call the static optimize function with the struct
         auto result = TensorOperation::optimize(
           dtype,
           prim_first,
@@ -150,15 +243,9 @@ PYBIND11_MODULE(_etops_core, m) {
           exec_types,
           dim_sizes,
           strides,
-          target_m,
-          target_n,
-          target_k,
-          num_threads,
-          br_gemm_support,
-          packed_gemm_support,
-          l2_cache_size
+          l_optimization_config
         );
-        
+
         // Return tuple of (error, optimized_parameters)
         return py::make_tuple(
           std::get<0>(result),  // error
@@ -180,14 +267,14 @@ PYBIND11_MODULE(_etops_core, m) {
         additional levels (e.g., packing) if optimization determined it beneficial.
 
         Binary contractions:
-          Uses ContractionOptimizer with provided target sizes and GEMM support flags.
+          Uses ContractionOptimizer with provided optimization parameters.
           May return 2 levels in strides if packing is added, otherwise 1 level.
 
         Unary operations:
-          Uses UnaryOptimizer. The target_m, target_n, target_k, br_gemm_support,
-          and packed_gemm_support parameters are ignored for unary operations.
+          Uses UnaryOptimizer. Most optimization_config parameters are ignored for unary operations.
           Typically returns 1 level in strides.
 
+        :param backend: Backend identifier (e.g., "tpp").
         :param dtype: Datatype of all tensor elements.
         :param prim_first: Type of the first touch primitive.
         :param prim_main: Type of the main primitive (determines operation type).
@@ -196,16 +283,11 @@ PYBIND11_MODULE(_etops_core, m) {
         :param exec_types: Execution types of the dimensions (prim, seq, shared, or sfc).
         :param dim_sizes: Sizes of the dimensions.
         :param strides: 3D stride tensor [LEVEL][TENSOR][DIMENSION].
-        :param target_m: Target size for dimension m (ignored for unary).
-        :param target_n: Target size for dimension n (ignored for unary).
-        :param target_k: Target size for dimension k (ignored for unary).
-        :param num_threads: Number of threads to use for execution.
-        :param br_gemm_support: Whether to support BR_GEMM optimizations (ignored for unary).
-        :param packed_gemm_support: Whether to support packed GEMM optimizations (ignored for unary).
-        :param l2_cache_size: Size of L2 cache in bytes.
+        :param optimization_config: Dictionary containing backend-specific optimization parameters.
         :return: Tuple containing (error, dtype, prim_first, prim_main, prim_last,
                  dim_types, exec_types, dim_sizes, optimized_strides).
       )doc",
+      py::arg("backend"),
       py::arg("dtype"),
       py::arg("prim_first"),
       py::arg("prim_main"),
@@ -214,12 +296,39 @@ PYBIND11_MODULE(_etops_core, m) {
       py::arg("exec_types"),
       py::arg("dim_sizes"),
       py::arg("strides"),
-      py::arg("target_m"),
-      py::arg("target_n"),
-      py::arg("target_k"),
-      py::arg("num_threads"),
-      py::arg("br_gemm_support"),
-      py::arg("packed_gemm_support"),
-      py::arg("l2_cache_size")
+      py::arg("optimization_config")
+    )
+    .def_static(
+      "get_default_optimization_config",
+      [](std::string const & backend) -> py::dict {
+        // Validate backend
+        if( backend != "tpp" ) {
+          return py::dict();
+        }
+
+        // Get the struct from C++ (TPP backend)
+        auto l_config = TensorOperation::get_default_optimization_config();
+
+        // Convert to Python dict
+        py::dict result;
+        result["target_m"]            = l_config.target_m;
+        result["target_n"]            = l_config.target_n;
+        result["target_k"]            = l_config.target_k;
+        result["num_threads"]         = l_config.num_threads;
+        result["packed_gemm_support"] = l_config.packed_gemm_support;
+        result["br_gemm_support"]     = l_config.br_gemm_support;
+        result["packing_support"]     = l_config.packing_support;
+        result["sfc_support"]         = l_config.sfc_support;
+        result["l2_cache_size"]       = l_config.l2_cache_size;
+
+        return result;
+      },
+      R"doc(
+        Get default optimization configuration for a backend.
+
+        :param backend: Backend identifier (currently only "tpp" is supported).
+        :return: Dictionary containing default optimization parameters for the backend.
+      )doc",
+      py::arg("backend")
     );
 }

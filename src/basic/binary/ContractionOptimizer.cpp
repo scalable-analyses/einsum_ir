@@ -687,7 +687,7 @@ void einsum_ir::basic::ContractionOptimizer::set_num_threads_sfc( int64_t   i_si
   
   int64_t l_num_threads = *io_num_threads_sfc_m * *io_num_threads_sfc_n * *io_num_threads_shared;
   std::vector<int64_t> l_divisors;
-  get_divisors( l_num_threads, l_divisors);
+  ContractionOptimizer::get_divisors( l_num_threads, l_divisors);
   double l_best_performance = 0;
   int64_t l_best_threads_m = 1;
   for( size_t l_id = 0; l_id < l_divisors.size(); l_id++ ){
@@ -799,7 +799,7 @@ int64_t einsum_ir::basic::ContractionOptimizer::find_split( int64_t i_dim_size,
 
   //get all divisors
   std::vector<int64_t> l_divisors;
-  get_divisors( i_dim_size, l_divisors);
+  ContractionOptimizer::get_divisors( i_dim_size, l_divisors);
 
   //find divisor that is closest to target size in log space
   int64_t l_best_divisor = i_dim_size;

@@ -11,6 +11,21 @@
 namespace einsum_ir {
   namespace py {
     class TensorOperation;
+
+    /**
+     * Backend-specific optimization parameters.
+     */
+    struct OptimizationConfig {
+      int64_t target_m            = 0;
+      int64_t target_n            = 0;
+      int64_t target_k            = 0;
+      int64_t num_threads         = 0;
+      bool    br_gemm_support     = false;
+      bool    packed_gemm_support = false;
+      bool    packing_support     = false;
+      bool    sfc_support         = false;
+      int64_t l2_cache_size       = 0;
+    };
   }
 }
 
@@ -60,9 +75,10 @@ class einsum_ir::py::TensorOperation {
 
     /// error codes
     enum class error_t : int32_t {
-      success              = 0,
-      compilation_failed   = 1,
-      invalid_stride_shape = 2
+      success                     = 0,
+      compilation_failed          = 1,
+      invalid_stride_shape        = 2,
+      invalid_optimization_config = 3
     };
 
     op_type_t m_op_type = op_type_t::undefined;
@@ -83,7 +99,6 @@ class einsum_ir::py::TensorOperation {
      *                   - LEVEL: 0=primary layout, 1=packing, 2+=reserved
      *                   - TENSOR: 0=in0, 1=in1, 2=out (binary) or 0=in, 1=out (unary)
      *                   - DIMENSION: dimension index
-     * @param num_threads Number of threads for parallel execution (determined automatically if <1).
      * @return           Appropriate error code.
      **/
     error_t setup(
@@ -94,8 +109,7 @@ class einsum_ir::py::TensorOperation {
       std::vector< dim_t >                                 const & dim_types,
       std::vector< exec_t >                                const & exec_types,
       std::vector< int64_t >                               const & dim_sizes,
-      std::vector< std::vector< std::vector< int64_t > > > const & strides,
-      int64_t                                                      num_threads
+      std::vector< std::vector< std::vector< int64_t > > > const & strides
     );
 
     /**
@@ -124,13 +138,7 @@ class einsum_ir::py::TensorOperation {
      * @param exec_types          Execution type of the dimensions.
      * @param dim_sizes           Sizes of the dimensions.
      * @param strides             3D stride tensor: [LEVEL][TENSOR][DIMENSION]
-     * @param target_m            Target M block size for optimization.
-     * @param target_n            Target N block size for optimization.
-     * @param target_k            Target K block size for optimization.
-     * @param num_threads         Number of threads for parallel execution.
-     * @param br_gemm_support     Whether backend supports batch-reduce GEMM.
-     * @param packed_gemm_support Whether backend supports packed GEMM.
-     * @param l2_cache_size       Size of L2 cache in bytes.
+     * @param optimization_config Backend-specific optimization parameters.
      * @return                    Tuple of (error, dtype, prim_first, prim_main, prim_last,
      *                            dim_types, exec_types, dim_sizes, optimized_strides).
      **/
@@ -153,14 +161,15 @@ class einsum_ir::py::TensorOperation {
       std::vector< exec_t >                                const & exec_types,
       std::vector< int64_t >                               const & dim_sizes,
       std::vector< std::vector< std::vector< int64_t > > > const & strides,
-      int64_t                                                      target_m,
-      int64_t                                                      target_n,
-      int64_t                                                      target_k,
-      int64_t                                                      num_threads,
-      bool                                                         br_gemm_support,
-      bool                                                         packed_gemm_support,
-      int64_t                                                      l2_cache_size
+      OptimizationConfig                                   const & optimization_config
     );
+
+    /**
+     * Get default optimization configuration.
+     *
+     * @return Default optimization parameters for the TPP backend.
+     **/
+    static OptimizationConfig get_default_optimization_config();
 
   private:
     /**
@@ -273,6 +282,26 @@ class einsum_ir::py::TensorOperation {
     static inline int64_t get_num_threads( int64_t num_threads );
 
     /**
+     * Calculate SFC dimension sizes from configuration.
+     *
+     * Iterates through dim_types and exec_types to find SFC dimensions
+     * and compute their combined sizes for M and N dimensions.
+     *
+     * @param dim_types    Dimension types vector.
+     * @param exec_types   Execution types vector.
+     * @param dim_sizes    Dimension sizes vector.
+     * @param o_size_sfc_m Combined size of all SFC M dimensions.
+     * @param o_size_sfc_n Combined size of all SFC N dimensions.
+     **/
+    static void calculate_sfc_sizes(
+      std::vector< dim_t >   const & dim_types,
+      std::vector< exec_t >  const & exec_types,
+      std::vector< int64_t > const & dim_sizes,
+      int64_t                      & o_size_sfc_m,
+      int64_t                      & o_size_sfc_n
+    );
+
+    /**
      * Setup for unary operations.
      *
      * @param dtype       Datatype of tensor elements.
@@ -281,7 +310,6 @@ class einsum_ir::py::TensorOperation {
      * @param dim_sizes   Sizes of dimensions.
      * @param strides_in0 Strides of input tensor.
      * @param strides_out Strides of output tensor.
-     * @param num_threads Number of threads.
      * @return            Appropriate error code.
      **/
     error_t setup_unary(
@@ -290,8 +318,7 @@ class einsum_ir::py::TensorOperation {
       std::vector< exec_t >  const & exec_types,
       std::vector< int64_t > const & dim_sizes,
       std::vector< int64_t > const & strides_in0,
-      std::vector< int64_t > const & strides_out,
-      int64_t                        num_threads
+      std::vector< int64_t > const & strides_out
     );
 
     /**
@@ -305,7 +332,6 @@ class einsum_ir::py::TensorOperation {
      * @param exec_types  Execution types.
      * @param dim_sizes   Sizes of dimensions.
      * @param strides     3D stride tensor [TENSOR][LEVEL][DIMENSION].
-     * @param num_threads Number of threads: [0]: shared, [1]: SFC M, [2]: SFC N.
      * @return            Appropriate error code.
      **/
     error_t setup_binary(
@@ -316,8 +342,7 @@ class einsum_ir::py::TensorOperation {
       std::vector< dim_t >                                 const & dim_types,
       std::vector< exec_t >                                const & exec_types,
       std::vector< int64_t >                               const & dim_sizes,
-      std::vector< std::vector< std::vector< int64_t > > > const & strides,
-      int64_t                                                      num_threads[3]
+      std::vector< std::vector< std::vector< int64_t > > > const & strides
     );
 
     /**
@@ -363,8 +388,10 @@ class einsum_ir::py::TensorOperation {
      * @param target_n            Target N block size.
      * @param target_k            Target K block size.
      * @param num_threads         Number of threads: [0]: shared, [1]: SFC M, [2]: SFC N.
-     * @param br_gemm_support     Whether to enable batch-reduce GEMM support.
      * @param packed_gemm_support Whether to enable packed GEMM support.
+     * @param br_gemm_support     Whether to enable batch-reduce GEMM support.
+     * @param packing_support     Whether to enable packing support.
+     * @param sfc_support         Whether to enable SFC support.
      * @param l2_cache_size       Size of L2 cache in bytes.
      * @return                    Appropriate error code.
      **/
@@ -383,8 +410,10 @@ class einsum_ir::py::TensorOperation {
       int64_t                  target_n,
       int64_t                  target_k,
       int64_t                  num_threads[3],
-      bool                     br_gemm_support,
       bool                     packed_gemm_support,
+      bool                     br_gemm_support,
+      bool                     packing_support,
+      bool                     sfc_support,
       int64_t                  l2_cache_size
     );
 };

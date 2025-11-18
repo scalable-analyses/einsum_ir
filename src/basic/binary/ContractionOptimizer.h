@@ -155,8 +155,8 @@ class einsum_ir::basic::ContractionOptimizer {
      * @param i_num number to find divisors for.
      * @param o_divisors output vector of divisors.
      **/                  
-    void get_divisors( int64_t                i_num, 
-                       std::vector<int64_t> & o_divisors );
+    static void get_divisors( int64_t                i_num,
+                              std::vector<int64_t> & o_divisors );
 
     /**
      * Determines a good integer splitt for a dimension size to be close to the target size.
@@ -246,12 +246,12 @@ class einsum_ir::basic::ContractionOptimizer {
      * @param io_num_threads_sfc_m number of threads used for sfc m parallelization.
      * @param io_num_threads_sfc_n number of threads used for sfc n parallelization.
      **/
-    void set_num_threads_sfc( int64_t   i_size_sfc_m, 
-                              int64_t   i_size_sfc_n,
-                              int64_t * io_num_threads_shared,
-                              int64_t * io_num_threads_sfc_m,
-                              int64_t * io_num_threads_sfc_n
-                              );
+    static void set_num_threads_sfc( int64_t   i_size_sfc_m,
+                                     int64_t   i_size_sfc_n,
+                                     int64_t * io_num_threads_shared,
+                                     int64_t * io_num_threads_sfc_m,
+                                     int64_t * io_num_threads_sfc_n
+                                     );
 };
 
 #endif

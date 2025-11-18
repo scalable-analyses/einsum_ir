@@ -139,6 +139,7 @@ class TensorOperationConfig:
       - Corresponds to dimension indices
 
     Binary Contractions:
+      - backend: "tpp" or None
       - prim_main: etops.prim.gemm or etops.prim.brgemm
       - dim_types: combination of etops.dim.m, .n, .k, .c
       - prim_first: etops.prim.zero or .none (optional first touch)
@@ -146,31 +147,127 @@ class TensorOperationConfig:
       - strides: shape [1 or more][3][num_dims]
 
     Unary Operations:
+      - backend: "tpp" or None
       - prim_main: etops.prim.copy or .zero
       - dim_types: must be etops.dim.c for all dimensions
       - prim_first: must be etops.prim.none
       - prim_last: must be etops.prim.none
       - strides: shape [1][2][num_dims]
     """
-    data_type: _DataType
+    data_type:  _DataType
     prim_first: _PrimType
-    prim_main: _PrimType
-    prim_last: _PrimType
-    dim_types: Sequence[_DimType]
+    prim_main:  _PrimType
+    prim_last:  _PrimType
+    dim_types:  Sequence[_DimType]
     exec_types: Sequence[_ExecType]
-    dim_sizes: Sequence[int]
-    strides: Sequence[Sequence[Sequence[int]]]  # [LEVEL][TENSOR][DIMENSION]
+    dim_sizes:  Sequence[int]
+    strides:    Sequence[Sequence[Sequence[int]]]  # [LEVEL][TENSOR][DIMENSION]
+    backend:    str | None = None
 
-    def apply(self, op: _CppOp, num_threads: int = 0) -> None:
+    def __post_init__(self):
+        """Validate configuration at creation time."""
+        # Validate backend
+        if self.backend is not None and self.backend not in ["tpp"]:
+            raise ValueError(f"Unsupported backend: '{self.backend}'. Currently only 'tpp' is supported.")
+
+        # Determine operation type from prim_main
+        is_binary = self.prim_main in [PrimType.gemm, PrimType.brgemm]
+        is_unary  = self.prim_main in [PrimType.copy, PrimType.zero]
+
+        if not is_binary and not is_unary:
+            raise ValueError(
+                f"Invalid prim_main: {self.prim_main}. "
+                f"Must be gemm/brgemm (binary) or copy/zero (unary)."
+            )
+
+        # Validate dimension consistency
+        num_dims = len(self.dim_types)
+        if len(self.exec_types) != num_dims:
+            raise ValueError(
+                f"exec_types length ({len(self.exec_types)}) must match "
+                f"dim_types length ({num_dims})."
+            )
+        if len(self.dim_sizes) != num_dims:
+            raise ValueError(
+                f"dim_sizes length ({len(self.dim_sizes)}) must match "
+                f"dim_types length ({num_dims})."
+            )
+
+        # Validate dim_sizes are positive
+        for i, size in enumerate(self.dim_sizes):
+            if size <= 0:
+                raise ValueError(f"dim_sizes[{i}] must be positive, got {size}.")
+
+        # Validate strides shape
+        if len(self.strides) == 0:
+            raise ValueError("strides must have at least one level (level 0).")
+
+        # Validate level 0 strides
+        expected_tensors = 3 if is_binary else 2
+        if len(self.strides[0]) != expected_tensors:
+            raise ValueError(
+                f"strides[0] must have {expected_tensors} tensors "
+                f"({'in0, in1, out' if is_binary else 'in, out'}), "
+                f"got {len(self.strides[0])}."
+            )
+
+        # Validate stride dimensions match num_dims
+        for tensor_idx, tensor_strides in enumerate(self.strides[0]):
+            if len(tensor_strides) != num_dims:
+                tensor_names = ['in0', 'in1', 'out'] if is_binary else ['in', 'out']
+                raise ValueError(
+                    f"strides[0][{tensor_idx}] ({tensor_names[tensor_idx]}) length "
+                    f"({len(tensor_strides)}) must match number of dimensions ({num_dims})."
+                )
+
+        # Unary-specific validations
+        if is_unary:
+            # All dim_types must be 'c' for unary operations
+            for i, dt in enumerate(self.dim_types):
+                if dt != DimType.c:
+                    raise ValueError(
+                        f"For unary operations, all dim_types must be etops.dim.c. "
+                        f"dim_types[{i}] is {dt}."
+                    )
+
+            # prim_first and prim_last must be 'none' for unary
+            if self.prim_first != PrimType.none:
+                raise ValueError(
+                    f"For unary operations, prim_first must be etops.prim.none, "
+                    f"got {self.prim_first}."
+                )
+            if self.prim_last != PrimType.none:
+                raise ValueError(
+                    f"For unary operations, prim_last must be etops.prim.none, "
+                    f"got {self.prim_last}."
+                )
+
+        # Binary-specific validations
+        if is_binary:
+            # Validate prim_first is compatible
+            if self.prim_first not in [PrimType.none, PrimType.zero]:
+                raise ValueError(
+                    f"For binary contractions, prim_first must be etops.prim.none or "
+                    f"etops.prim.zero, got {self.prim_first}."
+                )
+
+            # Validate prim_last is compatible
+            if self.prim_last not in [PrimType.none, PrimType.relu]:
+                raise ValueError(
+                    f"For binary contractions, prim_last must be etops.prim.none or "
+                    f"etops.prim.relu, got {self.prim_last}."
+                )
+
+    def apply(self, op: _CppOp) -> None:
         """
         Apply this configuration to a TensorOperation instance.
         Args:
             op: The TensorOperation instance to configure
-            num_threads: Number of threads to use for execution (automatically determined if <1)
         Raises:
             RuntimeError: If the setup fails.
         """
         err = op.setup(
+            self.backend,
             self.data_type,
             self.prim_first,
             self.prim_main,
@@ -178,73 +275,94 @@ class TensorOperationConfig:
             tuple(self.dim_types),
             tuple(self.exec_types),
             tuple(self.dim_sizes),
-            tuple(tuple(tuple(tensor) for tensor in level) for level in self.strides),
-            num_threads
+            tuple(tuple(tuple(tensor) for tensor in level) for level in self.strides)
         )
         if err != ErrorType.success:
             raise RuntimeError(f"einsum_ir TensorOperation setup failed: {err}")
 
 class TensorOperation(_CppOp):
-    def __init__(self, config: Union[TensorOperationConfig, None] = None, num_threads: int = 0):
+    def __init__(self, config: Union[TensorOperationConfig, None] = None):
         """
         Create a new tensor operation instance.
         Args:
             config: Optional configuration to apply to the operation
-            num_threads: Number of threads to use for execution (automatically determined if <1)
         Raises:
             RuntimeError: If the setup fails
         """
         super().__init__()
         if config is not None:
-            config.apply(self, num_threads=num_threads)
+            config.apply(self)
+
+# Backend namespace
+class _TPPBackend:
+    """TPP (Tensor Processing Primitives) backend for tensor operations."""
+    name: str = "tpp"
+
+    @staticmethod
+    def get_default_optimization_config() -> dict[str, int | bool]:
+        """Get default optimization configuration for TPP backend.
+
+        Returns:
+            Dictionary with keys:
+            - target_m (int): Target M block size.
+            - target_n (int): Target N block size.
+            - target_k (int): Target K block size.
+            - num_threads (int): Number of threads.
+            - packed_gemm_support (bool): Packed GEMM support.
+            - br_gemm_support (bool): Batch-reduce GEMM support.
+            - packing_support (bool): Packing support.
+            - sfc_support (bool): SFC support.
+            - l2_cache_size (int): L2 cache size in bytes (default: 1048576)
+        """
+        return _CppOp.get_default_optimization_config("tpp")
+
+class backend:
+    """Namespace for available backends."""
+    tpp = _TPPBackend()
 
 def optimize(
     config: TensorOperationConfig,
-    target_m: int = 0,
-    target_n: int = 0,
-    target_k: int = 0,
-    num_threads: int = 0,
-    br_gemm_support: bool = True,
-    packed_gemm_support: bool = True,
-    l2_cache_size: int = 0
+    optimization_config: dict[str, int | bool] | None = None
 ) -> TensorOperationConfig:
     """
     Optimize a tensor operation configuration.
 
-    The operation type is automatically determined from config.prim_main.
-
-    Binary contractions:
-      Uses ContractionOptimizer with provided target sizes and GEMM support flags.
-      If packing is added by optimization, the returned strides will have 2 levels
-      instead of 1. Otherwise returns 1 level.
-
-    Unary operations:
-      Uses UnaryOptimizer. The target_m, target_n, target_k, br_gemm_support,
-      and packed_gemm_support parameters are ignored for unary operations.
-      Typically returns 1 level in strides.
-
     Args:
-        config: The original tensor operation configuration
-        target_m: Target M block size for optimization (ignored for unary operations)
-        target_n: Target N block size for optimization (ignored for unary operations)
-        target_k: Target K block size for optimization (ignored for unary operations)
-        num_threads: Number of threads for parallel execution (auto-determined if <1)
-        br_gemm_support: Whether backend supports batch-reduce GEMM (ignored for unary operations)
-        packed_gemm_support: Whether backend supports packed GEMM (ignored for unary operations)
-        l2_cache_size: Size of the L2 cache in bytes (default: 1MiB if <1)
+        config: The tensor operation configuration to optimize
+        optimization_config: Backend-specific optimization parameters.
+                           If None, uses backend default configuration.
+
+                           For TPP backend, valid keys are:
+                           - target_m (int): Target M block size
+                           - target_n (int): Target N block size
+                           - target_k (int): Target K block size
+                           - num_threads (int): Number of threads
+                           - packed_gemm_support (bool): Packed GEMM support
+                           - br_gemm_support (bool): Batch-reduce GEMM support
+                           - packing_support (bool): Packing support
+                           - sfc_support (bool): SFC support
+                           - l2_cache_size (int): L2 cache size in bytes
 
     Returns:
-        Optimized configuration with potentially modified strides.
+        Optimized TensorOperationConfig
 
     Raises:
         RuntimeError: If optimization fails
+        ValueError: If backend is unknown
     """
-    # Use default L2 cache size if not provided
-    if l2_cache_size <= 0:
-        l2_cache_size = 1024 * 1024  # Default: 1MiB L2 cache
+    # Set backend to 'tpp' if not provided
+    actual_backend = config.backend if config.backend is not None else 'tpp'
 
-    # Call the static C++ method
+    # Get default config if not provided
+    if optimization_config is None:
+        if actual_backend == "tpp":
+            optimization_config = backend.tpp.get_default_optimization_config()
+        else:
+            raise ValueError(f"Unknown backend: {actual_backend}")
+
+    # Call C++ optimize
     result = _CppOp.optimize(
+        actual_backend,
         config.data_type,
         config.prim_first,
         config.prim_main,
@@ -253,32 +371,18 @@ def optimize(
         config.exec_types,
         config.dim_sizes,
         tuple(tuple(tuple(tensor) for tensor in level) for level in config.strides),
-        target_m,
-        target_n,
-        target_k,
-        num_threads,
-        br_gemm_support,
-        packed_gemm_support,
-        l2_cache_size
+        optimization_config
     )
     
-    # Unpack the result tuple
-    (err,
-     opt_data_type,
-     opt_prim_first,
-     opt_prim_main,
-     opt_prim_last,
-     opt_dim_types,
-     opt_exec_types,
-     opt_dim_sizes,
-     opt_strides) = result
+    # Unpack and check error
+    (err, opt_data_type, opt_prim_first, opt_prim_main, opt_prim_last,
+     opt_dim_types, opt_exec_types, opt_dim_sizes, opt_strides) = result
     
-    # Check for errors
     if err != ErrorType.success:
-        raise RuntimeError(f"einsum_ir TensorOperation optimization failed: {err}")
+        raise RuntimeError(f"einsum_ir optimization failed: {err}")
     
-    # Return new optimized Config with 3D strides
     return TensorOperationConfig(
+        backend=actual_backend,
         data_type=opt_data_type,
         prim_first=opt_prim_first,
         prim_main=opt_prim_main,
@@ -303,6 +407,7 @@ __all__ = [
     "etype",
     "exec",
     "dim",
+    "backend",
     "optimize",
     "ErrorType"
 ]

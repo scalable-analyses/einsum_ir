@@ -36,6 +36,27 @@ int64_t einsum_ir::py::TensorOperation::get_num_threads( int64_t num_threads ) {
   return l_num_threads;
 }
 
+void einsum_ir::py::TensorOperation::calculate_sfc_sizes(
+  std::vector< dim_t >   const & dim_types,
+  std::vector< exec_t >  const & exec_types,
+  std::vector< int64_t > const & dim_sizes,
+  int64_t                      & o_size_sfc_m,
+  int64_t                      & o_size_sfc_n
+) {
+  o_size_sfc_m = 1;
+  o_size_sfc_n = 1;
+
+  for( std::size_t i = 0; i < dim_types.size(); i++ ) {
+    if( exec_types[i] == exec_t::sfc ) {
+      if( dim_types[i] == dim_t::m ) {
+        o_size_sfc_m *= dim_sizes[i];
+      } else if( dim_types[i] == dim_t::n ) {
+        o_size_sfc_n *= dim_sizes[i];
+      }
+    }
+  }
+}
+
 einsum_ir::basic::exec_t einsum_ir::py::TensorOperation::convert_exec_type(
   einsum_ir::py::TensorOperation::exec_t exec_type
 ) {
@@ -213,12 +234,8 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
   std::vector< dim_t >                                 const & dim_types,
   std::vector< exec_t >                                const & exec_types,
   std::vector< int64_t >                               const & dim_sizes,
-  std::vector< std::vector< std::vector< int64_t > > > const & strides,
-  int64_t                                                      num_threads
+  std::vector< std::vector< std::vector< int64_t > > > const & strides
 ) {
-  int64_t l_num_threads[3] = {1, 1, 1};
-  l_num_threads[0] = get_num_threads(num_threads);
-
   m_op_type = determine_op_type(prim_main);
 
   if (m_op_type == op_type_t::undefined) {
@@ -258,8 +275,7 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
     l_strides_out = strides[0][2];
 
     return setup_binary(dtype, prim_first, prim_main, prim_last,
-                        dim_types, exec_types, dim_sizes,
-                        strides, l_num_threads);
+                        dim_types, exec_types, dim_sizes, strides);
   }
   else {
     // Unary operation: validate and extract out strides, dummy strides for in1
@@ -275,7 +291,7 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup(
     }
 
     return setup_unary(dtype, prim_main, exec_types,
-                       dim_sizes, l_strides_in0, l_strides_out, l_num_threads[0]);
+                       dim_sizes, l_strides_in0, l_strides_out);
   }
 }
 
@@ -285,8 +301,7 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup_un
   std::vector< exec_t>  const & exec_types,
   std::vector< int64_t> const & dim_sizes,
   std::vector< int64_t> const & strides_in0,
-  std::vector< int64_t> const & strides_out,
-  int64_t                       num_threads
+  std::vector< int64_t> const & strides_out
 ) {
   // Convert data types
   einsum_ir::basic::data_t l_dtype_in = einsum_ir::basic::data_t::UNDEFINED_DTYPE;
@@ -308,10 +323,13 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup_un
     l_exec_types.push_back(convert_exec_type(l_exec_type));
   }
 
+  // Auto-detect number of threads
+  int64_t l_num_threads = get_num_threads(0);
+
   // Initialize unary backend
   m_backend_unary.init(l_exec_types, dim_sizes, strides_in0, strides_out,
                        l_dtype_in, l_dtype_comp, l_dtype_out,
-                       l_ktype_main, num_threads);
+                       l_ktype_main, l_num_threads);
 
   // Compile backend
   einsum_ir::basic::err_t l_err = m_backend_unary.compile();
@@ -330,9 +348,28 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup_bi
   std::vector< dim_t >                                 const & dim_types,
   std::vector< exec_t >                                const & exec_types,
   std::vector< int64_t >                               const & dim_sizes,
-  std::vector< std::vector< std::vector< int64_t > > > const & strides,
-  int64_t                                                      num_threads[3]
+  std::vector< std::vector< std::vector< int64_t > > > const & strides
 ) {
+  // Auto-detect number of threads
+  int64_t l_num_threads[3] = {1, 1, 1};
+  l_num_threads[0] = get_num_threads(0);
+
+  // Calculate SFC dimension sizes from configuration
+  int64_t l_size_sfc_m = 1;
+  int64_t l_size_sfc_n = 1;
+  calculate_sfc_sizes(dim_types, exec_types, dim_sizes, l_size_sfc_m, l_size_sfc_n);
+
+  // Distribute threads for SFC dimensions if present
+  if( l_size_sfc_m > 1 || l_size_sfc_n > 1 ) {
+    einsum_ir::basic::ContractionOptimizer::set_num_threads_sfc(
+      l_size_sfc_m,
+      l_size_sfc_n,
+      &l_num_threads[0],
+      &l_num_threads[1],
+      &l_num_threads[2]
+    );
+  }
+
   // Extract level 0 strides (already validated in setup())
   std::vector<int64_t> l_strides_in0 = strides[0][0];
   std::vector<int64_t> l_strides_in1 = strides[0][1];
@@ -414,9 +451,9 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup_bi
                          l_ktype_first,
                          l_ktype_main,
                          l_ktype_last,
-                         num_threads[0],
-                         num_threads[1],
-                         num_threads[2],
+                         l_num_threads[0],
+                         l_num_threads[1],
+                         l_num_threads[2],
                          nullptr );
 
   // compile backend 
@@ -439,6 +476,22 @@ void einsum_ir::py::TensorOperation::execute( void const * tensor_in0,
   }
 }
 
+einsum_ir::py::OptimizationConfig einsum_ir::py::TensorOperation::get_default_optimization_config() {
+  OptimizationConfig config;
+
+  config.target_m            = 16;
+  config.target_n            = 12;
+  config.target_k            = 64;
+  config.num_threads         = 0;        // Auto-detect
+  config.packed_gemm_support = true;
+  config.br_gemm_support     = true;
+  config.packing_support     = true;
+  config.sfc_support         = true;
+  config.l2_cache_size       = 1048576;  // 1 MiB
+
+  return config;
+}
+
 std::tuple<
   einsum_ir::py::TensorOperation::error_t,
   einsum_ir::py::TensorOperation::dtype_t,
@@ -458,22 +511,27 @@ std::tuple<
   std::vector< exec_t >                                const & exec_types,
   std::vector< int64_t >                               const & dim_sizes,
   std::vector< std::vector< std::vector< int64_t > > > const & strides,
-  int64_t                                                      target_m,
-  int64_t                                                      target_n,
-  int64_t                                                      target_k,
-  int64_t                                                      num_threads,
-  bool                                                         br_gemm_support,
-  bool                                                         packed_gemm_support,
-  int64_t                                                      l2_cache_size
+  OptimizationConfig                                   const & optimization_config
 ) {
+  std::vector< std::vector< std::vector< int64_t > > > l_empty_strides;
+
+  // Extract optimization parameters from struct
+  int64_t l_target_m            = optimization_config.target_m;
+  int64_t l_target_n            = optimization_config.target_n;
+  int64_t l_target_k            = optimization_config.target_k;
+  bool    l_packed_gemm_support = optimization_config.packed_gemm_support;
+  bool    l_br_gemm_support     = optimization_config.br_gemm_support;
+  bool    l_packing_support     = optimization_config.packing_support;
+  bool    l_sfc_support         = optimization_config.sfc_support;
+  int64_t l_l2_cache_size       = optimization_config.l2_cache_size;
+
   int64_t l_num_threads[3] = {1, 1, 1};
-  l_num_threads[0] = get_num_threads(num_threads);
+  l_num_threads[0] = get_num_threads(optimization_config.num_threads);
 
   op_type_t l_op_type = determine_op_type(prim_main);
 
   // Validate stride dimensions based on operation type
   size_t l_expected_tensors = (l_op_type == op_type_t::binary) ? 3 : 2;
-  std::vector< std::vector< std::vector< int64_t > > > l_empty_strides;
 
   if (l_op_type == op_type_t::undefined) {
     return std::make_tuple(error_t::compilation_failed, dtype, prim_first,
@@ -533,8 +591,9 @@ std::tuple<
     l_err = optimize_binary(dtype, l_opt_prim_main, l_opt_dim_types, l_opt_exec_types,
                             l_opt_dim_sizes, l_opt_strides_in0, l_opt_strides_in1,
                             l_opt_strides_out, l_opt_packing_in0, l_opt_packing_in1,
-                            target_m, target_n, target_k, l_num_threads,
-                            br_gemm_support, packed_gemm_support, l2_cache_size);
+                            l_target_m, l_target_n, l_target_k, l_num_threads,
+                            l_packed_gemm_support, l_br_gemm_support, l_packing_support,
+                            l_sfc_support, l_l2_cache_size);
   }
 
   if (l_err != error_t::success) {
@@ -654,8 +713,10 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
   int64_t                  target_n,
   int64_t                  target_k,
   int64_t                  num_threads[3],
-  bool                     br_gemm_support,
   bool                     packed_gemm_support,
+  bool                     br_gemm_support,
+  bool                     packing_support,
+  bool                     sfc_support,
   int64_t                  l2_cache_size
 ) {
   // Create iter_properties from input parameters
@@ -682,9 +743,9 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
                     target_m,
                     target_n,
                     target_k,
-                    false, // TODO: Add SFC support flag
+                    sfc_support,
                     br_gemm_support,
-                    false, // TODO: Add packing support flag
+                    packing_support,
                     l_packed_gemm_support,
                     l_num_bytes,
                     l2_cache_size,
