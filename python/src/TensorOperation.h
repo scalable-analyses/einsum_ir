@@ -331,7 +331,7 @@ class einsum_ir::py::TensorOperation {
      * @param dim_types   Dimension types.
      * @param exec_types  Execution types.
      * @param dim_sizes   Sizes of dimensions.
-     * @param strides     3D stride tensor [TENSOR][LEVEL][DIMENSION].
+     * @param strides     3D stride tensor [LEVEL][TENSOR][DIMENSION].
      * @return            Appropriate error code.
      **/
     error_t setup_binary(
