@@ -167,7 +167,7 @@ class TensorOperationConfig:
     def __post_init__(self):
         """Validate configuration at creation time."""
         # Validate backend
-        if self.backend is not None and self.backend not in ["tpp"]:
+        if self.backend is not None and self.backend != "tpp":
             raise ValueError(f"Unsupported backend: '{self.backend}'. Currently only 'tpp' is supported.")
 
         # Determine operation type from prim_main
