@@ -396,7 +396,7 @@ einsum_ir::basic::err_t einsum_ir::basic::ContractionOptimizer::set_primitive_it
     std::vector<iter_property>::iterator l_iter;
     find_iter_with_dimtype( l_iter, dim_t::K );
     if( l_iter != m_iter_space->end() ){
-      if( !l_transpose_a || l_transpose_b ){
+      if( !l_transpose_a && l_transpose_b ){
         l_potential_kernel_iter[ PRIM_K ] = l_iter;
         l_potential_kernel_size[ PRIM_K ] = l_iter->size;
       }
