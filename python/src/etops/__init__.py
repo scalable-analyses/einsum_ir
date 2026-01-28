@@ -110,6 +110,7 @@ class dim:
         return cls.__all__
 
 # Helpers
+import json
 from dataclasses import dataclass
 from typing import Sequence, Union, Optional, Dict
 
@@ -279,6 +280,125 @@ class TensorOperationConfig:
         )
         if err != ErrorType.success:
             raise RuntimeError(f"einsum_ir TensorOperation setup failed: {err}")
+
+    def to_json(self, indent: Optional[int] = None) -> str:
+        """
+        Serialize this configuration to a JSON string.
+
+        Args:
+            indent: Number of spaces for indentation. If None, output is compact.
+
+        Returns:
+            JSON string representation of the configuration.
+
+        Example:
+            >>> config = TensorOperationConfig(...)
+            >>> json_str = config.to_json(indent=2)
+            >>> print(json_str)
+            {
+              "data_type": "float32",
+              "prim_first": "zero",
+              ...
+            }
+        """
+        data = {
+            "data_type": self.data_type.name,
+            "prim_first": self.prim_first.name,
+            "prim_main": self.prim_main.name,
+            "prim_last": self.prim_last.name,
+            "dim_types": [dt.name for dt in self.dim_types],
+            "exec_types": [et.name for et in self.exec_types],
+            "dim_sizes": list(self.dim_sizes),
+            "strides": [
+                [list(tensor) for tensor in level]
+                for level in self.strides
+            ]
+        }
+        # Only include backend if it's not None
+        if self.backend is not None:
+            data["backend"] = self.backend
+        return json.dumps(data, indent=indent)
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "TensorOperationConfig":
+        """
+        Deserialize a JSON string to a TensorOperationConfig.
+
+        Args:
+            json_str: JSON string representation of a configuration.
+
+        Returns:
+            A new TensorOperationConfig instance.
+
+        Raises:
+            ValueError: If the JSON is invalid or missing required fields.
+            AttributeError: If an enum value is not recognized.
+
+        Example:
+            >>> json_str = '{"data_type": "float32", ...}'
+            >>> config = TensorOperationConfig.from_json(json_str)
+        """
+        data = json.loads(json_str)
+
+        # Required fields
+        required = ["data_type", "prim_first", "prim_main", "prim_last",
+                    "dim_types", "exec_types", "dim_sizes", "strides"]
+        missing = [f for f in required if f not in data]
+        if missing:
+            raise ValueError(f"Missing required fields: {missing}")
+
+        # Helper to get enum value by name (pybind11 enums use getattr)
+        def get_enum(enum_type, name):
+            try:
+                return getattr(enum_type, name)
+            except AttributeError:
+                raise ValueError(f"Invalid {enum_type.__name__} value: '{name}'")
+
+        return cls(
+            data_type=get_enum(DataType, data["data_type"]),
+            prim_first=get_enum(PrimType, data["prim_first"]),
+            prim_main=get_enum(PrimType, data["prim_main"]),
+            prim_last=get_enum(PrimType, data["prim_last"]),
+            dim_types=tuple(get_enum(DimType, dt) for dt in data["dim_types"]),
+            exec_types=tuple(get_enum(ExecType, et) for et in data["exec_types"]),
+            dim_sizes=tuple(data["dim_sizes"]),
+            strides=tuple(
+                tuple(tuple(tensor) for tensor in level)
+                for level in data["strides"]
+            ),
+            backend=data.get("backend")
+        )
+
+    def save(self, path: str, indent: Optional[int] = 2) -> None:
+        """
+        Save this configuration to a JSON file.
+
+        Args:
+            path: File path to write to.
+            indent: Number of spaces for indentation. Default is 2 for readability.
+
+        Example:
+            >>> config.save("my_config.json")
+        """
+        with open(path, "w") as f:
+            f.write(self.to_json(indent=indent))
+
+    @classmethod
+    def load(cls, path: str) -> "TensorOperationConfig":
+        """
+        Load a configuration from a JSON file.
+
+        Args:
+            path: File path to read from.
+
+        Returns:
+            A new TensorOperationConfig instance.
+
+        Example:
+            >>> config = TensorOperationConfig.load("my_config.json")
+        """
+        with open(path, "r") as f:
+            return cls.from_json(f.read())
 
 class TensorOperation(_CppOp):
     def __init__(self, config: Union[TensorOperationConfig, None] = None):
