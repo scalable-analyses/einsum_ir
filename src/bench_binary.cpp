@@ -3,14 +3,11 @@
 #include <vector>
 #include <string>
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
 #include <ATen/ATen.h>
 #include "backend/BinaryContractionTpp.h"
 #include "backend/EinsumNode.h"
 #include "frontend/EinsumExpressionAscii.h"
+#include "basic/threading.h"
 
 void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
                    std::vector< int64_t>        & i_dim_ids_in_left,
@@ -94,11 +91,7 @@ void bench_binary( std::map< int64_t, int64_t > & i_dim_sizes_map,
    */
   std::cout << "einsum_ir:" << std::endl;
 
-#ifdef _OPENMP
-  int64_t l_num_threads = omp_get_max_threads();
-#else
-  int64_t l_num_threads = 1;
-#endif
+  int64_t l_num_threads = einsum_ir::basic::get_num_threads_available();
 
   einsum_ir::backend::MemoryManager l_memory;
   einsum_ir::backend::BinaryContractionTpp l_bin_cont;

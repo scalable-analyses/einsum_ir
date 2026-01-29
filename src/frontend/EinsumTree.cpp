@@ -1,8 +1,6 @@
 #include "EinsumTree.h"
 #include "EinsumTreeAscii.h"
-#ifdef _OPENMP
-#include "omp.h"
-#endif
+#include "../basic/threading.h"
 
 void einsum_ir::frontend::EinsumTree::init( std::vector< std::vector< int64_t > >         * i_dim_ids,
                                             std::vector< std::vector< int64_t > >         * i_children,
@@ -20,11 +18,7 @@ void einsum_ir::frontend::EinsumTree::init( std::vector< std::vector< int64_t > 
 einsum_ir::err_t einsum_ir::frontend::EinsumTree::compile() {
   err_t l_err = err_t::UNDEFINED_ERROR;
 
-#ifdef _OPENMP
-  int64_t l_num_threads = omp_get_max_threads();
-#else
-  int64_t l_num_threads = 1;
-#endif
+  int64_t l_num_threads = einsum_ir::basic::get_num_threads_available();
 
   m_nodes.resize( m_children->size() );
 

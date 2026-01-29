@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include "src/backend/EinsumNode.h"
+#include "src/basic/threading.h"
 
 int main( int     i_argc,
           char  * i_argv[] ) {
@@ -153,11 +154,7 @@ int main( int     i_argc,
 
   einsum_ir::backend::MemoryManager l_memory;
   
-#ifdef _OPENMP
-  int64_t l_num_threads = omp_get_max_threads();
-#else
-  int64_t l_num_threads = 1;
-#endif
+  int64_t l_num_threads = einsum_ir::basic::get_num_threads_available();
 
   l_node_input.init( 4,
                      l_dim_ids_input,

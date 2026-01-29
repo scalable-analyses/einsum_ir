@@ -2,12 +2,9 @@
 #include <iostream>
 #include <string>
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
 #include <ATen/ATen.h>
 #include "backend/UnaryTpp.h"
+#include "basic/threading.h"
 
 /**
  * Derives the permutation to transfer the input ids to the output ones.
@@ -259,11 +256,8 @@ int main( int     i_argc,
     l_map_dim_sizes.insert( std::pair< int64_t, int64_t >( l_di, l_dim_sizes[l_di] ) );
   }
 
-    // enable threading
-    int64_t l_num_threads = 1;
-#ifdef _OPENMP
-  l_num_threads = omp_get_max_threads();
-#endif
+  // enable threading
+  int64_t l_num_threads = einsum_ir::basic::get_num_threads_available();
 
   einsum_ir::backend::UnaryTpp l_unary_tpp;
 

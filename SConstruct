@@ -12,9 +12,9 @@ l_vars.AddVariables(
                  allowed_values=('release', 'debug', 'release+san', 'debug+san' )
               ),
   EnumVariable( 'parallel',
-                'used parallelization',
-                'omp',
-                 allowed_values=('none', 'omp') ),
+                'threading backend: auto (auto-detect), dispatch (Apple GCD), omp (OpenMP), none (sequential)',
+                'auto',
+                 allowed_values=('auto', 'dispatch', 'omp', 'none') ),
   PackageVariable( 'libxsmm',
                    'Enable libxsmm backend.',
                    'yes' ),
@@ -98,11 +98,35 @@ if g_env['CXX'].startswith("g++"):
 else:
   g_env.AppendUnique( CXXFLAGS = [ '-std=c++17' ] )
 
-# enable omp
-if 'omp' in g_env['parallel']:
+# Auto-detect threading backend
+if g_env['parallel'] == 'auto':
+  if sys.platform == 'darwin':
+    g_env['parallel'] = 'dispatch'
+    print( 'Auto-detected threading backend: dispatch (macOS)' )
+  else:
+    g_env['parallel'] = 'omp'
+    print( 'Auto-detected threading backend: omp' )
+else:
+  print( 'Using threading backend: ' + g_env['parallel'] )
+
+# Configure threading backend
+if g_env['parallel'] == 'dispatch':
+  if sys.platform != 'darwin':
+    print( 'Error: dispatch threading backend is only available on macOS' )
+    exit(1)
+  g_env.AppendUnique( CPPDEFINES = ['EINSUM_IR_USE_DISPATCH'] )
+  g_env.AppendUnique( CXXFLAGS = ['-fblocks'] )
+  print( 'Configuring Apple Dispatch (GCD) threading' )
+
+elif g_env['parallel'] == 'omp':
+  g_env.AppendUnique( CPPDEFINES = ['EINSUM_IR_USE_OPENMP'] )
   g_env.AppendUnique( CPPFLAGS = ['-fopenmp'] )
   g_env.AppendUnique( CPPFLAGS = ['-fopenmp-simd'] )
   g_env.AppendUnique( LINKFLAGS = ['-fopenmp'] )
+  print( 'Configuring OpenMP threading' )
+
+elif g_env['parallel'] == 'none':
+  print( 'Configuring sequential (no threading)' )
 
 # discover libraries
 if g_env['libtorch'] != False:

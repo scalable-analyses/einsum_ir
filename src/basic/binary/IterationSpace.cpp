@@ -1,10 +1,7 @@
 #include "IterationSpace.h"
 #include "../third_party/gilbertSFC.cpp"
+#include "../threading.h"
 #include <cmath>
-
-#ifdef _OPENMP
-#include <omp.h>
-#endif
 
 void einsum_ir::basic::IterationSpace::init( std::vector< dim_t >   const * i_dim_types,
                                              std::vector< exec_t >  const * i_exec_types,
@@ -99,10 +96,7 @@ einsum_ir::basic::err_t einsum_ir::basic::IterationSpace::setup( std::vector< in
   m_tasks_per_thread_n      = (m_sfc_tasks_n  + m_num_threads_n      - 1) / m_num_threads_n;
   m_tasks_per_thread_shared = (m_shared_tasks + m_num_threads_shared - 1) / m_num_threads_shared;
   
-#ifdef _OPENMP
-#pragma omp parallel for num_threads(l_num_threads)
-#endif
-  for( int64_t l_thread_id = 0; l_thread_id < l_num_threads; l_thread_id++ ){
+  execute_threaded( l_num_threads, [&](int64_t l_thread_id) {
     //get thread id in m and n 
     int64_t l_thread_id_m      = l_thread_id % m_num_threads_m;
     int64_t l_rem              = l_thread_id / m_num_threads_m;
@@ -183,7 +177,7 @@ einsum_ir::basic::err_t einsum_ir::basic::IterationSpace::setup( std::vector< in
       l_id_sfc_n_old = l_id_sfc_n_new;
       l_id_sfc_k_old = l_id_sfc_k_new;
     }
-  }
+  });
 
   //convert strides to offsets
   convert_strides_to_offsets( io_strides_left    );

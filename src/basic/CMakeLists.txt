@@ -6,10 +6,14 @@ project(einsum_ir LANGUAGES CXX VERSION 0.1.0)
 # Options
 # ──────────────────────────────────────────────────────
 option(EINSUM_IR_ENABLE_TPP           "Enable LIBXSMM TPP backend"              ON)
-option(EINSUM_IR_ENABLE_OPENMP        "Enable OpenMP parallelization"           ON)
 option(EINSUM_IR_AUTO_INSTALL_LIBXSMM "Auto-install LIBXSMM if not found"       ON)
 option(EINSUM_IR_BUNDLE_DEPENDENCIES  "Bundle dependencies for wheel packaging" OFF)
 option(BUILD_SHARED_LIBS              "Build shared libraries"                  ON)
+
+# Threading backend selection
+set(EINSUM_IR_THREADING_BACKEND "AUTO" CACHE STRING
+    "Threading backend: AUTO (auto-detect), DISPATCH (Apple GCD), OPENMP, SEQUENTIAL")
+set_property(CACHE EINSUM_IR_THREADING_BACKEND PROPERTY STRINGS AUTO DISPATCH OPENMP SEQUENTIAL)
 
 set(LIBXSMM_GIT_TAG "main" CACHE STRING "Git tag for auto-installed LIBXSMM")
 
@@ -103,10 +107,42 @@ if(EINSUM_IR_ENABLE_TPP)
 endif()
 
 # ──────────────────────────────────────────────────────
-# OpenMP Support
+# Threading Backend Configuration
 # ──────────────────────────────────────────────────────
-if(EINSUM_IR_ENABLE_OPENMP)
+
+# Auto-detect threading backend
+if(EINSUM_IR_THREADING_BACKEND STREQUAL "AUTO")
+  if(APPLE)
+    set(EINSUM_IR_THREADING_BACKEND_RESOLVED "DISPATCH")
+    message(STATUS "Auto-detected threading backend: DISPATCH (macOS)")
+  else()
+    set(EINSUM_IR_THREADING_BACKEND_RESOLVED "OPENMP")
+    message(STATUS "Auto-detected threading backend: OPENMP")
+  endif()
+else()
+  set(EINSUM_IR_THREADING_BACKEND_RESOLVED ${EINSUM_IR_THREADING_BACKEND})
+  message(STATUS "Using threading backend: ${EINSUM_IR_THREADING_BACKEND_RESOLVED}")
+endif()
+
+# Configure selected threading backend
+if(EINSUM_IR_THREADING_BACKEND_RESOLVED STREQUAL "DISPATCH")
+  if(NOT APPLE)
+    message(FATAL_ERROR "DISPATCH threading backend is only available on macOS")
+  endif()
+  set(EINSUM_IR_USE_DISPATCH TRUE)
+  message(STATUS "Configuring Apple Dispatch (GCD) threading")
+
+elseif(EINSUM_IR_THREADING_BACKEND_RESOLVED STREQUAL "OPENMP")
   find_package(OpenMP REQUIRED)
+  set(EINSUM_IR_USE_OPENMP TRUE)
+  message(STATUS "Configuring OpenMP threading")
+
+elseif(EINSUM_IR_THREADING_BACKEND_RESOLVED STREQUAL "SEQUENTIAL")
+  set(EINSUM_IR_USE_SEQUENTIAL TRUE)
+  message(STATUS "Configuring sequential (no threading)")
+
+else()
+  message(FATAL_ERROR "Invalid threading backend: ${EINSUM_IR_THREADING_BACKEND_RESOLVED}")
 endif()
 
 # ──────────────────────────────────────────────────────
@@ -134,17 +170,25 @@ if(EINSUM_IR_ENABLE_TPP)
     target_compile_definitions(einsum_ir PUBLIC EINSUM_IR_ENABLE_TPP)
 endif()
 
-if(EINSUM_IR_ENABLE_OPENMP AND OpenMP_CXX_FOUND)
-    target_compile_definitions(einsum_ir PUBLIC EINSUM_IR_ENABLE_OPENMP)
+# Threading backend definitions
+if(EINSUM_IR_USE_DISPATCH)
+  target_compile_definitions(einsum_ir PUBLIC EINSUM_IR_USE_DISPATCH)
+elseif(EINSUM_IR_USE_OPENMP)
+  target_compile_definitions(einsum_ir PUBLIC EINSUM_IR_USE_OPENMP)
 endif()
 
 # Enable position independent code
 set_property(TARGET einsum_ir PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-# Link with OpenMP when available
-if(EINSUM_IR_ENABLE_OPENMP AND OpenMP_CXX_FOUND)
+# Link with threading backend
+if(EINSUM_IR_USE_DISPATCH)
+  # Link with Apple Dispatch framework (part of libSystem, no explicit linking needed)
+  # However, we ensure C++ blocks support is available
+  target_compile_options(einsum_ir PRIVATE -fblocks)
+
+elseif(EINSUM_IR_USE_OPENMP)
   target_link_libraries(einsum_ir PUBLIC OpenMP::OpenMP_CXX)
-  
+
   # Special handling for Apple Clang which might need libomp
   if(CMAKE_CXX_COMPILER_ID MATCHES "AppleClang")
     target_link_options(einsum_ir PRIVATE ${OpenMP_CXX_FLAGS})
@@ -218,7 +262,8 @@ if(EINSUM_IR_ENABLE_TPP)
 endif()
 
 set(top_level_headers
-  constants.h)
+  constants.h
+  threading.h)
 
 # Install all headers in one consistent block
 install(FILES ${binary_headers} 

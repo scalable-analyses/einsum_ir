@@ -1,12 +1,10 @@
 #include "EinsumExpression.h"
+#include "../basic/threading.h"
 #include <deque>
 #include <set>
 #include <cmath>
 #include <string>
 #include <sstream>
-#ifdef _OPENMP
-#include "omp.h"
-#endif
 
 void einsum_ir::frontend::EinsumExpression::histogram( int64_t         i_num_dims,
                                                        int64_t         i_string_size,
@@ -259,11 +257,7 @@ einsum_ir::err_t einsum_ir::frontend::EinsumExpression::compile() {
   kernel_t l_ktype_first_touch = (m_ctype_ext == complex_t::REAL_ONLY) ? einsum_ir::ZERO : einsum_ir::CPX_ZERO;
   kernel_t l_ktype_main        = (m_ctype_ext == complex_t::REAL_ONLY) ? einsum_ir::MADD : einsum_ir::CPX_MADD;
 
-#ifdef _OPENMP
-  int64_t l_num_threads = omp_get_max_threads();
-#else
-  int64_t l_num_threads = 1;
-#endif
+  int64_t l_num_threads = einsum_ir::basic::get_num_threads_available();
 
   // add internal nodes
   for( int64_t l_co = 0; l_co < m_num_conts-1; l_co++ ) {

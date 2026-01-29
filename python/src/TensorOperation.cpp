@@ -1,10 +1,7 @@
 #include "TensorOperation.h"
+#include <einsum_ir/basic/threading.h>
 #include <cstdint>
 #include <tuple>
-
-#ifdef _OPENMP
-#include <omp.h>
-#endif
 
 einsum_ir::py::TensorOperation::op_type_t
 einsum_ir::py::TensorOperation::determine_op_type( prim_t prim_main ) {
@@ -24,15 +21,9 @@ einsum_ir::py::TensorOperation::determine_op_type( prim_t prim_main ) {
 
 int64_t einsum_ir::py::TensorOperation::get_num_threads( int64_t num_threads ) {
   int64_t l_num_threads = num_threads;
-#if defined(_OPENMP)
-  if (l_num_threads <= 0) {
-    l_num_threads = omp_get_max_threads();
-  }
-#else
   if( l_num_threads <= 0 ) {
-    l_num_threads = 1;
+    l_num_threads = einsum_ir::basic::get_num_threads_available();
   }
-#endif
   return l_num_threads;
 }
 

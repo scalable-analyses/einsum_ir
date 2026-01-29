@@ -1,10 +1,7 @@
 #include "ContractionBackend.h"
 #include "../unary/UnaryOptimizer.h"
+#include "../threading.h"
 #include <algorithm>
-
-#ifdef _OPENMP
-#include <omp.h>
-#endif
 
 void einsum_ir::basic::ContractionBackend::init( std::vector< dim_t >   const & i_dim_type,
                                                  std::vector< exec_t >  const & i_exec_type,
@@ -255,10 +252,7 @@ void einsum_ir::basic::ContractionBackend::contract( void const * i_tensor_left,
                                                      void const * i_tensor_right,
                                                      void const * i_tensor_out_aux,
                                                      void       * io_tensor_out ) {
-#ifdef _OPENMP
-#pragma omp parallel for num_threads(m_num_threads)
-#endif
-  for( int64_t l_thread_id = 0; l_thread_id < m_num_threads; l_thread_id++ ) {
+  execute_threaded( m_num_threads, [&](int64_t l_thread_id) {
     thread_info * l_thread_inf = &m_thread_infos[l_thread_id];
     //get packing memory
     if( m_size_packing_left || m_size_packing_right ){
@@ -296,7 +290,7 @@ void einsum_ir::basic::ContractionBackend::contract( void const * i_tensor_left,
                                  l_tensor_out,
                                  m_has_first_touch,
                                  m_has_last_touch );
-  }
+  });
 }
 
 void einsum_ir::basic::ContractionBackend::contract_iter( thread_info   * i_thread_info,

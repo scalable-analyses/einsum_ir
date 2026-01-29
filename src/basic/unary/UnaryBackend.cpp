@@ -1,4 +1,5 @@
 #include "UnaryBackend.h"
+#include "../threading.h"
 
 void einsum_ir::basic::UnaryBackend::init( std::vector< exec_t >  const & i_exec_types,
                                            std::vector< int64_t > const & i_dim_sizes,
@@ -155,36 +156,40 @@ void einsum_ir::basic::UnaryBackend::eval_iter_parallel( int64_t         i_id_lo
   
 
   // issue loop iterations
-#ifdef _OPENMP
-#pragma omp parallel for num_threads(m_num_threads)
-#endif
-  for( int64_t l_it = 0; l_it < l_all_size; l_it++ ) {
+  execute_threaded( m_num_threads, [&](int64_t l_thread_id) {
+    // Calculate work distribution for this thread
+    int64_t l_chunk_size = (l_all_size + m_num_threads - 1) / m_num_threads;
+    int64_t l_start = l_thread_id * l_chunk_size;
+    int64_t l_end = l_start + l_chunk_size;
+    if( l_end > l_all_size ) l_end = l_all_size;
 
-    char const * l_ptr_in  = i_ptr_in;
-    char       * l_ptr_out = i_ptr_out;
+    for( int64_t l_it = l_start; l_it < l_end; l_it++ ) {
+      char const * l_ptr_in  = i_ptr_in;
+      char       * l_ptr_out = i_ptr_out;
 
-    int64_t l_it_all_loops   = l_it;
-    int64_t l_it_single_loop = 0;
-    for( int64_t l_loop = m_num_parallel_loops - 1; l_loop >= 0; l_loop-- ) {
-      l_it_single_loop = l_it_all_loops % m_dim_sizes[l_loop];
-      l_it_all_loops   = l_it_all_loops / m_dim_sizes[l_loop];
+      int64_t l_it_all_loops   = l_it;
+      int64_t l_it_single_loop = 0;
+      for( int64_t l_loop = m_num_parallel_loops - 1; l_loop >= 0; l_loop-- ) {
+        l_it_single_loop = l_it_all_loops % m_dim_sizes[l_loop];
+        l_it_all_loops   = l_it_all_loops / m_dim_sizes[l_loop];
 
-      //update pointer
-      l_ptr_in  = i_ptr_in  + l_it_single_loop * m_strides_in[  l_loop ];
-      l_ptr_out = i_ptr_out + l_it_single_loop * m_strides_out[ l_loop ];
-    }
+        //update pointer
+        l_ptr_in  = i_ptr_in  + l_it_single_loop * m_strides_in[  l_loop ];
+        l_ptr_out = i_ptr_out + l_it_single_loop * m_strides_out[ l_loop ];
+      }
 
-    if( i_id_loop + 1 < m_id_first_primitive_dim ) {
-      eval_iter( i_id_loop+1,
-                 l_ptr_in,
-                 l_ptr_out );
-    }
-    else {
-      // execute main kernel
-      kernel_main( l_ptr_in,
+      if( i_id_loop + 1 < m_id_first_primitive_dim ) {
+        eval_iter( i_id_loop+1,
+                   l_ptr_in,
                    l_ptr_out );
+      }
+      else {
+        // execute main kernel
+        kernel_main( l_ptr_in,
+                     l_ptr_out );
+      }
     }
-  }
+  });
 }
 
 einsum_ir::basic::err_t einsum_ir::basic::UnaryBackend::set_kernel_properties( ){
