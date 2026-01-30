@@ -16,6 +16,10 @@ from ._etops_core import (
     ErrorType       as _ErrorType
 )
 
+from dataclasses import dataclass
+from typing import Sequence, Union, Optional, Dict
+import json
+
 # Make _ErrorType the *single* public alias
 ErrorType = _ErrorType
 
@@ -110,10 +114,6 @@ class dim:
         return cls.__all__
 
 # Helpers
-import json
-from dataclasses import dataclass
-from typing import Sequence, Union, Optional, Dict
-
 @dataclass(frozen=True)
 class TensorOperationConfig:
     """
@@ -332,7 +332,6 @@ class TensorOperationConfig:
 
         Raises:
             ValueError: If the JSON is invalid or missing required fields.
-            AttributeError: If an enum value is not recognized.
 
         Example:
             >>> json_str = '{"data_type": "float32", ...}'
