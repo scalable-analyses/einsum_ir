@@ -88,9 +88,8 @@ namespace einsum_ir {
       
 #elif defined(EINSUM_IR_USE_OPENMP)
       // OpenMP implementation
-#pragma omp parallel num_threads(i_num_threads)
-      {
-        int64_t l_thread_id = omp_get_thread_num();
+#pragma omp parallel for num_threads(i_num_threads)
+      for( int64_t l_thread_id = 0; l_thread_id < i_num_threads; l_thread_id++ ) {
         i_work( l_thread_id );
       }
       
