@@ -41,6 +41,12 @@ wheel.packages = ["src/etops"]
 wheel.expand-macos-universal-tags = true
 
 # ─────────────────────────────────────────────
+# CMake cache variables
+# ─────────────────────────────────────────────
+[tool.scikit-build.cmake.define]
+LIBXSMM_GIT_TAG = { env = "LIBXSMM_GIT_TAG", default = "c14cbc6" }
+
+# ─────────────────────────────────────────────
 # Version scheme
 # ─────────────────────────────────────────────
 [tool.setuptools_scm]
