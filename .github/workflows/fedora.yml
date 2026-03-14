@@ -90,10 +90,19 @@ jobs:
           CXX=clang++ CC=clang scons libtorch=$(pwd)/venv_pytorch/lib/python3.10/site-packages/torch blas=$(pwd)/openblas tblis=$(pwd)/tblis libxsmm=$(pwd)/libxsmm -j$(nproc)
           mv build build_llvm
 
+      - name: Install model
+        run: |
+          cd src/model
+          mkdir build && cd build
+          cmake ..
+          make -j
+          cd ../../..
+
       - name: Run unit tests
         run: |
           ./build_gcc/tests
           ./build_llvm/tests
+          ./src/model/build/model_tests
 
       - name: Run unary tests
         run: |

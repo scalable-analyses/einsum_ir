@@ -81,6 +81,7 @@ class einsum_ir::py::TensorOperation {
       invalid_optimization_config = 3
     };
 
+
     op_type_t m_op_type = op_type_t::undefined;
     einsum_ir::basic::UnaryBackendTpp m_backend_unary;
     einsum_ir::basic::ContractionBackendTpp m_backend_binary;

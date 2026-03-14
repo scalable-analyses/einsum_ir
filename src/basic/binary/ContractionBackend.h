@@ -428,6 +428,69 @@ class einsum_ir::basic::ContractionBackend {
      * @return SUCCESS if the compilation was successful, otherwise an appropiate error code.
      **/
     virtual err_t compile_kernels() = 0;
+
+    /**
+     * Getter for primitv m size
+     * 
+     * @return m size
+     */
+    uint64_t get_prim_m() const {
+      return m_m;
+    }
+
+    /**
+     * Getter for primitv n size
+     * 
+     * @return n size
+     */
+    uint64_t get_prim_n() const {
+      return m_n;
+    }
+
+    /**
+     * Getter for primitv k size
+     * 
+     * @return k size
+     */
+    uint64_t get_prim_k() const {
+      return m_k;
+    }
+
+    /**
+     * Getter for primitive br size
+     * 
+     * @return br size
+     */
+    uint64_t get_prim_br() const {
+      return m_br;
+    }
+
+    /**
+     * Getter for transpose A flag
+     * @return transpose A flag
+     */
+    bool get_transpose_a() const {
+      return m_trans_a;
+    }
+
+    /**
+     * Getter for transpose B flag
+     * @return transpose B flag
+     */
+    bool get_transpose_b() const {
+      return m_trans_b;
+    }
+
+    uint64_t gemm_iter(){
+      uint64_t iters = 1;
+
+      for( size_t i = 0; i < m_exec_type.size(); ++i ){
+        if( m_exec_type[i] != exec_t::PRIM ){
+          iters *= m_dim_sizes[i];
+        }
+      }
+      return iters;
+    }
 };
 
 #endif

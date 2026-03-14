@@ -9,11 +9,13 @@ except ImportError:
 
 from ._etops_core import (
     TensorOperation as _CppOp,
+    Model           as _CppModel,
     DataType        as _DataType,
     PrimType        as _PrimType,
     ExecType        as _ExecType,
     DimType         as _DimType,
-    ErrorType       as _ErrorType
+    ErrorType       as _ErrorType,
+    MicroArch       as _MicroArch
 )
 
 from dataclasses import dataclass
@@ -28,6 +30,7 @@ DataType = _DataType
 PrimType = _PrimType
 ExecType = _ExecType
 DimType  = _DimType
+MicroArch = _MicroArch
 
 #: Alias for DataType
 dtype = DataType
@@ -107,6 +110,28 @@ class dim:
         "m",
         "n",
         "k"
+    ]
+
+    @classmethod
+    def __dir__(cls):
+        return cls.__all__
+
+class arch:
+    """Namespace for micro-architecture types for performance models."""
+    #: Alias for MicroArch.zen5
+    zen5 = MicroArch.zen5
+    #: Alias for MicroArch.m4
+    m4 = MicroArch.m4
+    #: Alias for MicroArch.a76
+    a76 = MicroArch.a76
+    #: Alias for MicroArch.generic
+    generic = MicroArch.generic
+
+    __all__ = [
+        "zen5",
+        "m4",
+        "a76",
+        "generic"
     ]
 
     @classmethod
@@ -412,6 +437,81 @@ class TensorOperation(_CppOp):
         if config is not None:
             config.apply(self)
 
+
+class Model:
+    """
+    Performance prediction model for tensor operations.
+
+    This class provides performance predictions for GEMM/BRGEMM operations.
+    The Model is constructed with just the microarchitecture, and the
+    predict() method takes the configuration.
+
+    Example:
+        >>> config = TensorOperationConfig(...)
+        >>> model = etops.Model(micro_arch=etops.arch.m4)
+        >>> time = model.predict(config)
+    """
+
+    def __init__(
+        self,
+        micro_arch: _MicroArch = _MicroArch.generic,
+        peak_gflops: float = 0.0,
+        vector_size: int = 0
+    ):
+        """
+        Create a performance prediction model with microarchitecture configuration.
+
+        Args:
+            micro_arch: The micro-architecture for the performance model (zen5, m4, a76, or generic).
+            peak_gflops: Peak GFLOPS for generic model (required if micro_arch is generic).
+            vector_size: Vector width in bytes for generic model (required if micro_arch is generic).
+        """
+        # Create the C++ Model object
+        self._cpp_model = _CppModel(
+            micro_arch,
+            peak_gflops,
+            vector_size
+        )
+
+    def predict(self, config: TensorOperationConfig) -> float:
+        """
+        Predict the execution time for the tensor operation.
+
+        Args:
+            config: The tensor operation configuration.
+
+        Returns:
+            Estimated execution time in seconds.
+        """
+        return self._cpp_model.predict(
+            config.prim_main,
+            tuple(config.dim_types),
+            tuple(config.exec_types),
+            tuple(config.dim_sizes),
+            tuple(tuple(tuple(tensor) for tensor in level) for level in config.strides),
+            config.data_type
+        )
+
+    def predict_gflops(self, config: TensorOperationConfig) -> float:
+        """
+        Predict the GFLOPS for a single GEMM operation.
+
+        Args:
+            config: The tensor operation configuration.
+
+        Returns:
+            Estimated GFLOPS based on the performance model.
+        """
+        return self._cpp_model.predict_gflops(
+            config.prim_main,
+            tuple(config.dim_types),
+            tuple(config.exec_types),
+            tuple(config.dim_sizes),
+            tuple(tuple(tuple(tensor) for tensor in level) for level in config.strides),
+            config.data_type
+        )
+
+
 # Backend namespace
 class _TPPBackend:
     """TPP (Tensor Processing Primitives) backend for tensor operations."""
@@ -515,10 +615,12 @@ def optimize(
 __all__ = [
     "TensorOperation",
     "TensorOperationConfig",
+    "Model",
     "DataType",
     "PrimType",
     "ExecType",
     "DimType",
+    "MicroArch",
     "dtype",
     "float32",
     "float64",
@@ -526,6 +628,7 @@ __all__ = [
     "etype",
     "exec",
     "dim",
+    "arch",
     "backend",
     "optimize",
     "ErrorType"

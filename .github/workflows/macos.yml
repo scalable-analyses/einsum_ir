@@ -48,6 +48,14 @@ jobs:
           echo "using libtorch path: ${LIBTORCH_PATH}"
           scons mode=debug+san libtorch=${LIBTORCH_PATH} libxsmm=${LIBXSMM_PATH} blas=yes parallel=none || { cat config.log || true; exit 1; }
 
+      - name: Install model
+        run: |
+          cd src/model
+          mkdir build && cd build
+          cmake ..
+          make -j
+          cd ../../..
+
       - name: Run unit tests
         env:
           ASAN_OPTIONS:  "abort_on_error=1"
@@ -55,6 +63,7 @@ jobs:
           LSAN_OPTIONS:  "exitcode=1"
         run: |
           ./build/tests
+          ./src/model/build/model_tests
 
   bcont_lib_manual:
     runs-on: ubuntu-latest
