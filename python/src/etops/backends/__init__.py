@@ -7,7 +7,7 @@ are checked before use.
 """
 
 import importlib
-from typing import Callable, TYPE_CHECKING
+from typing import Callable, Dict, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from etops.config import TensorOperationConfig
@@ -33,7 +33,7 @@ _BACKEND_REGISTRY = {
 }
 
 # Cache for backend availability
-_available_backends: dict[str, bool] = {}
+_available_backends: Dict[str, bool] = {}
 
 
 def _check_availability(backend_name: str) -> bool:
@@ -97,7 +97,7 @@ def get_backend(backend_name: str) -> Callable[["TensorOperationConfig"], "Compi
     return getattr(module, info["factory"])
 
 
-def list_backends() -> list[str]:
+def list_backends() -> List[str]:
     """
     List available backends.
 
