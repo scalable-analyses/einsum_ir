@@ -24,6 +24,8 @@ Example:
     >>> op.execute(in0, in1, out)
 """
 
+from typing import Optional
+
 try:
     from ._version import version as __version__
 except ImportError:
@@ -72,7 +74,7 @@ def compile(config: TensorOperationConfig):
 
 def optimize(
     config: TensorOperationConfig,
-    optimization_config: dict | None = None
+    optimization_config: Optional[dict] = None
 ) -> TensorOperationConfig:
     """
     Optimize a tensor operation configuration.

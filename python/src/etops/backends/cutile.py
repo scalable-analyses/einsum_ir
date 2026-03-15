@@ -5,7 +5,7 @@ This backend provides GPU-accelerated tensor operations using NVIDIA's
 cuda.tile framework. It is optional and requires cuda.tile to be installed.
 """
 
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
@@ -35,7 +35,7 @@ class CutileOperation:
     def execute(
         self,
         in0: np.ndarray,
-        in1: np.ndarray | None,
+        in1: Optional[np.ndarray],
         out: np.ndarray
     ) -> None:
         """
@@ -94,7 +94,7 @@ def get_default_optimization_config() -> dict:
 
 def optimize_config(
     config: "TensorOperationConfig",
-    optimization_config: dict | None = None
+    optimization_config: Optional[dict] = None
 ) -> "TensorOperationConfig":
     """
     Optimize a tensor operation configuration for cutile backend.

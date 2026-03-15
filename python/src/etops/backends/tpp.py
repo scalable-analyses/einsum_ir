@@ -5,7 +5,7 @@ This backend uses the einsum_ir C++ backend for high-performance tensor
 operations on CPU using Tensor Processing Primitives (TPP).
 """
 
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
@@ -35,7 +35,7 @@ class TppOperation:
     def execute(
         self,
         in0: np.ndarray,
-        in1: np.ndarray | None,
+        in1: Optional[np.ndarray],
         out: np.ndarray
     ) -> None:
         """
@@ -103,7 +103,7 @@ def get_default_optimization_config() -> dict:
 
 def optimize_config(
     config: "TensorOperationConfig",
-    optimization_config: dict | None = None
+    optimization_config: Optional[dict] = None
 ) -> "TensorOperationConfig":
     """
     Optimize a tensor operation configuration for TPP backend.

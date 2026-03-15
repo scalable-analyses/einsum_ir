@@ -4,7 +4,7 @@ Base types for backend implementations.
 This module defines the protocol that all compiled operations must implement.
 """
 
-from typing import Protocol, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
 import numpy as np
 
 
@@ -23,7 +23,7 @@ class CompiledOperation(Protocol):
     def execute(
         self,
         in0: np.ndarray,
-        in1: np.ndarray | None,
+        in1: Optional[np.ndarray],
         out: np.ndarray
     ) -> None:
         """
