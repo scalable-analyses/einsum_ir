@@ -50,23 +50,41 @@ PYBIND11_MODULE(_etops_core, m) {
       [](
         TensorOperation                                      & self,
         std::string                                    const & backend,
-        TensorOperation::dtype_t                               dtype,
-        TensorOperation::prim_t                                prim_first,
-        TensorOperation::prim_t                                prim_main,
-        TensorOperation::prim_t                                prim_last,
-        std::vector<TensorOperation::dim_t>            const & dim_types,
-        std::vector<TensorOperation::exec_t>           const & exec_types,
+        int                                                    dtype,
+        int                                                    prim_first,
+        int                                                    prim_main,
+        int                                                    prim_last,
+        std::vector<int>                               const & dim_types,
+        std::vector<int>                               const & exec_types,
         std::vector<int64_t>                           const & dim_sizes,
         std::vector<std::vector<std::vector<int64_t>>> const & strides
       ) -> TensorOperation::error_t {
         // Validate backend
-        if (backend != "tpp") {
+        if( backend != "tpp" ) {
           return TensorOperation::error_t::compilation_failed;
         }
 
+        // Convert int values to enum types (Python is source of truth for enum values)
+        std::vector<TensorOperation::dim_t>  l_dim_types;
+        std::vector<TensorOperation::exec_t> l_exec_types;
+        for( auto const & d : dim_types ) {
+          l_dim_types.push_back(static_cast<TensorOperation::dim_t>(d));
+        }
+        for( auto const & e : exec_types ) {
+          l_exec_types.push_back(static_cast<TensorOperation::exec_t>(e));
+        }
+
         // Call TensorOperation setup (TPP backend)
-        return self.setup(dtype, prim_first, prim_main, prim_last,
-                         dim_types, exec_types, dim_sizes, strides);
+        return self.setup(
+          static_cast<TensorOperation::dtype_t>(dtype),
+          static_cast<TensorOperation::prim_t>(prim_first),
+          static_cast<TensorOperation::prim_t>(prim_main),
+          static_cast<TensorOperation::prim_t>(prim_last),
+          l_dim_types,
+          l_exec_types,
+          dim_sizes,
+          strides
+        );
       },
       R"doc(
         Setup for a unary tensor operation or a binary tensor contraction.
@@ -147,12 +165,12 @@ PYBIND11_MODULE(_etops_core, m) {
       "optimize",
       [](
         std::string                                    const & backend,
-        TensorOperation::dtype_t                               dtype,
-        TensorOperation::prim_t                                prim_first,
-        TensorOperation::prim_t                                prim_main,
-        TensorOperation::prim_t                                prim_last,
-        std::vector<TensorOperation::dim_t>            const & dim_types,
-        std::vector<TensorOperation::exec_t>           const & exec_types,
+        int                                                    dtype,
+        int                                                    prim_first,
+        int                                                    prim_main,
+        int                                                    prim_last,
+        std::vector<int>                               const & dim_types,
+        std::vector<int>                               const & exec_types,
         std::vector<int64_t>                           const & dim_sizes,
         std::vector<std::vector<std::vector<int64_t>>> const & strides,
         py::dict                                       const & optimization_config_dict
@@ -165,6 +183,16 @@ PYBIND11_MODULE(_etops_core, m) {
             dtype, prim_first, prim_main, prim_last,
             dim_types, exec_types, dim_sizes, empty_strides
           );
+        }
+
+        // Convert int values to enum types (Python is source of truth for enum values)
+        std::vector<TensorOperation::dim_t>  l_dim_types;
+        std::vector<TensorOperation::exec_t> l_exec_types;
+        for( auto const & d : dim_types ) {
+          l_dim_types.push_back(static_cast<TensorOperation::dim_t>(d));
+        }
+        for( auto const & e : exec_types ) {
+          l_exec_types.push_back(static_cast<TensorOperation::exec_t>(e));
         }
 
         // Parse the Python dict and create OptimizationConfig struct
@@ -182,9 +210,9 @@ PYBIND11_MODULE(_etops_core, m) {
 
         try {
           // Check for unknown keys
-          for (auto item : optimization_config_dict) {
+          for( auto item : optimization_config_dict ) {
             std::string key = item.first.cast<std::string>();
-            if (valid_keys.find(key) == valid_keys.end()) {
+            if( valid_keys.find(key) == valid_keys.end() ) {
               // Return error for unknown key
               std::vector<std::vector<std::vector<int64_t>>> empty_strides;
               return py::make_tuple(
@@ -196,31 +224,31 @@ PYBIND11_MODULE(_etops_core, m) {
           }
 
           // Override defaults with provided values
-          if (optimization_config_dict.contains("target_m")) {
+          if( optimization_config_dict.contains("target_m") ) {
             l_optimization_config.target_m = optimization_config_dict["target_m"].cast<int64_t>();
           }
-          if (optimization_config_dict.contains("target_n")) {
+          if( optimization_config_dict.contains("target_n") ) {
             l_optimization_config.target_n = optimization_config_dict["target_n"].cast<int64_t>();
           }
-          if (optimization_config_dict.contains("target_k")) {
+          if( optimization_config_dict.contains("target_k") ) {
             l_optimization_config.target_k = optimization_config_dict["target_k"].cast<int64_t>();
           }
-          if (optimization_config_dict.contains("num_threads")) {
+          if( optimization_config_dict.contains("num_threads") ) {
             l_optimization_config.num_threads = optimization_config_dict["num_threads"].cast<int64_t>();
           }
-          if (optimization_config_dict.contains("packed_gemm_support")) {
+          if( optimization_config_dict.contains("packed_gemm_support") ) {
             l_optimization_config.packed_gemm_support = optimization_config_dict["packed_gemm_support"].cast<bool>();
           }
-          if (optimization_config_dict.contains("br_gemm_support")) {
+          if( optimization_config_dict.contains("br_gemm_support") ) {
             l_optimization_config.br_gemm_support = optimization_config_dict["br_gemm_support"].cast<bool>();
           }
-          if (optimization_config_dict.contains("packing_support")) {
+          if( optimization_config_dict.contains("packing_support") ) {
             l_optimization_config.packing_support = optimization_config_dict["packing_support"].cast<bool>();
           }
-          if (optimization_config_dict.contains("sfc_support")) {
+          if( optimization_config_dict.contains("sfc_support") ) {
             l_optimization_config.sfc_support = optimization_config_dict["sfc_support"].cast<bool>();
           }
-          if (optimization_config_dict.contains("l2_cache_size")) {
+          if( optimization_config_dict.contains("l2_cache_size") ) {
             l_optimization_config.l2_cache_size = optimization_config_dict["l2_cache_size"].cast<int64_t>();
           }
         } catch (...) {
@@ -235,12 +263,12 @@ PYBIND11_MODULE(_etops_core, m) {
 
         // Call the static optimize function with the struct
         auto result = TensorOperation::optimize(
-          dtype,
-          prim_first,
-          prim_main,
-          prim_last,
-          dim_types,
-          exec_types,
+          static_cast<TensorOperation::dtype_t>(dtype),
+          static_cast<TensorOperation::prim_t>(prim_first),
+          static_cast<TensorOperation::prim_t>(prim_main),
+          static_cast<TensorOperation::prim_t>(prim_last),
+          l_dim_types,
+          l_exec_types,
           dim_sizes,
           strides,
           l_optimization_config

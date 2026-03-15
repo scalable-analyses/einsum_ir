@@ -26,6 +26,14 @@ dependencies = [
 license = "MIT AND BSD-3-Clause AND BSD-2-Clause"
 license-files = ["LICENSE"]
 
+[project.optional-dependencies]
+cutile = [
+  "cuda.tile>=1.2.0"
+]
+test = [
+  "pytest>=9.0"
+]
+
 [project.urls]
 Homepage = "https://github.com/scalable-analyses/einsum_ir"
 Source = "https://github.com/scalable-analyses/einsum_ir"

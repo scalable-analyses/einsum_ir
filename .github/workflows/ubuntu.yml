@@ -114,3 +114,8 @@ jobs:
           cd python
           SETUPTOOLS_SCM_PRETEND_VERSION=$(python version_cli.py) pip install -ve .
           python -c "import etops; print(etops.__version__)"
+
+      - name: Run etops tests
+        run: |
+          cd python
+          pytest tests/ -v

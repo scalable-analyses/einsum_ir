@@ -2,7 +2,8 @@
 
 High-performance C++17 einsum (tensor contraction) execution engine with
 Python bindings (`etops`). Supports TPP (libxsmm), BLAS, TBLIS, and scalar
-backends with OpenMP/GCD parallelism.
+backends with OpenMP/GCD parallelism. The `etops` Python package additionally
+supports a `cutile` GPU backend (via `cuda.tile`, optional).
 
 ---
 
@@ -51,7 +52,21 @@ cd python
 pip install -ve .
 # If SCM version detection fails:
 SETUPTOOLS_SCM_PRETEND_VERSION=$(python version_cli.py) pip install -ve .
+
+# Optional GPU support (cutile backend):
+pip install -ve ".[cutile]"
 ```
+
+Run the Python test suite with pytest (from the `python/` directory):
+
+```bash
+cd python
+pytest                          # all tests
+pytest -m tpp                   # only TPP backend tests
+pytest -m cutile                # only cutile GPU backend tests
+```
+
+Test files live in `python/tests/` and are named `test_*.py`.
 
 ### Prerequisites
 
@@ -229,11 +244,75 @@ einsum_ir/
 │   ├── backend/                # High-level wrappers (BinaryContraction*, EinsumNode, …)
 │   └── frontend/               # User APIs (EinsumExpression*, EinsumTree*, parsers)
 ├── python/                     # etops Python package (pybind11 / scikit-build-core)
-│   └── src/
-│       ├── TensorOperation.{h,cpp}
-│       ├── bindings.cpp
-│       └── etops/__init__.py
+│   ├── CMakeLists.txt          # CMake build for _etops_core extension module
+│   ├── pyproject.toml          # scikit-build-core project metadata & build config
+│   ├── pytest.ini              # pytest configuration (markers: tpp, cutile)
+│   ├── version_cli.py          # Git-based version string generator
+│   ├── src/
+│   │   ├── TensorOperation.{h,cpp}
+│   │   ├── bindings.cpp        # pybind11 bindings → _etops_core
+│   │   └── etops/              # Pure-Python package
+│   │       ├── __init__.py     # Public API: compile(), optimize(), types, …
+│   │       ├── config.py       # TensorOperationConfig dataclass (JSON I/O)
+│   │       ├── types.py        # dim, exec, prim, data_type enums
+│   │       └── backends/       # Backend-specific wrappers
+│   │           ├── base.py
+│   │           ├── tpp.py      # TPP backend (CPU via libxsmm)
+│   │           └── cutile.py   # cutile backend (GPU via cuda.tile, optional)
+│   └── tests/                  # pytest test suite
+│       ├── test_api.py
+│       ├── test_backends.py
+│       ├── test_config.py
+│       └── test_types.py
 └── samples/                    # Benchmark scripts and example configs
+```
+
+---
+
+## etops Python API
+
+### Compiling and executing a tensor operation
+
+```python
+import etops
+
+config = etops.TensorOperationConfig(
+    backend    = "tpp",
+    data_type  = etops.float32,
+    prim_first = etops.prim.zero,
+    prim_main  = etops.prim.gemm,
+    prim_last  = etops.prim.none,
+    dim_types  = (etops.dim.m,     etops.dim.n,     etops.dim.k    ),
+    exec_types = (etops.exec.prim, etops.exec.prim, etops.exec.prim),
+    dim_sizes  = (64,              32,              128            ),
+    strides  = (((1,               0,               64             ),    # in0
+                 (0,               128,             1              ),    # in1
+                 (1,               64,              0              )),), # out
+)
+
+top = etops.compile(config)   # compile; returns an executable TensorOperation
+top.execute(A, B, C)          # execute in-place
+```
+
+Key top-level functions:
+
+| Function | Description |
+|---|---|
+| `etops.compile(config)` | Compile a `TensorOperationConfig` into an executable `TensorOperation` |
+| `etops.optimize(config[, opts])` | Run the built-in contraction optimizer; returns an optimized config |
+
+### JSON serialization of configurations
+
+```python
+# Serialize to JSON string
+json_str = config.to_json(indent=2)
+
+# Save to / load from file
+config.save("config.json")
+loaded = etops.TensorOperationConfig.load("config.json")
+
+# Deserialize from JSON string
+config2 = etops.TensorOperationConfig.from_json(json_str)
 ```
 
 ---

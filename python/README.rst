@@ -1,7 +1,7 @@
 etops
 =====
 
-The `etops` package provides a Python interface for the Tiled Execution IR (TEIR). It enables users to define, configure, optimize, and execute complex tensor contractions and elementwise operations. The package is built on top of the einsum_ir C++ backend and exposes advanced features such as dimension fusion, dimension splitting, and backend-specific optimizations.
+The `etops` package provides a Python interface for the Tiled Execution IR (TEIR). It enables users to define, configure, optimize, and execute complex tensor contractions and elementwise operations. The package supports multiple backends: TPP (CPU via libxsmm) and cutile (GPU via cuda.tile, optional).
 
 Main Features
 -------------
@@ -20,6 +20,12 @@ Install the package using pip:
 .. code-block:: bash
 
     pip install etops
+
+For GPU support with the cutile backend (optional):
+
+.. code-block:: bash
+
+    pip install etops[cutile]
 
 Unary Examples
 --------------
@@ -48,8 +54,8 @@ Below are some examples showing how to configure and execute unary tensor operat
                        (1,               3               )),) # out
     )
 
-    # Create the TensorOperation instance
-    top = etops.TensorOperation(top_config)
+    # Compile the tensor operation
+    top = etops.compile(top_config)
 
     # Create input and output arrays
     import numpy as np
@@ -84,8 +90,8 @@ Below are some examples showing how to configure and execute unary tensor operat
                         (3,              2*3,             1,               4*2*3          )),) # out
     )
 
-    # Create the TensorOperation instance
-    perm_op = etops.TensorOperation(perm_config)
+    # Compile the tensor operation
+    perm_op = etops.compile(perm_config)
 
     # Create input and output arrays
     A = np.random.randn(2,3,4,5).astype(np.float32)
@@ -93,9 +99,9 @@ Below are some examples showing how to configure and execute unary tensor operat
 
     perm_op.execute(A, None, B)
 
+    # Check correctness
     B_np = np.einsum("abcd->dcab", A)
 
-    # Check correctness
     error_abs = np.max( np.abs(B - B_np) )
     print("4D Tensor Permutation using copy primitive:")
     print(f"  Max absolute error: {error_abs:.6e}")
@@ -107,6 +113,7 @@ Below are some examples showing how to configure and execute unary tensor operat
     #   Compares the result with NumPy
     # -------------------------------------------------
     perm_config = etops.TensorOperationConfig(
+        backend     =   "tpp",
         data_type   =   etops.float32,
         prim_first  =   etops.prim.none,
         prim_main   =   etops.prim.copy,
@@ -121,8 +128,8 @@ Below are some examples showing how to configure and execute unary tensor operat
     # Use default optimization config
     optimized_config = etops.optimize(perm_config)
 
-    # Create the TensorOperation instance
-    perm_op = etops.TensorOperation(optimized_config)
+    # Compile the tensor operation
+    perm_op = etops.compile(optimized_config)
 
     # Create input and output arrays
     A = np.random.randn(2,3,4,5).astype(np.float32)
@@ -166,8 +173,8 @@ Below are some examples showing how to configure and execute binary tensor opera
                        (1,               64,              0              )),) # out
     )
 
-    # Create the TensorOperation instance
-    top = etops.TensorOperation(top_config)
+    # Compile the tensor operation
+    top = etops.compile(top_config)
 
     # Create input and output arrays
     import numpy as np
@@ -206,8 +213,9 @@ Below are some examples showing how to configure and execute binary tensor opera
                        (32*128,            0,               128,             1              ),   # in1
                        (32*64,             1,               64,              0              )),) # out
     )
-    # Create the batched TensorOperation instance
-    top = etops.TensorOperation(batched_config)
+
+    # Compile the tensor operation
+    top = etops.compile(batched_config)
 
     import torch
     # Create input and output arrays
@@ -253,8 +261,8 @@ Below are some examples showing how to configure and execute binary tensor opera
                        (0,               0,               0              )),) # packing out
     )
 
-    # Create the TensorOperation instance
-    top = etops.TensorOperation(top_config)
+    # Compile the tensor operation
+    top = etops.compile(top_config)
 
     # Create input and output arrays
     import numpy as np
@@ -282,6 +290,7 @@ Below are some examples showing how to configure and execute binary tensor opera
     # -----------------------------------------------
     # Define a batch-reduce GEMM configuration
     batched_config =   etops.TensorOperationConfig(
+        backend    =   "tpp",
         data_type  =   etops.float32,
         prim_first =   etops.prim.zero,
         prim_main  =   etops.prim.gemm,
@@ -307,8 +316,8 @@ Below are some examples showing how to configure and execute binary tensor opera
         }
     )
 
-    # Create the optimized TensorOperation instance
-    top = etops.TensorOperation(optimized_config)
+    # # Compile the tensor operation
+    top = etops.compile(optimized_config)
 
     import torch
     # Create input and output arrays
@@ -329,3 +338,39 @@ Below are some examples showing how to configure and execute binary tensor opera
     print(f"  Max relative error: {error_rel:.6e}")
 
 See the source code and inline documentation for more advanced usage.
+
+JSON Serialization
+------------------
+
+Configurations can be serialized to and from JSON:
+
+.. code-block:: python
+
+    import etops
+
+    config = etops.TensorOperationConfig(
+        backend    =   "tpp",
+        data_type  =   etops.float32,
+        prim_first =   etops.prim.zero,
+        prim_main  =   etops.prim.gemm,
+        prim_last  =   etops.prim.none,
+        dim_types  =   (etops.dim.m,     etops.dim.n,     etops.dim.k    ),
+        exec_types =   (etops.exec.prim, etops.exec.prim, etops.exec.prim),
+        dim_sizes  =   (64,              32,              128            ),
+        strides    = (((1,               0,               64             ),   # in0
+                       (0,               128,             1              ),   # in1
+                       (1,               64,              0              )),) # out
+    )
+
+    # Serialize to JSON
+    json_str = config.to_json(indent=2)
+    print(json_str)
+
+    # Save to file
+    config.save("config.json")
+
+    # Load from file
+    loaded_config = etops.TensorOperationConfig.load("config.json")
+
+    # Deserialize from JSON
+    config2 = etops.TensorOperationConfig.from_json(json_str)
