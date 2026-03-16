@@ -3,14 +3,25 @@ Cutile backend implementation using cuda.tile.
 
 This backend provides GPU-accelerated tensor operations using NVIDIA's
 cuda.tile framework. It is optional and requires cuda.tile to be installed.
+
+Kernel JIT compilation and execution are implemented; the optimizer is not
+yet implemented (etops.optimize() will raise NotImplementedError for this backend).
 """
 
 from typing import Optional, TYPE_CHECKING
-import numpy as np
 
 if TYPE_CHECKING:
     from etops.config import TensorOperationConfig
     from etops.backends.base import CompiledOperation
+
+from etops.backends._cutile.config_parser import ConfigParser
+from etops.backends._cutile.jit_compiler import JitCompiler
+from etops.backends._cutile.cache import InMemoryCache
+
+
+# Module-level cache: persists across etops.compile() calls within the same process.
+# Kernels with identical configurations are compiled only once.
+_global_cache = InMemoryCache()
 
 
 class CutileOperation:
@@ -34,9 +45,9 @@ class CutileOperation:
 
     def execute(
         self,
-        in0: np.ndarray,
-        in1: Optional[np.ndarray],
-        out: np.ndarray
+        in0,
+        in1: Optional[object],
+        out,
     ) -> None:
         """
         Execute the tensor operation on GPU.
@@ -46,10 +57,14 @@ class CutileOperation:
             in1: Second input tensor (None for unary operations)
             out: Output tensor (must be pre-allocated on CUDA device)
         """
-        raise NotImplementedError(
-            "Cutile backend is not yet implemented. "
-            "This is a placeholder for future development. "
-            "Use backend='tpp' for now."
+        import cupy as cp
+        import cuda.tile as ct
+
+        ct.launch(
+            cp.cuda.get_current_stream(),
+            (self._grid_size,),
+            self._kernel.contraction_kernel,
+            (in0, in1, out),
         )
 
 
@@ -64,15 +79,16 @@ def create_operation(config: "TensorOperationConfig") -> CutileOperation:
         Compiled CutileOperation instance
 
     Raises:
-        NotImplementedError: Cutile backend is not yet implemented
+        ValueError: If config is not executable (e.g. missing prim exec_types)
+        ImportError: If cuda.tile or cupy is not installed
     """
-    # Import cutile dependencies (only when this backend is used)
-    # This ensures the backend is optional
-    raise NotImplementedError(
-        "Cutile backend is not yet implemented. "
-        "This is a placeholder for future development. "
-        "Use backend='tpp' for now."
-    )
+    config_parser = ConfigParser(config)
+    config_parser.verify_executable_config()
+
+    jit = JitCompiler(config_parser)
+    kernel_module = _global_cache.get_or_compile(config_parser, jit)
+
+    return CutileOperation(kernel_module, config_parser.grid_size)
 
 
 def get_default_optimization_config() -> dict:
@@ -83,12 +99,11 @@ def get_default_optimization_config() -> dict:
         Dictionary with optimization parameters
 
     Raises:
-        NotImplementedError: Cutile backend is not yet implemented
+        NotImplementedError: cuTile optimizer is not yet implemented
     """
     raise NotImplementedError(
-        "Cutile backend optimization is not yet implemented. "
-        "This is a placeholder for future development. "
-        "Use backend='tpp' for now."
+        "cuTile backend optimization is not yet implemented. "
+        "Assign exec_types manually or use backend='tpp' for now."
     )
 
 
@@ -107,12 +122,11 @@ def optimize_config(
         Optimized TensorOperationConfig
 
     Raises:
-        NotImplementedError: Cutile backend is not yet implemented
+        NotImplementedError: cuTile optimizer is not yet implemented
     """
     raise NotImplementedError(
-        "Cutile backend optimization is not yet implemented. "
-        "This is a placeholder for future development. "
-        "Use backend='tpp' for now."
+        "cuTile backend optimization is not yet implemented. "
+        "Assign exec_types manually or use backend='tpp' for now."
     )
 
 
