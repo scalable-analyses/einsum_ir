@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <vector>
+#include "types.h"
 #include <einsum_ir/basic/unary/UnaryBackendTpp.h>
 #include <einsum_ir/basic/unary/UnaryOptimizer.h>
 #include <einsum_ir/basic/binary/ContractionBackendTpp.h>
@@ -39,39 +40,16 @@ class einsum_ir::py::TensorOperation {
     };
 
     /// execution type
-    enum class exec_t : uint32_t {
-      seq       = 0, 
-      prim      = 1,
-      shared    = 2,
-      sfc       = 3,
-      undefined = 99
-    };
+    using exec_t = einsum_ir::py::exec_t;
 
     /// primitive type
-    enum class prim_t : uint32_t {
-      none      =  0,
-      zero      =  1,
-      copy      =  2,
-      relu      =  3,
-      gemm      =  4,
-      brgemm    =  5,
-      undefined = 99
-    };
+    using prim_t = einsum_ir::py::prim_t;
 
     /// dimension type
-    enum class dim_t : uint32_t {
-      c         = 0, 
-      m         = 1, 
-      n         = 2, 
-      k         = 3, 
-      undefined = 99
-    };
+    using dim_t = einsum_ir::py::dim_t;
 
     /// data type
-    enum class dtype_t : uint32_t {
-      fp32 = 0,
-      fp64 = 1
-    };
+    using dtype_t = einsum_ir::py::dtype_t;
 
     /// error codes
     enum class error_t : int32_t {

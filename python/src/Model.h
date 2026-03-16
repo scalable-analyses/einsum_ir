@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/common.h"
+#include "types.h"
 
 namespace einsum_ir {
   namespace py {
@@ -29,39 +30,16 @@ namespace einsum_ir {
     class Model {
      public:
       /// execution type
-      enum class exec_t : uint32_t {
-        seq = 0,
-        prim = 1,
-        shared = 2,
-        sfc = 3,
-        undefined = 99
-      };
+      using exec_t = einsum_ir::py::exec_t;
 
       /// primitive type
-      enum class prim_t : uint32_t {
-        none = 0,
-        zero = 1,
-        copy = 2,
-        relu = 3,
-        gemm = 4,
-        brgemm = 5,
-        undefined = 99
-      };
+      using prim_t = einsum_ir::py::prim_t;
 
       /// dimension type
-      enum class dim_t : uint32_t {
-        c = 0,
-        m = 1,
-        n = 2,
-        k = 3,
-        undefined = 99
-      };
+      using dim_t = einsum_ir::py::dim_t;
 
       /// data type
-      enum class dtype_t : uint32_t {
-        fp32 = 0,
-        fp64 = 1
-      };
+      using dtype_t = einsum_ir::py::dtype_t;
 
       /**
        * Construct a Model with microarchitecture configuration.
@@ -119,16 +97,27 @@ namespace einsum_ir {
       
       /**
        * Convert model_t to common::Model.
+       * @return Converted common::Model value.
        */
       einsum_ir::model::common::Model convert_model_type() const;
 
       /**
        * Convert dtype_t to common::DType.
+       * @param dtype TensorOperation data type.
+       * @return Converted common::DType value.
        */
       static einsum_ir::model::common::DType convert_dtype(dtype_t dtype);
 
       /**
        * Extract primitive dimensions from configuration.
+       * @param prim_main Main primitive type.
+       * @param dim_types Dimension types vector.
+       * @param exec_types Execution types vector.
+       * @param dim_sizes Dimension sizes vector.
+       * @param o_m Output M dimension size.
+       * @param o_n Output N dimension size.
+       * @param o_k Output K dimension size.
+       * @param o_br Output batch-reduce dimension size (for BRGEMM).
        */
       static void extract_primitive_dims( prim_t prim_main,
                                           std::vector<dim_t> const& dim_types,
@@ -141,6 +130,11 @@ namespace einsum_ir {
 
       /**
        * Extract transpose flags from stride patterns.
+       * @param dim_types Dimension types vector.
+       * @param exec_types Execution types vector.
+       * @param strides 3D stride tensor
+       * @param o_trans_a Output transpose flag for input A.
+       * @param o_trans_b Output transpose flag for input B.
        */
       static void extract_transpose_flags( std::vector<dim_t> const& dim_types,
                                            std::vector<exec_t> const& exec_types,
@@ -150,6 +144,9 @@ namespace einsum_ir {
 
       /**
        * Compute number of GEMM iterations.
+       * @param exec_types Execution types vector.
+       * @param dim_sizes Dimension sizes vector.
+       * @return Number of GEMM iterations based on non-primitive dimensions.
        */
       static int64_t compute_gemm_iter( std::vector<exec_t> const& exec_types,
                                         std::vector<int64_t> const& dim_sizes);

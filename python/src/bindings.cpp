@@ -377,22 +377,9 @@ PYBIND11_MODULE(_etops_core, m) {
         std::vector<std::vector<std::vector<int64_t>>> const& strides,
         TensorOperation::dtype_t dtype
       ) {
-        // Convert TensorOperation types to Model types
-        Model::prim_t model_prim = static_cast<Model::prim_t>(prim_main);
-        std::vector<Model::dim_t> model_dim_types;
-        model_dim_types.reserve(dim_types.size());
-        for (auto d : dim_types) {
-          model_dim_types.push_back(static_cast<Model::dim_t>(d));
-        }
-        std::vector<Model::exec_t> model_exec_types;
-        model_exec_types.reserve(exec_types.size());
-        for (auto e : exec_types) {
-          model_exec_types.push_back(static_cast<Model::exec_t>(e));
-        }
-        Model::dtype_t model_dtype = static_cast<Model::dtype_t>(dtype);
 
-        return self.predict(model_prim, model_dim_types, model_exec_types,
-                           dim_sizes, strides, model_dtype);
+        return self.predict(prim_main, dim_types, exec_types,
+                           dim_sizes, strides, dtype);
       },
       R"doc(
         Predict the execution time for the tensor operation.
@@ -423,22 +410,8 @@ PYBIND11_MODULE(_etops_core, m) {
         std::vector<std::vector<std::vector<int64_t>>> const& strides,
         TensorOperation::dtype_t dtype
       ) {
-        // Convert TensorOperation types to Model types
-        Model::prim_t model_prim = static_cast<Model::prim_t>(prim_main);
-        std::vector<Model::dim_t> model_dim_types;
-        model_dim_types.reserve(dim_types.size());
-        for (auto d : dim_types) {
-          model_dim_types.push_back(static_cast<Model::dim_t>(d));
-        }
-        std::vector<Model::exec_t> model_exec_types;
-        model_exec_types.reserve(exec_types.size());
-        for (auto e : exec_types) {
-          model_exec_types.push_back(static_cast<Model::exec_t>(e));
-        }
-        Model::dtype_t model_dtype = static_cast<Model::dtype_t>(dtype);
-
-        return self.predict_gflops(model_prim, model_dim_types, model_exec_types,
-                                   dim_sizes, strides, model_dtype);
+        return self.predict_gflops(prim_main, dim_types, exec_types,
+                                   dim_sizes, strides, dtype);
       },
       R"doc(
         Predict the GFLOPS for a single GEMM operation.
