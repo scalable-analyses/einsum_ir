@@ -118,4 +118,4 @@ jobs:
       - name: Run etops tests
         run: |
           cd python
-          pytest tests/ -v
+          python -m pytest tests/ -v
