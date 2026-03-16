@@ -243,4 +243,4 @@ jobs:
       - name: Run etops tests
         run: |
           cd python
-          python -m pytest tests/ -v
+          python${{ matrix.python }} -m pytest tests/ -v
