@@ -29,6 +29,16 @@ add_subdirectory(
 )
 
 # ------------------------------------------------------------
+# perf_model
+# ------------------------------------------------------------
+message(STATUS "Building perf_model from ../src/model")
+add_subdirectory(
+    "${CMAKE_CURRENT_LIST_DIR}/../src/model"
+    model_local
+    EXCLUDE_FROM_ALL
+)
+
+# ------------------------------------------------------------
 # Copy headers so that <einsum_ir/basic/...> resolves in-tree
 # ------------------------------------------------------------
 file(
@@ -37,11 +47,29 @@ file(
     DESTINATION "${CMAKE_BINARY_DIR}/include/einsum_ir"
 )
 
+file(
+    COPY
+    "${CMAKE_CURRENT_LIST_DIR}/../src/model"
+    DESTINATION "${CMAKE_BINARY_DIR}/include/einsum_ir"
+)
+
 # ------------------------------------------------------------
 # Sources & target
 # ------------------------------------------------------------
 set(PYBIND11_FINDPYTHON ON)
 find_package(pybind11 CONFIG REQUIRED)
+
+# Model library - independent of TensorOperation backend
+# Only depends on perf_model for prediction
+add_library(Model STATIC src/Model.cpp)
+target_link_libraries(Model PUBLIC perf_model)
+target_include_directories(
+    Model
+    PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/src>"
+    "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>"
+    "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/einsum_ir/model/src>"
+)
 
 add_library(TensorOperation STATIC src/TensorOperation.cpp)
 target_link_libraries(TensorOperation PUBLIC einsum_ir)
@@ -56,7 +84,7 @@ if(ETOPS_USE_OPENMP)
 endif()
 
 pybind11_add_module(_etops_core MODULE src/bindings.cpp)
-target_link_libraries(_etops_core PRIVATE TensorOperation)
+target_link_libraries(_etops_core PRIVATE TensorOperation Model)
 
 if(APPLE)
     set_target_properties(
