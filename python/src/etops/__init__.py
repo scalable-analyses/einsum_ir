@@ -44,6 +44,9 @@ from etops.types import (
     dtype,
     float32,
     float64,
+    float16,
+    bfloat16,
+    tfloat32
 )
 
 # Import config

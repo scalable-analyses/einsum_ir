@@ -25,10 +25,15 @@ class TestEnumConsistency:
     """Verify Python enum values match C++ bindings."""
 
     def test_datatype_matches_bindings(self):
-        """DataType values must match C++ dtype_t enum."""
+        """DataType values must match C++ dtype_t enum for supported types.
+        
+        Note: float16, bfloat16, and tfloat32 are CuTile-only and have no
+        C++ binding counterparts, so they are not tested here.
+        """
         from etops._etops_core import DataType as CppDataType
         from etops.types import DataType
 
+        # Only test types that have C++ bindings
         assert DataType.float32.value == int(CppDataType.float32)
         assert DataType.float64.value == int(CppDataType.float64)
 
@@ -116,3 +121,18 @@ class TestConvenienceAliases:
         """float64 alias matches DataType.float64."""
         from etops.types import float64, DataType
         assert float64 == DataType.float64
+
+    def test_float16_alias(self):
+        """float16 alias matches DataType.float16."""
+        from etops.types import float16, DataType
+        assert float16 == DataType.float16
+
+    def test_bfloat16_alias(self):
+        """bfloat16 alias matches DataType.bfloat16."""
+        from etops.types import bfloat16, DataType
+        assert bfloat16 == DataType.bfloat16
+
+    def test_tfloat32_alias(self):
+        """tfloat32 alias matches DataType.tfloat32."""
+        from etops.types import tfloat32, DataType
+        assert tfloat32 == DataType.tfloat32

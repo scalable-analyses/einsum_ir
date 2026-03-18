@@ -73,6 +73,15 @@ class TensorOperationConfig:
                 f"Supported backends: {sorted(valid_backends)}."
             )
 
+        # Validate data type compatibility with backend
+        tpp_supported_dtypes = {DataType.float32, DataType.float64}
+        if self.backend == "tpp" and self.data_type not in tpp_supported_dtypes:
+            raise ValueError(
+                f"TPP backend only supports float32 and float64 data types. "
+                f"Got: {self.data_type.name}. "
+                f"Use cutile backend for float16, bfloat16, and tfloat32."
+            )
+
         # Determine operation type from prim_main
         is_binary = self.prim_main in [PrimType.gemm, PrimType.brgemm]
         is_unary = self.prim_main in [PrimType.copy, PrimType.zero]

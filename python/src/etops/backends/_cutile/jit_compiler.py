@@ -138,11 +138,29 @@ class JitCompiler:
     def init_class_variables(self):
         self.indent = "    "
         
-        # there is currently no fp16 support in etops, so we use fp16 when dtype is set to fp64
-        if self.cv.data_type == etops.float64:
-            self.data_type_string = "ct.float16"
+        # Map etops data types to cuda.tile type strings
+        dtype_to_cutile = {
+            etops.float32: "ct.float32",
+            etops.float64: "ct.float64",
+            etops.float16: "ct.float16",
+            etops.bfloat16: "ct.bfloat16",
+            etops.tfloat32: "ct.tfloat32",
+        }
+        self.data_type_string = dtype_to_cutile.get(self.cv.data_type, "ct.float32")
+        
+        # Output dtype: TF32 uses float32 storage (TF32 is a compute format, not storage format)
+        # For all other types, output dtype matches the data type
+        if self.cv.data_type == etops.tfloat32:
+            self.output_dtype_string = "ct.float32"
         else:
-            self.data_type_string = "ct.float32"
+            self.output_dtype_string = self.data_type_string
+        
+        # Accumulator dtype: use float64 for float64 inputs, float32 for all others
+        # (float32 accumulation for float16/bfloat16/tfloat32 is intentional for numerical stability)
+        if self.cv.data_type == etops.float64:
+            self.accumulator_dtype_string = "ct.float64"
+        else:
+            self.accumulator_dtype_string = "ct.float32"
 
     
     def _validate_binary_operation(self):
@@ -355,10 +373,10 @@ class JitCompiler:
         reshape_tuple_out, permute_map_out = self.get_reshape_and_permute_map_out()
 
         # strings for each operation
-        accumulator_string = f"accumulator = ct.full({output_buffer_shape}, 0, dtype=ct.float32)\n"
+        accumulator_string = f"accumulator = ct.full({output_buffer_shape}, 0, dtype={self.accumulator_dtype_string})\n"
         load_left_string = f"tile_left = ct.load(left, index=({index_string_left}), shape=({shape_string_left}), padding_mode=ct.PaddingMode.ZERO)\n"
         load_right_string = f"tile_right = ct.load(right, index=({index_string_right}), shape=({shape_string_right}), padding_mode=ct.PaddingMode.ZERO)\n"
-        output_dtype_string = f"out_to_store = ct.astype(accumulator, {self.data_type_string})\n"
+        output_dtype_string = f"out_to_store = ct.astype(accumulator, {self.output_dtype_string})\n"
         reshape_output_string = f"out_to_store = ct.reshape(out_to_store, {reshape_tuple_out})\n"
         store_output_string = f"ct.store(output, index=({index_string_store}), tile=out_to_store)\n"
         mma_string = f"accumulator = ct.mma(matrix_right, matrix_left, accumulator)\n"
@@ -759,3 +777,4 @@ class JitCompiler:
         with open(path, "w") as f:
             f.write(self.string_kernel)
         f.close()
+

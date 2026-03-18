@@ -16,9 +16,15 @@ class DataType(IntEnum):
     Attributes:
         float32: 32-bit floating point (single precision)
         float64: 64-bit floating point (double precision)
+        float16: 16-bit floating point (half precision, CuTile backend only)
+        bfloat16: Brain floating point 16-bit (CuTile backend only)
+        tfloat32: TensorFloat-32 (CuTile backend only)
     """
     float32 = 0
     float64 = 1
+    float16 = 2
+    bfloat16 = 3
+    tfloat32 = 4
 
 
 class PrimType(IntEnum):
@@ -174,6 +180,15 @@ float32: DataType = DataType.float32
 #: Alias for DataType.float64
 float64: DataType = DataType.float64
 
+#: Alias for DataType.float16
+float16: DataType = DataType.float16
+
+#: Alias for DataType.bfloat16
+bfloat16: DataType = DataType.bfloat16
+
+#: Alias for DataType.tfloat32
+tfloat32: DataType = DataType.tfloat32
+
 
 __all__ = [
     # Enum types
@@ -191,4 +206,7 @@ __all__ = [
     "dtype",
     "float32",
     "float64",
+    "float16",
+    "bfloat16",
+    "tfloat32"
 ]
