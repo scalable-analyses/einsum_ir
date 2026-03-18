@@ -281,7 +281,7 @@ jobs:
 
       - name: Verify GPU availability
         run: |
-          python -c "import cupy; p = cupy.cuda.runtime.getDeviceProperties(0); print(p['name'].decode())"
+          python${{ matrix.python }} -c "import cupy; p = cupy.cuda.runtime.getDeviceProperties(0); print(p['name'].decode())"
 
       - name: Run cutile tests
         run: |
