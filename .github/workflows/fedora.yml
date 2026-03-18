@@ -270,6 +270,35 @@ jobs:
           sudo dnf install -y python${{ matrix.python }}-devel
           sudo python${{ matrix.python }} -m ensurepip --upgrade
 
+      - name: Install CUDA
+        run: |
+          # Detect Fedora version and architecture
+          FEDORA_VERSION=$(rpm -E %fedora)
+          ARCH=$(uname -m)
+          echo "Detected Fedora version: $FEDORA_VERSION"
+          echo "Detected architecture: $ARCH"
+
+          # Use sbsa for aarch64, otherwise x86_64
+          if [ "$ARCH" = "aarch64" ]; then
+            CUDA_ARCH="sbsa"
+          else
+            CUDA_ARCH="x86_64"
+          fi
+
+          # Add NVIDIA package repository
+          sudo dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/fedora${FEDORA_VERSION}/${CUDA_ARCH}/cuda-fedora${FEDORA_VERSION}.repo
+
+          # Install CUDA toolkit 13.2
+          sudo dnf install -y cuda-toolkit-13-2 cuda-driver-libs
+
+          # Set CUDA environment
+          echo "CUDA_PATH=/usr/local/cuda-13.2" >> $GITHUB_ENV
+          echo "/usr/local/cuda-13.2/bin" >> $GITHUB_PATH
+
+      - name: Verify CUDA installation
+        run: |
+          nvcc --version
+
       - name: Install etops with cutile
         run: |
           PYTHON=python${{ matrix.python }}
