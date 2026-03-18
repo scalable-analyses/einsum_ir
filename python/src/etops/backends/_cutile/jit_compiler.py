@@ -1,10 +1,134 @@
 import etops
 import os
-from .utils import find_next_power_of_2
+
+def find_next_power_of_2(x):
+    power = 1
+    while power < x:
+        power *= 2
+    return power
+
+# =============================================================================
+# Module-level registration for make_tensor_view lowering
+# =============================================================================
+
+# Registration state for make_tensor_view lowering
+_MAKE_TENSOR_VIEW_REGISTERED = False
+_MAKE_TENSOR_VIEW_AVAILABLE = None  # None = not checked, True/False = checked
+
+
+def _register_make_tensor_view():
+    """
+    Register make_tensor_view lowering rule with cuda.tile.
+    
+    Called lazily when JitCompiler is instantiated, not at module import.
+    This allows the module to be imported even if cuda.tile is not installed.
+    
+    Returns:
+        True if registration succeeded, False if cuda.tile unavailable.
+    """
+    global _MAKE_TENSOR_VIEW_REGISTERED, _MAKE_TENSOR_VIEW_AVAILABLE
+    
+    if _MAKE_TENSOR_VIEW_REGISTERED:
+        return True
+    
+    if _MAKE_TENSOR_VIEW_AVAILABLE is False:
+        return False
+    
+    try:
+        import cuda.tile as ct
+        from cuda.tile._ir.op_impl import impl
+        from cuda.tile._ir.ops import MakeTensorView
+        from cuda.tile._ir.ir import Var, Builder, ArrayValue
+        from cuda.tile._ir.type import ArrayTy, TupleTy, SizeTy
+    except ImportError:
+        _MAKE_TENSOR_VIEW_AVAILABLE = False
+        return False
+    
+    _MAKE_TENSOR_VIEW_AVAILABLE = True
+    
+    # Check if already registered by another module
+    if hasattr(ct, 'make_tensor_view'):
+        _MAKE_TENSOR_VIEW_REGISTERED = True
+        return True
+    
+    # Define the Python stub
+    def make_tensor_view(array, shape, dynamic_strides):
+        """
+        Create a view of a tensor with specified shape and strides.
+        
+        Args:
+            array: Input tensor (base pointer)
+            shape: Tuple of dimension sizes
+            dynamic_strides: Tuple of strides for each dimension
+        
+        Returns:
+            A tensor view with the specified layout
+        """
+        pass
+    
+    ct.make_tensor_view = make_tensor_view
+    
+    # Register the lowering implementation
+    @impl(ct.make_tensor_view)
+    def make_tensor_view_impl(array: Var, shape: Var, dynamic_strides: Var):
+        builder = Builder.get_current()
+        dtype = getattr(
+            array.get_type(),
+            'dtype',
+            getattr(array.get_type(), 'value_type', None)
+        )
+        
+        arr_val = array.get_aggregate()
+        base_ptr = arr_val.base_ptr
+        shape_tup = shape.get_aggregate().items
+        strides_tup = dynamic_strides.get_aggregate().items
+        
+        # Create result type with symbolic sizes
+        res_ty = ArrayTy(
+            dtype,
+            shape=TupleTy([SizeTy(None)] * len(shape_tup)),
+            strides=TupleTy([SizeTy(None)] * len(strides_tup)),
+            elements_disjoint=False,
+            base_ptr_div_by=None,
+            stride_div_by=(None,) * len(strides_tup),
+            shape_div_by=(None,) * len(shape_tup)
+        )
+        
+        # Add the MakeTensorView operation
+        res_var = builder.add_operation(
+            MakeTensorView,
+            res_ty,
+            dict(
+                base_ptr=base_ptr,
+                shape=tuple(shape_tup),
+                dynamic_strides=tuple(strides_tup)
+            )
+        )
+        
+        # Set aggregate for downstream operations
+        res_var.set_aggregate(
+            ArrayValue(base_ptr, tuple(shape_tup), tuple(strides_tup))
+        )
+        return res_var
+    
+    _MAKE_TENSOR_VIEW_REGISTERED = True
+    return True
+
+
+# =============================================================================
+# JitCompiler class
+# =============================================================================
 
 class JitCompiler:
 
     def __init__(self, cv):
+        # Ensure make_tensor_view is registered before compilation
+        if not _register_make_tensor_view():
+            raise ImportError(
+                "cuda.tile is required for the cutile backend. "
+                "Install with: pip install cuda-tile"
+            )
+        
         self.cv = cv
         self.string_kernel = ""
 
@@ -19,6 +143,54 @@ class JitCompiler:
             self.data_type_string = "ct.float16"
         else:
             self.data_type_string = "ct.float32"
+
+    
+    def _validate_binary_operation(self):
+        """
+        Validate that this is a binary operation (gemm main primitive).
+        
+        Raises:
+            NotImplementedError: If the main primitive is not gemm.
+        """
+        if self.cv.prim_main != etops.prim.gemm:
+            raise NotImplementedError(
+                f"Only gemm main primitive is supported, got {self.cv.prim_main}. "
+                f"Unary operations and other primitives are not yet implemented."
+            )
+    
+    
+    def _get_tensor_view_args(self, strides, tensor_name):
+        """
+        Get shape and strides for make_tensor_view, filtering out stride-0 dims.
+        
+        Stride 0 indicates the dimension is NOT part of that tensor.
+        This method filters those out and returns the effective shape/strides.
+        
+        Args:
+            strides: Tuple of strides for this tensor (from config.strides).
+            tensor_name: Name of tensor for error messages ("left", "right", "output").
+        
+        Returns:
+            Tuple of (shape_tuple, strides_tuple) for use with make_tensor_view.
+        
+        Raises:
+            ValueError: If all strides are 0 (empty tensor).
+        """
+        l_shape = []
+        l_strides = []
+        
+        for l_idx, l_stride in enumerate(strides):
+            if l_stride != 0:
+                l_shape.append(self.cv.dim_sizes[l_idx])
+                l_strides.append(l_stride)
+        
+        if len(l_shape) == 0:
+            raise ValueError(
+                f"Tensor '{tensor_name}' has all strides = 0, "
+                f"which indicates an empty tensor. This is not supported."
+            )
+        
+        return (tuple(l_shape), tuple(l_strides))
 
     
     def jit_kernel(self):
@@ -97,6 +269,28 @@ class JitCompiler:
 
         # pid
         string_header += f"{self.indent}pid = ct.bid(0)\n"
+        
+        # Validate that this is a binary operation (gemm)
+        self._validate_binary_operation()
+        
+        # make_tensor_view calls to reinterpret input pointers
+        # Left tensor
+        l_shape_left, l_strides_left = self._get_tensor_view_args(
+            self.cv.strides_left, "left"
+        )
+        string_header += f"{self.indent}left = ct.make_tensor_view(left, {l_shape_left}, {l_strides_left})\n"
+        
+        # Right tensor
+        l_shape_right, l_strides_right = self._get_tensor_view_args(
+            self.cv.strides_right, "right"
+        )
+        string_header += f"{self.indent}right = ct.make_tensor_view(right, {l_shape_right}, {l_strides_right})\n"
+        
+        # Output tensor
+        l_shape_output, l_strides_output = self._get_tensor_view_args(
+            self.cv.strides_output, "output"
+        )
+        string_header += f"{self.indent}output = ct.make_tensor_view(output, {l_shape_output}, {l_strides_output})\n"
 
         return string_header
 

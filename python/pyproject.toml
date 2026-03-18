@@ -28,7 +28,8 @@ license-files = ["LICENSE"]
 
 [project.optional-dependencies]
 cutile = [
-  "cuda.tile>=1.2.0"
+  "cuda.tile==1.2.0",
+  "cupy>=14.0"
 ]
 test = [
   "pytest>=8.0"

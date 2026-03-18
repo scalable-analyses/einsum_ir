@@ -85,7 +85,6 @@ class ConfigParser:
         self.init_config_loops()
         self.init_dimension_values()
         self.init_loop_strides()
-        self.init_tensor_shapes()
         self.init_config_indices_in_tensor()
         self.init_grid()
 
@@ -239,69 +238,38 @@ class ConfigParser:
             current_loop_stride *= self.dim_sizes[self.shared_loop_ids[i]]
 
     
-    def init_tensor_shapes(self):
-        self.tensor_shape_left = self.get_tensor_shape(self.dim_sizes, self.strides_left)
-        self.tensor_shape_right = self.get_tensor_shape(self.dim_sizes, self.strides_right)
-        self.tensor_shape_output = self.get_tensor_shape(self.dim_sizes, self.strides_output)
-
-    
-    def get_tensor_shape(self, dim_sizes, strides):
-        tensor_shape = []
-        current_stride = 1
-        for i in range(len(dim_sizes)):
-            # find dimension ID with stride equal to current_stride
-            for j in range(len(dim_sizes)):
-                if strides[j] == current_stride:
-                    # insert the corresponding dimension size to the front of the shape
-                    tensor_shape.insert(0, dim_sizes[j])
-                    break
-            
-            current_stride *= tensor_shape[0]
-
-        return tensor_shape
-
-    
     def init_config_indices_in_tensor(self):
-        config_indices_in_tensors = []
-        prim_config_indices_in_tensors = []
-
-        for it_tensor in range(3):
-            if it_tensor == 0:
-                strides = self.strides_left
-            elif it_tensor == 1:
-                strides = self.strides_right
-            else:
-                strides = self.strides_output
-
-            config_indices_in_tensor = []
-            prim_config_indices_in_tensor = []
-
-            current_stride = 1
+        """
+        Derives tensor dimension order from config order, filtering stride-0 dims.
+        """
+        # Left tensor: filter stride-0 dimensions, keep config order
+        self.config_indices_in_left_tensor = [
+            i for i in range(self.num_dimensions) if self.strides_left[i] != 0
+        ]
         
-            for j in range(self.num_dimensions):
-                # find dimension ID with stride equal to current_stride
-                for i in range(self.num_dimensions):
-                    if strides[i] == current_stride:
-                        # update load indices and shape for the corresponding dimension
-                        config_indices_in_tensor.insert(0, i)
-
-                        if self.exec_types[i] == etops.exec.prim:
-                            prim_config_indices_in_tensor.insert(0, i)
-
-                        current_stride *= self.dim_sizes[i]
-                        break
-            
-            config_indices_in_tensors.append(config_indices_in_tensor)
-            prim_config_indices_in_tensors.append(prim_config_indices_in_tensor)
-
+        # Right tensor: filter stride-0 dimensions, keep config order
+        self.config_indices_in_right_tensor = [
+            i for i in range(self.num_dimensions) if self.strides_right[i] != 0
+        ]
         
-        self.config_indices_in_left_tensor = config_indices_in_tensors[0]
-        self.config_indices_in_right_tensor = config_indices_in_tensors[1]
-        self.config_indices_in_out_tensor = config_indices_in_tensors[2]
-
-        self.prim_config_indices_left = prim_config_indices_in_tensors[0]
-        self.prim_config_indices_right = prim_config_indices_in_tensors[1]
-        self.prim_config_indices_output = prim_config_indices_in_tensors[2]
+        # Output tensor: filter stride-0 dimensions, keep config order
+        self.config_indices_in_out_tensor = [
+            i for i in range(self.num_dimensions) if self.strides_output[i] != 0
+        ]
+        
+        # Prim indices follow the same config order
+        self.prim_config_indices_left = [
+            i for i in self.config_indices_in_left_tensor
+            if self.exec_types[i] == etops.exec.prim
+        ]
+        self.prim_config_indices_right = [
+            i for i in self.config_indices_in_right_tensor
+            if self.exec_types[i] == etops.exec.prim
+        ]
+        self.prim_config_indices_output = [
+            i for i in self.config_indices_in_out_tensor
+            if self.exec_types[i] == etops.exec.prim
+        ]
 
 
     
@@ -378,18 +346,3 @@ class ConfigParser:
                 seq_k_seen = True
             elif self.config.exec_types[i] == etops.exec.seq and self.config.dim_types[i] != etops.dim.k and seq_k_seen:
                 raise ValueError("Config Parser Error: All sequential K dimensions must come after all other sequential dimensions")
-
-
-    
-    def print_config(self):
-        print(f"Backend: {self.backend}")
-        print(f"Data Type: {self.data_type}")
-        print(f"Primitive First: {self.prim_first}")
-        print(f"Primitive Main: {self.prim_main}")
-        print(f"Primitive Last: {self.prim_last}")
-        print(f"Dim Types: {self.dim_types}")
-        print(f"Exec Types: {self.exec_types}")
-        print(f"Dim Sizes: {self.dim_sizes}")
-        print(f"Strides: {self.strides}")
-
-
