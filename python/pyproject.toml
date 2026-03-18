@@ -28,15 +28,15 @@ license-files = ["LICENSE"]
 
 [project.optional-dependencies]
 cutile = [
-  "cuda.tile==1.2.0",
+  "cuda.tile[tileiras]==1.2.0",
   "cupy>=14.0"
 ]
 cutile-cuda12 = [
-  "cuda.tile==1.2.0",
+  "cuda.tile[tileiras]==1.2.0",
   "cupy-cuda12x[ctk]>=14.0"
 ]
 cutile-cuda13 = [
-  "cuda.tile==1.2.0",
+  "cuda.tile[tileiras]==1.2.0",
   "cupy-cuda13x[ctk]>=14.0"
 ]
 test = [
