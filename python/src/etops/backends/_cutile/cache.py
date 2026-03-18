@@ -20,13 +20,6 @@ class InMemoryCache:
     
     Kernels are cached by configuration hash and persist until
     the cache is destroyed or explicitly cleared.
-    
-    Example:
-        >>> cache = InMemoryCache()
-        >>> module = cache.get_or_compile(config_parser, jit_compiler)
-        >>> # Subsequent calls with same config return cached module
-        >>> module2 = cache.get_or_compile(config_parser, jit_compiler)
-        >>> assert module is module2
     """
     
     def __init__(self):
@@ -44,15 +37,7 @@ class InMemoryCache:
             16-character hex string cache key
         """
         hasher = hashlib.sha256()
-        hasher.update(str(config_parser.grid_size).encode())
-        hasher.update(str(config_parser.dim_sizes).encode())
-        hasher.update(str(config_parser.kernel_shape_m).encode())
-        hasher.update(str(config_parser.kernel_shape_n).encode())
-        hasher.update(str(config_parser.kernel_shape_k).encode())
-        hasher.update(str(config_parser.data_type).encode())
-        hasher.update(str(config_parser.exec_types).encode())
-        hasher.update(str(config_parser.seq_loop_ids).encode())
-        hasher.update(str(config_parser.shared_loop_ids).encode())
+        hasher.update(config_parser.config.to_json().encode())
         return hasher.hexdigest()[:16]
     
     def get(self, key: str) -> Optional[types.ModuleType]:
@@ -126,126 +111,3 @@ class InMemoryCache:
             
             self._cache[key] = module
             return module
-    
-    def import_from_file(self, path, metadata: Dict[str, Any]) -> types.ModuleType:
-        """
-        Import kernel from file and cache it.
-        
-        Args:
-            path: Directory containing kernel.py and metadata.json. Can be str or Path.
-            metadata: Metadata dictionary with cache_key, grid_size, etc.
-            
-        Returns:
-            Imported and cached kernel module
-            
-        Raises:
-            FileNotFoundError: If kernel.py doesn't exist
-        """
-        path = Path(path)
-        key = metadata.get("cache_key") or self._compute_key_from_metadata(metadata)
-        
-        with self._lock:
-            if key in self._cache:
-                return self._cache[key]
-            
-            kernel_path = path / "kernel.py"
-            if not kernel_path.exists():
-                raise FileNotFoundError(f"Kernel file not found: {kernel_path}")
-            
-            with open(kernel_path, 'r') as f:
-                kernel_code = f.read()
-            
-            # Use fake filename for linecache injection
-            fake_filename = f"<cutile_imported_{key}>"
-            module = types.ModuleType(f"cutile_kernel_{key}")
-            module.__file__ = fake_filename
-            module.GRID_SIZE = metadata.get("grid_size", 1)
-            
-            # Inject source into linecache for inspect.getsourcelines()
-            source_lines = kernel_code.splitlines(keepends=True)
-            linecache.cache[fake_filename] = (
-                len(kernel_code),
-                None,
-                source_lines,
-                fake_filename
-            )
-            
-            code_obj = compile(kernel_code, fake_filename, 'exec')
-            exec(code_obj, module.__dict__)
-            
-            self._cache[key] = module
-            return module
-    
-    def export_to_file(self, path, key: str, kernel_code: str,
-                       config_parser, einsum_str: str) -> None:
-        """
-        Export kernel and metadata to directory.
-        
-        Creates a directory with kernel.py and metadata.json files
-        that can be imported later using import_from_file().
-        
-        Args:
-            path: Directory to export to (will be created if needed). Can be str or Path.
-            key: Cache key for the kernel
-            kernel_code: Generated kernel Python code
-            config_parser: ConfigParser with kernel configuration
-            einsum_str: Original einsum string
-        """
-        path = Path(path)
-        path.mkdir(parents=True, exist_ok=True)
-        
-        # Write kernel code
-        with open(path / "kernel.py", 'w') as f:
-            f.write(kernel_code)
-        
-        # Write metadata
-        metadata = {
-            "cache_key": key,
-            "grid_size": config_parser.grid_size,
-            "dim_sizes": config_parser.dim_sizes,
-            "kernel_shape": {
-                "m": config_parser.kernel_shape_m,
-                "n": config_parser.kernel_shape_n,
-                "k": config_parser.kernel_shape_k,
-            },
-            "data_type": str(config_parser.data_type),
-            "einsum_str": einsum_str,
-        }
-        with open(path / "metadata.json", 'w') as f:
-            json.dump(metadata, f, indent=2)
-    
-    def _compute_key_from_metadata(self, metadata: Dict[str, Any]) -> str:
-        """
-        Compute cache key from metadata dictionary.
-        
-        Used when importing kernels that don't have a cache_key in metadata.
-        
-        Args:
-            metadata: Metadata dictionary
-            
-        Returns:
-            16-character hex string cache key
-        """
-        hasher = hashlib.sha256()
-        hasher.update(str(metadata.get("grid_size", "")).encode())
-        hasher.update(str(metadata.get("dim_sizes", {})).encode())
-        kernel_shape = metadata.get("kernel_shape", {})
-        hasher.update(str(kernel_shape.get("m", "")).encode())
-        hasher.update(str(kernel_shape.get("n", "")).encode())
-        hasher.update(str(kernel_shape.get("k", "")).encode())
-        hasher.update(str(metadata.get("data_type", "")).encode())
-        return hasher.hexdigest()[:16]
-    
-    def clear(self) -> None:
-        """Clear all cached kernels."""
-        with self._lock:
-            self._cache.clear()
-    
-    def __len__(self) -> int:
-        """Return number of cached kernels."""
-        return len(self._cache)
-    
-    def __contains__(self, key: str) -> bool:
-        """Check if a key is in the cache."""
-        with self._lock:
-            return key in self._cache
