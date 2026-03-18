@@ -1,6 +1,6 @@
-# ─────────────────────────────────────────────
+# ---------------------------------------------
 # Build system
-# ─────────────────────────────────────────────
+# ---------------------------------------------
 [build-system]
 requires = [
   "scikit-build-core>=0.11",
@@ -10,9 +10,9 @@ requires = [
 ]
 build-backend = "scikit_build_core.build"
 
-# ─────────────────────────────────────────────
+# ---------------------------------------------
 # Project metadata
-# ─────────────────────────────────────────────
+# ---------------------------------------------
 [project]
 name = "etops"
 dynamic = ["version"]
@@ -31,6 +31,14 @@ cutile = [
   "cuda.tile==1.2.0",
   "cupy>=14.0"
 ]
+cutile-cuda12 = [
+  "cuda.tile==1.2.0",
+  "cupy-cuda12x>=14.0"
+]
+cutile-cuda13 = [
+  "cuda.tile==1.2.0",
+  "cupy-cuda13x>=14.0"
+]
 test = [
   "pytest>=8.0"
 ]
@@ -40,24 +48,24 @@ Homepage = "https://github.com/scalable-analyses/einsum_ir"
 Source = "https://github.com/scalable-analyses/einsum_ir"
 Issues = "https://github.com/scalable-analyses/einsum_ir/issues"
 
-# ─────────────────────────────────────────────
+# ---------------------------------------------
 # scikit-build-core settings
-# ─────────────────────────────────────────────
+# ---------------------------------------------
 [tool.scikit-build]
 metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
 cmake.version = ">=3.20"
 wheel.packages = ["src/etops"]
 wheel.expand-macos-universal-tags = true
 
-# ─────────────────────────────────────────────
+# ---------------------------------------------
 # CMake cache variables
-# ─────────────────────────────────────────────
+# ---------------------------------------------
 [tool.scikit-build.cmake.define]
 LIBXSMM_GIT_TAG = { env = "LIBXSMM_GIT_TAG", default = "c14cbc6" }
 
-# ─────────────────────────────────────────────
+# ---------------------------------------------
 # Version scheme
-# ─────────────────────────────────────────────
+# ---------------------------------------------
 [tool.setuptools_scm]
 write_to = "src/etops/_version.py"
 fallback_version = "0.0.0+unknown"

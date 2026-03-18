@@ -302,7 +302,7 @@ jobs:
           $PYTHON -m pip install --upgrade pip
           cd python
           export SETUPTOOLS_SCM_PRETEND_VERSION=$($PYTHON version_cli.py)
-          $PYTHON -m pip install -ve ".[cutile,test]"
+          $PYTHON -m pip install -ve ".[cutile-cuda13,test]"
           $PYTHON -c "import etops; print(etops.__version__)"
 
       - name: Verify GPU availability
