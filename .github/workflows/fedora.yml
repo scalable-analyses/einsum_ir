@@ -244,3 +244,46 @@ jobs:
         run: |
           cd python
           python${{ matrix.python }} -m pytest tests/ -v
+
+  etops_cutile:
+    strategy:
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    runs-on: [l40s]
+
+    steps:
+      - name: Install Git
+        run: |
+          sudo dnf install -y git
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Install System Packages
+        run: |
+          PKG_DIR=.github/workflows/fedora-packages
+          for group in base development-tools; do
+            xargs -a "$PKG_DIR/${group}.txt" sudo dnf install -y
+          done
+          sudo dnf install -y python${{ matrix.python }}-devel
+          sudo python${{ matrix.python }} -m ensurepip --upgrade
+
+      - name: Install etops with cutile
+        run: |
+          PYTHON=python${{ matrix.python }}
+          $PYTHON -m pip install --upgrade pip
+          cd python
+          export SETUPTOOLS_SCM_PRETEND_VERSION=$($PYTHON version_cli.py)
+          $PYTHON -m pip install -ve ".[cutile,test]"
+          $PYTHON -c "import etops; print(etops.__version__)"
+
+      - name: Verify GPU availability
+        run: |
+          python${{ matrix.python }} -c "import cupy; print(f'GPU: {cupy.cuda.Device().name}')"
+
+      - name: Run cutile tests
+        run: |
+          cd python
+          python${{ matrix.python }} -m pytest -m cutile -v
