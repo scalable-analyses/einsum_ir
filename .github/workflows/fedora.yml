@@ -272,28 +272,25 @@ jobs:
 
       - name: Install CUDA
         run: |
-          # Detect Fedora version and architecture
-          FEDORA_VERSION=$(rpm -E %fedora)
+          # Detect architecture
           ARCH=$(uname -m)
-          echo "Detected Fedora version: $FEDORA_VERSION"
           echo "Detected architecture: $ARCH"
 
-          # Use sbsa for aarch64, otherwise x86_64
+          # Add NVIDIA package repository (rhel9 for both arches — better maintained than fedora-specific)
           if [ "$ARCH" = "aarch64" ]; then
-            CUDA_ARCH="sbsa"
+            REPO_URL="https://developer.download.nvidia.com/compute/cuda/repos/rhel9/sbsa/cuda-rhel9.repo"
           else
-            CUDA_ARCH="x86_64"
+            REPO_URL="https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo"
           fi
+          sudo dnf config-manager addrepo --from-repofile=${REPO_URL}
+          sudo dnf clean expire-cache
 
-          # Add NVIDIA package repository
-          sudo dnf config-manager addrepo --from-repofile-url=https://developer.download.nvidia.com/compute/cuda/repos/fedora${FEDORA_VERSION}/${CUDA_ARCH}/cuda-fedora${FEDORA_VERSION}.repo
-
-          # Install CUDA toolkit 13.2
-          sudo dnf install -y cuda-toolkit-13-2 cuda-driver-libs
+          # Install full CUDA
+          sudo dnf install -y cuda
 
           # Set CUDA environment
-          echo "CUDA_PATH=/usr/local/cuda-13.2" >> $GITHUB_ENV
-          echo "/usr/local/cuda-13.2/bin" >> $GITHUB_PATH
+          echo "CUDA_PATH=/usr/local/cuda" >> $GITHUB_ENV
+          echo "/usr/local/cuda/bin" >> $GITHUB_PATH
 
       - name: Verify CUDA installation
         run: |
