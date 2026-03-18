@@ -243,7 +243,7 @@ jobs:
       - name: Run etops tests
         run: |
           cd python
-          python${{ matrix.python }} -m pytest tests/ -v
+          python${{ matrix.python }} -m pytest tests/ -v -m "not cutile"
 
   etops_cutile:
     strategy:
@@ -286,7 +286,7 @@ jobs:
           fi
 
           # Add NVIDIA package repository
-          sudo dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/fedora${FEDORA_VERSION}/${CUDA_ARCH}/cuda-fedora${FEDORA_VERSION}.repo
+          sudo dnf config-manager addrepo --from-repofile-url=https://developer.download.nvidia.com/compute/cuda/repos/fedora${FEDORA_VERSION}/${CUDA_ARCH}/cuda-fedora${FEDORA_VERSION}.repo
 
           # Install CUDA toolkit 13.2
           sudo dnf install -y cuda-toolkit-13-2 cuda-driver-libs
