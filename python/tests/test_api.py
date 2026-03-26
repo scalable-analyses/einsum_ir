@@ -550,7 +550,7 @@ class TestEndToEnd:
     @pytest.mark.parametrize("config", [
         CUTILE_TC_SEQ
     ])
-    def test_cutile_execute_tc_fp16(self, config):
+    def test_cutile_optimize_and_execute_tc_fp16(self, config):
         """Test tensor contraction in cutile with float16."""
         import cupy as cp
 
