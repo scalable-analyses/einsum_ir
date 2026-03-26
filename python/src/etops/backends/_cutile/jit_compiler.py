@@ -177,19 +177,22 @@ class JitCompiler:
             )
     
     
-    def _get_tensor_view_args(self, strides, tensor_name):
+    def _get_tensor_view_args(self, stride_sorted_indices, strides, tensor_name):
         """
-        Get shape and strides for make_tensor_view, filtering out stride-0 dims.
+        Get shape and strides for make_tensor_view, ordered by stride (high to low).
         
         Stride 0 indicates the dimension is NOT part of that tensor.
-        This method filters those out and returns the effective shape/strides.
+        This method filters those out and returns the effective shape/strides,
+        ordered by stride descending (highest stride first) for GPU DMA optimization.
         
         Args:
+            stride_sorted_indices: List of config indices sorted by stride descending.
             strides: Tuple of strides for this tensor (from config.strides).
-            tensor_name: Name of tensor for error messages ("left", "right", "output").
+            tensor_name: Name of tensor for error messages ("in0", "in1", "out").
         
         Returns:
             Tuple of (shape_tuple, strides_tuple) for use with make_tensor_view.
+            Dimensions are ordered by stride descending (highest stride leftmost).
         
         Raises:
             ValueError: If all strides are 0 (empty tensor).
@@ -197,9 +200,10 @@ class JitCompiler:
         l_shape = []
         l_strides = []
         
-        for l_idx, l_stride in enumerate(strides):
+        for l_config_idx in stride_sorted_indices:
+            l_stride = strides[l_config_idx]
             if l_stride != 0:
-                l_shape.append(self.cv.dim_sizes[l_idx])
+                l_shape.append(self.cv.dim_sizes[l_config_idx])
                 l_strides.append(l_stride)
         
         if len(l_shape) == 0:
@@ -217,29 +221,29 @@ class JitCompiler:
         loop_header_strings = self.get_loop_header_strings()
 
         (accumulator_string,
-        load_left_string,
-        load_right_string,
+        load_in0_string,
+        load_in1_string,
         output_dtype_string,
         reshape_output_string,
         store_output_string,
         mma_string,
-        reshape_string_left,
-        reshape_string_right,
-        permute_string_left,
-        permute_string_right,
+        reshape_string_in0,
+        reshape_string_in1,
+        permute_string_in0,
+        permute_string_in1,
         permute_string_output) = self.get_loop_body_operation_strings()
 
         loop_body_strings_before_loop, loop_body_strings_before_next_loop, loop_body_strings_after_next_loop = self.get_loop_body_strings(accumulator_string,
-                                                                                                                                          load_left_string,
-                                                                                                                                          load_right_string,
+                                                                                                                                          load_in0_string,
+                                                                                                                                          load_in1_string,
                                                                                                                                           output_dtype_string,
                                                                                                                                           reshape_output_string,
                                                                                                                                           store_output_string,
                                                                                                                                           mma_string,
-                                                                                                                                          reshape_string_left,
-                                                                                                                                          reshape_string_right,
-                                                                                                                                          permute_string_left,
-                                                                                                                                          permute_string_right,
+                                                                                                                                          reshape_string_in0,
+                                                                                                                                          reshape_string_in1,
+                                                                                                                                          permute_string_in0,
+                                                                                                                                          permute_string_in1,
                                                                                                                                           permute_string_output)
 
         string_loop = self.generate_loop_string(loop_header_strings,
@@ -247,12 +251,12 @@ class JitCompiler:
                                                  loop_body_strings_before_next_loop,
                                                  loop_body_strings_after_next_loop,
                                                  accumulator_string,
-                                                 load_left_string,
-                                                 load_right_string,
-                                                 permute_string_left,
-                                                 permute_string_right,
-                                                 reshape_string_left,
-                                                 reshape_string_right,
+                                                 load_in0_string,
+                                                 load_in1_string,
+                                                 permute_string_in0,
+                                                 permute_string_in1,
+                                                 reshape_string_in0,
+                                                 reshape_string_in1,
                                                  mma_string,
                                                  output_dtype_string,
                                                  reshape_output_string,
@@ -271,7 +275,7 @@ class JitCompiler:
         kernel_decorator = "@ct.kernel()"
         kernel_name = "contraction_kernel"
         
-        kernel_arguments = ["left", "right", "output"]
+        kernel_arguments = ["in0", "in1", "out"]
         
         # define imports
         string_header = ""
@@ -292,23 +296,23 @@ class JitCompiler:
         self._validate_binary_operation()
         
         # make_tensor_view calls to reinterpret input pointers
-        # Left tensor
-        l_shape_left, l_strides_left = self._get_tensor_view_args(
-            self.cv.strides_left, "left"
+        # in0 tensor (first input)
+        l_shape_in0, l_strides_in0 = self._get_tensor_view_args(
+            self.cv.stride_sorted_indices_in0, self.cv.strides_in0, "in0"
         )
-        string_header += f"{self.indent}left = ct.make_tensor_view(left, {l_shape_left}, {l_strides_left})\n"
+        string_header += f"{self.indent}in0 = ct.make_tensor_view(in0, {l_shape_in0}, {l_strides_in0})\n"
         
-        # Right tensor
-        l_shape_right, l_strides_right = self._get_tensor_view_args(
-            self.cv.strides_right, "right"
+        # in1 tensor (second input)
+        l_shape_in1, l_strides_in1 = self._get_tensor_view_args(
+            self.cv.stride_sorted_indices_in1, self.cv.strides_in1, "in1"
         )
-        string_header += f"{self.indent}right = ct.make_tensor_view(right, {l_shape_right}, {l_strides_right})\n"
+        string_header += f"{self.indent}in1 = ct.make_tensor_view(in1, {l_shape_in1}, {l_strides_in1})\n"
         
-        # Output tensor
-        l_shape_output, l_strides_output = self._get_tensor_view_args(
-            self.cv.strides_output, "output"
+        # out tensor (output)
+        l_shape_out, l_strides_out = self._get_tensor_view_args(
+            self.cv.stride_sorted_indices_out, self.cv.strides_out, "out"
         )
-        string_header += f"{self.indent}output = ct.make_tensor_view(output, {l_shape_output}, {l_strides_output})\n"
+        string_header += f"{self.indent}out = ct.make_tensor_view(out, {l_shape_out}, {l_strides_out})\n"
 
         return string_header
 
@@ -368,39 +372,39 @@ class JitCompiler:
     def get_loop_body_operation_strings(self):
 
         output_buffer_shape = self.get_output_buffer_shape()
-        index_string_left, shape_string_left, index_string_right, shape_string_right, index_string_store = self.get_load_and_store_indices()
-        permute_map_left, permute_map_right = self.get_permute_maps()
+        index_string_in0, shape_string_in0, index_string_in1, shape_string_in1, index_string_store = self.get_load_and_store_indices()
+        permute_map_in0, permute_map_in1 = self.get_permute_maps()
         reshape_tuple_out, permute_map_out = self.get_reshape_and_permute_map_out()
 
         # strings for each operation
         accumulator_string = f"accumulator = ct.full({output_buffer_shape}, 0, dtype={self.accumulator_dtype_string})\n"
-        load_left_string = f"tile_left = ct.load(left, index=({index_string_left}), shape=({shape_string_left}), padding_mode=ct.PaddingMode.ZERO)\n"
-        load_right_string = f"tile_right = ct.load(right, index=({index_string_right}), shape=({shape_string_right}), padding_mode=ct.PaddingMode.ZERO)\n"
+        load_in0_string = f"tile_in0 = ct.load(in0, index=({index_string_in0}), shape=({shape_string_in0}), padding_mode=ct.PaddingMode.ZERO)\n"
+        load_in1_string = f"tile_in1 = ct.load(in1, index=({index_string_in1}), shape=({shape_string_in1}), padding_mode=ct.PaddingMode.ZERO)\n"
         output_dtype_string = f"out_to_store = ct.astype(accumulator, {self.output_dtype_string})\n"
         reshape_output_string = f"out_to_store = ct.reshape(out_to_store, {reshape_tuple_out})\n"
-        store_output_string = f"ct.store(output, index=({index_string_store}), tile=out_to_store)\n"
-        mma_string = f"accumulator = ct.mma(matrix_right, matrix_left, accumulator)\n"
-        reshape_string_left = f"matrix_left = ct.reshape(tile_left, ({find_next_power_of_2(self.cv.kernel_shape_k)}, {find_next_power_of_2(self.cv.kernel_shape_m)}))\n"
-        reshape_string_right = f"matrix_right = ct.reshape(tile_right, ({find_next_power_of_2(self.cv.kernel_shape_n)}, {find_next_power_of_2(self.cv.kernel_shape_k)}))\n"
-        permute_string_left = f"tile_left = ct.permute(tile_left, {permute_map_left})\n" if permute_map_left is not None else None
-        permute_string_right = f"tile_right = ct.permute(tile_right, {permute_map_right})\n" if permute_map_right is not None else None
+        store_output_string = f"ct.store(out, index=({index_string_store}), tile=out_to_store)\n"
+        mma_string = f"accumulator = ct.mma(matrix_in1, matrix_in0, accumulator)\n"
+        reshape_string_in0 = f"matrix_in0 = ct.reshape(tile_in0, ({find_next_power_of_2(self.cv.kernel_shape_k)}, {find_next_power_of_2(self.cv.kernel_shape_m)}))\n"
+        reshape_string_in1 = f"matrix_in1 = ct.reshape(tile_in1, ({find_next_power_of_2(self.cv.kernel_shape_n)}, {find_next_power_of_2(self.cv.kernel_shape_k)}))\n"
+        permute_string_in0 = f"tile_in0 = ct.permute(tile_in0, {permute_map_in0})\n" if permute_map_in0 is not None else None
+        permute_string_in1 = f"tile_in1 = ct.permute(tile_in1, {permute_map_in1})\n" if permute_map_in1 is not None else None
         permute_string_output = f"out_to_store = ct.permute(out_to_store, {permute_map_out})\n" if permute_map_out is not None else None
 
-        return accumulator_string, load_left_string, load_right_string, output_dtype_string, reshape_output_string, store_output_string, mma_string, reshape_string_left, reshape_string_right, permute_string_left, permute_string_right, permute_string_output
+        return accumulator_string, load_in0_string, load_in1_string, output_dtype_string, reshape_output_string, store_output_string, mma_string, reshape_string_in0, reshape_string_in1, permute_string_in0, permute_string_in1, permute_string_output
 
 
-    def get_loop_body_strings(self, 
+    def get_loop_body_strings(self,
                               accumulator_string,
-                              load_left_string,
-                              load_right_string,
+                              load_in0_string,
+                              load_in1_string,
                               output_dtype_string,
                               reshape_output_string,
                               store_output_string,
                               mma_string,
-                              reshape_string_left,
-                              reshape_string_right,
-                              permute_string_left,
-                              permute_string_right,
+                              reshape_string_in0,
+                              reshape_string_in1,
+                              permute_string_in0,
+                              permute_string_in1,
                               permute_string_output):
 
         loop_body_strings_before_next_loop = ["" for i in range(self.cv.num_seq_outer_loops)]
@@ -409,11 +413,11 @@ class JitCompiler:
 
         first_M_loop_depth, last_M_loop_depth, first_N_loop_depth, last_N_loop_depth, first_K_loop_depth, last_K_loop_depth, first_B_loop_depth, last_B_loop_depth = self.get_first_and_last_loop_depths()
 
-        left_tile_load_loop_depth = max(last_B_loop_depth, last_M_loop_depth, last_K_loop_depth)
-        right_tile_load_loop_depth = max(last_B_loop_depth, last_N_loop_depth, last_K_loop_depth)
+        in0_tile_load_loop_depth = max(last_B_loop_depth, last_M_loop_depth, last_K_loop_depth)
+        in1_tile_load_loop_depth = max(last_B_loop_depth, last_N_loop_depth, last_K_loop_depth)
 
-        load_left_before_all_loops = self.cv.num_seq_loops_B == 0 and self.cv.num_seq_loops_M == 0 and self.cv.num_seq_loops_K == 0
-        load_right_before_all_loops = self.cv.num_seq_loops_B == 0 and self.cv.num_seq_loops_N == 0 and self.cv.num_seq_loops_K == 0
+        load_in0_before_all_loops = self.cv.num_seq_loops_B == 0 and self.cv.num_seq_loops_M == 0 and self.cv.num_seq_loops_K == 0
+        load_in1_before_all_loops = self.cv.num_seq_loops_B == 0 and self.cv.num_seq_loops_N == 0 and self.cv.num_seq_loops_K == 0
 
         if self.cv.num_seq_loops_K > 0:
             buffer_allocation_loop_depth = first_K_loop_depth # should happen before this loop level
@@ -435,31 +439,31 @@ class JitCompiler:
                 else:
                     loop_body_strings_before_next_loop[i] += f"""{indent_string}    {accumulator_string}"""
 
-            # load left loop
-            if i == left_tile_load_loop_depth:
-                if load_left_before_all_loops:
-                    loop_body_strings_before_loop[i] += f"""{indent_string}{load_left_string}"""
-                    if permute_string_left is not None:
-                        loop_body_strings_before_loop[i] += f"""{indent_string}{permute_string_left}"""
-                    loop_body_strings_before_loop[i] += f"""{indent_string}{reshape_string_left}"""
+            # load in0 loop
+            if i == in0_tile_load_loop_depth:
+                if load_in0_before_all_loops:
+                    loop_body_strings_before_loop[i] += f"""{indent_string}{load_in0_string}"""
+                    if permute_string_in0 is not None:
+                        loop_body_strings_before_loop[i] += f"""{indent_string}{permute_string_in0}"""
+                    loop_body_strings_before_loop[i] += f"""{indent_string}{reshape_string_in0}"""
                 else:
-                    loop_body_strings_before_next_loop[i] += f"""{indent_string}    {load_left_string}"""
-                    if permute_string_left is not None:
-                        loop_body_strings_before_next_loop[i] += f"""{indent_string}    {permute_string_left}"""
-                    loop_body_strings_before_next_loop[i] += f"""{indent_string}    {reshape_string_left}"""
+                    loop_body_strings_before_next_loop[i] += f"""{indent_string}    {load_in0_string}"""
+                    if permute_string_in0 is not None:
+                        loop_body_strings_before_next_loop[i] += f"""{indent_string}    {permute_string_in0}"""
+                    loop_body_strings_before_next_loop[i] += f"""{indent_string}    {reshape_string_in0}"""
             
-            # load right loop
-            if i == right_tile_load_loop_depth:
-                if load_right_before_all_loops:
-                    loop_body_strings_before_loop[i] += f"""{indent_string}{load_right_string}"""
-                    if permute_string_right is not None:
-                        loop_body_strings_before_loop[i] += f"""{indent_string}{permute_string_right}"""
-                    loop_body_strings_before_loop[i] += f"""{indent_string}{reshape_string_right}"""
+            # load in1 loop
+            if i == in1_tile_load_loop_depth:
+                if load_in1_before_all_loops:
+                    loop_body_strings_before_loop[i] += f"""{indent_string}{load_in1_string}"""
+                    if permute_string_in1 is not None:
+                        loop_body_strings_before_loop[i] += f"""{indent_string}{permute_string_in1}"""
+                    loop_body_strings_before_loop[i] += f"""{indent_string}{reshape_string_in1}"""
                 else:
-                    loop_body_strings_before_next_loop[i] += f"""{indent_string}    {load_right_string}"""
-                    if permute_string_right is not None:
-                        loop_body_strings_before_next_loop[i] += f"""{indent_string}    {permute_string_right}"""
-                    loop_body_strings_before_next_loop[i] += f"""{indent_string}    {reshape_string_right}"""
+                    loop_body_strings_before_next_loop[i] += f"""{indent_string}    {load_in1_string}"""
+                    if permute_string_in1 is not None:
+                        loop_body_strings_before_next_loop[i] += f"""{indent_string}    {permute_string_in1}"""
+                    loop_body_strings_before_next_loop[i] += f"""{indent_string}    {reshape_string_in1}"""
 
             # mma loop
             if i == self.cv.num_seq_outer_loops - 1:
@@ -488,12 +492,12 @@ class JitCompiler:
                               loop_body_strings_before_next_loop,
                               loop_body_strings_after_next_loop,
                               accumulator_string,
-                              load_left_string,
-                              load_right_string,
-                              permute_string_left,
-                              permute_string_right,
-                              reshape_string_left,
-                              reshape_string_right,
+                              load_in0_string,
+                              load_in1_string,
+                              permute_string_in0,
+                              permute_string_in1,
+                              reshape_string_in0,
+                              reshape_string_in1,
                               mma_string,
                               output_dtype_string,
                               reshape_output_string,
@@ -511,14 +515,14 @@ class JitCompiler:
         
         if self.cv.num_seq_outer_loops == 0:
             loop_string += "    " + accumulator_string
-            loop_string += "    " + load_left_string
-            loop_string += "    " + load_right_string
-            if permute_string_left is not None:
-                loop_string += "    " + permute_string_left
-            if permute_string_right is not None:
-                loop_string += "    " + permute_string_right
-            loop_string += "    " + reshape_string_left
-            loop_string += "    " + reshape_string_right
+            loop_string += "    " + load_in0_string
+            loop_string += "    " + load_in1_string
+            if permute_string_in0 is not None:
+                loop_string += "    " + permute_string_in0
+            if permute_string_in1 is not None:
+                loop_string += "    " + permute_string_in1
+            loop_string += "    " + reshape_string_in0
+            loop_string += "    " + reshape_string_in1
             loop_string += "    " + mma_string
             loop_string += "    " + output_dtype_string
             loop_string += "    " + reshape_output_string
@@ -591,24 +595,25 @@ class JitCompiler:
 
     
     def get_load_and_store_indices(self):
-        load_indices_left, shape_load_left = self.get_load_and_store_indices_for_tensor(self.cv.config_indices_in_left_tensor)
-        load_indices_right, shape_load_right = self.get_load_and_store_indices_for_tensor(self.cv.config_indices_in_right_tensor)
-        store_indices, _ = self.get_load_and_store_indices_for_tensor(self.cv.config_indices_in_out_tensor)
+        # Use stride-sorted indices to match tensor view dimension order
+        load_indices_in0, shape_load_in0 = self.get_load_and_store_indices_for_tensor(self.cv.stride_sorted_indices_in0)
+        load_indices_in1, shape_load_in1 = self.get_load_and_store_indices_for_tensor(self.cv.stride_sorted_indices_in1)
+        store_indices, _ = self.get_load_and_store_indices_for_tensor(self.cv.stride_sorted_indices_out)
 
-        if len(load_indices_left) != self.cv.num_dimensions_left or len(shape_load_left) != self.cv.num_dimensions_left:
-            raise ValueError("Error in load indices or shapes for left tensor: Lengths do not match number of dimensions")
-        if len(load_indices_right) != self.cv.num_dimensions_right or len(shape_load_right) != self.cv.num_dimensions_right:
-            raise ValueError("Error in load indices or shapes for right tensor: Lengths do not match number of dimensions")
-        if len(store_indices) != self.cv.num_dimensions_output:
-            raise ValueError("Error in store indices or shapes for output tensor: Lengths do not match number of dimensions")
+        if len(load_indices_in0) != self.cv.num_dimensions_in0 or len(shape_load_in0) != self.cv.num_dimensions_in0:
+            raise ValueError("Error in load indices or shapes for in0 tensor: Lengths do not match number of dimensions")
+        if len(load_indices_in1) != self.cv.num_dimensions_in1 or len(shape_load_in1) != self.cv.num_dimensions_in1:
+            raise ValueError("Error in load indices or shapes for in1 tensor: Lengths do not match number of dimensions")
+        if len(store_indices) != self.cv.num_dimensions_out:
+            raise ValueError("Error in store indices or shapes for out tensor: Lengths do not match number of dimensions")
 
-        index_string_left = ", ".join(load_indices_left)
-        shape_string_left = ", ".join(shape_load_left)
-        index_string_right = ", ".join(load_indices_right)
-        shape_string_right = ", ".join(shape_load_right)
+        index_string_in0 = ", ".join(load_indices_in0)
+        shape_string_in0 = ", ".join(shape_load_in0)
+        index_string_in1 = ", ".join(load_indices_in1)
+        shape_string_in1 = ", ".join(shape_load_in1)
         index_string_store = ", ".join(store_indices)
 
-        return index_string_left, shape_string_left, index_string_right, shape_string_right, index_string_store
+        return index_string_in0, shape_string_in0, index_string_in1, shape_string_in1, index_string_store
 
 
     def get_load_and_store_indices_for_tensor(self, config_indices_in_tensor):
@@ -636,70 +641,72 @@ class JitCompiler:
 
 
     def get_permute_maps(self):
-        permute_map_left = []
-        permute_map_right = []
+        permute_map_in0 = []
+        permute_map_in1 = []
         permute_map_out = []
 
-        # left map
+        # in0 map: find positions of prim dimensions in stride-sorted tensor view
+        # ct.mma expects (K, M) order for left matrix
         for i in range(self.cv.num_prim_k):
             prim_dim_id = self.cv.prim_k_ids[i]
-            index_where_prim_id_matches = self.cv.config_indices_in_left_tensor.index(prim_dim_id)
-            permute_map_left.append(index_where_prim_id_matches)
+            index_where_prim_id_matches = self.cv.stride_sorted_indices_in0.index(prim_dim_id)
+            permute_map_in0.append(index_where_prim_id_matches)
 
         for i in range(self.cv.num_prim_m):
             prim_dim_id = self.cv.prim_m_ids[i]
-            index_where_prim_id_matches = self.cv.config_indices_in_left_tensor.index(prim_dim_id)
-            permute_map_left.append(index_where_prim_id_matches)
+            index_where_prim_id_matches = self.cv.stride_sorted_indices_in0.index(prim_dim_id)
+            permute_map_in0.append(index_where_prim_id_matches)
 
-        # right map
+        # in1 map: find positions of prim dimensions in stride-sorted tensor view
+        # ct.mma expects (N, K) order for right matrix
         for i in range(self.cv.num_prim_n):
             prim_dim_id = self.cv.prim_n_ids[i]
-            index_where_prim_id_matches = self.cv.config_indices_in_right_tensor.index(prim_dim_id)
-            permute_map_right.append(index_where_prim_id_matches)
+            index_where_prim_id_matches = self.cv.stride_sorted_indices_in1.index(prim_dim_id)
+            permute_map_in1.append(index_where_prim_id_matches)
 
         for i in range(self.cv.num_prim_k):
             prim_dim_id = self.cv.prim_k_ids[i]
-            index_where_prim_id_matches = self.cv.config_indices_in_right_tensor.index(prim_dim_id)
-            permute_map_right.append(index_where_prim_id_matches)
+            index_where_prim_id_matches = self.cv.stride_sorted_indices_in1.index(prim_dim_id)
+            permute_map_in1.append(index_where_prim_id_matches)
 
 
         # check if permute maps are in order; if so, no permute is needed
-        if permute_map_left == sorted(permute_map_left):
-            permute_map_left = None
+        if permute_map_in0 == sorted(permute_map_in0):
+            permute_map_in0 = None
 
-        if permute_map_right == sorted(permute_map_right):
-            permute_map_right = None
+        if permute_map_in1 == sorted(permute_map_in1):
+            permute_map_in1 = None
 
 
         # if permute maps are not None, inject the other dimension indices (dimensions are all of size 1) to the front
-        if permute_map_left is not None:
-            append_to_the_front_of_permute_map_left = []
-            for i in range(self.cv.num_dimensions_left):
-                if not i in permute_map_left:
-                    append_to_the_front_of_permute_map_left.append(i)
+        if permute_map_in0 is not None:
+            append_to_the_front_of_permute_map_in0 = []
+            for i in range(self.cv.num_dimensions_in0):
+                if not i in permute_map_in0:
+                    append_to_the_front_of_permute_map_in0.append(i)
 
-            permute_map_left = append_to_the_front_of_permute_map_left + permute_map_left
+            permute_map_in0 = append_to_the_front_of_permute_map_in0 + permute_map_in0
 
-        if permute_map_right is not None:
-            append_to_the_front_of_permute_map_right = []
-            for i in range(self.cv.num_dimensions_right):
-                if not i in permute_map_right:
-                    append_to_the_front_of_permute_map_right.append(i)
+        if permute_map_in1 is not None:
+            append_to_the_front_of_permute_map_in1 = []
+            for i in range(self.cv.num_dimensions_in1):
+                if not i in permute_map_in1:
+                    append_to_the_front_of_permute_map_in1.append(i)
 
-            permute_map_right = append_to_the_front_of_permute_map_right + permute_map_right
+            permute_map_in1 = append_to_the_front_of_permute_map_in1 + permute_map_in1
 
 
         # generate tupels if not none
-        permute_map_left_tuple = None
-        permute_map_right_tuple = None
+        permute_map_in0_tuple = None
+        permute_map_in1_tuple = None
 
-        if permute_map_left is not None:
-            permute_map_left_tuple = tuple(permute_map_left)
-        if permute_map_right is not None:
-            permute_map_right_tuple = tuple(permute_map_right)
+        if permute_map_in0 is not None:
+            permute_map_in0_tuple = tuple(permute_map_in0)
+        if permute_map_in1 is not None:
+            permute_map_in1_tuple = tuple(permute_map_in1)
 
 
-        return permute_map_left_tuple, permute_map_right_tuple
+        return permute_map_in0_tuple, permute_map_in1_tuple
 
 
     def get_reshape_and_permute_map_out(self):
@@ -710,14 +717,14 @@ class JitCompiler:
 
         # afterwards we need to permute the primitive dimensions in the reshaped tile so that they are in the same order as the output tensor configuration
 
-        reshape_out = [1 for i in range(self.cv.num_dimensions_output)]
-        # ordered for config
+        reshape_out = [1 for i in range(self.cv.num_dimensions_out)]
+        # ordered by stride (highest first) to match tensor view dimension order
         prim_ids_in_out = self.cv.prim_n_ids + self.cv.prim_m_ids
         current_prim_count = 0
         prim_indices = []
 
-        for i in range(self.cv.num_dimensions_output):
-            current_out_config_index = self.cv.config_indices_in_out_tensor[i]
+        for i in range(self.cv.num_dimensions_out):
+            current_out_config_index = self.cv.stride_sorted_indices_out[i]
 
             if self.cv.exec_types[current_out_config_index] != etops.exec.prim:
                 continue
@@ -732,19 +739,19 @@ class JitCompiler:
 
 
         prim_indices_reordered = []
-        for i in range(len(self.cv.prim_config_indices_output)):
-            current_prim_config_index = self.cv.prim_config_indices_output[i]
+        for i in range(len(self.cv.prim_stride_sorted_indices_out)):
+            current_prim_config_index = self.cv.prim_stride_sorted_indices_out[i]
             index_where_current_prim_config_index_matches_prim_id = prim_ids_in_out.index(current_prim_config_index)
             prim_indices_reordered.append(prim_indices[index_where_current_prim_config_index_matches_prim_id])
 
-        if len(prim_indices_reordered) != len(self.cv.prim_config_indices_output) or len(prim_indices_reordered) != len(prim_indices):
-            raise ValueError("Error in permute map for output: Length of reordered prim indices does not match number of prim dimensions in output or length of prim config indices in output")
+        if len(prim_indices_reordered) != len(self.cv.prim_stride_sorted_indices_out) or len(prim_indices_reordered) != len(prim_indices):
+            raise ValueError("Error in permute map for out: Length of reordered prim indices does not match number of prim dimensions in out or length of prim config indices in out")
 
         permute_map_out = []
         current_prim_reordered_count = 0
 
-        for i in range(self.cv.num_dimensions_output):
-            current_out_config_index = self.cv.config_indices_in_out_tensor[i]
+        for i in range(self.cv.num_dimensions_out):
+            current_out_config_index = self.cv.stride_sorted_indices_out[i]
 
             if self.cv.exec_types[current_out_config_index] != etops.exec.prim:
                 permute_map_out.append(i)

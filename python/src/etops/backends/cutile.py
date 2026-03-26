@@ -24,8 +24,8 @@ from etops.backends._cutile.cache import InMemoryCache
 def _select_prim(
     indices: List[int],
     dim_type: "etops.types.DimType",
-    strides_left: Tuple[int, ...],
-    strides_right: Tuple[int, ...],
+    strides_in0: Tuple[int, ...],
+    strides_in1: Tuple[int, ...],
 ) -> int:
     """
     Select the prim representative from a group of dimension indices.
@@ -36,8 +36,8 @@ def _select_prim(
     Args:
         indices: List of dimension indices to select from.
         dim_type: The dimension type (m, n, or k).
-        strides_left: Strides for the left tensor.
-        strides_right: Strides for the right tensor.
+        strides_in0: Strides for the first input tensor.
+        strides_in1: Strides for the second input tensor.
 
     Returns:
         The index of the selected prim dimension.
@@ -51,12 +51,12 @@ def _select_prim(
     def primary_stride(i: int) -> Tuple[int, int]:
         """Returns (stride, -size) for lex ordering."""
         if dim_type == etops.dim.m:
-            s = strides_left[i]
+            s = strides_in0[i]
         elif dim_type == etops.dim.n:
-            s = strides_right[i]
+            s = strides_in1[i]
         else:  # k
-            s0 = strides_left[i]
-            s1 = strides_right[i]
+            s0 = strides_in0[i]
+            s1 = strides_in1[i]
             s = min(s0, s1) if s0 > 0 and s1 > 0 else (s0 if s0 > 0 else s1)
         # Use infinity for zero strides
         effective_stride = s if s > 0 else float('inf')
@@ -68,8 +68,8 @@ def _select_prim(
 def _sort_by_stride_desc(
     indices: List[int],
     dim_type: "etops.types.DimType",
-    strides_left: Tuple[int, ...],
-    strides_right: Tuple[int, ...],
+    strides_in0: Tuple[int, ...],
+    strides_in1: Tuple[int, ...],
     strides_out: Tuple[int, ...],
 ) -> List[int]:
     """
@@ -78,8 +78,8 @@ def _sort_by_stride_desc(
     Args:
         indices: List of dimension indices to sort.
         dim_type: The dimension type (c, m, n, or k).
-        strides_left: Strides for the left tensor.
-        strides_right: Strides for the right tensor.
+        strides_in0: Strides for the first input tensor.
+        strides_in1: Strides for the second input tensor.
         strides_out: Strides for the output tensor.
 
     Returns:
@@ -87,17 +87,17 @@ def _sort_by_stride_desc(
     """
     def order_key(i: int) -> int:
         if dim_type == etops.dim.c:
-            s0 = strides_left[i] if strides_left[i] > 0 else 0
-            s1 = strides_right[i] if strides_right[i] > 0 else 0
+            s0 = strides_in0[i] if strides_in0[i] > 0 else 0
+            s1 = strides_in1[i] if strides_in1[i] > 0 else 0
             so = strides_out[i] if strides_out[i] > 0 else 0
             return min(s0, s1, so) if (s0 > 0 or s1 > 0 or so > 0) else 0
         elif dim_type == etops.dim.m:
-            return strides_left[i] if strides_left[i] > 0 else 0
+            return strides_in0[i] if strides_in0[i] > 0 else 0
         elif dim_type == etops.dim.n:
-            return strides_right[i] if strides_right[i] > 0 else 0
+            return strides_in1[i] if strides_in1[i] > 0 else 0
         else:  # k
-            s0 = strides_left[i] if strides_left[i] > 0 else 0
-            s1 = strides_right[i] if strides_right[i] > 0 else 0
+            s0 = strides_in0[i] if strides_in0[i] > 0 else 0
+            s1 = strides_in1[i] if strides_in1[i] > 0 else 0
             return min(s0, s1) if (s0 > 0 or s1 > 0) else 0
 
     return sorted(indices, key=order_key, reverse=True)
@@ -197,8 +197,8 @@ def _interleave_shared_mn(
 def _add_synthetic_prim_dims(
     dim_types: Tuple["etops.types.DimType", ...],
     dim_sizes: Tuple[int, ...],
-    strides_left: Tuple[int, ...],
-    strides_right: Tuple[int, ...],
+    strides_in0: Tuple[int, ...],
+    strides_in1: Tuple[int, ...],
     strides_out: Tuple[int, ...],
 ) -> Tuple[
     Tuple["etops.types.DimType", ...],
@@ -215,17 +215,17 @@ def _add_synthetic_prim_dims(
     Args:
         dim_types: Original dimension types.
         dim_sizes: Original dimension sizes.
-        strides_left: Original left tensor strides.
-        strides_right: Original right tensor strides.
+        strides_in0: Original first input tensor strides.
+        strides_in1: Original second input tensor strides.
         strides_out: Original output tensor strides.
 
     Returns:
-        Extended dim_types, dim_sizes, strides_left, strides_right, strides_out.
+        Extended dim_types, dim_sizes, strides_in0, strides_in1, strides_out.
     """
     new_dim_types = list(dim_types)
     new_dim_sizes = list(dim_sizes)
-    new_s0 = list(strides_left)
-    new_s1 = list(strides_right)
+    new_s0 = list(strides_in0)
+    new_s1 = list(strides_in1)
     new_so = list(strides_out)
 
     # Synthetic dimension templates: (DimType, s0, s1, so)
@@ -255,8 +255,8 @@ def _add_synthetic_prim_dims(
 def _optimize_config_impl(
     dim_types: Tuple["etops.types.DimType", ...],
     dim_sizes: Tuple[int, ...],
-    strides_left: Tuple[int, ...],
-    strides_right: Tuple[int, ...],
+    strides_in0: Tuple[int, ...],
+    strides_in1: Tuple[int, ...],
     strides_out: Tuple[int, ...],
     max_grid: int,
 ) -> Tuple[Tuple[int, ...], Tuple["etops.types.ExecType", ...]]:
@@ -266,8 +266,8 @@ def _optimize_config_impl(
     Args:
         dim_types: Dimension types.
         dim_sizes: Dimension sizes.
-        strides_left: Left tensor strides.
-        strides_right: Right tensor strides.
+        strides_in0: First input tensor strides.
+        strides_in1: Second input tensor strides.
         strides_out: Output tensor strides.
         max_grid: Maximum allowed grid size.
 
@@ -281,9 +281,9 @@ def _optimize_config_impl(
     k_indices = [i for i, dt in enumerate(dim_types) if dt == etops.dim.k]
 
     # Step 2: Select prim representatives
-    p_m = _select_prim(m_indices, etops.dim.m, strides_left, strides_right)
-    p_n = _select_prim(n_indices, etops.dim.n, strides_left, strides_right)
-    p_k = _select_prim(k_indices, etops.dim.k, strides_left, strides_right)
+    p_m = _select_prim(m_indices, etops.dim.m, strides_in0, strides_in1)
+    p_n = _select_prim(n_indices, etops.dim.n, strides_in0, strides_in1)
+    p_k = _select_prim(k_indices, etops.dim.k, strides_in0, strides_in1)
 
     # Remaining indices after prim selection
     shared_m = [i for i in m_indices if i != p_m]
@@ -293,16 +293,16 @@ def _optimize_config_impl(
     # Step 3: Sort shared dims descending by primary-tensor stride
     # Outermost (largest stride) first, innermost (smallest stride) last
     c_ord = _sort_by_stride_desc(
-        c_indices, etops.dim.c, strides_left, strides_right, strides_out
+        c_indices, etops.dim.c, strides_in0, strides_in1, strides_out
     )
     m_ord = _sort_by_stride_desc(
-        shared_m, etops.dim.m, strides_left, strides_right, strides_out
+        shared_m, etops.dim.m, strides_in0, strides_in1, strides_out
     )
     n_ord = _sort_by_stride_desc(
-        shared_n, etops.dim.n, strides_left, strides_right, strides_out
+        shared_n, etops.dim.n, strides_in0, strides_in1, strides_out
     )
     k_ord = _sort_by_stride_desc(
-        seq_k, etops.dim.k, strides_left, strides_right, strides_out
+        seq_k, etops.dim.k, strides_in0, strides_in1, strides_out
     )
 
     # Step 4: Interleave shared M and N
@@ -472,8 +472,8 @@ def optimize_config(
     max_grid = opts["max_grid"]
 
     # Unpack strides from level 0
-    strides_left = config.strides[0][0]
-    strides_right = config.strides[0][1]
+    strides_in0 = config.strides[0][0]
+    strides_in1 = config.strides[0][1]
     strides_out = config.strides[0][2]
 
     # Add synthetic prim dims if M/N/K missing
@@ -486,8 +486,8 @@ def optimize_config(
     ) = _add_synthetic_prim_dims(
         tuple(config.dim_types),
         tuple(config.dim_sizes),
-        strides_left,
-        strides_right,
+        strides_in0,
+        strides_in1,
         strides_out,
     )
 

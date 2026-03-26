@@ -13,9 +13,9 @@ class ConfigParser:
         exec_types
         dim_sizes
         strides
-        strides_left
-        strides_right
-        strides_output
+        strides_in0
+        strides_in1
+        strides_out
         outer_loops_M
         outer_loops_N
         outer_loops_K
@@ -31,9 +31,9 @@ class ConfigParser:
         prim_m_ids
         prim_n_ids
         prim_k_ids
-        prim_config_indices_left
-        prim_config_indices_right
-        prim_config_indices_output
+        prim_config_indices_in0
+        prim_config_indices_in1
+        prim_config_indices_out
         prim_dim_ids
         shared_loop_ids
         seq_loop_ids
@@ -57,20 +57,26 @@ class ConfigParser:
         num_loops_K
         num_loops_B
         num_dimensions
-        num_dimensions_left
-        num_dimensions_right
-        num_dimensions_output
+        num_dimensions_in0
+        num_dimensions_in1
+        num_dimensions_out
         kernel_shape_m
         kernel_shape_n
         kernel_shape_k
         shared_loop_strides
         grid_size
-        tensor_shape_left
-        tensor_shape_right
-        tensor_shape_output
-        config_indices_in_left_tensor
-        config_indices_in_right_tensor
-        config_indices_in_out_tensor
+        tensor_shape_in0
+        tensor_shape_in1
+        tensor_shape_out
+        config_indices_in_in0
+        config_indices_in_in1
+        config_indices_in_out
+        stride_sorted_indices_in0
+        stride_sorted_indices_in1
+        stride_sorted_indices_out
+        prim_stride_sorted_indices_in0
+        prim_stride_sorted_indices_in1
+        prim_stride_sorted_indices_out
     """
 
     def __init__(self, config, verify_input=True, verify_executable=False):
@@ -99,9 +105,9 @@ class ConfigParser:
         self.exec_types = self.config.exec_types
         self.dim_sizes = self.config.dim_sizes
         self.strides = self.config.strides
-        self.strides_left = self.config.strides[0][0]
-        self.strides_right = self.config.strides[0][1]
-        self.strides_output = self.config.strides[0][2]
+        self.strides_in0 = self.config.strides[0][0]
+        self.strides_in1 = self.config.strides[0][1]
+        self.strides_out = self.config.strides[0][2]
 
     
     def init_config_loops(self):
@@ -210,9 +216,9 @@ class ConfigParser:
         self.num_prim_dimensions = self.num_prim_m + self.num_prim_n + self.num_prim_k
 
         self.num_dimensions = len(self.dim_types)
-        self.num_dimensions_left = self.num_loops_B + self.num_loops_M + self.num_loops_K + self.num_prim_m + self.num_prim_k
-        self.num_dimensions_right = self.num_loops_B + self.num_loops_K + self.num_loops_N + self.num_prim_n + self.num_prim_k
-        self.num_dimensions_output = self.num_loops_B + self.num_loops_M + self.num_loops_N + self.num_prim_m + self.num_prim_n
+        self.num_dimensions_in0 = self.num_loops_B + self.num_loops_M + self.num_loops_K + self.num_prim_m + self.num_prim_k
+        self.num_dimensions_in1 = self.num_loops_B + self.num_loops_K + self.num_loops_N + self.num_prim_n + self.num_prim_k
+        self.num_dimensions_out = self.num_loops_B + self.num_loops_M + self.num_loops_N + self.num_prim_m + self.num_prim_n
 
         self.kernel_shape_m = 1
         self.kernel_shape_n = 1
@@ -240,34 +246,68 @@ class ConfigParser:
     
     def init_config_indices_in_tensor(self):
         """
-        Derives tensor dimension order from config order, filtering stride-0 dims.
+        Derives tensor dimension indices from config order, filtering stride-0 dims.
+        
+        Also computes stride-sorted index lists for each tensor, sorted by stride
+        in descending order (highest stride first).
         """
-        # Left tensor: filter stride-0 dimensions, keep config order
-        self.config_indices_in_left_tensor = [
-            i for i in range(self.num_dimensions) if self.strides_left[i] != 0
+        # in0 tensor: filter stride-0 dimensions, keep config order
+        self.config_indices_in_in0 = [
+            i for i in range(self.num_dimensions) if self.strides_in0[i] != 0
         ]
         
-        # Right tensor: filter stride-0 dimensions, keep config order
-        self.config_indices_in_right_tensor = [
-            i for i in range(self.num_dimensions) if self.strides_right[i] != 0
+        # in1 tensor: filter stride-0 dimensions, keep config order
+        self.config_indices_in_in1 = [
+            i for i in range(self.num_dimensions) if self.strides_in1[i] != 0
         ]
         
-        # Output tensor: filter stride-0 dimensions, keep config order
-        self.config_indices_in_out_tensor = [
-            i for i in range(self.num_dimensions) if self.strides_output[i] != 0
+        # out tensor: filter stride-0 dimensions, keep config order
+        self.config_indices_in_out = [
+            i for i in range(self.num_dimensions) if self.strides_out[i] != 0
         ]
         
         # Prim indices follow the same config order
-        self.prim_config_indices_left = [
-            i for i in self.config_indices_in_left_tensor
+        self.prim_config_indices_in0 = [
+            i for i in self.config_indices_in_in0
             if self.exec_types[i] == etops.exec.prim
         ]
-        self.prim_config_indices_right = [
-            i for i in self.config_indices_in_right_tensor
+        self.prim_config_indices_in1 = [
+            i for i in self.config_indices_in_in1
             if self.exec_types[i] == etops.exec.prim
         ]
-        self.prim_config_indices_output = [
-            i for i in self.config_indices_in_out_tensor
+        self.prim_config_indices_out = [
+            i for i in self.config_indices_in_out
+            if self.exec_types[i] == etops.exec.prim
+        ]
+        
+        # Stride-sorted indices: sort by stride descending (highest stride first)
+        self.stride_sorted_indices_in0 = sorted(
+            self.config_indices_in_in0,
+            key=lambda i: self.strides_in0[i],
+            reverse=True
+        )
+        self.stride_sorted_indices_in1 = sorted(
+            self.config_indices_in_in1,
+            key=lambda i: self.strides_in1[i],
+            reverse=True
+        )
+        self.stride_sorted_indices_out = sorted(
+            self.config_indices_in_out,
+            key=lambda i: self.strides_out[i],
+            reverse=True
+        )
+        
+        # Prim stride-sorted indices: filter from stride-sorted lists
+        self.prim_stride_sorted_indices_in0 = [
+            i for i in self.stride_sorted_indices_in0
+            if self.exec_types[i] == etops.exec.prim
+        ]
+        self.prim_stride_sorted_indices_in1 = [
+            i for i in self.stride_sorted_indices_in1
+            if self.exec_types[i] == etops.exec.prim
+        ]
+        self.prim_stride_sorted_indices_out = [
+            i for i in self.stride_sorted_indices_out
             if self.exec_types[i] == etops.exec.prim
         ]
 
@@ -283,7 +323,7 @@ class ConfigParser:
     def verify_input_config(self):
         # check that all arrays have the same length
         if not (len(self.config.dim_types) == len(self.config.exec_types) == len(self.config.dim_sizes) == len(self.config.strides[0][0]) == len(self.config.strides[0][1]) == len(self.config.strides[0][2])):
-            raise ValueError("Config Parser Error: Length of dim_types, exec_types, dim_sizes, strides_left, strides_right, and strides_output must all be the same")
+            raise ValueError("Config Parser Error: Length of dim_types, exec_types, dim_sizes, strides_in0, strides_in1, and strides_out must all be the same")
         
         # check that dim sizes and stides are positive
         for i in range(len(self.config.dim_sizes)):
