@@ -243,6 +243,20 @@ class TestEndToEnd:
         prim_first =   etops.prim.zero,
         prim_main  =   etops.prim.gemm,
         prim_last  =   etops.prim.none,
+        dim_types  =   (etops.dim.k,    etops.dim.k,    etops.dim.m,    etops.dim.m,    etops.dim.n,    etops.dim.n   ),
+        exec_types =   (etops.exec.seq, etops.exec.seq, etops.exec.seq, etops.exec.seq, etops.exec.seq, etops.exec.seq),
+        dim_sizes  =   (48,             16,             4,              32,             2,              8             ),
+        strides    = (((2048,           128,            32,             1,              0,              0             ),   # in0
+                       (16,             1,              0,              0,              6144,           768           ),   # in1
+                       (0,              0,              32,             1,              1024,           128           )),) # out
+    )
+
+    CUTILE_GEMM_SEQ_PRIM = etops.TensorOperationConfig(
+        backend    =   "cutile",
+        data_type  =   etops.float32,
+        prim_first =   etops.prim.zero,
+        prim_main  =   etops.prim.gemm,
+        prim_last  =   etops.prim.none,
         dim_types  =   (etops.dim.n,    etops.dim.m,    etops.dim.k,    etops.dim.m,     etops.dim.n,     etops.dim.k    ),
         exec_types =   (etops.exec.seq, etops.exec.seq, etops.exec.seq, etops.exec.prim, etops.exec.prim, etops.exec.prim),
         dim_sizes  =   (2,              4,              48,             32,              8,               16             ),
@@ -265,7 +279,7 @@ class TestEndToEnd:
                        (1024,           0,              32,              1,               128,             0              )),) # out
     )
 
-    CUTILE_GEMM_SHARED = etops.TensorOperationConfig(
+    CUTILE_GEMM_SHARED_PRIM = etops.TensorOperationConfig(
         backend    =   "cutile",
         data_type  =   etops.float32,
         prim_first =   etops.prim.zero,
@@ -280,6 +294,20 @@ class TestEndToEnd:
     )
 
     CUTILE_TC_SEQ = etops.TensorOperationConfig(
+        backend    =   "cutile",
+        data_type  =   etops.float32,
+        prim_first =   etops.prim.zero,
+        prim_main  =   etops.prim.gemm,
+        prim_last  =   etops.prim.none,
+        dim_types  =   (etops.dim.k,    etops.dim.k,    etops.dim.m,    etops.dim.m,    etops.dim.n,    etops.dim.n   ),
+        exec_types =   (etops.exec.seq, etops.exec.seq, etops.exec.seq, etops.exec.seq, etops.exec.seq, etops.exec.seq),
+        dim_sizes  =   (48,             16,             4,              32,             2,              8             ),
+        strides    = (((2048,           32,             512,            1,              0,              0             ),   # in0
+                       (128,            1,              0,              0,              6144,           16            ),   # in1
+                       (0,              0,              256,            1,              1024,           32            )),) # out
+    )
+
+    CUTILE_TC_SEQ_PRIM = etops.TensorOperationConfig(
         backend    =   "cutile",
         data_type  =   etops.float32,
         prim_first =   etops.prim.zero,
@@ -327,11 +355,11 @@ class TestEndToEnd:
 
     @pytest.mark.cutile
     @pytest.mark.parametrize("config", [
-        CUTILE_GEMM_SEQ,
+        CUTILE_GEMM_SEQ_PRIM,
         CUTILE_GEMM_SEQ_MULTI_PRIM,
-        CUTILE_GEMM_SHARED
+        CUTILE_GEMM_SHARED_PRIM
     ])
-    def test_cutile_gemm_fp32(self, config):
+    def test_cutile_execute_gemm_fp32(self, config):
         """Test GEMM execution in cutile: einsum('abcd,efab->efcd', A, B).
 
         The dimension sizes are: |a|=48, |b|=16, |c|=4, |d|=32, |e|=2, |f|=8.
@@ -362,11 +390,11 @@ class TestEndToEnd:
 
     @pytest.mark.cutile
     @pytest.mark.parametrize("config", [
-        CUTILE_TC_SEQ,
+        CUTILE_TC_SEQ_PRIM,
         CUTILE_TC_SEQ_MULTI_PRIM,
         CUTILE_TC_SHARED
     ])
-    def test_cutile_tc_fp32(self, config):
+    def test_cutile_execute_tc_fp32(self, config):
         """Test tensor contraction in cutile: einsum('acbd,eafb->ecfd', A, B).
 
         The dimension sizes are: |a|=48, |b|=16, |c|=4, |d|=32, |e|=2, |f|=8.
@@ -396,11 +424,11 @@ class TestEndToEnd:
 
     @pytest.mark.cutile
     @pytest.mark.parametrize("config", [
-        CUTILE_GEMM_SEQ,
+        CUTILE_GEMM_SEQ_PRIM,
         CUTILE_GEMM_SEQ_MULTI_PRIM,
-        CUTILE_GEMM_SHARED
+        CUTILE_GEMM_SHARED_PRIM
     ])
-    def test_cutile_gemm_fp64(self, config):
+    def test_cutile_execute_gemm_fp64(self, config):
         """Test GEMM execution in cutile with float64."""
         import cupy as cp
         
@@ -418,12 +446,11 @@ class TestEndToEnd:
 
     @pytest.mark.cutile
     @pytest.mark.parametrize("config", [
-        CUTILE_TC_SEQ,
-        # TODO: does not return
-        # CUTILE_TC_SEQ_MULTI_PRIM,
+        CUTILE_TC_SEQ_PRIM,
+        CUTILE_TC_SEQ_MULTI_PRIM,
         CUTILE_TC_SHARED
     ])
-    def test_cutile_tc_fp64(self, config):
+    def test_cutile_execute_tc_fp64(self, config):
         """Test tensor contraction in cutile with float64."""
         import cupy as cp
 
@@ -445,11 +472,11 @@ class TestEndToEnd:
 
     @pytest.mark.cutile
     @pytest.mark.parametrize("config", [
-        CUTILE_GEMM_SEQ,
+        CUTILE_GEMM_SEQ_PRIM,
         CUTILE_GEMM_SEQ_MULTI_PRIM,
-        CUTILE_GEMM_SHARED
+        CUTILE_GEMM_SHARED_PRIM
     ])
-    def test_cutile_gemm_fp16(self, config):
+    def test_cutile_execute_gemm_fp16(self, config):
         """Test GEMM execution in cutile with float16."""
         import cupy as cp
         
@@ -468,15 +495,68 @@ class TestEndToEnd:
 
     @pytest.mark.cutile
     @pytest.mark.parametrize("config", [
-        CUTILE_TC_SEQ,
+        CUTILE_GEMM_SEQ
+    ])
+    def test_cutile_optimize_and_execute_gemm_fp16(self, config):
+        """Test GEMM optimization and execution in cutile with float16."""
+        import cupy as cp
+        
+        # Compile
+        config = self._config_with_dtype(config, etops.float16)
+        opt_config = etops.get_default_optimization_config("cutile")
+        config = etops.optimize( config, opt_config )
+
+        op = etops.compile(config)
+        
+        # Create tensors on GPU
+        in0 = cp.random.randn(768, 128).astype(cp.float16)
+        in1 = cp.random.randn(16, 768).astype(cp.float16)
+        out = cp.random.randn(16, 128).astype(cp.float16)
+        
+        # Execute
+        op.execute(in0, in1, out)
+        
+        # Verify result using cupy
+        expected = cp.matmul(in1, in0)
+        
+        cp.testing.assert_allclose(out, expected, rtol=1e-2, atol=1e-2)
+
+    @pytest.mark.cutile
+    @pytest.mark.parametrize("config", [
+        CUTILE_TC_SEQ_PRIM,
         CUTILE_TC_SEQ_MULTI_PRIM,
         CUTILE_TC_SHARED
     ])
-    def test_cutile_tc_fp16(self, config):
+    def test_cutile_execute_tc_fp16(self, config):
         """Test tensor contraction in cutile with float16."""
         import cupy as cp
 
         config = self._config_with_dtype(config, etops.float16)
+        op = etops.compile(config)
+        
+        in0 = cp.random.randn(48, 4, 16, 32).astype(cp.float16)
+        in1 = cp.random.randn(2, 48, 8, 16).astype(cp.float16)
+        out = cp.random.randn(2, 4, 8, 32).astype(cp.float16)
+        
+        op.execute(in0, in1, out)
+        
+        # Compare against float32 reference
+        expected = cp.einsum('acbd,eafb->ecfd',
+                             in0.astype(cp.float32),
+                             in1.astype(cp.float32))
+        cp.testing.assert_allclose(out.astype(cp.float32), expected, rtol=1e-2, atol=1e-2)
+
+    @pytest.mark.cutile
+    @pytest.mark.parametrize("config", [
+        CUTILE_TC_SEQ
+    ])
+    def test_cutile_execute_tc_fp16(self, config):
+        """Test tensor contraction in cutile with float16."""
+        import cupy as cp
+
+        config = self._config_with_dtype(config, etops.float16)
+        opt_config = etops.get_default_optimization_config("cutile")
+        config = etops.optimize(config, opt_config)
         op = etops.compile(config)
         
         in0 = cp.random.randn(48, 4, 16, 32).astype(cp.float16)
@@ -497,11 +577,11 @@ class TestEndToEnd:
 
     @pytest.mark.cutile
     @pytest.mark.parametrize("config", [
-        CUTILE_GEMM_SEQ,
+        CUTILE_GEMM_SEQ_PRIM,
         CUTILE_GEMM_SEQ_MULTI_PRIM,
-        CUTILE_GEMM_SHARED
+        CUTILE_GEMM_SHARED_PRIM
     ])
-    def test_cutile_gemm_bf16(self, config):
+    def test_cutile_execute_gemm_bf16(self, config):
         """Test GEMM execution in cutile with bfloat16.
         
         Uses PyTorch for bfloat16 support since cuda.tile has better support
@@ -530,11 +610,11 @@ class TestEndToEnd:
 
     @pytest.mark.cutile
     @pytest.mark.parametrize("config", [
-        CUTILE_TC_SEQ,
+        CUTILE_TC_SEQ_PRIM,
         CUTILE_TC_SEQ_MULTI_PRIM,
         CUTILE_TC_SHARED
     ])
-    def test_cutile_tc_bf16(self, config):
+    def test_cutile_execute_tc_bf16(self, config):
         """Test tensor contraction in cutile with bfloat16.
         
         Uses PyTorch for bfloat16 support since cuda.tile has better support
@@ -567,11 +647,11 @@ class TestEndToEnd:
 
     @pytest.mark.cutile
     @pytest.mark.parametrize("config", [
-        CUTILE_GEMM_SEQ,
+        CUTILE_GEMM_SEQ_PRIM,
         CUTILE_GEMM_SEQ_MULTI_PRIM,
-        CUTILE_GEMM_SHARED
+        CUTILE_GEMM_SHARED_PRIM
     ])
-    def test_cutile_gemm_tf32(self, config):
+    def test_cutile_execute_gemm_tf32(self, config):
         """Test GEMM execution in cutile with tensorfloat32."""
         import cupy as cp
         
@@ -590,11 +670,11 @@ class TestEndToEnd:
 
     @pytest.mark.cutile
     @pytest.mark.parametrize("config", [
-        CUTILE_TC_SEQ,
+        CUTILE_TC_SEQ_PRIM,
         CUTILE_TC_SEQ_MULTI_PRIM,
         CUTILE_TC_SHARED
     ])
-    def test_cutile_tc_tf32(self, config):
+    def test_cutile_execute_tc_tf32(self, config):
         """Test tensor contraction in cutile with tensorfloat32. """
         import cupy as cp
 
