@@ -23,8 +23,8 @@ _BACKEND_REGISTRY = {
         "default_config": "get_default_optimization_config",
         "requires": [],  # Bundled with etops
     },
-    "cutile": {
-        "module": "etops.backends.cutile",
+    "tileir": {
+        "module": "etops.backends.tileir",
         "factory": "create_operation",
         "optimize": "optimize_config",
         "default_config": "get_default_optimization_config",
@@ -39,10 +39,10 @@ _available_backends: Dict[str, bool] = {}
 def _check_availability(backend_name: str) -> bool:
     """
     Check if a backend's dependencies are available.
-    
+
     Args:
         backend_name: Name of the backend to check
-        
+
     Returns:
         True if all dependencies are available, False otherwise
     """
@@ -64,15 +64,14 @@ def _check_availability(backend_name: str) -> bool:
     return True
 
 
-def get_backend(backend_name: str) -> Callable[["TensorOperationConfig"], "CompiledOperation"]:
+def get_backend(
+    backend_name: str,
+) -> Callable[["TensorOperationConfig"], "CompiledOperation"]:
     """
     Get backend factory function.
 
     Args:
-        backend_name: Name of the backend ("tpp" or "cutile")
-
-    Returns:
-        Factory function that creates compiled operations
+        backend_name: Name of the backend ("tpp" or "tileir")
 
     Raises:
         ValueError: If backend name is unknown
@@ -81,8 +80,7 @@ def get_backend(backend_name: str) -> Callable[["TensorOperationConfig"], "Compi
     if backend_name not in _BACKEND_REGISTRY:
         available = list_backends()
         raise ValueError(
-            f"Unknown backend '{backend_name}'. "
-            f"Available backends: {available}"
+            f"Unknown backend '{backend_name}'. Available backends: {available}"
         )
 
     if not _check_availability(backend_name):
@@ -104,8 +102,7 @@ def list_backends() -> List[str]:
     Returns:
         List of backend names that have all dependencies installed.
     """
-    return [name for name in _BACKEND_REGISTRY.keys()
-            if _check_availability(name)]
+    return [name for name in _BACKEND_REGISTRY.keys() if _check_availability(name)]
 
 
 def get_optimizer(backend_name: str):
@@ -113,7 +110,7 @@ def get_optimizer(backend_name: str):
     Get backend optimizer function.
 
     Args:
-        backend_name: Name of the backend ("tpp" or "cutile")
+        backend_name: Name of the backend ("tpp" or "tileir")
 
     Returns:
         Optimizer function that optimizes TensorOperationConfig
@@ -125,8 +122,7 @@ def get_optimizer(backend_name: str):
     if backend_name not in _BACKEND_REGISTRY:
         available = list_backends()
         raise ValueError(
-            f"Unknown backend '{backend_name}'. "
-            f"Available backends: {available}"
+            f"Unknown backend '{backend_name}'. Available backends: {available}"
         )
 
     if not _check_availability(backend_name):
@@ -146,7 +142,7 @@ def get_default_optimization_config(backend_name: str):
     Get backend's default optimization configuration.
 
     Args:
-        backend_name: Name of the backend ("tpp" or "cutile")
+        backend_name: Name of the backend ("tpp" or "tileir")
 
     Returns:
         Default optimization configuration for the backend
@@ -158,8 +154,7 @@ def get_default_optimization_config(backend_name: str):
     if backend_name not in _BACKEND_REGISTRY:
         available = list_backends()
         raise ValueError(
-            f"Unknown backend '{backend_name}'. "
-            f"Available backends: {available}"
+            f"Unknown backend '{backend_name}'. Available backends: {available}"
         )
 
     if not _check_availability(backend_name):
@@ -174,4 +169,9 @@ def get_default_optimization_config(backend_name: str):
     return getattr(module, info["default_config"])()
 
 
-__all__ = ["get_backend", "get_optimizer", "get_default_optimization_config", "list_backends"]
+__all__ = [
+    "get_backend",
+    "get_optimizer",
+    "get_default_optimization_config",
+    "list_backends",
+]

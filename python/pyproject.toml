@@ -27,15 +27,15 @@ license = "MIT AND BSD-3-Clause AND BSD-2-Clause"
 license-files = ["LICENSE"]
 
 [project.optional-dependencies]
-cutile = [
+tileir = [
   "cuda.tile[tileiras]==1.2.0",
   "cupy>=14.0"
 ]
-cutile-cuda12 = [
+tileir-cuda12 = [
   "cuda.tile[tileiras]==1.2.0",
   "cupy-cuda12x[ctk]>=14.0"
 ]
-cutile-cuda13 = [
+tileir-cuda13 = [
   "cuda.tile[tileiras]==1.2.0",
   "cupy-cuda13x[ctk]>=14.0"
 ]

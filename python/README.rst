@@ -1,7 +1,7 @@
 etops
 =====
 
-The `etops` package provides a Python interface for the Tiled Execution IR (TEIR). It enables users to define, configure, optimize, and execute complex tensor contractions and elementwise operations. The package supports multiple backends: TPP (CPU via libxsmm) and cutile (GPU via cuda.tile, optional).
+The `etops` package provides a Python interface for the Tiled Execution IR (TEIR). It enables users to define, configure, optimize, and execute complex tensor contractions and elementwise operations. The package supports multiple backends: TPP (CPU via libxsmm) and tileir (GPU via direct TileIR construction, optional).
 
 Main Features
 -------------
@@ -21,11 +21,11 @@ Install the package using pip:
 
     pip install etops
 
-For GPU support with the cutile backend (optional):
+For GPU support with the tileir backend (optional):
 
 .. code-block:: bash
 
-    pip install etops[cutile]
+    pip install etops[tileir-cuda13]
 
 Unary Examples
 --------------
@@ -339,8 +339,8 @@ Below are some examples showing how to configure and execute binary tensor opera
 
 See the source code and inline documentation for more advanced usage.
 
-CuTile Example
---------------
+TileIR GPU Example
+------------------
 
 .. code-block:: python
 
@@ -355,7 +355,7 @@ CuTile Example
 
     # Define config
     config = etops.TensorOperationConfig(
-        backend    =   "cutile",
+        backend    =   "tileir",
         data_type  =   etops.float16,
         prim_first =   etops.prim.zero,
         prim_main  =   etops.prim.gemm,
@@ -388,7 +388,7 @@ CuTile Example
     error_abs = float(cp.max(cp.abs(C.astype(cp.float32) - C_ref.astype(cp.float32))))
     error_rel = float(cp.max(cp.abs(C.astype(cp.float32) - C_ref.astype(cp.float32))
                                 / (cp.abs(C_ref) + 1e-4)))
-    print("Tiled GEMM using CuTile backend (abcd,efab->efcd):")
+    print("Tiled GEMM using TileIR backend (abcd,efab->efcd):")
     print(f"  Max absolute error: {error_abs:.6e}")
     print(f"  Max relative error: {error_rel:.6e}")
 
@@ -419,6 +419,28 @@ CuTile Example
     tops  = (flops * N_BENCH) / elapsed_s / 1e12
     print(f"  Throughput: {tops:.2f} FP16 TOPs  "
           f"({elapsed_ms / N_BENCH:.3f} ms / call)")
+
+TileIR Environment Variables
+----------------------------
+
+``ETOPS_TILEIR_DUMP_IR``
+    Controls dumping of the TileIR intermediate representation to stderr.
+    Useful for debugging kernel generation. Case-insensitive, whitespace-tolerant.
+
+    +-----------+--------------------------------------------------------------+
+    | Value     | Effect                                                       |
+    +===========+==============================================================+
+    | *(unset)* | No dump (default)                                            |
+    +-----------+--------------------------------------------------------------+
+    | ``before``| Dump IR before optimization passes                           |
+    +-----------+--------------------------------------------------------------+
+    | ``after`` | Dump IR after all optimization passes                        |
+    +-----------+--------------------------------------------------------------+
+    | ``both``  | Dump IR before and after passes                              |
+    +-----------+--------------------------------------------------------------+
+    | ``all``   | Dump before passes, after each individual pass (with pass    |
+    |           | name), and after all passes                                  |
+    +-----------+--------------------------------------------------------------+
 
 
 JSON Serialization

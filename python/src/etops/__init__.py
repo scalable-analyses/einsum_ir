@@ -2,15 +2,15 @@
 Einsum tree operations with multi-backend support.
 
 This module provides a unified interface for tensor operations across
-different backends (TPP for CPU, cutile for GPU).
+different backends (TPP for CPU, tileir for GPU).
 
 Example:
     >>> import etops
-    >>> 
+    >>>
     >>> # List available backends
     >>> etops.list_backends()
     ['tpp']
-    >>> 
+    >>>
     >>> # Create and compile a configuration
     >>> config = etops.TensorOperationConfig(
     ...     backend="tpp",
@@ -19,7 +19,7 @@ Example:
     ...     ...
     ... )
     >>> op = etops.compile(config)
-    >>> 
+    >>>
     >>> # Execute
     >>> op.execute(in0, in1, out)
 """
@@ -46,14 +46,19 @@ from etops.types import (
     float64,
     float16,
     bfloat16,
-    tfloat32
+    tfloat32,
 )
 
 # Import config
 from etops.config import TensorOperationConfig
 
 # Import backend registry
-from etops.backends import get_backend, list_backends, get_optimizer, get_default_optimization_config
+from etops.backends import (
+    get_backend,
+    list_backends,
+    get_optimizer,
+    get_default_optimization_config,
+)
 
 
 def compile(config: TensorOperationConfig):
@@ -76,8 +81,7 @@ def compile(config: TensorOperationConfig):
 
 
 def optimize(
-    config: TensorOperationConfig,
-    optimization_config: Optional[dict] = None
+    config: TensorOperationConfig, optimization_config: Optional[dict] = None
 ) -> TensorOperationConfig:
     """
     Optimize a tensor operation configuration.
@@ -117,6 +121,7 @@ __all__ = [
     "compile",
     "optimize",
     "list_backends",
+    "get_default_optimization_config",
     "TensorOperationConfig",
     # Types
     "DataType",
@@ -132,4 +137,7 @@ __all__ = [
     "dtype",
     "float32",
     "float64",
+    "float16",
+    "bfloat16",
+    "tfloat32",
 ]

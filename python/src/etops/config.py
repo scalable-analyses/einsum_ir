@@ -38,7 +38,7 @@ class TensorOperationConfig:
       - Corresponds to dimension indices
 
     Binary Contractions:
-      - backend: "tpp" or "cutile"
+      - backend: "tpp" or "tileir"
       - prim_main: etops.prim.gemm or etops.prim.brgemm
       - dim_types: combination of etops.dim.m, .n, .k, .c
       - prim_first: etops.prim.zero or .none (optional first touch)
@@ -46,13 +46,14 @@ class TensorOperationConfig:
       - strides: shape [1 or more][3][num_dims]
 
     Unary Operations:
-      - backend: "tpp" or "cutile"
+      - backend: "tpp"
       - prim_main: etops.prim.copy or .zero
       - dim_types: must be etops.dim.c for all dimensions
       - prim_first: must be etops.prim.none
       - prim_last: must be etops.prim.none
       - strides: shape [1][2][num_dims]
     """
+
     backend: str
     data_type: DataType
     prim_first: PrimType
@@ -66,7 +67,7 @@ class TensorOperationConfig:
     def __post_init__(self):
         """Validate configuration at creation time."""
         # Validate backend is explicitly set
-        valid_backends = {"tpp", "cutile"}
+        valid_backends = {"tpp", "tileir"}
         if self.backend not in valid_backends:
             raise ValueError(
                 f"Unsupported backend: '{self.backend}'. "
@@ -79,7 +80,7 @@ class TensorOperationConfig:
             raise ValueError(
                 f"TPP backend only supports float32 and float64 data types. "
                 f"Got: {self.data_type.name}. "
-                f"Use cutile backend for float16, bfloat16, and tfloat32."
+                f"Use tileir backend for float16, bfloat16, and tfloat32."
             )
 
         # Determine operation type from prim_main
@@ -126,7 +127,7 @@ class TensorOperationConfig:
         # Validate stride dimensions match num_dims
         for tensor_idx, tensor_strides in enumerate(self.strides[0]):
             if len(tensor_strides) != num_dims:
-                tensor_names = ['in0', 'in1', 'out'] if is_binary else ['in', 'out']
+                tensor_names = ["in0", "in1", "out"] if is_binary else ["in", "out"]
                 raise ValueError(
                     f"strides[0][{tensor_idx}] ({tensor_names[tensor_idx]}) length "
                     f"({len(tensor_strides)}) must match number of dimensions ({num_dims})."
@@ -200,10 +201,7 @@ class TensorOperationConfig:
             "dim_types": [dt.name for dt in self.dim_types],
             "exec_types": [et.name for et in self.exec_types],
             "dim_sizes": list(self.dim_sizes),
-            "strides": [
-                [list(tensor) for tensor in level]
-                for level in self.strides
-            ]
+            "strides": [[list(tensor) for tensor in level] for level in self.strides],
         }
         return json.dumps(data, indent=indent)
 
@@ -228,8 +226,17 @@ class TensorOperationConfig:
         data = json.loads(json_str)
 
         # Required fields
-        required = ["backend", "data_type", "prim_first", "prim_main", "prim_last",
-                    "dim_types", "exec_types", "dim_sizes", "strides"]
+        required = [
+            "backend",
+            "data_type",
+            "prim_first",
+            "prim_main",
+            "prim_last",
+            "dim_types",
+            "exec_types",
+            "dim_sizes",
+            "strides",
+        ]
         missing = [f for f in required if f not in data]
         if missing:
             raise ValueError(f"Missing required fields: {missing}")
@@ -251,8 +258,7 @@ class TensorOperationConfig:
             exec_types=tuple(get_enum(ExecType, et) for et in data["exec_types"]),
             dim_sizes=tuple(data["dim_sizes"]),
             strides=tuple(
-                tuple(tuple(tensor) for tensor in level)
-                for level in data["strides"]
+                tuple(tuple(tensor) for tensor in level) for level in data["strides"]
             ),
         )
 
