@@ -39,7 +39,7 @@ def build_function(analysis: ConfigAnalysis, kernel_name: str) -> object:
 
     Args:
         analysis: Frozen config analysis produced by
-            :func:`~etops.backends._tileir.config_analysis.analyse_config`.
+            :func:`~etops.backends._tileir.config_analysis.analyze_config`.
         kernel_name: Name to assign to the generated kernel function.
 
     Returns:

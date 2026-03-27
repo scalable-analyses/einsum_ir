@@ -90,10 +90,10 @@ def create_operation(config: "TensorOperationConfig") -> TileIROperation:
         ValueError: If config is not executable.
         ImportError: If ``cuda.tile`` or ``cupy`` is not installed.
     """
-    from etops.backends._tileir.config_analysis import analyse_config
+    from etops.backends._tileir.config_analysis import analyze_config
     from etops.backends._tileir.compiler import compile_analysis
 
-    analysis = analyse_config(config)
+    analysis = analyze_config(config)
     kernel = compile_analysis(analysis)
 
     return TileIROperation(kernel, analysis.grid_size)
