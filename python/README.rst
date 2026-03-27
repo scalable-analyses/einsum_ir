@@ -339,6 +339,88 @@ Below are some examples showing how to configure and execute binary tensor opera
 
 See the source code and inline documentation for more advanced usage.
 
+CuTile Example
+--------------
+
+.. code-block:: python
+
+    import etops
+    import cupy as cp
+
+    #
+    # Tile GEMM:
+    # abcd,efab->efcd
+    # a:32,b:64,c:8,d:256,e:32,f:64
+    #
+
+    # Define config
+    config = etops.TensorOperationConfig(
+        backend    =   "cutile",
+        data_type  =   etops.float16,
+        prim_first =   etops.prim.zero,
+        prim_main  =   etops.prim.gemm,
+        prim_last  =   etops.prim.none,
+        dim_types  =   (etops.dim.m,       etops.dim.n,       etops.dim.k,    etops.dim.m,     etops.dim.n,     etops.dim.k    ),
+        exec_types =   (etops.exec.shared, etops.exec.shared, etops.exec.seq, etops.exec.prim, etops.exec.prim, etops.exec.prim),
+        dim_sizes  =   (8,                 32,                32,             256,             64,              64             ),
+        strides    = (((256,               0,                 131072,         1,               0,               2048           ),   # in0
+                    (0,                 131072,            64,             0,               2048,            1              ),   # in1
+                    (256,               131072,            0,              1,               2048,            0              )),) # out
+    )
+
+    # Compile the tensor operation
+    top = etops.compile(config)
+
+    # Create input and output matrices
+    # A: (k_total × m_total) = (a*b × c*d) = (2048 × 2048)  → acts as in0 (abcd flat)
+    # B: (n_total × k_total) = (e*f × a*b) = (2048 × 2048)  → acts as in1 (efab flat)
+    # C: (n_total × m_total) = (e*f × c*d) = (2048 × 2048)  → acts as out (efcd flat)
+    A = cp.random.randn(2048, 2048).astype(cp.float16)
+    B = cp.random.randn(2048, 2048).astype(cp.float16)
+    C = cp.zeros((2048, 2048), dtype=cp.float16)
+
+    # Execute the operation
+    top.execute(A, B, C)
+
+    # Verify correctness against CuPy matmul reference
+    C_ref = cp.matmul(B.astype(cp.float32), A.astype(cp.float32))
+
+    error_abs = float(cp.max(cp.abs(C.astype(cp.float32) - C_ref.astype(cp.float32))))
+    error_rel = float(cp.max(cp.abs(C.astype(cp.float32) - C_ref.astype(cp.float32))
+                                / (cp.abs(C_ref) + 1e-4)))
+    print("Tiled GEMM using CuTile backend (abcd,efab->efcd):")
+    print(f"  Max absolute error: {error_abs:.6e}")
+    print(f"  Max relative error: {error_rel:.6e}")
+
+    # -------------------------------------------------------------------
+    # Benchmark — report FP16 TOPs
+    # FLOPs per call = 2 * m_total * n_total * k_total
+    #               = 2 * 2048 * 2048 * 2048 ≈ 17.18 GFLOPs
+    # -------------------------------------------------------------------
+    N_WARMUP = 10
+    N_BENCH  = 100
+
+    for _ in range(N_WARMUP):
+        top.execute(A, B, C)
+    cp.cuda.Device().synchronize()
+
+    t_start = cp.cuda.Event()
+    t_end   = cp.cuda.Event()
+    t_start.record()
+    for _ in range(N_BENCH):
+        top.execute(A, B, C)
+    t_end.record()
+    t_end.synchronize()
+
+    elapsed_ms = cp.cuda.get_elapsed_time(t_start, t_end)
+    elapsed_s  = elapsed_ms / 1000.0
+
+    flops = 2 * 2048 * 2048 * 2048
+    tops  = (flops * N_BENCH) / elapsed_s / 1e12
+    print(f"  Throughput: {tops:.2f} FP16 TOPs  "
+          f"({elapsed_ms / N_BENCH:.3f} ms / call)")
+
+
 JSON Serialization
 ------------------
 
