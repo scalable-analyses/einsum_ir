@@ -21,6 +21,17 @@ class Optimizer:
         self.cv_initial = ConfigParser(self.config, verify_input=True)
 
         self.data_type = self.config.data_type
+        if self.data_type == etops.float16:
+            self.bytes_per_element = 2
+        elif self.data_type == etops.bfloat16:
+            self.bytes_per_element = 2
+        elif self.data_type == etops.float32:
+            self.bytes_per_element = 4
+        elif self.data_type == etops.float64:
+            self.bytes_per_element = 8
+        else:
+            raise ValueError(f"Unsupported data type {self.data_type} for cuTile optimizer.")
+
         self.prim_main = self.config.prim_main
 
         self.exec_types = list(self.config.exec_types)
@@ -37,6 +48,18 @@ class Optimizer:
         self.strides_left = list(self.config.strides[0][0])
         self.strides_right = list(self.config.strides[0][1])
         self.strides_out = list(self.config.strides[0][2])
+
+        self.M_size_total = 1
+        self.N_size_total = 1
+        self.K_size_total = 1
+        self.C_size_total = 1
+        self._init_CMNK_sizes()
+
+        self.left_size_total = self.C_size_total * self.M_size_total * self.K_size_total
+        self.right_size_total = self.C_size_total * self.K_size_total * self.N_size_total
+        self.out_size_total = self.C_size_total * self.M_size_total * self.N_size_total
+
+        self.elements_total = self.left_size_total + self.right_size_total + self.out_size_total
 
 
 
@@ -186,7 +209,7 @@ class Optimizer:
         self.strides_out[new_id] = new_stride_out
         self.divisors[new_id] = self._get_divisors_for_dim(new_id)
 
-    
+
 
     def _split_dimension(self, id, dim_size_0, dim_size_1):
         """
@@ -274,7 +297,7 @@ class Optimizer:
         self._fuse_all_fusable_dimensions_for_dim_type(etops.dim.c, exec_type_filter=exec_type_filter, new_exec_type=new_exec_type)
 
 
-    
+
     def _fuse_all_fusable_dimensions_for_dim_type(self, dim_type, exec_type_filter=None, new_exec_type=None):
         """
         Fuse all fusable dimensions of a given dimension type together.
@@ -340,3 +363,41 @@ class Optimizer:
                     dim_divisors.append(dim_size // i)
         
         return dim_divisors
+
+    
+
+    def _get_ids_sorted_by_stride(self, strides_list):
+        """
+        Get the list of dimension IDs sorted by stride in ascending order.
+        Drops dimensions with stride equal to 0.
+        """
+
+        strides_list_without_zeros = [(i, stride) for i, stride in enumerate(strides_list) if stride != 0]
+        sorted_ids = [i for i, stride in sorted(strides_list_without_zeros, key=lambda x: x[1])]
+
+        return sorted_ids
+
+    
+    def _init_CMNK_sizes(self):
+        """
+        Initialize the total number of elements in the M, N, K, and C dimensions.
+        """
+
+        self.M_size_total = 1
+        self.N_size_total = 1
+        self.K_size_total = 1
+        self.C_size_total = 1
+
+        for i in range(len(self.dim_types)):
+            dim_type = self.dim_types[i]
+            dim_size = self.dim_sizes[i]
+
+            if dim_type == etops.dim.m:
+                self.M_size_total *= dim_size
+            elif dim_type == etops.dim.n:
+                self.N_size_total *= dim_size
+            elif dim_type == etops.dim.k:
+                self.K_size_total *= dim_size
+            elif dim_type == etops.dim.c:
+                self.C_size_total *= dim_size
+
