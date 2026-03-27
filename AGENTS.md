@@ -47,26 +47,37 @@ cmake --install . --prefix $(pwd)/../install
 
 ### Python package (`etops`)
 
-```bash
-cd python
-pip install -ve .
-# If SCM version detection fails:
-SETUPTOOLS_SCM_PRETEND_VERSION=$(python version_cli.py) pip install -ve .
+> **Important:** Always create and use an **isolated venv scoped to your session**.
+> Never install into the user's existing environment or the repo-root `.venv/`.
 
-# Optional GPU support (cutile backend):
-pip install -ve ".[cutile]"
+Create and activate a fresh venv using `uv`:
+
+```bash
+uv venv my_venv                  # creates python/my_venv
+source my_venv/bin/activate      # Linux / macOS
 ```
 
-Run the Python test suite with pytest (from the `python/` directory):
+Install the package in editable mode:
 
 ```bash
-cd python
+uv pip install -ve .
+
+# Optional GPU support (cutile backend):
+uv pip install -ve ".[cutile-cuda13]"
+```
+
+Run the Python test suite with pytest (venv must be active):
+
+```bash
 pytest                          # all tests
 pytest -m tpp                   # only TPP backend tests
 pytest -m cutile                # only cutile GPU backend tests
 ```
 
 Test files live in `python/tests/` and are named `test_*.py`.
+
+**Python version:** 3.9 or newer required. Pin a specific interpreter with
+`uv venv --python 3.11 my_venv` if needed.
 
 ### Prerequisites
 
@@ -227,6 +238,34 @@ Test files are named `ClassName.test.cpp` (no libtorch required) or
   ```
 - Python layer converts C++ error codes into `RuntimeError` exceptions.
 
+### Python Style (etops package)
+
+- Follow **PEP 8**; maximum line length **88 characters** (Black-compatible).
+- Every module must have a triple-quoted module-level docstring.
+- Every public module must declare `__all__` to define the public API surface.
+- **Docstrings**: Google style (`Args:`, `Returns:`, `Attributes:`) on all public
+  classes, methods, and functions; a single-line docstring is acceptable for trivial
+  test helpers.
+- **Type annotations**: Required on all public function signatures and dataclass fields.
+  Use `from typing import Optional, Sequence, …` for Python 3.9 compatibility.
+- **Enums**: Subclass `IntEnum`; always assign explicit integer values — never `auto()`.
+- **Dataclasses**: Use `@dataclass(frozen=True)` for immutable configuration objects.
+- **Exception handling**: Always chain exceptions when wrapping:
+  `raise ValueError("msg") from original_exc`. Never suppress context with `from None`
+  unless intentional. Never use bare `except:` — always name the exception type.
+- **Logging**: The library is silent by default. Never use `print`. If a module needs
+  to emit diagnostic information (backend unavailability, JIT fallback, etc.), use
+  `logging.getLogger(__name__)` at `DEBUG` or `WARNING` level only. Never call
+  `logging.basicConfig()` or add handlers — that is the calling application's job.
+  Add a single `NullHandler` in `etops/__init__.py` to suppress framework warnings:
+  `logging.getLogger("etops").addHandler(logging.NullHandler())`.
+- **Private members**: Prefix with a single underscore (`_op`, `_cache`).
+- **Imports**: stdlib → third-party → local project, each group separated by a blank line.
+- **Tests**: pytest with class-based grouping (`class TestFoo`) and `def test_*` methods,
+  each with a one-line docstring.
+- **Linting**: Run `ruff check python/` and `ruff format --check python/` before
+  committing. Config lives in `python/pyproject.toml` under `[tool.ruff]`.
+
 ---
 
 ## Project Structure
@@ -263,6 +302,7 @@ einsum_ir/
 │       ├── test_api.py
 │       ├── test_backends.py
 │       ├── test_config.py
+│       ├── test_cutile_jit.py
 │       └── test_types.py
 └── samples/                    # Benchmark scripts and example configs
 ```
