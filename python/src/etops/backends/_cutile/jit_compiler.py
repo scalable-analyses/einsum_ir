@@ -82,26 +82,54 @@ def _register_make_tensor_view():
         base_ptr = arr_val.base_ptr
         shape_tup = shape.get_aggregate().items
         strides_tup = dynamic_strides.get_aggregate().items
-        
-        # Create result type with symbolic sizes
+
+        def _const_val(var):
+            """Return the integer value if var is a compile-time constant, else None.
+
+            Uses Var.is_constant() / Var.get_constant() from cuda.tile._ir.ir,
+            which is the correct API for inspecting constant scalars at @impl time.
+            """
+            try:
+                if var.is_constant():
+                    return int(var.get_constant())
+            except Exception:
+                pass
+            return None
+
+        # Preserve static size information for shapes and strides where the
+        # values are compile-time constants.
+        shape_size_types  = [SizeTy(_const_val(v)) for v in shape_tup]
+        stride_size_types = [SizeTy(_const_val(v)) for v in strides_tup]
+
+        # Create result type, preserving static shape/stride info where available
         res_ty = ArrayTy(
             dtype,
-            shape=TupleTy([SizeTy(None)] * len(shape_tup)),
-            strides=TupleTy([SizeTy(None)] * len(strides_tup)),
+            shape=TupleTy(shape_size_types),
+            strides=TupleTy(stride_size_types),
             elements_disjoint=False,
             base_ptr_div_by=None,
             stride_div_by=(None,) * len(strides_tup),
             shape_div_by=(None,) * len(shape_tup)
         )
         
+        # MakeTensorView operands must only include dims that remain dynamic.
+        # Static dims are encoded in the type itself and must NOT appear as
+        # operands or the IR verifier rejects the op.
+        dynamic_shape_ops  = tuple(
+            v for v, st in zip(shape_tup,   shape_size_types)  if st.value is None
+        )
+        dynamic_stride_ops = tuple(
+            v for v, st in zip(strides_tup, stride_size_types) if st.value is None
+        )
+
         # Add the MakeTensorView operation
         res_var = builder.add_operation(
             MakeTensorView,
             res_ty,
             dict(
                 base_ptr=base_ptr,
-                shape=tuple(shape_tup),
-                dynamic_strides=tuple(strides_tup)
+                shape=dynamic_shape_ops,
+                dynamic_strides=dynamic_stride_ops,
             )
         )
         
@@ -770,18 +798,4 @@ class JitCompiler:
 
         return reshape_out_tuple, permute_map_out_tuple
 
-
-    def print_kernel(self):
-        print(self.string_kernel)
-
-    
-    def safe_kernel_to_file(self, filename):
-        dirname = "generated_kernels"
-        path = os.path.join(dirname, filename)
-        os.makedirs(dirname, exist_ok=True)
-
-
-        with open(path, "w") as f:
-            f.write(self.string_kernel)
-        f.close()
 
