@@ -3,7 +3,7 @@
 High-performance C++17 einsum (tensor contraction) execution engine with
 Python bindings (`etops`). Supports TPP (libxsmm), BLAS, TBLIS, and scalar
 backends with OpenMP/GCD parallelism. The `etops` Python package additionally
-supports a `cutile` GPU backend (via `cuda.tile`, optional).
+supports a `tileir` GPU backend (via `cuda.tile`, optional).
 
 ---
 
@@ -62,8 +62,8 @@ Install the package in editable mode:
 ```bash
 uv pip install -ve .
 
-# Optional GPU support (cutile backend):
-uv pip install -ve ".[cutile-cuda13]"
+# Optional GPU support (tileir backend):
+uv pip install -ve ".[tileir-cuda13]"
 ```
 
 Run the Python test suite with pytest (venv must be active):
@@ -71,7 +71,7 @@ Run the Python test suite with pytest (venv must be active):
 ```bash
 pytest                          # all tests
 pytest -m tpp                   # only TPP backend tests
-pytest -m cutile                # only cutile GPU backend tests
+pytest -m tileir                # only tileir GPU backend tests
 ```
 
 Test files live in `python/tests/` and are named `test_*.py`.
@@ -285,7 +285,7 @@ einsum_ir/
 ├── python/                     # etops Python package (pybind11 / scikit-build-core)
 │   ├── CMakeLists.txt          # CMake build for _etops_core extension module
 │   ├── pyproject.toml          # scikit-build-core project metadata & build config
-│   ├── pytest.ini              # pytest configuration (markers: tpp, cutile)
+│   ├── pytest.ini              # pytest configuration (markers: tpp, tileir)
 │   ├── version_cli.py          # Git-based version string generator
 │   ├── src/
 │   │   ├── TensorOperation.{h,cpp}
@@ -297,12 +297,12 @@ einsum_ir/
 │   │       └── backends/       # Backend-specific wrappers
 │   │           ├── base.py
 │   │           ├── tpp.py      # TPP backend (CPU via libxsmm)
-│   │           └── cutile.py   # cutile backend (GPU via cuda.tile, optional)
+│   │           └── tileir.py   # tileir backend (GPU via cuda.tile, optional)
 │   └── tests/                  # pytest test suite
 │       ├── test_api.py
 │       ├── test_backends.py
 │       ├── test_config.py
-│       ├── test_cutile_jit.py
+│       ├── test_tileir.py
 │       └── test_types.py
 └── samples/                    # Benchmark scripts and example configs
 ```

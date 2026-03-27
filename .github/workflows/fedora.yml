@@ -243,9 +243,9 @@ jobs:
       - name: Run etops tests
         run: |
           cd python
-          python${{ matrix.python }} -m pytest tests/ -v -m "not cutile"
+          python${{ matrix.python }} -m pytest tests/ -v -m "not tileir"
 
-  etops_cutile:
+  etops_tileir:
     strategy:
       matrix:
         python: ["3.10", "3.11", "3.12", "3.13"]
@@ -270,20 +270,20 @@ jobs:
           sudo dnf install -y python${{ matrix.python }}-devel
           sudo python${{ matrix.python }} -m ensurepip --upgrade
 
-      - name: Install etops with cutile
+      - name: Install etops with tileir
         run: |
           PYTHON=python${{ matrix.python }}
           $PYTHON -m pip install --upgrade pip
           cd python
           export SETUPTOOLS_SCM_PRETEND_VERSION=$($PYTHON version_cli.py)
-          $PYTHON -m pip install -ve ".[cutile-cuda13,test]"
+          $PYTHON -m pip install -ve ".[tileir-cuda13,test]"
           $PYTHON -c "import etops; print(etops.__version__)"
 
       - name: Verify GPU availability
         run: |
           python${{ matrix.python }} -c "import cupy; p = cupy.cuda.runtime.getDeviceProperties(0); print(p['name'].decode())"
 
-      - name: Run cutile tests
+      - name: Run tileir tests
         run: |
           cd python
-          python${{ matrix.python }} -m pytest -m cutile -v
+          python${{ matrix.python }} -m pytest -m tileir -v

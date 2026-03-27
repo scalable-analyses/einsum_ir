@@ -118,4 +118,4 @@ jobs:
       - name: Run etops tests
         run: |
           cd python
-          python${{ matrix.python }} -m pytest tests/ -v -m "not cutile"
+          python${{ matrix.python }} -m pytest tests/ -v -m "not tileir"
