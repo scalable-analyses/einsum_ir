@@ -126,10 +126,15 @@ def get_default_optimization_config() -> dict:
         - ``max_grid``: Maximum CUDA grid size (2^24 - 1).
         - ``max_prim_dims``: Maximum number of prim dimensions for unary
           operations (default: 5).
+        - ``max_prim_tile_volume``: Maximum padded tile volume (product of
+          ``next_pow2(size)`` for all prim dims) for unary operations.
+          Tiles exceeding this limit cause the tileiras compiler to time
+          out or produce slow code.  Default: 32768 (2^15).
     """
     return {
         "max_grid": 16777215,  # 2^24 - 1
         "max_prim_dims": 5,
+        "max_prim_tile_volume": 32768,  # 2^15
     }
 
 
@@ -153,15 +158,20 @@ def optimize_config(
     **Unary algorithm:**
 
     1. Select prim dims: unit-stride dims from in0 and out, then fill
-       to *max_prim_dims* by smallest min-stride.
-    2. Remaining dims become shared (up to *max_grid*), then seq.
-    3. Produce ordering: ``[shared] -> [seq] -> [prims]``.
+       to *max_prim_dims* by smallest min-stride, subject to
+       *max_prim_tile_volume* (padded tile volume cap).
+    2. Safety check: avoid a known tileiras assembler crash when the
+       innermost prim dim pads to 64 with asymmetric unit strides.
+    3. Remaining dims become shared (up to *max_grid*), then seq.
+    4. Produce ordering: ``[shared] -> [seq] -> [prims]``.
 
     Args:
         config: Tensor operation configuration to optimize.
         optimization_config: Optional dict with keys:
             - ``max_grid``: Maximum allowed grid size (default: 2^24 - 1).
-            - ``max_prim_dims``: Max prim dims for unary (default: 2).
+            - ``max_prim_dims``: Max prim dims for unary (default: 5).
+            - ``max_prim_tile_volume``: Max padded prim tile volume for
+              unary (default: 32768).
 
     Returns:
         Optimized :class:`TensorOperationConfig` with exec_types and

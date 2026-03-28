@@ -256,16 +256,22 @@ def _optimize_unary_impl(
     strides_out: Tuple[int, ...],
     max_grid: int,
     max_prim_dims: int,
+    max_prim_tile_volume: int,
 ) -> Tuple[Tuple[int, ...], Tuple["etops.types.ExecType", ...]]:
     """Core optimization for unary operations: determine exec_types and ordering.
 
     Prim selection strategy:
       1. Always include unit-stride dims from in0 and out (if different).
       2. Fill up to *max_prim_dims* by preferring dims with smallest
-         ``min(stride_in0, stride_out)`` (good for GPU DMA).
+         ``min(stride_in0, stride_out)`` (good for GPU DMA), subject to
+         the padded tile volume staying within *max_prim_tile_volume*.
+      2b. Safety check: avoid a known tileiras assembler crash when the
+          innermost prim dim would pad to 64 with asymmetric unit strides.
       3. Remaining dims become shared (up to *max_grid*), then seq.
       4. Ordering: shared (stride desc) → seq (stride desc) → prim (stride asc).
     """
+    from etops.backends._tileir.config_analysis import _next_pow2
+
     num_dims = len(dim_sizes)
     all_indices = list(range(num_dims))
 
@@ -289,7 +295,13 @@ def _optimize_unary_impl(
             must_prim.add(i)
             break
 
-    # Step 2: fill up to max_prim_dims from remaining dims
+    # Committed padded volume from must-have prim dims.
+    prim_volume = 1
+    for i in must_prim:
+        prim_volume *= _next_pow2(dim_sizes[i])
+
+    # Step 2: fill up to max_prim_dims from remaining dims, subject to
+    # the padded tile volume staying within max_prim_tile_volume.
     candidates = sorted(
         [i for i in all_indices if i not in must_prim],
         key=_min_stride,
@@ -298,11 +310,44 @@ def _optimize_unary_impl(
     for idx in candidates:
         if len(prim_set) >= max_prim_dims:
             break
+        padded = _next_pow2(dim_sizes[idx])
+        if prim_volume * padded > max_prim_tile_volume:
+            continue  # skip — would exceed volume budget
+        prim_volume *= padded
         prim_set.add(idx)
 
     # Ensure at least 1 prim dim even if all strides are zero
     if not prim_set:
         prim_set.add(all_indices[-1])
+
+    # ------------------------------------------------------------------
+    # Step 2b — Workaround: tileiras crash with padded-64 innermost prim
+    #
+    # The tileiras assembler (cuda.tile v1.2.0, sm_121) crashes with
+    # return code 5 when ALL of the following hold:
+    #   - 4 or more prim dims
+    #   - the innermost prim dim pads to exactly 64
+    #   - the original size of that dim is divisible by 4
+    #   - that dim has unit stride in exactly one of in0/out
+    #     (asymmetric gather/scatter)
+    #
+    # When this is detected the problematic dim is removed from the prim
+    # set so it falls through to shared or seq instead.
+    #
+    # TODO(tileiras): Remove this workaround when the bug has been fixed.
+    # ------------------------------------------------------------------
+    if len(prim_set) >= 4:
+        # Determine which dim would be innermost (smallest _min_stride;
+        # ties broken by index via stable sort).
+        prim_ord_check = sorted(prim_set, key=_min_stride, reverse=True)
+        innermost = prim_ord_check[-1]
+        padded_inner = _next_pow2(dim_sizes[innermost])
+        if (
+            padded_inner == 64
+            and dim_sizes[innermost] % 4 == 0
+            and (strides_in0[innermost] == 1) != (strides_out[innermost] == 1)
+        ):
+            prim_set.discard(innermost)
 
     prim_indices = sorted(prim_set)
     non_prim_indices = [i for i in all_indices if i not in prim_set]
@@ -437,14 +482,20 @@ def _optimize_unary(
     max_grid: int,
 ) -> "TensorOperationConfig":
     """Optimize a unary operation config."""
-    max_prim_dims = opts.get("max_prim_dims", 2)
+    max_prim_dims = opts.get("max_prim_dims", 5)
+    max_prim_tile_volume = opts.get("max_prim_tile_volume", 32768)
 
     strides_in0 = tuple(config.strides[0][0])
     strides_out = tuple(config.strides[0][1])
     dim_sizes = tuple(config.dim_sizes)
 
     new_order, new_exec_types = _optimize_unary_impl(
-        dim_sizes, strides_in0, strides_out, max_grid, max_prim_dims
+        dim_sizes,
+        strides_in0,
+        strides_out,
+        max_grid,
+        max_prim_dims,
+        max_prim_tile_volume,
     )
 
     permuted_dim_types = tuple(config.dim_types[i] for i in new_order)

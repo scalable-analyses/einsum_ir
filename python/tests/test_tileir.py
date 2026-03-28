@@ -983,3 +983,178 @@ class TestTileIRUnary:
 
         expected = cp.maximum(in0, cp.float16(0.0))
         cp.testing.assert_allclose(out, expected, rtol=1e-2, atol=1e-2)
+
+    # =========================================================================
+    # Permutation regression tests
+    # =========================================================================
+
+    # Permutation [b,e,h,i] -> [e,h,i,b], b=60, e=h=i=8.
+    # fmt: off
+    PERM_BEHI_TO_EHIB_SEQ = etops.TensorOperationConfig(
+        backend    =   "tileir",
+        data_type  =   etops.float32,
+        prim_first =   etops.prim.none,
+        prim_main  =   etops.prim.copy,
+        prim_last  =   etops.prim.none,
+        dim_types  =   (etops.dim.c,    etops.dim.c,    etops.dim.c,    etops.dim.c   ),
+        exec_types =   (etops.exec.seq, etops.exec.seq, etops.exec.seq, etops.exec.seq),
+        dim_sizes  =   (8,              8,              8,              60             ),
+        strides    = (((64,             8,              1,              512            ),   # in0: [b,e,h,i]
+                       (3840,           480,            60,             1              )),) # out: [e,h,i,b]
+    )
+    # fmt: on
+
+    # Permutation [a,c,d,b] -> [a,b,c,d], a=60, b=60, c=20, d=20.
+    # fmt: off
+    PERM_ACDB_TO_ABCD_SEQ = etops.TensorOperationConfig(
+        backend    =   "tileir",
+        data_type  =   etops.float32,
+        prim_first =   etops.prim.none,
+        prim_main  =   etops.prim.copy,
+        prim_last  =   etops.prim.none,
+        dim_types  =   (etops.dim.c,    etops.dim.c,    etops.dim.c,    etops.dim.c   ),
+        exec_types =   (etops.exec.seq, etops.exec.seq, etops.exec.seq, etops.exec.seq),
+        dim_sizes  =   (60,             20,             60,             20             ),
+        strides    = (((24000,          1200,           1,              60             ),   # in0: [a,c,d,b]
+                       (24000,          20,             400,            1              )),) # out: [a,b,c,d]
+    )
+    # fmt: on
+
+    @pytest.mark.tileir
+    def test_optimize_permutation_volume_cap(self):
+        """Optimizer caps padded prim tile volume for large permutations."""
+        from etops.backends._tileir.config_analysis import _next_pow2
+
+        config = self.PERM_ACDB_TO_ABCD_SEQ
+        opt = etops.optimize(config)
+
+        prim_volume = 1
+        for et, sz in zip(opt.exec_types, opt.dim_sizes):
+            if et == etops.exec.prim:
+                prim_volume *= _next_pow2(sz)
+
+        assert prim_volume <= 32768, (
+            f"Padded prim tile volume {prim_volume} exceeds 32768"
+        )
+
+    @pytest.mark.tileir
+    def test_optimize_permutation_tileiras_workaround(self):
+        """Optimizer avoids tileiras padded-64 crash for asymmetric strides."""
+        from etops.backends._tileir.config_analysis import _next_pow2
+
+        config = self.PERM_BEHI_TO_EHIB_SEQ
+        opt = etops.optimize(config)
+
+        # The problematic dim (original dim 3, size=60) must not be the
+        # innermost prim dim after optimization.
+        prim_dims = [
+            (sz, s_in, s_out)
+            for et, sz, s_in, s_out in zip(
+                opt.exec_types,
+                opt.dim_sizes,
+                opt.strides[0][0],
+                opt.strides[0][1],
+            )
+            if et == etops.exec.prim
+        ]
+        assert len(prim_dims) > 0, "Optimizer must assign at least one prim dim"
+
+        # Innermost prim dim is the last in the config ordering.
+        innermost_sz = prim_dims[-1][0]
+        padded = _next_pow2(innermost_sz)
+        innermost_s_in = prim_dims[-1][1]
+        innermost_s_out = prim_dims[-1][2]
+
+        # The tileiras bug triggers when padded=64, size%4==0,
+        # and unit stride in exactly one of in0/out.
+        is_buggy = (
+            padded == 64
+            and innermost_sz % 4 == 0
+            and (innermost_s_in == 1) != (innermost_s_out == 1)
+        )
+        assert not is_buggy, (
+            f"Innermost prim dim (size={innermost_sz}, padded={padded}) "
+            f"would trigger the tileiras padded-64 crash"
+        )
+
+    @pytest.mark.tileir
+    def test_compile_and_execute_permutation_behi_to_ehib(self):
+        """End-to-end: optimize, compile, execute [b,e,h,i]->[e,h,i,b]."""
+        import cupy as cp
+        import numpy as np
+
+        config = self.PERM_BEHI_TO_EHIB_SEQ
+        opt = etops.optimize(config)
+        op = etops.compile(opt)
+
+        # Original config dims: (b=8, e=8, h=8, i=60)
+        # strides_in0=(64,8,1,512), strides_out=(3840,480,60,1)
+        dim_sizes = tuple(config.dim_sizes)
+        strides_in = tuple(config.strides[0][0])
+        strides_out = tuple(config.strides[0][1])
+        total = 1
+        for s in dim_sizes:
+            total *= s
+
+        in_np = np.arange(total, dtype=np.float32)
+        in_gpu = cp.asarray(in_np)
+        out_gpu = cp.zeros(total, dtype=cp.float32)
+
+        op.execute(in_gpu, None, out_gpu)
+        out_np = cp.asnumpy(out_gpu)
+
+        # The copy operation does:
+        #   for each multi-index (d0,d1,d2,d3):
+        #     out_buf[sum(di*strides_out[i])] = in_buf[sum(di*strides_in[i])]
+        # Verify element-by-element using the original strides.
+        byte_size = np.float32().itemsize
+        in_view = np.lib.stride_tricks.as_strided(
+            in_np,
+            shape=dim_sizes,
+            strides=tuple(s * byte_size for s in strides_in),
+        )
+        out_view = np.lib.stride_tricks.as_strided(
+            out_np,
+            shape=dim_sizes,
+            strides=tuple(s * byte_size for s in strides_out),
+        )
+        np.testing.assert_allclose(out_view, in_view, rtol=0, atol=0)
+
+    @pytest.mark.tileir
+    def test_compile_and_execute_permutation_acdb_to_abcd(self):
+        """End-to-end: optimize, compile, execute [a,c,d,b]->[a,b,c,d]."""
+        import cupy as cp
+        import numpy as np
+
+        config = self.PERM_ACDB_TO_ABCD_SEQ
+        opt = etops.optimize(config)
+        op = etops.compile(opt)
+
+        # Original config dims: (a=60, c=20, d=60, b=20)
+        # strides_in0=(24000,1200,1,60), strides_out=(24000,20,400,1)
+        dim_sizes = tuple(config.dim_sizes)
+        strides_in = tuple(config.strides[0][0])
+        strides_out = tuple(config.strides[0][1])
+        total = 1
+        for s in dim_sizes:
+            total *= s
+
+        in_np = np.arange(total, dtype=np.float32)
+        in_gpu = cp.asarray(in_np)
+        out_gpu = cp.zeros(total, dtype=cp.float32)
+
+        op.execute(in_gpu, None, out_gpu)
+        out_np = cp.asnumpy(out_gpu)
+
+        byte_size = np.float32().itemsize
+        in_view = np.lib.stride_tricks.as_strided(
+            in_np,
+            shape=dim_sizes,
+            strides=tuple(s * byte_size for s in strides_in),
+        )
+        out_view = np.lib.stride_tricks.as_strided(
+            out_np,
+            shape=dim_sizes,
+            strides=tuple(s * byte_size for s in strides_out),
+        )
+        np.testing.assert_allclose(out_view, in_view, rtol=0, atol=0)
