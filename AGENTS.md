@@ -132,6 +132,11 @@ Test files are named `ClassName.test.cpp` (no libtorch required) or
 
 ## Code Style
 
+### Language
+
+- **American English** in all code, comments, documentation, and commit messages
+  (e.g., "optimize" not "optimise", "color" not "colour", "initialize" not "initialise").
+
 ### C++ Standard and Indentation
 
 - **C++17** throughout.
@@ -265,6 +270,10 @@ Test files are named `ClassName.test.cpp` (no libtorch required) or
   each with a one-line docstring.
 - **Linting**: Run `ruff check python/` and `ruff format --check python/` before
   committing. Config lives in `python/pyproject.toml` under `[tool.ruff]`.
+- **`TensorOperationConfig` formatting**: Column-align `=` signs and tuple elements
+  so that dimensions, execution types, sizes, and strides read as a visual table.
+  See the example in the [etops Python API](#compiling-and-executing-a-tensor-operation)
+  section below.
 
 ---
 
@@ -317,17 +326,17 @@ einsum_ir/
 import etops
 
 config = etops.TensorOperationConfig(
-    backend    = "tpp",
-    data_type  = etops.float32,
-    prim_first = etops.prim.zero,
-    prim_main  = etops.prim.gemm,
-    prim_last  = etops.prim.none,
-    dim_types  = (etops.dim.m,     etops.dim.n,     etops.dim.k    ),
-    exec_types = (etops.exec.prim, etops.exec.prim, etops.exec.prim),
-    dim_sizes  = (64,              32,              128            ),
-    strides  = (((1,               0,               64             ),    # in0
-                 (0,               128,             1              ),    # in1
-                 (1,               64,              0              )),), # out
+    backend    =   "tpp",
+    data_type  =   etops.float32,
+    prim_first =   etops.prim.zero,
+    prim_main  =   etops.prim.gemm,
+    prim_last  =   etops.prim.none,
+    dim_types  =   (etops.dim.m,     etops.dim.n,     etops.dim.k    ),
+    exec_types =   (etops.exec.prim, etops.exec.prim, etops.exec.prim),
+    dim_sizes  =   (64,              32,              128            ),
+    strides    = (((1,               0,               64             ),   # in0
+                   (0,               128,             1              ),   # in1
+                   (1,               64,              0              )),) # out
 )
 
 top = etops.compile(config)   # compile; returns an executable TensorOperation
