@@ -1,17 +1,18 @@
 """
 TileIR backend implementation for etops.
 
-This backend generates GPU tensor contraction kernels by directly
-constructing TileIR object graphs (``cuda.tile._ir.ops.*`` classes),
-bypassing the ``@ct.kernel`` Python frontend.  Compiled cubins are
-launched via CuPy ``RawModule`` with a pointer-only ABI (in0, in1, out).
+This backend generates GPU tensor kernels by directly constructing TileIR
+object graphs (``cuda.tile._ir.ops.*`` classes), bypassing the
+``@ct.kernel`` Python frontend.  Compiled cubins are launched via CuPy
+``RawModule``.
 
 Supports:
-  * Binary contractions: GEMM and BRGEMM.
+  * Binary contractions: GEMM and BRGEMM (3-pointer ABI: in0, in1, out).
+  * Unary operations: copy, zero, relu (2-pointer ABI: in0, out).
   * Data types: FP32, FP64, FP16, BF16, TF32.
-  * Exec types: shared (grid-mapped), sequential (for-loops), prim (MMA tile).
-  * ``prim_first``: ``zero`` (beta=0) or ``none`` (beta=1).
-  * ``prim_last``: ``none`` or ``relu``.
+  * Exec types: shared (grid-mapped), sequential (for-loops), prim (tile).
+  * ``prim_first``: ``zero`` (beta=0) or ``none`` (beta=1) [binary only].
+  * ``prim_last``: ``none`` or ``relu`` [binary only].
 """
 
 from __future__ import annotations
@@ -28,7 +29,6 @@ from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from etops.config import TensorOperationConfig
-    from etops.backends.base import CompiledOperation
 
 _logger = logging.getLogger(__name__)
 
@@ -67,6 +67,7 @@ class TileIROperation:
         Args:
             in0: First input tensor (CuPy ndarray on CUDA device).
             in1: Second input tensor (CuPy ndarray on CUDA device).
+                Ignored for unary operations.
             out: Output tensor (pre-allocated, on CUDA device).
         """
         self._kernel(in0, in1, out)
@@ -80,6 +81,8 @@ class TileIROperation:
 def create_operation(config: "TensorOperationConfig") -> TileIROperation:
     """Create and compile a tileir operation from configuration.
 
+    Dispatches to the binary or unary pipeline based on ``prim_main``.
+
     Args:
         config: Tensor operation configuration with ``backend="tileir"``.
 
@@ -90,13 +93,24 @@ def create_operation(config: "TensorOperationConfig") -> TileIROperation:
         ValueError: If config is not executable.
         ImportError: If ``cuda.tile`` or ``cupy`` is not installed.
     """
-    from etops.backends._tileir.config_analysis import analyze_config
-    from etops.backends._tileir.compiler import compile_analysis
+    from etops.types import PrimType
 
-    analysis = analyze_config(config)
-    kernel = compile_analysis(analysis)
+    is_unary = config.prim_main in (PrimType.copy, PrimType.relu)
 
-    return TileIROperation(kernel, analysis.grid_size)
+    if is_unary:
+        from etops.backends._tileir.config_analysis import analyze_unary_config
+        from etops.backends._tileir.compiler import compile_unary_analysis
+
+        unary_analysis = analyze_unary_config(config)
+        unary_kernel = compile_unary_analysis(unary_analysis)
+        return TileIROperation(unary_kernel, unary_analysis.grid_size)
+
+    from etops.backends._tileir.config_analysis import analyze_binary_config
+    from etops.backends._tileir.compiler import compile_binary_analysis
+
+    binary_analysis = analyze_binary_config(config)
+    binary_kernel = compile_binary_analysis(binary_analysis)
+    return TileIROperation(binary_kernel, binary_analysis.grid_size)
 
 
 # =============================================================================
@@ -110,9 +124,12 @@ def get_default_optimization_config() -> dict:
     Returns:
         Dictionary with default optimization parameters:
         - ``max_grid``: Maximum CUDA grid size (2^24 - 1).
+        - ``max_prim_dims``: Maximum number of prim dimensions for unary
+          operations (default: 5).
     """
     return {
         "max_grid": 16777215,  # 2^24 - 1
+        "max_prim_dims": 5,
     }
 
 
@@ -122,19 +139,29 @@ def optimize_config(
 ) -> "TensorOperationConfig":
     """Optimize a tensor operation configuration for the tileir backend.
 
-    The algorithm:
+    Dispatches to the binary or unary optimizer based on ``prim_main``.
+
+    **Binary algorithm:**
 
     1. Add synthetic prim dimensions for any missing M/N/K types.
     2. Select prim representatives (preferring unit stride).
     3. Sort shared dims by stride for memory locality.
     4. Interleave shared M and N dimensions.
     5. Demote outermost shared dims to seq if grid would exceed *max_grid*.
-    6. Produce ordering: ``[shared] → [seq] → [prims]``.
+    6. Produce ordering: ``[shared] -> [seq] -> [prims]``.
+
+    **Unary algorithm:**
+
+    1. Select prim dims: unit-stride dims from in0 and out, then fill
+       to *max_prim_dims* by smallest min-stride.
+    2. Remaining dims become shared (up to *max_grid*), then seq.
+    3. Produce ordering: ``[shared] -> [seq] -> [prims]``.
 
     Args:
         config: Tensor operation configuration to optimize.
         optimization_config: Optional dict with keys:
             - ``max_grid``: Maximum allowed grid size (default: 2^24 - 1).
+            - ``max_prim_dims``: Max prim dims for unary (default: 2).
 
     Returns:
         Optimized :class:`TensorOperationConfig` with exec_types and

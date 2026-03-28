@@ -3,7 +3,8 @@
 High-performance C++17 einsum (tensor contraction) execution engine with
 Python bindings (`etops`). Supports TPP (libxsmm), BLAS, TBLIS, and scalar
 backends with OpenMP/GCD parallelism. The `etops` Python package additionally
-supports a `tileir` GPU backend (via `cuda.tile`, optional).
+supports a `tileir` GPU backend (via `cuda.tile`, optional) for both
+**binary contractions** (GEMM, BRGEMM) and **unary operations** (copy, relu).
 
 ---
 
@@ -272,8 +273,9 @@ Test files are named `ClassName.test.cpp` (no libtorch required) or
   committing. Config lives in `python/pyproject.toml` under `[tool.ruff]`.
 - **`TensorOperationConfig` formatting**: Column-align `=` signs and tuple elements
   so that dimensions, execution types, sizes, and strides read as a visual table.
-  See the example in the [etops Python API](#compiling-and-executing-a-tensor-operation)
-  section below.
+  Protect column-aligned configs from auto-formatting with `# fmt: off` /
+  `# fmt: on` pragmas (the standard ruff mechanism). See the examples in the
+  [etops Python API](#compiling-and-executing-a-tensor-operation) section below.
 
 ---
 
@@ -306,7 +308,12 @@ einsum_ir/
 │   │       └── backends/       # Backend-specific wrappers
 │   │           ├── base.py
 │   │           ├── tpp.py      # TPP backend (CPU via libxsmm)
-│   │           └── tileir.py   # tileir backend (GPU via cuda.tile, optional)
+│   │           ├── tileir.py   # tileir backend facade (GPU via cuda.tile)
+│   │           └── _tileir/    # tileir internal modules
+│   │               ├── config_analysis.py  # Binary/unary config → analysis objects
+│   │               ├── ir_builder.py       # TileIR function graph construction
+│   │               ├── compiler.py         # Optimization, compilation, kernel cache
+│   │               └── optimizer.py        # Exec-type / dim-ordering optimizer
 │   └── tests/                  # pytest test suite
 │       ├── test_api.py
 │       ├── test_backends.py
@@ -321,6 +328,8 @@ einsum_ir/
 ## etops Python API
 
 ### Compiling and executing a tensor operation
+
+#### Binary contraction (GEMM)
 
 ```python
 import etops
@@ -343,12 +352,38 @@ top = etops.compile(config)   # compile; returns an executable TensorOperation
 top.execute(A, B, C)          # execute in-place
 ```
 
+#### Unary operation (copy / relu)
+
+Unary operations use `prim_main` ∈ {`copy`, `relu`}, require all
+dimensions to be `dim.c`, and have 2-tensor strides (`in`, `out`) instead of 3.
+`prim_first` and `prim_last` must both be `prim.none`.
+
+```python
+config = etops.TensorOperationConfig(
+    backend    =   "tileir",
+    data_type  =   etops.float32,
+    prim_first =   etops.prim.none,
+    prim_main  =   etops.prim.relu,
+    prim_last  =   etops.prim.none,
+    dim_types  =   (etops.dim.c,       etops.dim.c,     etops.dim.c    ),
+    exec_types =   (etops.exec.shared, etops.exec.prim, etops.exec.prim),
+    dim_sizes  =   (4,                 16,              16             ),
+    strides    = (((256,               16,              1              ),   # in
+                   (256,               16,              1              )),) # out
+)
+
+top = etops.compile(config)
+top.execute(in_gpu, None, out_gpu)   # in1 is None for unary ops
+```
+
 Key top-level functions:
 
 | Function | Description |
 |---|---|
 | `etops.compile(config)` | Compile a `TensorOperationConfig` into an executable `TensorOperation` |
-| `etops.optimize(config[, opts])` | Run the built-in contraction optimizer; returns an optimized config |
+| `etops.optimize(config[, opts])` | Run the built-in optimizer; returns an optimized config (binary and unary) |
+| `etops.list_backends()` | List registered backends and their availability |
+| `etops.get_default_optimization_config(backend)` | Return the default optimization config dict for a backend |
 
 ### JSON serialization of configurations
 

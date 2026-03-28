@@ -179,7 +179,7 @@ def _add_synthetic_prim_dims(
 # ---------------------------------------------------------------------------
 
 
-def _optimize_impl(
+def _optimize_binary_impl(
     dim_types: Tuple["etops.types.DimType", ...],
     dim_sizes: Tuple[int, ...],
     strides_in0: Tuple[int, ...],
@@ -187,7 +187,7 @@ def _optimize_impl(
     strides_out: Tuple[int, ...],
     max_grid: int,
 ) -> Tuple[Tuple[int, ...], Tuple["etops.types.ExecType", ...]]:
-    """Core optimization: determine exec_types and ordering."""
+    """Core optimization for binary contractions: determine exec_types and ordering."""
     c_indices = [i for i, dt in enumerate(dim_types) if dt == etops.dim.c]
     m_indices = [i for i, dt in enumerate(dim_types) if dt == etops.dim.m]
     n_indices = [i for i, dt in enumerate(dim_types) if dt == etops.dim.n]
@@ -246,6 +246,108 @@ def _optimize_impl(
 
 
 # ---------------------------------------------------------------------------
+# Unary optimization
+# ---------------------------------------------------------------------------
+
+
+def _optimize_unary_impl(
+    dim_sizes: Tuple[int, ...],
+    strides_in0: Tuple[int, ...],
+    strides_out: Tuple[int, ...],
+    max_grid: int,
+    max_prim_dims: int,
+) -> Tuple[Tuple[int, ...], Tuple["etops.types.ExecType", ...]]:
+    """Core optimization for unary operations: determine exec_types and ordering.
+
+    Prim selection strategy:
+      1. Always include unit-stride dims from in0 and out (if different).
+      2. Fill up to *max_prim_dims* by preferring dims with smallest
+         ``min(stride_in0, stride_out)`` (good for GPU DMA).
+      3. Remaining dims become shared (up to *max_grid*), then seq.
+      4. Ordering: shared (stride desc) → seq (stride desc) → prim (stride asc).
+    """
+    num_dims = len(dim_sizes)
+    all_indices = list(range(num_dims))
+
+    # Score each dim by min non-zero stride across in0 and out.
+    # Lower score = better prim candidate (more contiguous).
+    def _min_stride(i: int) -> float:
+        s0 = strides_in0[i] if strides_in0[i] > 0 else float("inf")
+        so = strides_out[i] if strides_out[i] > 0 else float("inf")
+        return min(s0, so)
+
+    # Step 1: identify must-have prim dims (unit-stride dims)
+    must_prim = set()
+    # Find unit-stride dim in in0 (if any)
+    for i in all_indices:
+        if strides_in0[i] == 1:
+            must_prim.add(i)
+            break
+    # Find unit-stride dim in out (if any, and different)
+    for i in all_indices:
+        if strides_out[i] == 1:
+            must_prim.add(i)
+            break
+
+    # Step 2: fill up to max_prim_dims from remaining dims
+    candidates = sorted(
+        [i for i in all_indices if i not in must_prim],
+        key=_min_stride,
+    )
+    prim_set = set(must_prim)
+    for idx in candidates:
+        if len(prim_set) >= max_prim_dims:
+            break
+        prim_set.add(idx)
+
+    # Ensure at least 1 prim dim even if all strides are zero
+    if not prim_set:
+        prim_set.add(all_indices[-1])
+
+    prim_indices = sorted(prim_set)
+    non_prim_indices = [i for i in all_indices if i not in prim_set]
+
+    # Step 3: sort non-prim by stride desc for shared ordering
+    def _max_stride(i: int) -> int:
+        s0 = strides_in0[i] if strides_in0[i] > 0 else 0
+        so = strides_out[i] if strides_out[i] > 0 else 0
+        return max(s0, so)
+
+    shared_ord = sorted(non_prim_indices, key=_max_stride, reverse=True)
+
+    # Step 4: apply max_grid limit
+    grid_size = 1
+    keep_shared: List[int] = []
+    demote_to_seq: List[int] = []
+    for idx in shared_ord:
+        dim_size = dim_sizes[idx]
+        if grid_size * dim_size > max_grid:
+            demote_to_seq.append(idx)
+        else:
+            grid_size *= dim_size
+            keep_shared.append(idx)
+
+    # Step 5: sort prim dims by stride ascending (unit-stride innermost)
+    prim_ord = sorted(prim_indices, key=_min_stride, reverse=True)
+
+    # Final ordering: shared → seq → prim
+    new_order = tuple(keep_shared + demote_to_seq + prim_ord)
+
+    prim_set_final = set(prim_ord)
+    seq_set = set(demote_to_seq)
+    exec_types = []
+    for j in new_order:
+        if j in prim_set_final:
+            exec_types.append(etops.exec.prim)
+        elif j in seq_set:
+            exec_types.append(etops.exec.seq)
+        else:
+            exec_types.append(etops.exec.shared)
+
+    return new_order, tuple(exec_types)
+
+
+# ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
@@ -256,19 +358,38 @@ def optimize(
 ) -> "TensorOperationConfig":
     """Optimize *config* for tileir execution.
 
+    Dispatches to the binary or unary optimizer based on ``prim_main``.
+
     Args:
         config: Input configuration.
-        optimization_config: Optional overrides (``max_grid``).
+        optimization_config: Optional overrides.  Common keys:
+            - ``max_grid`` (int): Maximum CUDA grid size.
+            - ``max_prim_dims`` (int): Maximum prim dims for unary
+              (default: 2).
 
     Returns:
         Optimized ``TensorOperationConfig``.
     """
     from etops.backends.tileir import get_default_optimization_config
+    from etops.types import PrimType
 
     defaults = get_default_optimization_config()
     opts = {**defaults, **(optimization_config or {})}
     max_grid = opts["max_grid"]
 
+    is_unary = config.prim_main in (PrimType.copy, PrimType.relu)
+
+    if is_unary:
+        return _optimize_unary(config, opts, max_grid)
+    return _optimize_binary(config, opts, max_grid)
+
+
+def _optimize_binary(
+    config: "TensorOperationConfig",
+    opts: dict,
+    max_grid: int,
+) -> "TensorOperationConfig":
+    """Optimize a binary contraction config."""
     strides_in0 = config.strides[0][0]
     strides_in1 = config.strides[0][1]
     strides_out = config.strides[0][2]
@@ -281,7 +402,7 @@ def optimize(
         tuple(strides_out),
     )
 
-    new_order, new_exec_types = _optimize_impl(
+    new_order, new_exec_types = _optimize_binary_impl(
         new_dt, new_ds, new_s0, new_s1, new_so, max_grid
     )
 
@@ -292,6 +413,46 @@ def optimize(
             tuple(new_s0[i] for i in new_order),
             tuple(new_s1[i] for i in new_order),
             tuple(new_so[i] for i in new_order),
+        ),
+    )
+
+    from etops.config import TensorOperationConfig
+
+    return TensorOperationConfig(
+        backend=config.backend,
+        data_type=config.data_type,
+        prim_first=config.prim_first,
+        prim_main=config.prim_main,
+        prim_last=config.prim_last,
+        dim_types=permuted_dim_types,
+        exec_types=new_exec_types,
+        dim_sizes=permuted_dim_sizes,
+        strides=permuted_strides,
+    )
+
+
+def _optimize_unary(
+    config: "TensorOperationConfig",
+    opts: dict,
+    max_grid: int,
+) -> "TensorOperationConfig":
+    """Optimize a unary operation config."""
+    max_prim_dims = opts.get("max_prim_dims", 2)
+
+    strides_in0 = tuple(config.strides[0][0])
+    strides_out = tuple(config.strides[0][1])
+    dim_sizes = tuple(config.dim_sizes)
+
+    new_order, new_exec_types = _optimize_unary_impl(
+        dim_sizes, strides_in0, strides_out, max_grid, max_prim_dims
+    )
+
+    permuted_dim_types = tuple(config.dim_types[i] for i in new_order)
+    permuted_dim_sizes = tuple(dim_sizes[i] for i in new_order)
+    permuted_strides = (
+        (
+            tuple(strides_in0[i] for i in new_order),
+            tuple(strides_out[i] for i in new_order),
         ),
     )
 

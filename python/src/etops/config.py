@@ -46,8 +46,8 @@ class TensorOperationConfig:
       - strides: shape [1 or more][3][num_dims]
 
     Unary Operations:
-      - backend: "tpp"
-      - prim_main: etops.prim.copy or .zero
+      - backend: "tpp" or "tileir"
+      - prim_main: etops.prim.copy or .relu
       - dim_types: must be etops.dim.c for all dimensions
       - prim_first: must be etops.prim.none
       - prim_last: must be etops.prim.none
@@ -85,12 +85,20 @@ class TensorOperationConfig:
 
         # Determine operation type from prim_main
         is_binary = self.prim_main in [PrimType.gemm, PrimType.brgemm]
-        is_unary = self.prim_main in [PrimType.copy, PrimType.zero]
+        is_unary = self.prim_main in [PrimType.copy, PrimType.relu]
+
+        if self.prim_main == PrimType.zero:
+            raise ValueError(
+                "prim_main=prim.zero is not a valid unary operation. "
+                "Use prim_first=prim.zero for beta=0 accumulator init in "
+                "binary contractions, or prim_main=prim.copy/prim.relu "
+                "for unary operations."
+            )
 
         if not is_binary and not is_unary:
             raise ValueError(
                 f"Invalid prim_main: {self.prim_main}. "
-                f"Must be gemm/brgemm (binary) or copy/zero (unary)."
+                f"Must be gemm/brgemm (binary) or copy/relu (unary)."
             )
 
         # Validate dimension consistency

@@ -12,18 +12,20 @@ Includes:
 
 from __future__ import annotations
 
-__all__ = ["compile_analysis", "TileIRKernel"]
+__all__ = ["compile_binary_analysis", "compile_unary_analysis", "TileIRKernel"]
 
 import hashlib
 import logging
 import os
 import sys
-import tempfile
 import threading
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
-from etops.backends._tileir.config_analysis import ConfigAnalysis
+from etops.backends._tileir.config_analysis import (
+    BinaryConfigAnalysis,
+    UnaryConfigAnalysis,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -172,6 +174,7 @@ class TileIRKernel:
         grid_size: Number of CUDA thread blocks.
         kernel_name: Name of the kernel entry point in the cubin.
         cubin_path: Filesystem path to the ``.cubin``.
+        is_unary: Whether this is a unary kernel (2-pointer ABI).
     """
 
     def __init__(
@@ -179,10 +182,12 @@ class TileIRKernel:
         cubin_path: str,
         kernel_name: str,
         grid_size: int,
+        is_unary: bool = False,
     ) -> None:
         self.cubin_path = cubin_path
         self.kernel_name = kernel_name
         self.grid_size = grid_size
+        self.is_unary = is_unary
 
         import cupy as cp
 
@@ -194,26 +199,32 @@ class TileIRKernel:
 
         Args:
             in0: First input (CuPy or PyTorch CUDA tensor).
-            in1: Second input (CuPy or PyTorch CUDA tensor).
+            in1: Second input (CuPy or PyTorch CUDA tensor).  Ignored
+                for unary kernels.
             out: Output (CuPy or PyTorch CUDA tensor, pre-allocated).
         """
         import cupy as cp
 
-        # CuPy RawKernel only accepts CuPy ndarrays.  Convert any
-        # object that exposes __cuda_array_interface__ (e.g. PyTorch
-        # CUDA tensors) to a zero-copy CuPy view.
         in0 = self._as_cupy(in0)
-        in1 = self._as_cupy(in1)
         out = self._as_cupy(out)
 
         stream = cp.cuda.get_current_stream()
         # Block dims are embedded in cubin metadata; pass (1,1,1).
-        self._kernel(
-            (self.grid_size,),
-            (1, 1, 1),
-            (in0, in1, out),
-            stream=stream,
-        )
+        if self.is_unary:
+            self._kernel(
+                (self.grid_size,),
+                (1, 1, 1),
+                (in0, out),
+                stream=stream,
+            )
+        else:
+            in1 = self._as_cupy(in1)
+            self._kernel(
+                (self.grid_size,),
+                (1, 1, 1),
+                (in0, in1, out),
+                stream=stream,
+            )
 
     @staticmethod
     def _as_cupy(tensor: object) -> object:
@@ -240,32 +251,32 @@ class TileIRKernel:
 # ---------------------------------------------------------------------------
 
 
-class _Cache:
-    """Thread-safe in-memory cache of compiled kernels."""
+class _BinaryCache:
+    """Thread-safe in-memory cache of compiled binary kernels."""
 
     def __init__(self) -> None:
         self._store: Dict[str, TileIRKernel] = {}
         self._lock = threading.RLock()
 
-    def _key(self, analysis: ConfigAnalysis) -> str:
+    def _key(self, analysis: BinaryConfigAnalysis) -> str:
         """SHA-256 of the config JSON, truncated to 32 hex chars."""
         h = hashlib.sha256()
         h.update(analysis.config.to_json().encode())
         return h.hexdigest()[:32]
 
-    def get_or_compile(self, analysis: ConfigAnalysis) -> TileIRKernel:
+    def get_or_compile(self, analysis: BinaryConfigAnalysis) -> TileIRKernel:
         """Return cached kernel or build + cache it."""
         key = self._key(analysis)
         with self._lock:
             if key in self._store:
                 return self._store[key]
 
-            kernel = _compile_from_scratch(analysis, key)
+            kernel = _compile_binary_from_scratch(analysis, key)
             self._store[key] = kernel
             return kernel
 
 
-_global_cache = _Cache()
+_binary_cache = _BinaryCache()
 
 
 # ---------------------------------------------------------------------------
@@ -275,15 +286,15 @@ _global_cache = _Cache()
 _KERNEL_PREFIX = "tileir_"
 
 
-def _compile_from_scratch(
-    analysis: ConfigAnalysis,
+def _compile_binary_from_scratch(
+    analysis: BinaryConfigAnalysis,
     cache_key: str,
 ) -> TileIRKernel:
-    """Build IR → passes → bytecode → cubin → CuPy kernel."""
-    from etops.backends._tileir.ir_builder import build_function
+    """Build IR → passes → bytecode → cubin → CuPy kernel for binary."""
+    from etops.backends._tileir.ir_builder import build_binary_function
 
     kernel_name = _KERNEL_PREFIX + cache_key
-    func_ir, ctx, temp_dir = build_function(analysis, kernel_name)
+    func_ir, ctx, temp_dir = build_binary_function(analysis, kernel_name)
 
     mode = _dump_mode()
 
@@ -304,15 +315,96 @@ def _compile_from_scratch(
     )
 
 
-def compile_analysis(analysis: ConfigAnalysis) -> TileIRKernel:
-    """Compile *analysis* to an executable kernel (cached).
+def compile_binary_analysis(analysis: BinaryConfigAnalysis) -> TileIRKernel:
+    """Compile a binary *analysis* to an executable kernel (cached).
 
-    This is the main entry point used by :func:`tileir.create_operation`.
+    This is the main entry point used by :func:`tileir.create_operation`
+    for binary contractions.
 
     Args:
-        analysis: Frozen config analysis.
+        analysis: Frozen binary config analysis.
 
     Returns:
         A :class:`TileIRKernel` ready for launch.
     """
-    return _global_cache.get_or_compile(analysis)
+    return _binary_cache.get_or_compile(analysis)
+
+
+# ---------------------------------------------------------------------------
+# Unary compile pipeline
+# ---------------------------------------------------------------------------
+
+
+class _UnaryCache:
+    """Thread-safe in-memory cache of compiled unary kernels."""
+
+    def __init__(self) -> None:
+        self._store: Dict[str, TileIRKernel] = {}
+        self._lock = threading.RLock()
+
+    def _key(self, analysis: UnaryConfigAnalysis) -> str:
+        """SHA-256 of the config JSON, truncated to 32 hex chars."""
+        h = hashlib.sha256()
+        h.update(analysis.config.to_json().encode())
+        return h.hexdigest()[:32]
+
+    def get_or_compile(self, analysis: UnaryConfigAnalysis) -> TileIRKernel:
+        """Return cached kernel or build + cache it."""
+        key = self._key(analysis)
+        with self._lock:
+            if key in self._store:
+                return self._store[key]
+
+            kernel = _compile_unary_from_scratch(analysis, key)
+            self._store[key] = kernel
+            return kernel
+
+
+_unary_cache = _UnaryCache()
+
+_UNARY_KERNEL_PREFIX = "tileir_u_"
+
+
+def _compile_unary_from_scratch(
+    analysis: UnaryConfigAnalysis,
+    cache_key: str,
+) -> TileIRKernel:
+    """Build IR → passes → bytecode → cubin → CuPy kernel for unary."""
+    from etops.backends._tileir.ir_builder import build_unary_function
+
+    kernel_name = _UNARY_KERNEL_PREFIX + cache_key
+    func_ir, ctx, temp_dir = build_unary_function(analysis, kernel_name)
+
+    mode = _dump_mode()
+
+    if mode in ("before", "both", "all"):
+        _dump_ir("BEFORE passes (unary)", func_ir)
+
+    _apply_passes(func_ir)
+
+    if mode in ("after", "both", "all"):
+        _dump_ir("AFTER all passes (unary)", func_ir)
+
+    cubin_path = _build_cubin(func_ir, temp_dir, kernel_name)
+
+    return TileIRKernel(
+        cubin_path=str(cubin_path),
+        kernel_name=kernel_name,
+        grid_size=max(analysis.grid_size, 1),
+        is_unary=True,
+    )
+
+
+def compile_unary_analysis(analysis: UnaryConfigAnalysis) -> TileIRKernel:
+    """Compile a unary *analysis* to an executable kernel (cached).
+
+    This is the main entry point used by :func:`tileir.create_operation`
+    for unary operations.
+
+    Args:
+        analysis: Frozen unary config analysis.
+
+    Returns:
+        A :class:`TileIRKernel` ready for launch.
+    """
+    return _unary_cache.get_or_compile(analysis)

@@ -69,3 +69,9 @@ LIBXSMM_GIT_TAG = { env = "LIBXSMM_GIT_TAG", default = "c14cbc6" }
 [tool.setuptools_scm]
 write_to = "src/etops/_version.py"
 fallback_version = "0.0.0+unknown"
+
+# ---------------------------------------------
+# Ruff linter / formatter
+# ---------------------------------------------
+[tool.ruff]
+line-length = 88
