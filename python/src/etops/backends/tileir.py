@@ -8,7 +8,7 @@ object graphs (``cuda.tile._ir.ops.*`` classes), bypassing the
 
 Supports:
   * Binary contractions: GEMM and BRGEMM (3-pointer ABI: in0, in1, out).
-  * Unary operations: copy, zero, relu (2-pointer ABI: in0, out).
+  * Unary operations: copy, relu (2-pointer ABI: in0, out).
   * Data types: FP32, FP64, FP16, BF16, TF32.
   * Exec types: shared (grid-mapped), sequential (for-loops), prim (tile).
   * ``prim_first``: ``zero`` (beta=0) or ``none`` (beta=1) [binary only].
@@ -46,15 +46,14 @@ class TileIROperation:
     :class:`~etops.backends.base.CompiledOperation` protocol.
     """
 
-    def __init__(self, kernel: object, grid_size: int) -> None:
+    def __init__(self, kernel: object) -> None:
         """Initialize.
 
         Args:
-            kernel: A :class:`TileIRKernel` instance.
-            grid_size: Grid size for kernel launch.
+            kernel: A :class:`TileIRKernel` instance.  The kernel
+                manages its own grid size internally.
         """
         self._kernel = kernel
-        self._grid_size = grid_size
 
     def execute(
         self,
@@ -67,7 +66,8 @@ class TileIROperation:
         Args:
             in0: First input tensor (CuPy ndarray on CUDA device).
             in1: Second input tensor (CuPy ndarray on CUDA device).
-                Ignored for unary operations.
+                Required for binary contractions.  Pass ``None`` for
+                unary operations.
             out: Output tensor (pre-allocated, on CUDA device).
         """
         self._kernel(in0, in1, out)
@@ -103,14 +103,14 @@ def create_operation(config: "TensorOperationConfig") -> TileIROperation:
 
         unary_analysis = analyze_unary_config(config)
         unary_kernel = compile_unary_analysis(unary_analysis)
-        return TileIROperation(unary_kernel, unary_analysis.grid_size)
+        return TileIROperation(unary_kernel)
 
     from etops.backends._tileir.config_analysis import analyze_binary_config
     from etops.backends._tileir.compiler import compile_binary_analysis
 
     binary_analysis = analyze_binary_config(config)
     binary_kernel = compile_binary_analysis(binary_analysis)
-    return TileIROperation(binary_kernel, binary_analysis.grid_size)
+    return TileIROperation(binary_kernel)
 
 
 # =============================================================================
@@ -123,16 +123,22 @@ def get_default_optimization_config() -> dict:
 
     Returns:
         Dictionary with default optimization parameters:
+
         - ``max_grid``: Maximum CUDA grid size (2^24 - 1).
-        - ``max_prim_dims``: Maximum number of prim dimensions for unary
-          operations (default: 5).
-        - ``max_prim_tile_volume``: Maximum padded tile volume (product of
-          ``next_pow2(size)`` for all prim dims) for unary operations.
-          Tiles exceeding this limit cause the tileiras compiler to time
-          out or produce slow code.  Default: 32768 (2^15).
+        - ``max_prim_dim_size``: Maximum raw size for any single
+          dimension (binary and unary).  Dimensions exceeding this
+          limit are split into an outer/inner pair via factorization
+          before prim selection. Default: 64.
+        - ``max_prim_dims``: Maximum number of prim dimensions for
+          unary operations (default: 5).
+        - ``max_prim_tile_volume``: Maximum padded tile volume (product
+          of ``next_pow2(size)`` for all prim dims).  Tiles exceeding
+          this limit cause the cuda.tile compiler to time out or
+          produce slow code.  Default: 32768 (2^15).
     """
     return {
         "max_grid": 16777215,  # 2^24 - 1
+        "max_prim_dim_size": 64,
         "max_prim_dims": 5,
         "max_prim_tile_volume": 32768,  # 2^15
     }
@@ -145,33 +151,34 @@ def optimize_config(
     """Optimize a tensor operation configuration for the tileir backend.
 
     Dispatches to the binary or unary optimizer based on ``prim_main``.
+    Both pipelines use a transformation-based approach: split oversized
+    dims, assign exec types, reorder, and fuse compatible neighbors.
 
-    **Binary algorithm:**
+    **Binary pipeline:**
 
-    1. Add synthetic prim dimensions for any missing M/N/K types.
-    2. Select prim representatives (preferring unit stride).
-    3. Sort shared dims by stride for memory locality.
-    4. Interleave shared M and N dimensions.
-    5. Demote outermost shared dims to seq if grid would exceed *max_grid*.
-    6. Produce ordering: ``[shared] -> [seq] -> [prims]``.
+    1. Add synthetic size-1 prim dims for any missing M/N/K types.
+    2. Split dims exceeding *max_prim_dim_size* via factorization.
+    3. Select prim representatives (preferring unit stride).
+    4. Assign exec types: K outers -> seq, M/N/C outers -> shared.
+    5. Reorder: shared -> seq -> prim (N, K, M innermost).
+    6. Fuse adjacent compatible dims.
 
-    **Unary algorithm:**
+    **Unary pipeline:**
 
-    1. Select prim dims: unit-stride dims from in0 and out, then fill
+    1. Split dims exceeding *max_prim_dim_size* via factorization.
+    2. Select prim dims: unit-stride dims from in0 and out, then fill
        to *max_prim_dims* by smallest min-stride, subject to
        *max_prim_tile_volume* (padded tile volume cap).
-    2. Safety check: avoid a known tileiras assembler crash when the
+    3. Safety check: avoid a known cuda.tile assembler crash when the
        innermost prim dim pads to 64 with asymmetric unit strides.
-    3. Remaining dims become shared (up to *max_grid*), then seq.
-    4. Produce ordering: ``[shared] -> [seq] -> [prims]``.
+    4. Remaining dims become shared (up to *max_grid*), then seq.
+    5. Reorder: shared -> seq -> prim.
+    6. Fuse adjacent compatible dims.
 
     Args:
         config: Tensor operation configuration to optimize.
-        optimization_config: Optional dict with keys:
-            - ``max_grid``: Maximum allowed grid size (default: 2^24 - 1).
-            - ``max_prim_dims``: Max prim dims for unary (default: 5).
-            - ``max_prim_tile_volume``: Max padded prim tile volume for
-              unary (default: 32768).
+        optimization_config: Optional dict with keys documented in
+            :func:`get_default_optimization_config`.
 
     Returns:
         Optimized :class:`TensorOperationConfig` with exec_types and
