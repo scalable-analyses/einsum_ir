@@ -313,7 +313,8 @@ einsum_ir/
 │   │               ├── config_analysis.py  # Binary/unary config → analysis objects
 │   │               ├── ir_builder.py       # TileIR function graph construction
 │   │               ├── compiler.py         # Optimization, compilation, kernel cache
-│   │               └── optimizer.py        # Exec-type / dim-ordering optimizer
+│   │               ├── optimizer.py        # Exec-type / dim-ordering optimizer
+│   │               └── transforms.py       # Dimension split/fuse/reorder transforms
 │   └── tests/                  # pytest test suite
 │       ├── test_api.py
 │       ├── test_backends.py
