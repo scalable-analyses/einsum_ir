@@ -117,20 +117,10 @@ def get_optimizer(backend_name: str):
 
     Raises:
         ValueError: If backend name is unknown
-        ImportError: If backend dependencies are not installed
     """
     if backend_name not in _BACKEND_REGISTRY:
-        available = list_backends()
-        raise ValueError(
-            f"Unknown backend '{backend_name}'. Available backends: {available}"
-        )
-
-    if not _check_availability(backend_name):
-        info = _BACKEND_REGISTRY[backend_name]
-        raise ImportError(
-            f"Backend '{backend_name}' requires: {info['requires']}. "
-            f"Install with: pip install etops[{backend_name}]"
-        )
+        known = sorted(_BACKEND_REGISTRY.keys())
+        raise ValueError(f"Unknown backend '{backend_name}'. Known backends: {known}")
 
     info = _BACKEND_REGISTRY[backend_name]
     module = importlib.import_module(info["module"])
@@ -149,20 +139,10 @@ def get_default_optimization_config(backend_name: str):
 
     Raises:
         ValueError: If backend name is unknown
-        ImportError: If backend dependencies are not installed
     """
     if backend_name not in _BACKEND_REGISTRY:
-        available = list_backends()
-        raise ValueError(
-            f"Unknown backend '{backend_name}'. Available backends: {available}"
-        )
-
-    if not _check_availability(backend_name):
-        info = _BACKEND_REGISTRY[backend_name]
-        raise ImportError(
-            f"Backend '{backend_name}' requires: {info['requires']}. "
-            f"Install with: pip install etops[{backend_name}]"
-        )
+        known = sorted(_BACKEND_REGISTRY.keys())
+        raise ValueError(f"Unknown backend '{backend_name}'. Known backends: {known}")
 
     info = _BACKEND_REGISTRY[backend_name]
     module = importlib.import_module(info["module"])
