@@ -423,24 +423,50 @@ TileIR GPU Example
 TileIR Environment Variables
 ----------------------------
 
-``ETOPS_TILEIR_DUMP_IR``
-    Controls dumping of the TileIR intermediate representation to stderr.
-    Useful for debugging kernel generation. Case-insensitive, whitespace-tolerant.
+``ETOPS_DUMP_IR``
+    Controls dumping of generated TileIR intermediate representation and/or
+    SASS disassembly to stderr. Useful for debugging kernel generation.
 
-    +-----------+--------------------------------------------------------------+
-    | Value     | Effect                                                       |
-    +===========+==============================================================+
-    | *(unset)* | No dump (default)                                            |
-    +-----------+--------------------------------------------------------------+
-    | ``before``| Dump IR before optimization passes                           |
-    +-----------+--------------------------------------------------------------+
-    | ``after`` | Dump IR after all optimization passes                        |
-    +-----------+--------------------------------------------------------------+
-    | ``both``  | Dump IR before and after passes                              |
-    +-----------+--------------------------------------------------------------+
-    | ``all``   | Dump before passes, after each individual pass (with pass    |
-    |           | name), and after all passes                                  |
-    +-----------+--------------------------------------------------------------+
+    The value is a **comma-separated list** of tokens (case-insensitive,
+    whitespace-tolerant).  Multiple tokens may be combined freely.
+
+    +--------------------+--------------------------------------------------------------+
+    | Token              | Effect                                                       |
+    +====================+==============================================================+
+    | *(unset / empty)*  | No dump (default)                                            |
+    +--------------------+--------------------------------------------------------------+
+    | ``tileir_before``  | Dump TileIR text before optimization passes                  |
+    +--------------------+--------------------------------------------------------------+
+    | ``tileir_after``   | Dump TileIR text after all optimization passes               |
+    +--------------------+--------------------------------------------------------------+
+    | ``tileir_all``     | Dump TileIR text before passes, after each individual pass   |
+    |                    | (with pass name), and after all passes                       |
+    +--------------------+--------------------------------------------------------------+
+    | ``sass``           | Dump SASS disassembly of the compiled cubin (requires        |
+    |                    | ``cuobjdump`` on ``PATH``)                                   |
+    +--------------------+--------------------------------------------------------------+
+
+    **Examples:**
+
+    .. code-block:: bash
+
+        # TileIR after optimization passes only
+        ETOPS_DUMP_IR=tileir_after python my_script.py
+
+        # SASS disassembly only
+        ETOPS_DUMP_IR=sass python my_script.py
+
+        # TileIR before + after passes, plus SASS
+        ETOPS_DUMP_IR=tileir_before,tileir_after,sass python my_script.py
+
+        # Full TileIR trace (every pass) plus SASS
+        ETOPS_DUMP_IR=tileir_all,sass python my_script.py
+
+    .. note::
+
+        The ``sass`` token requires ``cuobjdump`` (part of the CUDA Toolkit)
+        to be available on ``PATH``.  A ``RuntimeError`` is raised if
+        ``cuobjdump`` cannot be found when SASS dumping is requested.
 
 
 JSON Serialization

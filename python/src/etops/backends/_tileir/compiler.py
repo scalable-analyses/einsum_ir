@@ -7,7 +7,7 @@ a ``.cubin``, and wraps the result in a CuPy ``RawKernel`` for launch.
 
 Includes:
   * In-memory SHA-256 kernel cache (thread-safe).
-  * ``ETOPS_TILEIR_DUMP_IR`` environment-variable controlled IR text dump.
+  * ``ETOPS_DUMP_IR`` environment-variable controlled IR / SASS text dump.
 """
 
 from __future__ import annotations
@@ -17,10 +17,12 @@ __all__ = ["compile_binary_analysis", "compile_unary_analysis", "TileIRKernel"]
 import hashlib
 import logging
 import os
+import shutil
+import subprocess
 import sys
 import threading
 from pathlib import Path
-from typing import Dict
+from typing import Dict, FrozenSet
 
 from etops.backends._tileir.config_analysis import (
     BinaryConfigAnalysis,
@@ -31,19 +33,35 @@ _logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# IR dump configuration
+# Dump configuration (ETOPS_DUMP_IR)
 # ---------------------------------------------------------------------------
 
-_DUMP_ENV = "ETOPS_TILEIR_DUMP_IR"
+_DUMP_ENV = "ETOPS_DUMP_IR"
+
+#: Valid tokens recognised in the comma-separated ``ETOPS_DUMP_IR`` value.
+_VALID_TOKENS = frozenset({"tileir_before", "tileir_after", "tileir_all", "sass"})
 
 
-def _dump_mode() -> str:
-    """Return the dump mode from ``ETOPS_TILEIR_DUMP_IR`` (lower-cased).
+def _dump_tokens() -> FrozenSet[str]:
+    """Return the set of active dump tokens from ``ETOPS_DUMP_IR``.
 
-    Valid values: ``""`` (off), ``"before"``, ``"after"``, ``"both"``,
-    ``"all"``.
+    The environment variable is a comma-separated list of tokens
+    (case-insensitive, whitespace-tolerant).  Valid tokens:
+
+    * ``tileir_before`` -- dump TileIR text before optimisation passes.
+    * ``tileir_after``  -- dump TileIR text after all optimisation passes.
+    * ``tileir_all``    -- dump TileIR text before, after each individual
+      pass, and after all passes.
+    * ``sass``          -- dump SASS disassembly of the compiled cubin.
+
+    Unrecognised tokens are silently ignored so that forward-compatible
+    values do not break older releases.
     """
-    return os.environ.get(_DUMP_ENV, "").strip().lower()
+    raw = os.environ.get(_DUMP_ENV, "").strip().lower()
+    if not raw:
+        return frozenset()
+    tokens = frozenset(t.strip() for t in raw.split(",") if t.strip())
+    return tokens & _VALID_TOKENS
 
 
 def _dump_ir(label: str, func_ir: object) -> None:
@@ -51,6 +69,38 @@ def _dump_ir(label: str, func_ir: object) -> None:
     sep = "=" * 72
     sys.stderr.write(f"{sep}\nTileIR  *** {label} ***\n{sep}\n")
     sys.stderr.write(func_ir.body.to_string())
+    sys.stderr.write("\n\n")
+    sys.stderr.flush()
+
+
+def _dump_sass(cubin_path: str) -> None:
+    """Disassemble *cubin_path* with ``cuobjdump -sass`` and write to stderr.
+
+    Raises:
+        RuntimeError: If ``cuobjdump`` is not found on ``PATH``.
+    """
+    cuobjdump = shutil.which("cuobjdump")
+    if cuobjdump is None:
+        raise RuntimeError(
+            "SASS dump requested (ETOPS_DUMP_IR contains 'sass') but "
+            "'cuobjdump' was not found on PATH.  Install the CUDA Toolkit "
+            "or ensure 'cuobjdump' is accessible."
+        )
+
+    result = subprocess.run(
+        [cuobjdump, "-sass", cubin_path],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"cuobjdump -sass failed (exit code {result.returncode}):\n{result.stderr}"
+        )
+
+    sep = "=" * 72
+    sys.stderr.write(f"{sep}\nSASS  *** {cubin_path} ***\n{sep}\n")
+    sys.stderr.write(result.stdout)
     sys.stderr.write("\n\n")
     sys.stderr.flush()
 
@@ -71,7 +121,7 @@ _PASS_NAMES = [
 ]
 
 
-def _apply_passes(func_ir: object) -> None:
+def _apply_passes(func_ir: object, tokens: FrozenSet[str]) -> None:
     """Apply the standard 8-pass IR transformation pipeline in-place."""
     from cuda.tile._passes.alias_analysis import alias_analysis_pass
     from cuda.tile._passes.code_motion import hoist_loop_invariants
@@ -81,7 +131,7 @@ def _apply_passes(func_ir: object) -> None:
     from cuda.tile._passes.rewrite_patterns import rewrite_patterns
     from cuda.tile._passes.token_order import token_order_pass
 
-    mode = _dump_mode()
+    dump_all = "tileir_all" in tokens
     root = func_ir.body
 
     passes = [
@@ -99,16 +149,16 @@ def _apply_passes(func_ir: object) -> None:
     for name, fn in passes:
         if name == "alias_analysis_pass":
             alias_result = alias_analysis_pass(root)
-            if mode == "all":
+            if dump_all:
                 _dump_ir(f"AFTER {name}", func_ir)
             continue
         if name == "token_order_pass":
             token_order_pass(root, alias_result)
-            if mode == "all":
+            if dump_all:
                 _dump_ir(f"AFTER {name}", func_ir)
             continue
         fn(root)
-        if mode == "all":
+        if dump_all:
             _dump_ir(f"AFTER {name}", func_ir)
 
 
@@ -296,17 +346,20 @@ def _compile_binary_from_scratch(
     kernel_name = _KERNEL_PREFIX + cache_key
     func_ir, ctx, temp_dir = build_binary_function(analysis, kernel_name)
 
-    mode = _dump_mode()
+    tokens = _dump_tokens()
 
-    if mode in ("before", "both", "all"):
+    if tokens & {"tileir_before", "tileir_all"}:
         _dump_ir("BEFORE passes", func_ir)
 
-    _apply_passes(func_ir)
+    _apply_passes(func_ir, tokens)
 
-    if mode in ("after", "both", "all"):
+    if tokens & {"tileir_after", "tileir_all"}:
         _dump_ir("AFTER all passes", func_ir)
 
     cubin_path = _build_cubin(func_ir, temp_dir, kernel_name)
+
+    if "sass" in tokens:
+        _dump_sass(str(cubin_path))
 
     return TileIRKernel(
         cubin_path=str(cubin_path),
@@ -375,17 +428,20 @@ def _compile_unary_from_scratch(
     kernel_name = _UNARY_KERNEL_PREFIX + cache_key
     func_ir, ctx, temp_dir = build_unary_function(analysis, kernel_name)
 
-    mode = _dump_mode()
+    tokens = _dump_tokens()
 
-    if mode in ("before", "both", "all"):
+    if tokens & {"tileir_before", "tileir_all"}:
         _dump_ir("BEFORE passes (unary)", func_ir)
 
-    _apply_passes(func_ir)
+    _apply_passes(func_ir, tokens)
 
-    if mode in ("after", "both", "all"):
+    if tokens & {"tileir_after", "tileir_all"}:
         _dump_ir("AFTER all passes (unary)", func_ir)
 
     cubin_path = _build_cubin(func_ir, temp_dir, kernel_name)
+
+    if "sass" in tokens:
+        _dump_sass(str(cubin_path))
 
     return TileIRKernel(
         cubin_path=str(cubin_path),
