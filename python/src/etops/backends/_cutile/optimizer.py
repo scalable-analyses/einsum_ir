@@ -1,3 +1,4 @@
+import copy
 import etops
 import cupy as cp
 import itertools
@@ -690,6 +691,55 @@ class Optimizer:
                         best_splits        = best_splits[:20]
 
 
+        # create new config helpers for the top 20 splits
+        # For each candidate, deep-copy the current (post-fused) cfg and apply the
+        # M/N/K tile splits so that every dimension is split into
+        #   [outer_loop_size, primitive_tile_size]
+        # where the primitive tile occupies the inner (lower-stride) sub-dimension.
+        # Dimensions whose tile equals their full size (no outer loop needed) or
+        # whose tile is 1 (dimension not included in the primitive) are left unsplit.
+        self.prim_cfgs = []
+
+        for score, split_m, split_n, split_k in best_splits:
+            prim_cfg = copy.deepcopy(self.cfg)
+
+            dim_ids_to_split = []
+            splits_to_apply  = []
+
+            split_counter_m = 0
+            split_counter_n = 0
+            split_counter_k = 0
+
+            for i in range(len(prim_cfg.dim_types)):
+                dim_type  = prim_cfg.dim_types[i]
+                full_size = prim_cfg.dim_sizes[i]
+
+                if dim_type == etops.dim.m:
+                    tile_size = split_m[split_counter_m]
+                    split_counter_m += 1
+                elif dim_type == etops.dim.n:
+                    tile_size = split_n[split_counter_n]
+                    split_counter_n += 1
+                elif dim_type == etops.dim.k:
+                    tile_size = split_k[split_counter_k]
+                    split_counter_k += 1
+                else:
+                    # C (batch) dimensions are not split here
+                    continue
+
+                if tile_size == 1 or tile_size == full_size:
+                    continue
+
+                dim_ids_to_split.append(i)
+                # split[0] = outer loop size (higher stride, id)
+                # split[1] = primitive tile  (lower/original stride, id+1)
+
+                splits_to_apply.append([full_size // tile_size, tile_size])
+
+            prim_cfg._split_multiple_dimensions(dim_ids_to_split, splits_to_apply)
+            self.prim_cfgs.append((prim_cfg, score))
+
+
 
     def _optimize_for_l2_cache(self):
         """
@@ -729,24 +779,3 @@ class Optimizer:
 
 
 
-    def get_optimized_config(self):
-        """
-        Returns the optimized configuration
-        """
-
-        # convert strides back to tuple of tuples format
-        strides = ((tuple(self.cfg.strides_left), tuple(self.cfg.strides_right), tuple(self.cfg.strides_out)),)
-
-        optimized_config = etops.TensorOperationConfig(
-            backend    =   self.config.backend,
-            data_type  =   self.data_type,
-            prim_first =   self.config.prim_first,
-            prim_main  =   self.prim_main,
-            prim_last  =   self.config.prim_last,
-            dim_types  =   tuple(self.cfg.dim_types),
-            exec_types =   tuple(self.cfg.exec_types),
-            dim_sizes  =   tuple(self.cfg.dim_sizes),
-            strides    =   strides
-        )
-
-        return optimized_config

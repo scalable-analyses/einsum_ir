@@ -2,7 +2,6 @@ import etops
 import math
 
 
-
 class ConfigHelper:
     def __init__(self, config):
         """
@@ -15,6 +14,13 @@ class ConfigHelper:
         # currently no support for multiple memory layers
         if len(config.strides) > 1:
             raise ValueError("Currently only support for one memory layer for the cuTile backend.")
+
+        # Non-list fields needed to reconstruct a TensorOperationConfig
+        self.backend    = config.backend
+        self.data_type  = config.data_type
+        self.prim_first = config.prim_first
+        self.prim_main  = config.prim_main
+        self.prim_last  = config.prim_last
 
         self.exec_types = list(config.exec_types)
         self.dim_types  = list(config.dim_types)
@@ -137,21 +143,39 @@ class ConfigHelper:
         appear_in_right = stride_0_right != 0 and stride_1_right != 0
         appear_in_out   = stride_0_out   != 0 and stride_1_out   != 0
 
-        are_fusable = True
+        # Track whether id_0 is the inner (lower-stride) dimension.
+        # None  = not yet determined.
+        # True  = id_0 is inner, id_1 is outer  (stride_0 < stride_1).
+        # False = id_1 is inner, id_0 is outer  (stride_1 < stride_0).
+        # All tensors where both dimensions appear must agree on this ordering;
+        # otherwise fusing them would reorder the logical layout across tensors.
+        inner_is_id_0 = None
 
-        if appear_in_left:
-            are_fusable_left = (stride_0_left == dim_size_1 * stride_1_left) or (stride_1_left == dim_size_0 * stride_0_left)
-            are_fusable = are_fusable and are_fusable_left
+        for appear, s0, s1 in (
+            (appear_in_left,  stride_0_left,  stride_1_left),
+            (appear_in_right, stride_0_right, stride_1_right),
+            (appear_in_out,   stride_0_out,   stride_1_out),
+        ):
+            if not appear:
+                continue
 
-        if appear_in_right:
-            are_fusable_right = (stride_0_right == dim_size_1 * stride_1_right) or (stride_1_right == dim_size_0 * stride_0_right)
-            are_fusable = are_fusable and are_fusable_right
+            if s0 == dim_size_1 * s1:
+                # id_1 is inner (lower stride), id_0 is outer
+                this_inner_is_id_0 = False
+            elif s1 == dim_size_0 * s0:
+                # id_0 is inner (lower stride), id_1 is outer
+                this_inner_is_id_0 = True
+            else:
+                # dimensions are not adjacent in this tensor
+                return False
 
-        if appear_in_out:
-            are_fusable_out = (stride_0_out == dim_size_1 * stride_1_out) or (stride_1_out == dim_size_0 * stride_0_out)
-            are_fusable = are_fusable and are_fusable_out
+            if inner_is_id_0 is None:
+                inner_is_id_0 = this_inner_is_id_0
+            elif inner_is_id_0 != this_inner_is_id_0:
+                # ordering is inconsistent across tensors — cannot fuse
+                return False
 
-        return are_fusable
+        return True
 
 
 
@@ -376,3 +400,29 @@ class ConfigHelper:
         self.strides_right = [self.strides_right[i] for i in new_order]
         self.strides_out   = [self.strides_out[i]   for i in new_order]
         self.divisors     = [self.divisors[i]     for i in new_order]
+
+
+
+    # =========================================================================
+    # Config reconstruction
+    # =========================================================================
+
+    def get_config(self):
+        """
+        Reconstruct and return a TensorOperationConfig from the current
+        (potentially fused / split / permuted) dimension and stride lists.
+        """
+
+        strides = ((tuple(self.strides_left), tuple(self.strides_right), tuple(self.strides_out)),)
+
+        return etops.TensorOperationConfig(
+            backend    = self.backend,
+            data_type  = self.data_type,
+            prim_first = self.prim_first,
+            prim_main  = self.prim_main,
+            prim_last  = self.prim_last,
+            dim_types  = tuple(self.dim_types),
+            exec_types = tuple(self.exec_types),
+            dim_sizes  = tuple(self.dim_sizes),
+            strides    = strides
+        )
