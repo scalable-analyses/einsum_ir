@@ -20,6 +20,8 @@ class Optimizer:
         self.global_mem_size = props['totalGlobalMem']
         self.l2_cache_size = props['l2CacheSize']
 
+        self.MAX_L2_CACHE_UTILIZATION = 0.9
+
         self.config = config
 
         self.data_type = self.config.data_type
@@ -44,11 +46,7 @@ class Optimizer:
         # Build config helper — owns all mutable dim/stride metadata
         self.cfg = ConfigHelper(config)
 
-        self.left_size_total  = self.cfg.C_size_total * self.cfg.M_size_total * self.cfg.K_size_total
-        self.right_size_total = self.cfg.C_size_total * self.cfg.K_size_total * self.cfg.N_size_total
-        self.out_size_total   = self.cfg.C_size_total * self.cfg.M_size_total * self.cfg.N_size_total
-
-        self.elements_total = self.left_size_total + self.right_size_total + self.out_size_total
+        self.l2_cache_size_in_elements = self.l2_cache_size // self.bytes_per_element_load
 
 
 
@@ -63,9 +61,14 @@ class Optimizer:
         # Fuse all fusable dimensions together
         self.cfg._fuse_all_fusable_dimensions(new_exec_type=etops.exec.seq)
 
-        self._find_primitive_dimension()
-        self._optimize_for_l2_cache()
+        # Get the primitive dimension candidates
+        candidate_cfgs = self._find_primitive_dimension()
 
+        # If both the left and right input tensor fit into L2 cache, we can skip l2 cache optimization        
+        if self.cfg.left_size_total + self.cfg.right_size_total > self.l2_cache_size_in_elements * self.MAX_L2_CACHE_UTILIZATION:
+            self.cfg._optimize_for_l2_cache(candidate_cfgs[0])
+
+        
 
 
     def _get_all_possible_dim_size_combinations(self, ids_list, strides_list, strides_list_2=None, pruning_rules=[], merge_rules=[]):
@@ -674,7 +677,7 @@ class Optimizer:
 
                     if len(performance_scores) < 20 or performance_score > performance_scores[-1]:
                         performance_scores.append(performance_score)
-                        best_splits.append([performance_score, split_m, split_n, split_k])
+                        best_splits.append([split_m, split_n, split_k])
 
                         # sort by performance score
                         sorted_pairs = sorted(
@@ -698,9 +701,9 @@ class Optimizer:
         # where the primitive tile occupies the inner (lower-stride) sub-dimension.
         # Dimensions whose tile equals their full size (no outer loop needed) or
         # whose tile is 1 (dimension not included in the primitive) are left unsplit.
-        self.prim_cfgs = []
+        prim_cfgs = []
 
-        for score, split_m, split_n, split_k in best_splits:
+        for split_m, split_n, split_k in best_splits:
             prim_cfg = copy.deepcopy(self.cfg)
 
             dim_ids_to_split = []
@@ -748,29 +751,18 @@ class Optimizer:
                 splits_to_apply.append([full_size // tile_size, tile_size])
 
             prim_cfg._split_multiple_dimensions(dim_ids_to_split, splits_to_apply, new_exec_type_left=etops.exec.seq, new_exec_type_right=etops.exec.prim)
-            self.prim_cfgs.append(prim_cfg)
+            prim_cfgs.append(prim_cfg)
+        
+        return prim_cfgs
 
 
 
-    def _optimize_for_l2_cache(self):
+    def _optimize_for_l2_cache(self, config_object):
         """
         Optimize the configuration for L2 cache size by splitting/fusing dimensions.
         The goal is to maximize L2 cache utilization and reuse.
         """
 
-        l2_cache_size_in_elements = self.l2_cache_size // self.bytes_per_element_load
+        
 
-        # calculate sizes of left and right tensor
-        left_tensor_elements_count  = 1
-        right_tensor_elements_count = 1
-        for i in range(len(self.cfg.dim_types)):
-            if self.cfg.dim_types[i] == etops.dim.m or self.cfg.dim_types[i] == etops.dim.k or self.cfg.dim_types[i] == etops.dim.c:
-                left_tensor_elements_count *= self.cfg.dim_sizes[i]
 
-        for i in range(len(self.cfg.dim_types)):
-            if self.cfg.dim_types[i] == etops.dim.n or self.cfg.dim_types[i] == etops.dim.k or self.cfg.dim_types[i] == etops.dim.c:
-                right_tensor_elements_count *= self.cfg.dim_sizes[i]
-
-        # if left tensor and right tensor both fit in L2 cache, return
-        if left_tensor_elements_count + right_tensor_elements_count <= l2_cache_size_in_elements * 0.9:
-            return
