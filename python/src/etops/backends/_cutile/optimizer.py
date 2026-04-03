@@ -716,18 +716,29 @@ class Optimizer:
 
                 if dim_type == etops.dim.m:
                     tile_size = split_m[split_counter_m]
+                    num_dims_of_type = len(split_m)
                     split_counter_m += 1
                 elif dim_type == etops.dim.n:
                     tile_size = split_n[split_counter_n]
+                    num_dims_of_type = len(split_n)
                     split_counter_n += 1
                 elif dim_type == etops.dim.k:
                     tile_size = split_k[split_counter_k]
+                    num_dims_of_type = len(split_k)
                     split_counter_k += 1
                 else:
                     # C (batch) dimensions are not split here
                     continue
 
-                if tile_size == 1 or tile_size == full_size:
+                # no split
+                if tile_size == 1:
+                    if num_dims_of_type == 1:
+                        prim_cfg.exec_types[i] = etops.exec.prim
+                    continue
+
+                # no split, but prim dimension
+                if tile_size == full_size:
+                    prim_cfg.exec_types[i] = etops.exec.prim
                     continue
 
                 dim_ids_to_split.append(i)
@@ -736,8 +747,8 @@ class Optimizer:
 
                 splits_to_apply.append([full_size // tile_size, tile_size])
 
-            prim_cfg._split_multiple_dimensions(dim_ids_to_split, splits_to_apply)
-            self.prim_cfgs.append((prim_cfg, score))
+            prim_cfg._split_multiple_dimensions(dim_ids_to_split, splits_to_apply, new_exec_type_left=etops.exec.seq, new_exec_type_right=etops.exec.prim)
+            self.prim_cfgs.append(prim_cfg)
 
 
 
@@ -763,19 +774,3 @@ class Optimizer:
         # if left tensor and right tensor both fit in L2 cache, return
         if left_tensor_elements_count + right_tensor_elements_count <= l2_cache_size_in_elements * 0.9:
             return
-
-
-
-    def _get_ids_sorted_by_stride(self, strides_list):
-        """
-        Get the list of dimension IDs sorted by stride in ascending order.
-        Drops dimensions with stride equal to 0.
-        """
-
-        strides_list_without_zeros = [(i, stride) for i, stride in enumerate(strides_list) if stride != 0]
-        sorted_ids = [i for i, stride in sorted(strides_list_without_zeros, key=lambda x: x[1])]
-
-        return sorted_ids
-
-
-

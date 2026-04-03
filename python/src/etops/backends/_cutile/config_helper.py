@@ -284,7 +284,7 @@ class ConfigHelper:
     # Split helpers
     # =========================================================================
 
-    def _split_multiple_dimensions(self, dim_ids, splits):
+    def _split_multiple_dimensions(self, dim_ids, splits, new_exec_type_left=None, new_exec_type_right=None):
         """
         Split multiple dimensions at once.
 
@@ -322,11 +322,11 @@ class ConfigHelper:
 
         for offset, (original_id, split) in enumerate(sorted_pairs):
             actual_id = original_id + offset
-            self._split_dimension(actual_id, split[0], split[1])
+            self._split_dimension(actual_id, split[0], split[1], new_exec_type_left=new_exec_type_left, new_exec_type_right=new_exec_type_right)
 
 
 
-    def _split_dimension(self, id, dim_size_0, dim_size_1):
+    def _split_dimension(self, id, dim_size_0, dim_size_1, new_exec_type_left=None, new_exec_type_right=None):
         """
         Split a dimension into two dimensions.
         New dimensions will have sizes dim_size_0 and dim_size_1.
@@ -346,14 +346,15 @@ class ConfigHelper:
         old_stride_out   = self.strides_out[id]
 
         # update or insert new dimensions into lists
-        self.dim_sizes[id]    = dim_size_0
+        self.dim_sizes[id]     = dim_size_0
         self.strides_left[id]  = old_stride_left  * dim_size_1
         self.strides_right[id] = old_stride_right * dim_size_1
         self.strides_out[id]   = old_stride_out   * dim_size_1
-        self.divisors[id]     = self._get_divisors_for_dim(id)
+        self.divisors[id]      = self._get_divisors_for_dim(id)
+        self.exec_types[id]    = new_exec_type_left if new_exec_type_left is not None else self.exec_types[id]
 
         self.dim_types.insert(id + 1,     self.dim_types[id])
-        self.exec_types.insert(id + 1,    self.exec_types[id])
+        self.exec_types.insert(id + 1,    new_exec_type_right if new_exec_type_right is not None else self.exec_types[id])
         self.dim_sizes.insert(id + 1,     dim_size_1)
         self.strides_left.insert(id + 1,  old_stride_left)
         self.strides_right.insert(id + 1, old_stride_right)
