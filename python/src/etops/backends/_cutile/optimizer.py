@@ -66,7 +66,11 @@ class Optimizer:
 
         # If both the left and right input tensor fit into L2 cache, we can skip l2 cache optimization        
         if self.cfg.left_size_total + self.cfg.right_size_total > self.l2_cache_size_in_elements * self.MAX_L2_CACHE_UTILIZATION:
-            self.cfg._optimize_for_l2_cache(candidate_cfgs[0])
+            self._optimize_for_l2_cache(candidate_cfgs[0])
+
+            import pprint
+            print("Optimized config:")
+            pprint.pprint(candidate_cfgs[0].get_config())
 
         
 
@@ -757,12 +761,202 @@ class Optimizer:
 
 
 
-    def _optimize_for_l2_cache(self, config_object):
+    def _l2_split_wins_by_stride(self, candidate, existing, dim_ids, strides):
         """
-        Optimize the configuration for L2 cache size by splitting/fusing dimensions.
-        The goal is to maximize L2 cache utilization and reuse.
+        Tie-break between two split combinations that have the same total size and the same
+        number of 1s. Compares the split sizes for each dimension in ascending stride order.
+        The candidate wins if it has a strictly larger split size at the first position
+        where the two differ. Returns False if the candidate does not win (existing stays).
         """
 
-        
+        sorted_positions = sorted(range(len(dim_ids)), key=lambda pos: strides[dim_ids[pos]])
+
+        for pos in sorted_positions:
+            if candidate[pos] > existing[pos]:
+                return True
+            elif candidate[pos] < existing[pos]:
+                return False
+
+        return False  # equal in every position — existing stays
+
+
+    def _get_l2_splits_for_dim_ids(self, dim_ids, config_object, strides, prim_size, total_k_size, l2_limit):
+        """
+        Generate all valid L2 cache tile splits for the given list of dimension IDs.
+
+        Each element of the returned splits list is a tuple of per-dimension tile sizes
+        (one divisor per dimension  in dim_ids). A split is pruned when the tile alone —
+        multiplied by the associated primitive size and total K — already exceeds the L2
+        limit. When two splits have the same total tile size the merge rule is applied:
+        keep the split with more 1s (fewer active tile dimensions); if equal, resolve by
+        ascending-stride tie-break via _l2_split_wins_by_stride.
+
+        If no split survives pruning, a trivial all-ones split is returned as fallback
+        (no L2 tiling in that dimension).
+
+        Returns (splits, total_sizes).
+        """
+
+        if len(dim_ids) == 0:
+            return [()], [1]
+
+        splits      = []
+        total_sizes = []
+
+        for combination in itertools.product(*[config_object.divisors[i] for i in dim_ids]):
+            total_size = 1
+            for s in combination:
+                total_size *= s
+
+            # Prune: tile * prim * K exceeds the L2 budget for this dimension alone
+            if total_size * prim_size * total_k_size > l2_limit:
+                continue
+
+            if total_size not in total_sizes:
+                splits.append(combination)
+                total_sizes.append(total_size)
+            else:
+                existing_idx  = total_sizes.index(total_size)
+                existing      = splits[existing_idx]
+
+                current_ones  = sum(1 for s in combination if s == 1)
+                existing_ones = sum(1 for s in existing    if s == 1)
+
+                if current_ones > existing_ones:
+                    splits[existing_idx] = combination
+                elif current_ones == existing_ones:
+                    if self._l2_split_wins_by_stride(combination, existing, dim_ids, strides):
+                        splits[existing_idx] = combination
+
+        if not splits:
+            # Fallback: trivial split — no L2 tiling for this dimension
+            trivial = tuple(1 for _ in dim_ids)
+            splits.append(trivial)
+            total_sizes.append(1)
+
+        return splits, total_sizes
+
+
+    def _optimize_for_l2_cache(self, config_object):
+        """
+        Optimize the configuration for L2 cache size by splitting non-prim dimensions.
+        The goal is to maximise L2 cache utilisation and reuse.
+
+        For each non-prim M and N dimension a set of candidate tile sizes is generated
+        using _get_l2_splits_for_dim_ids. Individual splits are pruned when their tile
+        alone (times the corresponding primitive size times total K) exceeds the L2
+        budget. All (M-tile, N-tile) combinations are then evaluated with a simple
+        arithmetic-intensity performance model; the combination with the highest score is
+        applied in-place to config_object by splitting the relevant dimensions into an
+        outer (seq) and inner (seq) loop.
+        """
+
+        # -----------------------------------------------------------------------
+        # Prim sizes
+        # -----------------------------------------------------------------------
+        total_m_prim_size = 1
+        total_n_prim_size = 1
+
+        for i in range(len(config_object.dim_types)):
+            if config_object.dim_types[i] == etops.dim.m and config_object.exec_types[i] == etops.exec.prim:
+                total_m_prim_size *= config_object.dim_sizes[i]
+            elif config_object.dim_types[i] == etops.dim.n and config_object.exec_types[i] == etops.exec.prim:
+                total_n_prim_size *= config_object.dim_sizes[i]
+
+        # Combined prim footprint (m and n prim) used in the per-dimension pruning.
+        # total_k_size (full K, not just prim K) is passed separately and accounts
+        # for the iteration depth over K during the L2 tile computation.
+        total_mn_prim_size = total_m_prim_size * total_n_prim_size
+
+        total_k_size = config_object.K_size_total
+        l2_limit     = self.l2_cache_size_in_elements * self.MAX_L2_CACHE_UTILIZATION
+
+        # -----------------------------------------------------------------------
+        # Strides selection: use the strides of the larger tensor for each type
+        # -----------------------------------------------------------------------
+        left_size  = config_object.C_size_total * config_object.M_size_total * config_object.K_size_total
+        right_size = config_object.C_size_total * config_object.K_size_total * config_object.N_size_total
+        out_size   = config_object.C_size_total * config_object.M_size_total * config_object.N_size_total
+
+        m_strides = config_object.strides_left  if left_size  >= out_size else config_object.strides_out
+        n_strides = config_object.strides_right if right_size >= out_size else config_object.strides_out
+
+        # -----------------------------------------------------------------------
+        # Non-prim dimension IDs for M and N
+        # -----------------------------------------------------------------------
+        m_dim_ids = [
+            i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+            if dt == etops.dim.m and et != etops.exec.prim
+        ]
+        n_dim_ids = [
+            i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+            if dt == etops.dim.n and et != etops.exec.prim
+        ]
+
+        # -----------------------------------------------------------------------
+        # Generate candidate splits for M and N separately
+        # -----------------------------------------------------------------------
+        m_splits, m_total_sizes = self._get_l2_splits_for_dim_ids(
+            m_dim_ids, config_object, m_strides, total_mn_prim_size, total_k_size, l2_limit
+        )
+        n_splits, n_total_sizes = self._get_l2_splits_for_dim_ids(
+            n_dim_ids, config_object, n_strides, total_mn_prim_size, total_k_size, l2_limit
+        )
+
+        # -----------------------------------------------------------------------
+        # Evaluate all (M-tile, N-tile) combinations and keep the best
+        # -----------------------------------------------------------------------
+        best_split_m = m_splits[0]
+        best_split_n = n_splits[0]
+        best_score   = -math.inf
+
+        for split_m, total_m in zip(m_splits, m_total_sizes):
+            for split_n, total_n in zip(n_splits, n_total_sizes):
+                # Combined L2 footprint check
+                combined_footprint = total_m * total_m_prim_size + total_n * total_n_prim_size
+                if combined_footprint > l2_limit:
+                    score = 0.0
+                else:
+                    # Arithmetic-intensity performance model:
+                    #   (total_M * M_prim * K + total_N * N_prim * K)
+                    #   -------------------------------------------
+                    #   (total_M * M_prim * total_N * N_prim)
+                    numerator   = (total_m * total_m_prim_size * total_k_size +
+                                   total_n * total_n_prim_size * total_k_size)
+                    denominator =  total_m * total_m_prim_size * total_n * total_n_prim_size
+                    score = numerator / denominator if denominator > 0 else 0.0
+
+                if score > best_score:
+                    best_score   = score
+                    best_split_m = split_m
+                    best_split_n = split_n
+
+        # -----------------------------------------------------------------------
+        # Apply best split in-place: split each non-prim dim into [outer, inner]
+        # Both outer and inner receive exec.seq.
+        # -----------------------------------------------------------------------
+        dim_ids_to_split = []
+        splits_to_apply  = []
+
+        for pos, i in enumerate(m_dim_ids):
+            tile_size = best_split_m[pos]
+            full_size = config_object.dim_sizes[i]
+            if 1 < tile_size < full_size:
+                dim_ids_to_split.append(i)
+                splits_to_apply.append([full_size // tile_size, tile_size])
+
+        for pos, i in enumerate(n_dim_ids):
+            tile_size = best_split_n[pos]
+            full_size = config_object.dim_sizes[i]
+            if 1 < tile_size < full_size:
+                dim_ids_to_split.append(i)
+                splits_to_apply.append([full_size // tile_size, tile_size])
+
+        config_object._split_multiple_dimensions(
+            dim_ids_to_split, splits_to_apply,
+            new_exec_type_left=etops.exec.seq,
+            new_exec_type_right=etops.exec.seq
+        )
+
 
 

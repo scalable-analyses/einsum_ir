@@ -39,9 +39,9 @@ class ConfigHelper:
         self.C_size_total = 1
         self._init_CMNK_sizes()
 
-        self.left_size_total  = self.cfg.C_size_total * self.cfg.M_size_total * self.cfg.K_size_total
-        self.right_size_total = self.cfg.C_size_total * self.cfg.K_size_total * self.cfg.N_size_total
-        self.out_size_total   = self.cfg.C_size_total * self.cfg.M_size_total * self.cfg.N_size_total
+        self.left_size_total  = self.C_size_total * self.M_size_total * self.K_size_total
+        self.right_size_total = self.C_size_total * self.K_size_total * self.N_size_total
+        self.out_size_total   = self.C_size_total * self.M_size_total * self.N_size_total
 
         self.elements_total = self.left_size_total + self.right_size_total + self.out_size_total
 
