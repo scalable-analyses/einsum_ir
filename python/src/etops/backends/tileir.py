@@ -186,8 +186,15 @@ def optimize_config(
         dimension order set for tileir execution.
     """
 
-    # TODO: Add optimization_config support
+    from etops.types import PrimType
 
+    is_unary = config.prim_main in (PrimType.copy, PrimType.relu)
+
+    if is_unary:
+        from etops.backends._tileir.unary_optimizer import optimize
+        return optimize(config, optimization_config)
+
+    # TODO: Add optimization_config support
     from etops.backends._tileir.optimizer import Optimizer
 
     optimizer = Optimizer(config)
