@@ -75,6 +75,19 @@ class Optimizer:
 
         for i, cfg in enumerate(candidate_cfgs):
             optimized_cfg, factor = self._optimize_for_l2_cache(cfg)
+
+            # Assign final execution types:
+            #   prim dims   → keep exec.prim
+            #   k non-prim  → exec.seq  (reduction loop, sequential)
+            #   all others  → exec.shared (C/M/N dims parallelised across SM blocks)
+            for j in range(len(optimized_cfg.dim_types)):
+                if optimized_cfg.exec_types[j] == etops.exec.prim:
+                    pass
+                elif optimized_cfg.dim_types[j] == etops.dim.k:
+                    optimized_cfg.exec_types[j] = etops.exec.seq
+                else:
+                    optimized_cfg.exec_types[j] = etops.exec.shared
+
             candidate_cfgs_after_l2_cache_optimization.append(optimized_cfg)
             performance_scores[i] *= factor
 
