@@ -154,6 +154,7 @@ def optimize_config(
     Both pipelines use a transformation-based approach: split oversized
     dims, assign exec types, reorder, and fuse compatible neighbors.
 
+    TODO: Update binary pipeline description
     **Binary pipeline:**
 
     1. Add synthetic size-1 prim dims for any missing M/N/K types.
@@ -184,6 +185,11 @@ def optimize_config(
         Optimized :class:`TensorOperationConfig` with exec_types and
         dimension order set for tileir execution.
     """
-    from etops.backends._tileir.optimizer import optimize
 
-    return optimize(config, optimization_config)
+    # TODO: Add optimization_config support
+
+    from etops.backends._tileir.optimizer import Optimizer
+
+    optimizer = Optimizer(config)
+    optimizer.optimize()
+    return optimizer.get_optimized_config()

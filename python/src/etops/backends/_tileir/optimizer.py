@@ -1,760 +1,1202 @@
-"""
-Optimizer for the tileir backend.
-
-Determines optimal ``exec_types`` and dimension ordering for GPU execution
-via the tileir (direct TileIR construction) backend.
-
-The optimizer is structured as a transformation pipeline that operates on
-``TensorOperationConfig`` objects using general-purpose transforms
-(``split_dim``, ``fuse_dims``, ``reorder_dims``) from the
-``transforms`` module.
-
-**Binary pipeline** (``_optimize_binary``):
-
-1. Add synthetic size-1 prim dims for any missing M, N, or K type.
-2. Split oversized dims (``size > max_prim_dim_size``) via factorization.
-3. Select one prim representative per GEMM role (M, N, K).
-4. Assign exec types: M/N/C outers -> shared, K outers -> seq.
-5. Reorder: shared -> seq -> prim (N, K, M innermost).
-6. Fuse adjacent compatible dims.
-
-**Unary pipeline** (``_optimize_unary``):
-
-1. Split oversized dims (``size > max_prim_dim_size``) via factorization.
-2. Select prim dims (unit-stride first, then fill by smallest stride,
-   subject to ``max_prim_tile_volume`` and ``max_prim_dims``).
-3. Apply cuda.tile assembler crash workaround.
-4. Reorder: shared -> seq -> prim.
-5. Fuse adjacent compatible dims.
-"""
-
-from __future__ import annotations
-
-__all__ = ["optimize"]
-
-import math
-from dataclasses import replace
-from typing import List, Optional, Tuple
-
-from etops.backends._tileir.config_analysis import _next_pow2
-
+import copy
 import etops
+import cupy as cp
+import itertools
+import math
 
-from etops.backends._tileir.transforms import (
-    fuse_dims,
-    reorder_dims,
-    split_dim,
-)
-
-
-def _largest_factor_leq(n: int, cap: int) -> int:
-    """Return the largest factor of *n* that is <= *cap*.
-
-    If *n* is prime and greater than *cap*, returns 1 (the trivial
-    factor).  This is acceptable because a size-1 "outer" dimension
-    acts as a synthetic no-op dimension.
-
-    Args:
-        n: Positive integer to factorize.
-        cap: Upper bound (inclusive) for the returned factor.
-
-    Returns:
-        Largest integer *f* such that ``1 <= f <= cap`` and ``n % f == 0``.
-
-    Raises:
-        ValueError: If *n* or *cap* is less than 1.
-    """
-    if n < 1:
-        raise ValueError(f"n must be >= 1, got {n}")
-    if cap < 1:
-        raise ValueError(f"cap must be >= 1, got {cap}")
-    if n <= cap:
-        return n
-
-    # Check divisors from cap downward.  For small caps this is fast;
-    # for large caps we only need to search up to sqrt(n) from below.
-    best = 1
-    sqrt_n = int(math.isqrt(n))
-    for d in range(1, sqrt_n + 1):
-        if n % d == 0:
-            if d <= cap:
-                best = max(best, d)
-            complement = n // d
-            if complement <= cap:
-                best = max(best, complement)
-    return best
+from .config_helper import ConfigHelper
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
+class Optimizer:
+    def __init__(self, config):
+        # Initialize GPU properties
+        device_id = cp.cuda.Device().id
+        props = cp.cuda.runtime.getDeviceProperties(device_id)
 
-def _select_prim(
-    indices: List[int],
-    dim_type: etops.types.DimType,
-    strides_in0: Tuple[int, ...],
-    strides_in1: Tuple[int, ...],
-) -> int:
-    """Select the prim representative from a group of dimension indices.
+        self.sm_count = props['multiProcessorCount']
 
-    Prefers the dimension with the smallest non-zero stride in its
-    primary tensor (M -> in0, N -> in1, K -> min of both).  Ties are
-    broken by preferring the smaller index for stability.
+        # byte values for memory sizes
+        self.global_mem_size = props['totalGlobalMem']
+        self.l2_cache_size = props['l2CacheSize']
 
-    Args:
-        indices: Non-empty list of dimension indices in the same group.
-        dim_type: The GEMM role of this group (``dim.m``, ``dim.n``,
-            or ``dim.k``).
-        strides_in0: Level-0 strides for the left input tensor.
-        strides_in1: Level-0 strides for the right input tensor.
+        self.MAX_L2_CACHE_UTILIZATION = 0.9
 
-    Returns:
-        Index of the selected prim representative.
+        self.config = config
 
-    Raises:
-        ValueError: If *indices* is empty.
-    """
-    if not indices:
-        raise ValueError("Cannot select prim from empty group")
-    if len(indices) == 1:
-        return indices[0]
+        self.data_type = self.config.data_type
+        if self.data_type == etops.float16:
+            self.bytes_per_element_load = 2
+        elif self.data_type == etops.bfloat16:
+            self.bytes_per_element_load = 2
+        elif self.data_type == etops.tfloat32:
+            self.bytes_per_element_load = 4
+        elif self.data_type == etops.float32:
+            self.bytes_per_element_load = 4
+        elif self.data_type == etops.float64:
+            self.bytes_per_element_load = 8
 
-    def primary_stride(i: int) -> Tuple[float, int]:
-        if dim_type == etops.dim.m:
-            s = strides_in0[i]
-        elif dim_type == etops.dim.n:
-            s = strides_in1[i]
         else:
-            s0 = strides_in0[i]
-            s1 = strides_in1[i]
-            s = min(s0, s1) if s0 > 0 and s1 > 0 else (s0 if s0 > 0 else s1)
-        effective_stride = s if s > 0 else float("inf")
-        return (effective_stride, i)
+            raise ValueError(f"Unsupported data type {self.data_type} for cuTile optimizer.")
 
-    return min(indices, key=primary_stride)
+        self.bytes_per_element_compute = self.bytes_per_element_load
 
+        self.prim_main = self.config.prim_main
 
-def _sort_by_stride_desc(
-    indices: List[int],
-    dim_type: etops.types.DimType,
-    strides_in0: Tuple[int, ...],
-    strides_in1: Tuple[int, ...],
-    strides_out: Tuple[int, ...],
-) -> List[int]:
-    """Sort *indices* descending by primary-tensor stride.
+        # Build config helper — owns all mutable dim/stride metadata
+        self.cfg = ConfigHelper(config)
 
-    Outermost (largest-stride) dimensions come first so they map to
-    the outermost grid/loop positions for memory locality.
+        self.l2_cache_size_in_elements = self.l2_cache_size // self.bytes_per_element_load
 
-    For dim.c, the maximum non-zero stride across all three tensors is
-    used; for dim.m, the in0 stride; for dim.n, the in1 stride; for
-    dim.k, the maximum across in0 and in1.
-
-    Args:
-        indices: Dimension indices to sort.
-        dim_type: GEMM role (``dim.c``, ``dim.m``, ``dim.n``, or
-            ``dim.k``).
-        strides_in0: Level-0 strides for the left input tensor.
-        strides_in1: Level-0 strides for the right input tensor.
-        strides_out: Level-0 strides for the output tensor.
-
-    Returns:
-        Sorted copy of *indices* (descending by stride).
-    """
-
-    def order_key(i: int) -> int:
-        if dim_type == etops.dim.c:
-            s0 = strides_in0[i] if strides_in0[i] > 0 else 0
-            s1 = strides_in1[i] if strides_in1[i] > 0 else 0
-            so = strides_out[i] if strides_out[i] > 0 else 0
-            return max(s0, s1, so)
-        elif dim_type == etops.dim.m:
-            return strides_in0[i] if strides_in0[i] > 0 else 0
-        elif dim_type == etops.dim.n:
-            return strides_in1[i] if strides_in1[i] > 0 else 0
-        else:
-            s0 = strides_in0[i] if strides_in0[i] > 0 else 0
-            s1 = strides_in1[i] if strides_in1[i] > 0 else 0
-            return max(s0, s1) if (s0 > 0 or s1 > 0) else 0
-
-    return sorted(indices, key=order_key, reverse=True)
+        self.optimized_config = None
+        self.performance_score_optimized_config = None
 
 
-def _interleave_evenly(
-    major: List[int],
-    minor: List[int],
-) -> List[int]:
-    """Bresenham-style interleaving of two sequences.
 
-    Distributes *minor* elements as evenly as possible among *major*
-    elements.  When ``len(major) >= len(minor)`` the result is a
-    single list where minor elements are spaced roughly evenly within
-    the major elements.
+    def optimize(self):
+        """
+        Run the optimization pass on the configuration.
+        """
 
-    Args:
-        major: The dominant (more numerous) sequence.
-        minor: The subordinate (fewer) sequence.
+        # initialize all exec types to seq
+        self.cfg.exec_types = [etops.exec.seq] * len(self.cfg.exec_types)
 
-    Returns:
-        Interleaved list of length ``len(major) + len(minor)``.
-    """
-    if not major:
-        return minor[:]
-    if not minor:
-        return major[:]
-    total = len(major) + len(minor)
-    result: List[int] = []
-    i_maj = 0
-    i_min = 0
-    for pos in range(total):
-        prev_acc = pos * len(minor) // total
-        curr_acc = (pos + 1) * len(minor) // total
-        if i_min < len(minor) and curr_acc > prev_acc:
-            result.append(minor[i_min])
-            i_min += 1
-        else:
-            result.append(major[i_maj])
-            i_maj += 1
-    return result
+        # Fuse all fusable dimensions together
+        self.cfg._fuse_all_fusable_dimensions(new_exec_type=etops.exec.seq)
 
+        # Get the primitive dimension candidates
+        candidate_cfgs, performance_scores = self._find_primitive_dimension()
 
-def _interleave_shared_mn(
-    shared_m: List[int],
-    shared_n: List[int],
-) -> List[int]:
-    """Interleave shared M and N dimensions for balanced grid mapping.
+        # Reorder non-prim K dimensions immediately to the left of the prim block
+        for cfg in candidate_cfgs:
+            self._reorder_k_dimensions(cfg)
 
-    M dimensions are always treated as the minor (interleaved) group
-    regardless of count, to keep N-strided accesses contiguous in the
-    outer grid positions.
+        candidate_cfgs_after_l2_cache_optimization = []
 
-    Args:
-        shared_m: Shared M dimension indices (sorted by stride desc).
-        shared_n: Shared N dimension indices (sorted by stride desc).
+        for i, cfg in enumerate(candidate_cfgs):
+            optimized_cfg, factor = self._optimize_for_l2_cache(cfg)
 
-    Returns:
-        Interleaved list with N as major and M as minor.
-    """
-    if len(shared_m) >= len(shared_n):
-        return _interleave_evenly(shared_m, shared_n)
-    return _interleave_evenly(shared_n, shared_m)
+            # Assign final execution types:
+            #   prim dims   → keep exec.prim
+            #   k non-prim  → exec.seq  (reduction loop, sequential)
+            #   all others  → exec.shared (C/M/N dims parallelised across SM blocks)
+            for j in range(len(optimized_cfg.dim_types)):
+                if optimized_cfg.exec_types[j] == etops.exec.prim:
+                    pass
+                elif optimized_cfg.dim_types[j] == etops.dim.k:
+                    optimized_cfg.exec_types[j] = etops.exec.seq
+                else:
+                    optimized_cfg.exec_types[j] = etops.exec.shared
+
+            candidate_cfgs_after_l2_cache_optimization.append(optimized_cfg)
+            performance_scores[i] *= factor
+
+        # get the best config according to the performance scores after L2 cache optimization
+        best_index = performance_scores.index(max(performance_scores))
+        best_cfg = candidate_cfgs_after_l2_cache_optimization[best_index]
+
+        self.optimized_config = best_cfg.get_config()
+        self.performance_score_optimized_config = performance_scores[best_index]
 
 
-def _add_synthetic_prim_dims(
-    config: object,
-) -> object:
-    """Add synthetic size-1 prim dimensions for missing M, N, or K types.
-
-    Returns a new config with any missing GEMM roles appended as size-1
-    dimensions.  Stride patterns follow GEMM semantics:
-
-    * M: present in in0 and out (stride 1), absent from in1 (stride 0).
-    * N: present in in1 and out (stride 1), absent from in0 (stride 0).
-    * K: present in in0 and in1 (stride 1), absent from out (stride 0).
-
-    The initial ``exec_type`` for synthetic dims is ``seq``; the caller
-    reassigns all exec types in the subsequent pipeline step.
-
-    Args:
-        config: Input configuration (binary contraction).
-
-    Returns:
-        New config with any missing M/N/K dims appended.
-    """
-    dim_types = list(config.dim_types)
-    dim_sizes = list(config.dim_sizes)
-    exec_types = list(config.exec_types)
-
-    # Extract level-0 strides (only level we manipulate).
-    strides_in0 = list(config.strides[0][0])
-    strides_in1 = list(config.strides[0][1])
-    strides_out = list(config.strides[0][2])
-
-    existing_types = set(dim_types)
-    synthetics = [
-        # (dim_type, s_in0, s_in1, s_out)
-        (etops.dim.m, 1, 0, 1),
-        (etops.dim.n, 0, 1, 1),
-        (etops.dim.k, 1, 1, 0),
-    ]
-    for dim_t, s0, s1, so in synthetics:
-        if dim_t not in existing_types:
-            dim_types.append(dim_t)
-            dim_sizes.append(1)
-            exec_types.append(etops.exec.seq)
-            strides_in0.append(s0)
-            strides_in1.append(s1)
-            strides_out.append(so)
-
-    return replace(
-        config,
-        dim_types=tuple(dim_types),
-        exec_types=tuple(exec_types),
-        dim_sizes=tuple(dim_sizes),
-        strides=((tuple(strides_in0), tuple(strides_in1), tuple(strides_out)),),
-    )
 
 
-def _split_oversized_dims(
-    config: object,
-    max_prim_dim_size: int,
-) -> object:
-    """Split every dimension whose size exceeds *max_prim_dim_size*.
+    def _get_all_possible_dim_size_combinations(self, ids_list, strides_list, strides_list_2=None, pruning_rules=[], merge_rules=[]):
+        """
+        Returns a list of all possible dimension sizes + their corresponding splits that are a combination of the divisors for the given list of dimension IDs.
 
-    Iterates from the last dimension to the first so that earlier
-    indices are not invalidated by insertions.
+        pruning_rules determine pruning rules for the generated combinations. Options are:
+            - 'always_include_stride_1': always include the stride-1 dimension in the combinations.
+              When strides_list_2 is provided, the stride-1 dimension must be non-trivially split
+              in both strides lists.
+            - '16B_aligned': only include combinations that are aligned to 16 bytes.
+              When strides_list_2 is provided, alignment must hold in both strides lists (AND semantics).
+            - 'smaller_than_max_prim_size': only include combinations that are smaller than the maximum primitive bytes
 
-    Args:
-        config: Input configuration.
-        max_prim_dim_size: Maximum raw size for any single dimension.
+        merge_rules determine which combination to keep if the same total size can be achieved by multiple
+        divisor combinations. Options are:
+            - 'prefer_best_performance_factor': keep the combination with the best performance score,
+              evaluated using padding penalty, min-load-size penalty, and split-count penalty.
+              Works with one or two strides lists.
+        """
 
-    Returns:
-        New config with oversized dims split into outer/inner pairs.
-    """
-    result = config
-    # Work backwards so indices remain valid after each split.
-    dim_idx = len(result.dim_sizes) - 1
-    while dim_idx >= 0:
-        if result.dim_sizes[dim_idx] > max_prim_dim_size:
-            inner = _largest_factor_leq(result.dim_sizes[dim_idx], max_prim_dim_size)
-            if inner == 1:
-                # Dimension is prime and > cap — cannot split further.
-                # The outer stays at the original size; move on.
-                dim_idx -= 1
-                continue
-            result = split_dim(result, dim_idx, inner)
-            # After split, dim_idx is the outer and dim_idx+1 is the
-            # inner.  The outer might still be > cap, so re-check it
-            # (don't decrement).
-            continue
-        dim_idx -= 1
-    return result
+        check_always_include_stride_1  = 'always_include_stride_1'       in pruning_rules
+        check_smaller_than_max_prim_size = 'smaller_than_max_prim_size' in pruning_rules
+        check_aligned_to_16B           = '16B_aligned'                    in pruning_rules
+        prefer_best_performance_factor = 'prefer_best_performance_factor' in merge_rules
 
+        MAX_PRIM_BYTES    = 256
+        MAX_PRIM_ELEMENTS = MAX_PRIM_BYTES // self.bytes_per_element_compute
 
-def _try_fuse_adjacent(config: object) -> object:
-    """Fuse adjacent dimensions that share type, exec_type, and strides.
-
-    Scans from left to right, fusing greedily.  A successful fuse
-    reduces the dimension count by 1 and re-checks the same position.
-
-    Args:
-        config: Input configuration.
-
-    Returns:
-        New config with compatible adjacent dims fused.
-    """
-    result = config
-    idx = 0
-    while idx < len(result.dim_sizes) - 1:
-        dim_a = idx
-        dim_b = idx + 1
-
-        # Same dim_type and exec_type?
-        if (
-            result.dim_types[dim_a] != result.dim_types[dim_b]
-            or result.exec_types[dim_a] != result.exec_types[dim_b]
-        ):
-            idx += 1
-            continue
-
-        # Stride compatibility check across all tensors at all levels.
-        size_b = result.dim_sizes[dim_b]
-        compatible = True
-        for level in result.strides:
-            for tensor_strides in level:
-                stride_a = tensor_strides[dim_a]
-                stride_b = tensor_strides[dim_b]
-                if not (
-                    (stride_a == 0 and stride_b == 0) or stride_a == size_b * stride_b
-                ):
-                    compatible = False
-                    break
-            if not compatible:
+        # stride_1_index_1 is the *positional* index (0..len(ids_list)-1) inside
+        # `combination` where strides_list has stride == 1.
+        stride_1_index_1 = None
+        for pos, dim_id in enumerate(ids_list):
+            if strides_list[dim_id] == 1:
+                stride_1_index_1 = pos
                 break
 
-        if compatible:
-            result = fuse_dims(result, dim_a, dim_b)
-            # Don't advance — the fused dim might be fusable with the
-            # next one too.
+        # stride_1_index_2 is the positional index where strides_list_2 has stride == 1.
+        stride_1_index_2 = None
+        if strides_list_2 is not None:
+            for pos, dim_id in enumerate(ids_list):
+                if strides_list_2[dim_id] == 1:
+                    stride_1_index_2 = pos
+                    break
+
+        # Validate always_include_stride_1: both lists must have a stride-1 dim when the rule is active.
+        if check_always_include_stride_1 and stride_1_index_1 is None:
+            raise ValueError("Pruning rule always_include_stride_1 is set but no stride-1 dimension found in the given ids_list and strides_list.")
+        if check_always_include_stride_1 and strides_list_2 is not None and stride_1_index_2 is None:
+            raise ValueError("Pruning rule always_include_stride_1 is set but no stride-1 dimension found in the given ids_list and strides_list_2.")
+
+        alignment_size = 16 // self.bytes_per_element_load
+
+        list_of_divisors = []
+        for i in ids_list:
+            list_of_divisors.append(self.cfg.divisors[i])
+
+        splits      = []
+        total_sizes = []
+
+        # iterator over the cartesian product of the list of divisors
+        for combination in itertools.product(*list_of_divisors):
+            total_size = 1
+            for i in range(len(combination)):
+                total_size *= combination[i]
+
+            # check pruning rules
+            # ===================
+
+            # check smaller_than_max_prim_size
+            if check_smaller_than_max_prim_size and total_size > MAX_PRIM_ELEMENTS:
+                continue
+
+            # check always_include_stride_1
+            # combination[stride_1_index] is the split chosen for the stride-1 dim;
+            # skip combinations where that dimension contributes nothing (split==1).
+            if stride_1_index_1 is not None:
+                if check_always_include_stride_1 and combination[stride_1_index_1] == 1:
+                    continue
+            if strides_list_2 is not None and stride_1_index_2 is not None:
+                if check_always_include_stride_1 and combination[stride_1_index_2] == 1:
+                    continue
+
+            # check 16B alignment for strides_list.
+            # For the stride-1 dim: the split size itself must be a multiple of alignment_size
+            # (elements are contiguous, so the tile width determines the memory alignment boundary).
+            # For all other non-trivially split dims: the stride must be a multiple of alignment_size.
+            is_aligned_to_16B = True
+
+            if stride_1_index_1 is not None:
+                is_aligned_to_16B = is_aligned_to_16B and combination[stride_1_index_1] % alignment_size == 0
+
+            # pos is the positional index into combination; ids_list[pos] is the
+            # corresponding dimension ID used to look up strides_list.
+            for pos in range(len(combination)):
+                if ((stride_1_index_1 is None or pos != stride_1_index_1) and combination[pos] != 1) or sum(combination) == len(combination):
+                    is_aligned_to_16B = is_aligned_to_16B and strides_list[ids_list[pos]] % alignment_size == 0
+
+            # check 16B alignment for strides_list_2 (if provided; must also pass — AND semantics).
+            if strides_list_2 is not None:
+                if stride_1_index_2 is not None:
+                    is_aligned_to_16B = is_aligned_to_16B and combination[stride_1_index_2] % alignment_size == 0
+                for pos in range(len(combination)):
+                    if ((stride_1_index_2 is None or pos != stride_1_index_2) and combination[pos] != 1) or sum(combination) == len(combination):
+                        is_aligned_to_16B = is_aligned_to_16B and strides_list_2[ids_list[pos]] % alignment_size == 0
+
+            if check_aligned_to_16B and not is_aligned_to_16B:
+                continue
+
+
+            # check if the same size combination already exists from a different divisor combination, and if so, apply merge rules
+            # ====================================================================================================================
+
+            # if merge rules empty or no existing combination has the same total size, add the combination to the list
+            if len(merge_rules) == 0 or total_size not in total_sizes:
+                splits.append(combination)
+                total_sizes.append(total_size)
+
+            elif prefer_best_performance_factor:
+                existing_index      = total_sizes.index(total_size)
+                existing_combination = splits[existing_index]
+
+                current_score  = self._get_merge_performance_score_for_split(combination,          ids_list, strides_list, strides_list_2)
+                existing_score = self._get_merge_performance_score_for_split(existing_combination, ids_list, strides_list, strides_list_2)
+
+                if current_score > existing_score:
+                    splits[existing_index] = combination
+
+                elif current_score == existing_score:
+                    # if scores are equal, keep the one with a higher split number for lower stride dimensions
+                    pass
+
+        return total_sizes, splits
+
+
+    def _get_all_possible_splits_for_dim_type(self, dim_type, strides_list, strides_list_2=None, pruning_rules=[], merge_rules=[]):
+        dim_ids = [i for i, dt in enumerate(self.cfg.dim_types) if dt == dim_type]
+
+        total_sizes, splits = self._get_all_possible_dim_size_combinations(
+            dim_ids, strides_list,
+            strides_list_2=strides_list_2,
+            pruning_rules=pruning_rules,
+            merge_rules=merge_rules
+        )
+        return total_sizes, splits
+
+
+    def _get_all_possible_splits_for_dim_with_iterative_pruning_removal(self, dim_type, strides_list, pruning_rules_ordered, merge_rules, strides_list_2=None):
+        total_sizes, splits = self._get_all_possible_splits_for_dim_type(dim_type, strides_list, strides_list_2=strides_list_2, pruning_rules=pruning_rules_ordered, merge_rules=merge_rules)
+
+        while len(total_sizes) == 0:
+            if len(pruning_rules_ordered) == 0:
+                raise ValueError(
+                    f"_get_all_possible_splits_for_dim_with_iterative_pruning_removal: "
+                    f"No valid splits found for dim_type {dim_type} even after all pruning rules were removed."
+                )
+            pruning_rules_ordered.pop(0)
+            total_sizes, splits = self._get_all_possible_splits_for_dim_type(dim_type, strides_list, strides_list_2=strides_list_2, pruning_rules=pruning_rules_ordered, merge_rules=merge_rules)
+
+        return total_sizes, splits
+
+
+    def _get_merge_performance_score_for_split(self, split, ids_list, strides_list, strides_list_2=None):
+        """
+        Compute a scalar performance score for a split combination, used when merging two candidates
+        with the same total size under the 'prefer_best_performance_factor' merge rule.
+
+        Scores the three factors that can actually differ between same-total-size candidates:
+          - Padding penalty: split_size / next_power_of_2(split_size) for each element in the split.
+          - Min-load-size penalty: ×0.65 for each stride-1 dimension in each strides list whose
+            split is below the minimum load threshold (64 // bytes_per_element_load).
+          - Split-count penalty: ×0.95 if more than one element in the split is != 1.
+
+        Works with one or two strides lists.
+        """
+
+        factor = 1.0
+        min_load_elements_stride_1 = 64 // self.bytes_per_element_load
+
+        for pos, split_size in enumerate(split):
+            dim_id = ids_list[pos]
+
+            # padding penalty
+            split_size_pow_2 = self._get_next_power_of_2(split_size)
+            factor *= split_size / split_size_pow_2
+
+            # min-load-size penalty for stride-1 dimensions
+            if split_size != 1 and split_size < min_load_elements_stride_1:
+                if strides_list[dim_id] == 1:
+                    factor *= 0.65
+                if strides_list_2 is not None and strides_list_2[dim_id] == 1:
+                    factor *= 0.65
+
+        # split-count penalty: penalise splits spread across more than one dimension
+        non_split_count = sum(1 for size in split if size != 1)
+        if non_split_count > 1:
+            factor *= 0.95
+
+        return factor
+
+
+
+    def _get_next_power_of_2(self, n):
+        """
+        Get the next power of 2 greater than or equal to n.
+        """
+
+        if n <= 0:
+            raise ValueError("_get_next_power_of_2: n must be greater than 0.")
+
+        power = 1
+        while power < n:
+            power *= 2
+        return power
+
+
+
+    def _get_performance_model_factor_prim_sizes(self, m_split, n_split, k_split):
+
+        total_m_size = 1
+        total_n_size = 1
+        total_k_size = 1
+
+        factor = 1
+
+        for i in range(len(m_split)):
+            total_m_size *= m_split[i]
+        for i in range(len(n_split)):
+            total_n_size *= n_split[i]
+        for i in range(len(k_split)):
+            total_k_size *= k_split[i]
+
+        total_mn_size = total_m_size * total_n_size
+
+        # =============================================
+        # prim sizes not larger than max primitive size
+        # =============================================
+        max_primitive_size_m = 256 // self.bytes_per_element_compute
+        max_primitive_size_n = 256 // self.bytes_per_element_compute
+        max_primitive_size_k = 256 // self.bytes_per_element_compute
+
+        max_primitive_size_k = max_primitive_size_k // 2 if total_mn_size > ((64 * 64 * 2) // self.bytes_per_element_compute) else max_primitive_size_k
+
+
+        if total_m_size > max_primitive_size_m:
+            factor *= 0.1
+        if total_n_size > max_primitive_size_n:
+            factor *= 0.1
+        if total_k_size > max_primitive_size_k:
+            factor *= 0.2
+
+        # ==================
+        # prim size m/n size
+        # ==================
+
+        limit_size = 1024 * 2048 // self.bytes_per_element_compute
+
+        # we prefer |m_prim| = |n_prim| = 128 for contractions where |M| * |N| is larger than limit_size
+        # we prefer |m_prim| = 128 and |n_prim| = 64, or vice versa, for contractions where |M| * |N| is smaller than limit_size
+
+        total_size_M_contraction = 1
+        total_size_N_contraction = 1
+
+        for i in range(len(self.cfg.dim_types)):
+            if self.cfg.dim_types[i] == etops.dim.m:
+                total_size_M_contraction *= self.cfg.dim_sizes[i]
+            elif self.cfg.dim_types[i] == etops.dim.n:
+                total_size_N_contraction *= self.cfg.dim_sizes[i]
+
+        total_size_MN_contraction = total_size_M_contraction * total_size_N_contraction
+
+        if total_size_MN_contraction >= limit_size:
+            contraction_larger_than_limit = True
         else:
-            idx += 1
+            contraction_larger_than_limit = False
 
-    return result
+        if contraction_larger_than_limit:
+            # compare to prim sizes if 128/128 for m/n in fp16
+            log_wanted_prim = math.log2(128)
 
+            log_m_prim = math.ceil(math.log2(total_m_size))
+            log_n_prim = math.ceil(math.log2(total_n_size))
 
-# ---------------------------------------------------------------------------
-# Binary pipeline
-# ---------------------------------------------------------------------------
+            diff_m = abs(log_m_prim - log_wanted_prim)
+            diff_n = abs(log_n_prim - log_wanted_prim)
 
+            factor *= 0.75 ** (diff_m + diff_n)
 
-def _optimize_binary_impl(
-    config: object,
-    max_grid: int,
-) -> object:
-    """Core binary optimization: assign exec_types and reorder dims.
-
-    Operates on a config that has already been through synthetic-dim
-    addition and oversized-dim splitting.
-
-    Steps (continuing from the outer ``_optimize_binary`` pipeline):
-
-    3. Select one prim representative per role (M, N, K).
-    4. Assign exec types: prim reps -> prim, K outers -> seq,
-       M/N/C outers -> shared (subject to max_grid).
-    5. Reorder: shared -> seq -> prim (N, K, M innermost).
-    6. Fuse adjacent compatible dims.
-
-    Args:
-        config: Input configuration (post-split, post-synthetic).
-        max_grid: Maximum CUDA grid size.
-
-    Returns:
-        Optimized config with exec types assigned and dims reordered.
-    """
-    dim_types = tuple(config.dim_types)
-    dim_sizes = tuple(config.dim_sizes)
-    strides_in0 = tuple(config.strides[0][0])
-    strides_in1 = tuple(config.strides[0][1])
-    strides_out = tuple(config.strides[0][2])
-
-    # Classify indices by dim_type.
-    c_indices = [i for i, dt in enumerate(dim_types) if dt == etops.dim.c]
-    m_indices = [i for i, dt in enumerate(dim_types) if dt == etops.dim.m]
-    n_indices = [i for i, dt in enumerate(dim_types) if dt == etops.dim.n]
-    k_indices = [i for i, dt in enumerate(dim_types) if dt == etops.dim.k]
-
-    # Step 3: select prim representatives.
-    p_m = _select_prim(m_indices, etops.dim.m, strides_in0, strides_in1)
-    p_n = _select_prim(n_indices, etops.dim.n, strides_in0, strides_in1)
-    p_k = _select_prim(k_indices, etops.dim.k, strides_in0, strides_in1)
-    prim_set = {p_m, p_n, p_k}
-
-    # Step 4: classify remaining dims.
-    shared_m = [i for i in m_indices if i != p_m]
-    shared_n = [i for i in n_indices if i != p_n]
-    seq_k = [i for i in k_indices if i != p_k]
-
-    # Sort within groups by stride for memory locality.
-    c_ord = _sort_by_stride_desc(
-        c_indices,
-        etops.dim.c,
-        strides_in0,
-        strides_in1,
-        strides_out,
-    )
-    m_ord = _sort_by_stride_desc(
-        shared_m,
-        etops.dim.m,
-        strides_in0,
-        strides_in1,
-        strides_out,
-    )
-    n_ord = _sort_by_stride_desc(
-        shared_n,
-        etops.dim.n,
-        strides_in0,
-        strides_in1,
-        strides_out,
-    )
-    k_ord = _sort_by_stride_desc(
-        seq_k,
-        etops.dim.k,
-        strides_in0,
-        strides_in1,
-        strides_out,
-    )
-
-    # Interleave shared M and N for balanced grid dimensions.
-    mn_ord = _interleave_shared_mn(m_ord, n_ord)
-    shared_ord = c_ord + mn_ord
-
-    # Apply max_grid limit: demote excess shared dims to seq.
-    grid_size = 1
-    keep_shared: List[int] = []
-    demote_to_seq: List[int] = []
-    for idx in shared_ord:
-        dim_size = dim_sizes[idx]
-        if grid_size * dim_size > max_grid:
-            demote_to_seq.append(idx)
         else:
-            grid_size *= dim_size
-            keep_shared.append(idx)
+            # compare to both m_prim = 128 and n_prim = 64, and m_prim = 64 and n_prim = 128, and take the better one
+            log_wanted_prim_m_128 = math.log2(128)
+            log_wanted_prim_n_64  = math.log2(64)
 
-    all_seq = demote_to_seq + k_ord
+            log_wanted_prim_m_64  = math.log2(64)
+            log_wanted_prim_n_128 = math.log2(128)
 
-    # Step 5: build final ordering — shared -> seq -> prim (N, K, M).
-    new_order = tuple(keep_shared + all_seq + [p_n, p_k, p_m])
+            log_m_prim = math.ceil(math.log2(total_m_size))
+            log_n_prim = math.ceil(math.log2(total_n_size))
 
-    # Build exec_type assignments.
-    all_seq_set = set(all_seq)
-    exec_types: List[etops.types.ExecType] = []
-    for j in new_order:
-        if j in prim_set:
-            exec_types.append(etops.exec.prim)
-        elif j in all_seq_set:
-            exec_types.append(etops.exec.seq)
+            diff_prim_128_64 = abs(log_m_prim - log_wanted_prim_m_128) + abs(log_n_prim - log_wanted_prim_n_64)
+            diff_prim_64_128 = abs(log_m_prim - log_wanted_prim_m_64)  + abs(log_n_prim - log_wanted_prim_n_128)
+
+            diff_prim_size = min(diff_prim_128_64, diff_prim_64_128)
+
+            factor *= 0.75 ** diff_prim_size
+
+
+        # ===========
+        # prim size k
+        # ===========
+
+        # compare k_prim size to 64 or 128 for fp16, depending on the size of total_mn_size
+        # if total_mn_size is larger than limit_size_k, we prefer k_prim of size 64 or 32
+        # if total_mn_size is smaller than limit_size_k, we prefer k_prim of size 128 or 64
+
+        limit_size_k = 64 * 128 // self.bytes_per_element_compute
+
+        if total_mn_size >= limit_size_k:
+            first_compare_k_prim  = 64
+            second_compare_k_prim = 32
         else:
-            exec_types.append(etops.exec.shared)
+            first_compare_k_prim  = 128
+            second_compare_k_prim = 64
 
-    # Apply reorder via transform, then override exec_types.
-    reordered = reorder_dims(config, new_order)
-    reordered = replace(reordered, exec_types=tuple(exec_types))
+        log_wanted_prim_k_first  = math.log2(first_compare_k_prim)
+        log_wanted_prim_k_second = math.log2(second_compare_k_prim)
+        log_k_prim = math.ceil(math.log2(total_k_size))
 
-    # Step 6: fuse adjacent compatible dims.
-    return _try_fuse_adjacent(reordered)
+        diff_k_prim_first  = abs(log_k_prim - log_wanted_prim_k_first)
+        diff_k_prim_second = abs(log_k_prim - log_wanted_prim_k_second)
+
+        diff_k_prim_size = min(diff_k_prim_first, diff_k_prim_second)
+
+        factor *= 0.75 ** diff_k_prim_size
+
+        # ======================================================
+        # minimum load sizes of 64 bytes for stride-1 dimensions
+        # ======================================================
+        min_load_elements_stride_1 = 64 // self.bytes_per_element_load
+
+        split_counter_m = 0
+        split_counter_n = 0
+        split_counter_k = 0
+
+        for i in range(len(self.cfg.dim_types)):
+            if self.cfg.dim_types[i] == etops.dim.m:
+                if m_split[split_counter_m] != 1 and m_split[split_counter_m] < min_load_elements_stride_1:
+                    if self.cfg.strides_left[i] == 1:
+                        factor *= 0.65
+                    if self.cfg.strides_out[i] == 1:
+                        factor *= 0.65
+                split_counter_m += 1
+
+            elif self.cfg.dim_types[i] == etops.dim.n:
+                if n_split[split_counter_n] != 1 and n_split[split_counter_n] < min_load_elements_stride_1:
+                    if self.cfg.strides_right[i] == 1:
+                        factor *= 0.65
+                    if self.cfg.strides_out[i] == 1:
+                        factor *= 0.65
+                split_counter_n += 1
+
+            elif self.cfg.dim_types[i] == etops.dim.k:
+                if k_split[split_counter_k] != 1 and k_split[split_counter_k] < min_load_elements_stride_1:
+                    if self.cfg.strides_left[i] == 1:
+                        factor *= 0.65
+                    if self.cfg.strides_right[i] == 1:
+                        factor *= 0.65
+                split_counter_k += 1
 
 
-# ---------------------------------------------------------------------------
-# Unary pipeline
-# ---------------------------------------------------------------------------
+
+        # ===============
+        # padding penalty
+        # ===============
+
+        for split_size in m_split:
+            split_size_pow_2 = self._get_next_power_of_2(split_size)
+            percentage_non_padded = split_size / split_size_pow_2
+            factor *= percentage_non_padded
+
+        for split_size in n_split:
+            split_size_pow_2 = self._get_next_power_of_2(split_size)
+            percentage_non_padded = split_size / split_size_pow_2
+            factor *= percentage_non_padded
+
+        for split_size in k_split:
+            split_size_pow_2 = self._get_next_power_of_2(split_size)
+            percentage_non_padded = split_size / split_size_pow_2
+            factor *= percentage_non_padded
 
 
-def _optimize_unary_impl(
-    config: object,
-    max_grid: int,
-    max_prim_dims: int,
-    max_prim_tile_volume: int,
-) -> object:
-    """Core unary optimization: assign exec_types and reorder dims.
+        # penalty if primitive dimensions are split
+        non_split_m = sum(1 for size in m_split if size != 1)
+        non_split_n = sum(1 for size in n_split if size != 1)
+        non_split_k = sum(1 for size in k_split if size != 1)
 
-    Operates on a config that has already been through oversized-dim
-    splitting.
+        if non_split_m > 1:
+            factor *= 0.95
+        if non_split_n > 1:
+            factor *= 0.95
+        if non_split_k > 1:
+            factor *= 0.95
 
-    Steps (continuing from the outer ``_optimize_unary`` pipeline):
+        return factor
 
-    2. Select prim dims: unit-stride first, then fill by smallest
-       min-stride subject to volume cap.
-    3. Apply cuda.tile assembler crash workaround.
-    4. Remaining dims: shared (up to max_grid), then seq.
-    5. Reorder: shared -> seq -> prim.
-    6. Fuse adjacent compatible dims.
 
-    Args:
-        config: Input configuration (post-split).
-        max_grid: Maximum CUDA grid size.
-        max_prim_dims: Maximum number of prim dimensions.
-        max_prim_tile_volume: Maximum padded tile volume for prim dims.
 
-    Returns:
-        Optimized config with exec types assigned and dims reordered.
-    """
-    dim_sizes = tuple(config.dim_sizes)
-    # Unary configs have 2 tensors: [0]=in, [1]=out.
-    strides_in0 = tuple(config.strides[0][0])
-    strides_out = tuple(config.strides[0][1])
-    num_dims = len(dim_sizes)
-    all_indices = list(range(num_dims))
+    def _get_performance_model_factor_alignment(self, m_split, n_split, k_split, elements_to_align):
+        left_tensor_byte_aligned   = True
+        right_tensor_byte_aligned  = True
+        output_tensor_byte_aligned = True
 
-    # Score each dim by min non-zero stride across in0 and out.
-    def _min_stride(i: int) -> float:
-        s0 = strides_in0[i] if strides_in0[i] > 0 else float("inf")
-        so = strides_out[i] if strides_out[i] > 0 else float("inf")
-        return min(s0, so)
+        split_counter_m = 0
+        split_counter_n = 0
+        split_counter_k = 0
 
-    # Step 2: identify must-have prim dims (unit-stride dims).
-    must_prim: set = set()
-    for i in all_indices:
-        if strides_in0[i] == 1:
-            must_prim.add(i)
-            break
-    for i in all_indices:
-        if strides_out[i] == 1:
-            must_prim.add(i)
-            break
+        for i in range(len(self.cfg.dim_types)):
+            if self.cfg.dim_types[i] == etops.dim.m:
+                if m_split[split_counter_m] != 1:
+                    # left
+                    if self.cfg.strides_left[i] != 1 and self.cfg.strides_left[i] % elements_to_align != 0:
+                        left_tensor_byte_aligned = False
+                    elif self.cfg.strides_left[i] == 1 and self.cfg.dim_sizes[i] % elements_to_align != 0:
+                        left_tensor_byte_aligned = False
 
-    # Committed padded volume from must-have prim dims.
-    prim_volume = 1
-    for i in must_prim:
-        prim_volume *= _next_pow2(dim_sizes[i])
+                    # output
+                    if self.cfg.strides_out[i] != 1 and self.cfg.strides_out[i] % elements_to_align != 0:
+                        output_tensor_byte_aligned = False
+                    elif self.cfg.strides_out[i] == 1 and self.cfg.dim_sizes[i] % elements_to_align != 0:
+                        output_tensor_byte_aligned = False
 
-    # Fill up to max_prim_dims, subject to volume cap.
-    candidates = sorted(
-        [i for i in all_indices if i not in must_prim],
-        key=_min_stride,
-    )
-    prim_set = set(must_prim)
-    for idx in candidates:
-        if len(prim_set) >= max_prim_dims:
-            break
-        padded = _next_pow2(dim_sizes[idx])
-        if prim_volume * padded > max_prim_tile_volume:
-            continue
-        prim_volume *= padded
-        prim_set.add(idx)
+                split_counter_m += 1
 
-    # Ensure at least 1 prim dim.
-    if not prim_set:
-        prim_set.add(all_indices[-1])
+            elif self.cfg.dim_types[i] == etops.dim.n:
+                if n_split[split_counter_n] != 1:
+                    # right
+                    if self.cfg.strides_right[i] != 1 and self.cfg.strides_right[i] % elements_to_align != 0:
+                        right_tensor_byte_aligned = False
+                    elif self.cfg.strides_right[i] == 1 and self.cfg.dim_sizes[i] % elements_to_align != 0:
+                        right_tensor_byte_aligned = False
 
-    # ------------------------------------------------------------------
-    # Step 3 — Workaround: cuda.tile assembler crash with padded-64
-    # innermost prim dim.
-    #
-    # The cuda.tile assembler (v1.2.0, sm_121) crashes with return
-    # code 5 when ALL of the following hold:
-    #   - 4 or more prim dims
-    #   - the innermost prim dim pads to exactly 64
-    #   - the original size of that dim is divisible by 4
-    #   - that dim has unit stride in exactly one of in0/out
-    #     (asymmetric gather/scatter)
-    #
-    # When this is detected the problematic dim is removed from the
-    # prim set so it falls through to shared or seq instead.
-    #
-    # TODO(cuda.tile): Remove when the assembler bug is fixed.
-    # ------------------------------------------------------------------
-    if len(prim_set) >= 4:
-        prim_ord_check = sorted(prim_set, key=_min_stride, reverse=True)
-        innermost = prim_ord_check[-1]
-        padded_inner = _next_pow2(dim_sizes[innermost])
-        if (
-            padded_inner == 64
-            and dim_sizes[innermost] % 4 == 0
-            and (strides_in0[innermost] == 1) != (strides_out[innermost] == 1)
-        ):
-            prim_set.discard(innermost)
+                    # output
+                    if self.cfg.strides_out[i] != 1 and self.cfg.strides_out[i] % elements_to_align != 0:
+                        output_tensor_byte_aligned = False
+                    elif self.cfg.strides_out[i] == 1 and self.cfg.dim_sizes[i] % elements_to_align != 0:
+                        output_tensor_byte_aligned = False
 
-    prim_indices = sorted(prim_set)
-    non_prim_indices = [i for i in all_indices if i not in prim_set]
+                split_counter_n += 1
 
-    # Step 4: sort non-prim by stride desc for shared ordering.
-    def _max_stride(i: int) -> int:
-        s0 = strides_in0[i] if strides_in0[i] > 0 else 0
-        so = strides_out[i] if strides_out[i] > 0 else 0
-        return max(s0, so)
+            elif self.cfg.dim_types[i] == etops.dim.k:
+                if k_split[split_counter_k] != 1:
+                    # left
+                    if self.cfg.strides_left[i] != 1 and self.cfg.strides_left[i] % elements_to_align != 0:
+                        left_tensor_byte_aligned = False
+                    elif self.cfg.strides_left[i] == 1 and self.cfg.dim_sizes[i] % elements_to_align != 0:
+                        left_tensor_byte_aligned = False
 
-    shared_ord = sorted(non_prim_indices, key=_max_stride, reverse=True)
+                    # right
+                    if self.cfg.strides_right[i] != 1 and self.cfg.strides_right[i] % elements_to_align != 0:
+                        right_tensor_byte_aligned = False
+                    elif self.cfg.strides_right[i] == 1 and self.cfg.dim_sizes[i] % elements_to_align != 0:
+                        right_tensor_byte_aligned = False
 
-    # Apply max_grid limit.
-    grid_size = 1
-    keep_shared: List[int] = []
-    demote_to_seq: List[int] = []
-    for idx in shared_ord:
-        dim_size = dim_sizes[idx]
-        if grid_size * dim_size > max_grid:
-            demote_to_seq.append(idx)
+                split_counter_k += 1
+
+        factor = 1
+        if not left_tensor_byte_aligned:
+            factor *= 0.25
+        if not right_tensor_byte_aligned:
+            factor *= 0.25
+        if not output_tensor_byte_aligned:
+            factor *= 0.25
+
+        return factor
+
+
+
+    def _performance_model_primitives(self, m_split, n_split, k_split):
+        """
+        Performance model to estimate the performance of a given primitive configuration.
+        """
+
+        ALIGNMENT_BYTES_LOAD = 16
+
+        # check split dimension sizes
+        factor_prim_sizes = self._get_performance_model_factor_prim_sizes(m_split, n_split, k_split)
+
+        # alignment to 16 bytes for memory accesses
+        elements_to_align = ALIGNMENT_BYTES_LOAD // self.bytes_per_element_load
+        factor_alignment  = self._get_performance_model_factor_alignment(m_split, n_split, k_split, elements_to_align)
+
+        performance_score = 100 * factor_prim_sizes * factor_alignment
+        return performance_score
+
+
+
+    def _find_primitive_dimension(self):
+        """
+        Find the primitive dimension for the main primitive.
+        """
+
+        stride_1_type_left  = None
+        stride_1_type_right = None
+        stride_1_type_out   = None
+
+        for i in range(len(self.cfg.strides_left)):
+            if self.cfg.strides_left[i] == 1:
+                stride_1_type_left = self.cfg.dim_types[i]
+            if self.cfg.strides_right[i] == 1:
+                stride_1_type_right = self.cfg.dim_types[i]
+            if self.cfg.strides_out[i] == 1:
+                stride_1_type_out = self.cfg.dim_types[i]
+
+        if stride_1_type_left is None or stride_1_type_right is None or stride_1_type_out is None:
+            raise ValueError("No stride-1 dimension found in left, right, or output tensor.")
+
+
+        total_sizes_m = []
+        total_sizes_n = []
+        total_sizes_k = []
+        splits_m = []
+        splits_n = []
+        splits_k = []
+
+        pruning_rules_initial = ['16B_aligned', 'smaller_than_max_prim_size', 'always_include_stride_1']
+        merge_rules = ['prefer_best_performance_factor']
+
+        # find and split m primitive dimension
+        pruning_rules = pruning_rules_initial.copy()
+
+        if stride_1_type_left == etops.dim.m and stride_1_type_out == etops.dim.m:
+            strides_list   = self.cfg.strides_left
+            strides_list_2 = self.cfg.strides_out
+
+        elif stride_1_type_left == etops.dim.m and stride_1_type_out != etops.dim.m:
+            strides_list   = self.cfg.strides_left
+            strides_list_2 = None
+
+        elif stride_1_type_left != etops.dim.m and stride_1_type_out == etops.dim.m:
+            strides_list   = self.cfg.strides_out
+            strides_list_2 = None
+
         else:
-            grid_size *= dim_size
-            keep_shared.append(idx)
+            strides_list   = self.cfg.strides_left
+            strides_list_2 = None
+            pruning_rules.remove('always_include_stride_1')
 
-    # Sort prim dims by stride ascending (unit-stride innermost).
-    prim_ord = sorted(prim_indices, key=_min_stride, reverse=True)
+        total_sizes_m, splits_m = self._get_all_possible_splits_for_dim_with_iterative_pruning_removal(etops.dim.m, strides_list, strides_list_2=strides_list_2, pruning_rules_ordered=pruning_rules.copy(), merge_rules=merge_rules)
 
-    # Step 5: final ordering — shared -> seq -> prim.
-    new_order = tuple(keep_shared + demote_to_seq + prim_ord)
+        # find and split n primitive dimension
+        pruning_rules = pruning_rules_initial.copy()
+        if stride_1_type_right == etops.dim.n and stride_1_type_out == etops.dim.n:
+            strides_list   = self.cfg.strides_right
+            strides_list_2 = self.cfg.strides_out
 
-    prim_set_final = set(prim_ord)
-    seq_set = set(demote_to_seq)
-    exec_types: List[etops.types.ExecType] = []
-    for j in new_order:
-        if j in prim_set_final:
-            exec_types.append(etops.exec.prim)
-        elif j in seq_set:
-            exec_types.append(etops.exec.seq)
+        elif stride_1_type_right == etops.dim.n and stride_1_type_out != etops.dim.n:
+            strides_list   = self.cfg.strides_right
+            strides_list_2 = None
+
+        elif stride_1_type_right != etops.dim.n and stride_1_type_out == etops.dim.n:
+            strides_list   = self.cfg.strides_out
+            strides_list_2 = None
+
         else:
-            exec_types.append(etops.exec.shared)
+            strides_list   = self.cfg.strides_right
+            strides_list_2 = None
+            pruning_rules.remove('always_include_stride_1')
 
-    # Apply reorder via transform, then override exec_types.
-    reordered = reorder_dims(config, new_order)
-    reordered = replace(reordered, exec_types=tuple(exec_types))
+        total_sizes_n, splits_n = self._get_all_possible_splits_for_dim_with_iterative_pruning_removal(etops.dim.n, strides_list, strides_list_2=strides_list_2, pruning_rules_ordered=pruning_rules.copy(), merge_rules=merge_rules)
 
-    # Step 6: fuse adjacent compatible dims.
-    return _try_fuse_adjacent(reordered)
+        # find and split k primitive dimension
+        pruning_rules = pruning_rules_initial.copy()
 
+        if stride_1_type_left == etops.dim.k and stride_1_type_right == etops.dim.k:
+            strides_list   = self.cfg.strides_left
+            strides_list_2 = self.cfg.strides_right
 
-# ---------------------------------------------------------------------------
-# Public entry point
-# ---------------------------------------------------------------------------
+        elif stride_1_type_left == etops.dim.k and stride_1_type_right != etops.dim.k:
+            strides_list   = self.cfg.strides_left
+            strides_list_2 = None
 
+        elif stride_1_type_left != etops.dim.k and stride_1_type_right == etops.dim.k:
+            strides_list   = self.cfg.strides_right
+            strides_list_2 = None
 
-def optimize(
-    config: object,
-    optimization_config: Optional[dict] = None,
-) -> object:
-    """Optimize *config* for tileir execution.
-
-    Dispatches to the binary or unary optimizer based on ``prim_main``.
-
-    Args:
-        config: Input ``TensorOperationConfig``.
-        optimization_config: Optional overrides.  Keys are documented in
-            :func:`~etops.backends.tileir.get_default_optimization_config`.
-
-    Returns:
-        Optimized ``TensorOperationConfig``.
-    """
-    from etops.backends.tileir import get_default_optimization_config
-    from etops.types import PrimType
-
-    defaults = get_default_optimization_config()
-    opts = {**defaults, **(optimization_config or {})}
-    max_grid = opts["max_grid"]
-
-    is_unary = config.prim_main in (PrimType.copy, PrimType.relu)
-
-    if is_unary:
-        return _optimize_unary(config, opts, max_grid)
-    return _optimize_binary(config, opts, max_grid)
+        else:
+            strides_list   = self.cfg.strides_left
+            strides_list_2 = None
+            pruning_rules.remove('always_include_stride_1')
 
 
-def _optimize_binary(
-    config: object,
-    opts: dict,
-    max_grid: int,
-) -> object:
-    """Optimize a binary contraction config.
+        total_sizes_k, splits_k = self._get_all_possible_splits_for_dim_with_iterative_pruning_removal(etops.dim.k, strides_list, strides_list_2=strides_list_2, pruning_rules_ordered=pruning_rules.copy(), merge_rules=merge_rules)
 
-    Pipeline:
-        1. Add synthetic prim dims for missing M/N/K.
-        2. Split oversized dims.
-        3-6. Assign exec types, reorder, and fuse.
+        # should not happen
+        if len(total_sizes_m) == 0 or len(total_sizes_n) == 0 or len(total_sizes_k) == 0:
+            raise ValueError("No valid primitive dimension splits found for m, n, or k dimensions.")
 
-    Args:
-        config: Input configuration.
-        opts: Merged optimization parameters.
-        max_grid: Maximum CUDA grid size.
+        # for each combination of m, n, and k splits, calculate a performance score using the performance model, and keep 20 best performing splits
+        best_splits        = []
+        performance_scores = []
 
-    Returns:
-        Optimized config.
-    """
-    max_prim_dim_size = opts["max_prim_dim_size"]
+        for split_m in splits_m:
+            for split_n in splits_n:
+                for split_k in splits_k:
+                    performance_score = self._performance_model_primitives(split_m, split_n, split_k)
 
-    # Step 1: add synthetic dims.
-    cfg = _add_synthetic_prim_dims(config)
+                    if len(performance_scores) < 20 or performance_score > performance_scores[-1]:
+                        performance_scores.append(performance_score)
+                        best_splits.append([split_m, split_n, split_k])
 
-    # Step 2: split oversized dims.
-    cfg = _split_oversized_dims(cfg, max_prim_dim_size)
+                        # sort by performance score
+                        sorted_pairs = sorted(
+                            zip(performance_scores, best_splits),
+                            key=lambda pair: pair[0],
+                            reverse=True
+                        )
 
-    # Steps 3-6: assign exec types, reorder, fuse.
-    return _optimize_binary_impl(cfg, max_grid)
+                        performance_scores = [score for score, split in sorted_pairs]
+                        best_splits        = [split for score, split in sorted_pairs]
+
+                        # keep only top 20
+                        performance_scores = performance_scores[:20]
+                        best_splits        = best_splits[:20]
 
 
-def _optimize_unary(
-    config: object,
-    opts: dict,
-    max_grid: int,
-) -> object:
-    """Optimize a unary operation config.
+        # create new config helpers for the top 20 splits
+        # For each candidate, deep-copy the current (post-fused) cfg and apply the
+        # M/N/K tile splits so that every dimension is split into
+        #   [outer_loop_size, primitive_tile_size]
+        # where the primitive tile occupies the inner (lower-stride) sub-dimension.
+        # Dimensions whose tile equals their full size (no outer loop needed) or
+        # whose tile is 1 (dimension not included in the primitive) are left unsplit.
+        prim_cfgs = []
 
-    Pipeline:
-        1. Split oversized dims.
-        2-6. Assign exec types (with workaround), reorder, and fuse.
+        for split_m, split_n, split_k in best_splits:
+            prim_cfg = copy.deepcopy(self.cfg)
 
-    Args:
-        config: Input configuration.
-        opts: Merged optimization parameters.
-        max_grid: Maximum CUDA grid size.
+            dim_ids_to_split = []
+            splits_to_apply  = []
 
-    Returns:
-        Optimized config.
-    """
-    max_prim_dims = opts["max_prim_dims"]
-    max_prim_tile_volume = opts["max_prim_tile_volume"]
-    max_prim_dim_size = opts["max_prim_dim_size"]
+            split_counter_m = 0
+            split_counter_n = 0
+            split_counter_k = 0
 
-    # Step 1: split oversized dims.
-    cfg = _split_oversized_dims(config, max_prim_dim_size)
+            for i in range(len(prim_cfg.dim_types)):
+                dim_type  = prim_cfg.dim_types[i]
+                full_size = prim_cfg.dim_sizes[i]
 
-    # Steps 2-6: assign exec types, workaround, reorder, fuse.
-    return _optimize_unary_impl(cfg, max_grid, max_prim_dims, max_prim_tile_volume)
+                if dim_type == etops.dim.m:
+                    tile_size = split_m[split_counter_m]
+                    num_dims_of_type = len(split_m)
+                    split_counter_m += 1
+                elif dim_type == etops.dim.n:
+                    tile_size = split_n[split_counter_n]
+                    num_dims_of_type = len(split_n)
+                    split_counter_n += 1
+                elif dim_type == etops.dim.k:
+                    tile_size = split_k[split_counter_k]
+                    num_dims_of_type = len(split_k)
+                    split_counter_k += 1
+                else:
+                    # C (batch) dimensions are not split here
+                    continue
+
+                # no split
+                if tile_size == 1:
+                    if num_dims_of_type == 1:
+                        prim_cfg.exec_types[i] = etops.exec.prim
+                    continue
+
+                # no split, but prim dimension
+                if tile_size == full_size:
+                    prim_cfg.exec_types[i] = etops.exec.prim
+                    continue
+
+                dim_ids_to_split.append(i)
+                # split[0] = outer loop size (higher stride, id)
+                # split[1] = primitive tile  (lower/original stride, id+1)
+
+                splits_to_apply.append([full_size // tile_size, tile_size])
+
+            prim_cfg._split_multiple_dimensions(dim_ids_to_split, splits_to_apply, new_exec_type_left=etops.exec.seq, new_exec_type_right=etops.exec.prim)
+
+            # -----------------------------------------------------------------------
+            # Reorder prim dimensions to the rightmost positions in the order m, n, k.
+            # Within each type the prim dim with the largest stride (in the deciding
+            # tensor) is placed leftmost.  Deciding tensors:
+            #   m → left tensor
+            #   n → right tensor
+            #   k → right tensor if m_prim_size >= n_prim_size, else left tensor
+            # Non-prim dimensions keep their existing relative order at the front.
+            # -----------------------------------------------------------------------
+            m_prim_size_reorder = 1
+            n_prim_size_reorder = 1
+            for i in range(len(prim_cfg.dim_types)):
+                if prim_cfg.dim_types[i] == etops.dim.m and prim_cfg.exec_types[i] == etops.exec.prim:
+                    m_prim_size_reorder *= prim_cfg.dim_sizes[i]
+                elif prim_cfg.dim_types[i] == etops.dim.n and prim_cfg.exec_types[i] == etops.exec.prim:
+                    n_prim_size_reorder *= prim_cfg.dim_sizes[i]
+
+            k_deciding_strides = prim_cfg.strides_right if m_prim_size_reorder >= n_prim_size_reorder else prim_cfg.strides_left
+
+            non_prim_ids = [
+                i for i, et in enumerate(prim_cfg.exec_types)
+                if et != etops.exec.prim
+            ]
+            m_prim_ids = sorted(
+                [i for i, (dt, et) in enumerate(zip(prim_cfg.dim_types, prim_cfg.exec_types))
+                 if dt == etops.dim.m and et == etops.exec.prim],
+                key=lambda i: prim_cfg.strides_left[i],
+                reverse=True
+            )
+            n_prim_ids = sorted(
+                [i for i, (dt, et) in enumerate(zip(prim_cfg.dim_types, prim_cfg.exec_types))
+                 if dt == etops.dim.n and et == etops.exec.prim],
+                key=lambda i: prim_cfg.strides_right[i],
+                reverse=True
+            )
+            k_prim_ids = sorted(
+                [i for i, (dt, et) in enumerate(zip(prim_cfg.dim_types, prim_cfg.exec_types))
+                 if dt == etops.dim.k and et == etops.exec.prim],
+                key=lambda i: k_deciding_strides[i],
+                reverse=True
+            )
+
+            prim_cfg._permute_dimensions(non_prim_ids + m_prim_ids + n_prim_ids + k_prim_ids)
+
+            prim_cfgs.append(prim_cfg)
+        
+        return prim_cfgs, performance_scores
+
+
+
+    def _reorder_k_dimensions(self, config_object):
+        """
+        Reorder non-prim K dimensions so they are grouped immediately to the left
+        of the primitive block, ordered by descending stride in the deciding tensor.
+
+        The deciding tensor is the larger of the two input tensors by element count,
+        using config_object.left_size_total (C×M×K) vs config_object.right_size_total
+        (C×N×K).  Left wins ties.
+
+        Within the non-prim K block, the dimension with the largest stride is
+        placed leftmost (outermost over K).  Non-K non-prim dimensions (c, m_outer,
+        n_outer) keep their existing relative order at the front.  The prim block
+        (already ordered m → n → k by _find_primitive_dimension) is left unchanged.
+
+        Modifies config_object in place and returns it.
+        """
+
+        k_deciding_strides = config_object.strides_left if config_object.left_size_total >= config_object.right_size_total else config_object.strides_right
+
+        non_k_non_prim_ids = [
+            i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+            if dt != etops.dim.k and et != etops.exec.prim
+        ]
+        k_non_prim_ids = sorted(
+            [i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+             if dt == etops.dim.k and et != etops.exec.prim],
+            key=lambda i: k_deciding_strides[i],
+            reverse=True
+        )
+        prim_ids = [
+            i for i, et in enumerate(config_object.exec_types)
+            if et == etops.exec.prim
+        ]
+
+        config_object._permute_dimensions(non_k_non_prim_ids + k_non_prim_ids + prim_ids)
+        return config_object
+
+
+
+    def _reorder_front_dimensions(self, config_object, l2_inner_id_set, l2_inner_m_ids, l2_inner_n_ids):
+        """
+        Reorder the 'front' block (C, M, N dims that are not prim, not k, and not
+        L2 inner tile dims) into the canonical layout and emit a single combined
+        _permute_dimensions call that covers the entire cfg:
+
+            [C front (sorted) | M front (sorted) | N front (sorted)
+             | m_l2_tiles | n_l2_tiles | k_non_prim | prim]
+
+        Sorting rules within each front group (descending stride, largest leftmost):
+            C → larger of left_size_total vs right_size_total decides (left wins ties)
+            M → left tensor strides
+            N → right tensor strides
+
+        l2_inner_id_set  : set of pre-permutation indices that are L2 inner tile dims.
+        l2_inner_m_ids   : m L2 tile dim indices in their already-sorted order.
+        l2_inner_n_ids   : n L2 tile dim indices in their already-sorted order.
+
+        All three are expressed in the pre-permutation index space of config_object,
+        so they must be passed before any _permute_dimensions call has been made on
+        the current state of config_object.
+
+        Modifies config_object in place.
+        """
+
+        c_deciding_strides = (
+            config_object.strides_left
+            if config_object.left_size_total >= config_object.right_size_total
+            else config_object.strides_right
+        )
+
+        c_front_ids = sorted(
+            [i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+             if dt == etops.dim.c and et != etops.exec.prim and i not in l2_inner_id_set],
+            key=lambda i: c_deciding_strides[i],
+            reverse=True
+        )
+        m_front_ids = sorted(
+            [i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+             if dt == etops.dim.m and et != etops.exec.prim and i not in l2_inner_id_set],
+            key=lambda i: config_object.strides_left[i],
+            reverse=True
+        )
+        n_front_ids = sorted(
+            [i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+             if dt == etops.dim.n and et != etops.exec.prim and i not in l2_inner_id_set],
+            key=lambda i: config_object.strides_right[i],
+            reverse=True
+        )
+
+        k_non_prim_ids = [
+            i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+            if dt == etops.dim.k and et != etops.exec.prim
+        ]
+        prim_ids = [
+            i for i, et in enumerate(config_object.exec_types)
+            if et == etops.exec.prim
+        ]
+
+        config_object._permute_dimensions(
+            c_front_ids + m_front_ids + n_front_ids +
+            l2_inner_m_ids + l2_inner_n_ids +
+            k_non_prim_ids + prim_ids
+        )
+
+
+
+    def _l2_split_wins_by_stride(self, candidate, existing, dim_ids, strides):
+        """
+        Tie-break between two split combinations that have the same total size and the same
+        number of 1s. Compares the split sizes for each dimension in ascending stride order.
+        The candidate wins if it has a strictly larger split size at the first position
+        where the two differ. Returns False if the candidate does not win (existing stays).
+        """
+
+        sorted_positions = sorted(range(len(dim_ids)), key=lambda pos: strides[dim_ids[pos]])
+
+        for pos in sorted_positions:
+            if candidate[pos] > existing[pos]:
+                return True
+            elif candidate[pos] < existing[pos]:
+                return False
+
+        return False  # equal in every position — existing stays
+
+
+    def _get_l2_splits_for_dim_ids(self, dim_ids, config_object, strides, prim_size, total_k_size, l2_limit):
+        """
+        Generate all valid L2 cache tile splits for the given list of dimension IDs.
+
+        Each element of the returned splits list is a tuple of per-dimension tile sizes
+        (one divisor per dimension  in dim_ids). A split is pruned when the tile alone —
+        multiplied by the associated primitive size and total K — already exceeds the L2
+        limit. When two splits have the same total tile size the merge rule is applied:
+        keep the split with more 1s (fewer active tile dimensions); if equal, resolve by
+        ascending-stride tie-break via _l2_split_wins_by_stride.
+
+        If no split survives pruning, a trivial all-ones split is returned as fallback
+        (no L2 tiling in that dimension).
+
+        Returns (splits, total_sizes).
+        """
+
+        if len(dim_ids) == 0:
+            return [()], [1]
+
+        splits      = []
+        total_sizes = []
+
+        for combination in itertools.product(*[config_object.divisors[i] for i in dim_ids]):
+            total_size = 1
+            for s in combination:
+                total_size *= s
+
+            # Prune: tile * prim * K exceeds the L2 budget for this dimension alone
+            if total_size * prim_size * total_k_size > l2_limit:
+                continue
+
+            if total_size not in total_sizes:
+                splits.append(combination)
+                total_sizes.append(total_size)
+            else:
+                existing_idx  = total_sizes.index(total_size)
+                existing      = splits[existing_idx]
+
+                current_ones  = sum(1 for s in combination if s == 1)
+                existing_ones = sum(1 for s in existing    if s == 1)
+
+                if current_ones > existing_ones:
+                    splits[existing_idx] = combination
+                elif current_ones == existing_ones:
+                    if self._l2_split_wins_by_stride(combination, existing, dim_ids, strides):
+                        splits[existing_idx] = combination
+
+        if not splits:
+            # Fallback: trivial split — no L2 tiling for this dimension
+            trivial = tuple(1 for _ in dim_ids)
+            splits.append(trivial)
+            total_sizes.append(1)
+
+        return splits, total_sizes
+
+
+    def _optimize_for_l2_cache(self, config_object):
+        """
+        Optimize the configuration for L2 cache size by splitting non-prim dimensions.
+        The goal is to maximise L2 cache utilisation and reuse.
+
+        For each non-prim M and N dimension a set of candidate tile sizes is generated
+        using _get_l2_splits_for_dim_ids. Individual splits are pruned when their tile
+        alone (times the corresponding primitive size times total K) exceeds the L2
+        budget. All (M-tile, N-tile) combinations are then evaluated with a simple
+        arithmetic-intensity performance model; the combination with the highest score is
+        applied to a deep copy of config_object by splitting the relevant dimensions into
+        an outer (seq) and inner (seq) loop.
+
+        Returns:
+            (optimized_cfg, best_score) — a deep copy of config_object with the best
+            L2 splits applied, and the arithmetic-intensity score of that split.
+        """
+
+        cfg = copy.deepcopy(config_object)
+
+        # -----------------------------------------------------------------------
+        # Prim sizes
+        # -----------------------------------------------------------------------
+        total_m_prim_size = 1
+        total_n_prim_size = 1
+
+        for i in range(len(cfg.dim_types)):
+            if cfg.dim_types[i] == etops.dim.m and cfg.exec_types[i] == etops.exec.prim:
+                total_m_prim_size *= cfg.dim_sizes[i]
+            elif cfg.dim_types[i] == etops.dim.n and cfg.exec_types[i] == etops.exec.prim:
+                total_n_prim_size *= cfg.dim_sizes[i]
+
+        # Combined prim footprint (m and n prim) used in the per-dimension pruning.
+        # total_k_size (full K, not just prim K) is passed separately and accounts
+        # for the iteration depth over K during the L2 tile computation.
+        total_mn_prim_size = total_m_prim_size * total_n_prim_size
+
+        total_k_size = cfg.K_size_total
+        l2_limit     = self.l2_cache_size_in_elements * self.MAX_L2_CACHE_UTILIZATION
+
+        # -----------------------------------------------------------------------
+        # Strides selection: use the strides of the larger tensor for each type
+        # -----------------------------------------------------------------------
+        left_size  = cfg.C_size_total * cfg.M_size_total * cfg.K_size_total
+        right_size = cfg.C_size_total * cfg.K_size_total * cfg.N_size_total
+        out_size   = cfg.C_size_total * cfg.M_size_total * cfg.N_size_total
+
+        m_strides = cfg.strides_left  if left_size  >= out_size else cfg.strides_out
+        n_strides = cfg.strides_right if right_size >= out_size else cfg.strides_out
+
+        # -----------------------------------------------------------------------
+        # Non-prim dimension IDs for M and N
+        # -----------------------------------------------------------------------
+        m_dim_ids = [
+            i for i, (dt, et) in enumerate(zip(cfg.dim_types, cfg.exec_types))
+            if dt == etops.dim.m and et != etops.exec.prim
+        ]
+        n_dim_ids = [
+            i for i, (dt, et) in enumerate(zip(cfg.dim_types, cfg.exec_types))
+            if dt == etops.dim.n and et != etops.exec.prim
+        ]
+
+        # -----------------------------------------------------------------------
+        # Generate candidate splits for M and N separately
+        # -----------------------------------------------------------------------
+        m_splits, m_total_sizes = self._get_l2_splits_for_dim_ids(
+            m_dim_ids, cfg, m_strides, total_mn_prim_size, total_k_size, l2_limit
+        )
+        n_splits, n_total_sizes = self._get_l2_splits_for_dim_ids(
+            n_dim_ids, cfg, n_strides, total_mn_prim_size, total_k_size, l2_limit
+        )
+
+        # -----------------------------------------------------------------------
+        # Evaluate all (M-tile, N-tile) combinations and keep the best
+        # -----------------------------------------------------------------------
+        best_split_m = m_splits[0]
+        best_split_n = n_splits[0]
+        best_score   = -math.inf
+
+        for split_m, total_m in zip(m_splits, m_total_sizes):
+            for split_n, total_n in zip(n_splits, n_total_sizes):
+                # Combined L2 footprint check
+                combined_footprint = total_m * total_m_prim_size + total_n * total_n_prim_size
+                if combined_footprint > l2_limit:
+                    score = 0.0
+                else:
+                    # Arithmetic-intensity performance model:
+                    #   (total_M * M_prim * total_N * N_prim) 
+                    #   -------------------------------------------
+                    #   (total_M * M_prim * K + total_N * N_prim * K)
+                    numerator   =  total_m * total_m_prim_size * total_n * total_n_prim_size
+                    denominator = (total_m * total_m_prim_size * total_k_size +
+                                   total_n * total_n_prim_size * total_k_size)
+                    score = numerator / denominator if denominator > 0 else 0.0
+
+                if score > best_score:
+                    best_score   = score
+                    best_split_m = split_m
+                    best_split_n = split_n
+
+        # -----------------------------------------------------------------------
+        # Apply best split to the copy: split each non-prim dim into [outer, inner]
+        # Both outer and inner receive exec.seq.
+        # -----------------------------------------------------------------------
+        dim_ids_to_split = []
+        splits_to_apply  = []
+
+        for pos, i in enumerate(m_dim_ids):
+            tile_size = best_split_m[pos]
+            full_size = cfg.dim_sizes[i]
+            if 1 < tile_size < full_size:
+                dim_ids_to_split.append(i)
+                splits_to_apply.append([full_size // tile_size, tile_size])
+
+        for pos, i in enumerate(n_dim_ids):
+            tile_size = best_split_n[pos]
+            full_size = cfg.dim_sizes[i]
+            if 1 < tile_size < full_size:
+                dim_ids_to_split.append(i)
+                splits_to_apply.append([full_size // tile_size, tile_size])
+
+        cfg._split_multiple_dimensions(
+            dim_ids_to_split, splits_to_apply,
+            new_exec_type_left=etops.exec.seq,
+            new_exec_type_right=etops.exec.seq
+        )
+
+        # -----------------------------------------------------------------------
+        # Reorder all remaining free dims (front block: C, M, N outer) and place
+        # the L2 inner (tile) dims in the canonical position, all in one permutation.
+        # See _reorder_front_dimensions for the full ordering rules.
+        #
+        # Inner dim positions are determined by the same index-shift arithmetic used
+        # inside _split_multiple_dimensions: splits are processed in ascending order of
+        # original_id, so the i-th inner dim lands at original_id + offset + 1.
+        # -----------------------------------------------------------------------
+        sorted_split_pairs = sorted(zip(dim_ids_to_split, splits_to_apply), key=lambda p: p[0])
+        l2_inner_ids = [
+            original_id + offset + 1
+            for offset, (original_id, _) in enumerate(sorted_split_pairs)
+        ]
+
+        l2_inner_id_set = set(l2_inner_ids)
+
+        l2_inner_m_ids = sorted(
+            [i for i in l2_inner_ids if cfg.dim_types[i] == etops.dim.m],
+            key=lambda i: cfg.strides_left[i],
+            reverse=True
+        )
+        l2_inner_n_ids = sorted(
+            [i for i in l2_inner_ids if cfg.dim_types[i] == etops.dim.n],
+            key=lambda i: cfg.strides_right[i],
+            reverse=True
+        )
+
+        self._reorder_front_dimensions(cfg, l2_inner_id_set, l2_inner_m_ids, l2_inner_n_ids)
+
+        # -----------------------------------------------------------------------
+        # Convert best_score to a factor in [WORST_L2_FACTOR, 1.0] based on the best possible score.
+        # -----------------------------------------------------------------------
+        WORST_L2_FACTOR = 0.4
+        
+        # best M/N:
+        # M * K + N * K = l2_limit
+        # M = K => 2 * M * K = l2_limit
+        # => M = l2_limit / (2 * K)
+
+        best_possible_M_N = l2_limit / (2 * total_k_size)
+        best_possible_score = (best_possible_M_N ** 2) / (2 * best_possible_M_N * total_k_size)
+
+
+        if best_possible_score > 0:
+            raw    = best_score / best_possible_score
+            factor = WORST_L2_FACTOR + (1.0 - WORST_L2_FACTOR) * raw
+            factor = min(1.0, max(WORST_L2_FACTOR, factor))
+        else:
+            factor = WORST_L2_FACTOR
+
+        return cfg, factor
+
+    
+    def get_optimized_config(self):
+        return self.optimized_config
+
+
+
