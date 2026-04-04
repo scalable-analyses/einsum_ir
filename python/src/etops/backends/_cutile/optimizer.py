@@ -48,6 +48,9 @@ class Optimizer:
 
         self.l2_cache_size_in_elements = self.l2_cache_size // self.bytes_per_element_load
 
+        self.optimized_config = None
+        self.performance_score_optimized_config = None
+
 
 
     def optimize(self):
@@ -62,17 +65,22 @@ class Optimizer:
         self.cfg._fuse_all_fusable_dimensions(new_exec_type=etops.exec.seq)
 
         # Get the primitive dimension candidates
-        candidate_cfgs = self._find_primitive_dimension()
+        candidate_cfgs, performance_scores = self._find_primitive_dimension()
 
-        # If both the left and right input tensor fit into L2 cache, we can skip l2 cache optimization        
-        if self.cfg.left_size_total + self.cfg.right_size_total > self.l2_cache_size_in_elements * self.MAX_L2_CACHE_UTILIZATION:
-            self._optimize_for_l2_cache(candidate_cfgs[0])
+        candidate_cfgs_after_l2_cache_optimization = []
 
-            import pprint
-            print("Optimized config:")
-            pprint.pprint(candidate_cfgs[0].get_config())
+        for i, cfg in enumerate(candidate_cfgs):
+            optimized_cfg, factor = self._optimize_for_l2_cache(cfg)
+            candidate_cfgs_after_l2_cache_optimization.append(optimized_cfg)
+            performance_scores[i] *= factor
 
-        
+        # get the best config according to the performance scores after L2 cache optimization
+        best_index = performance_scores.index(max(performance_scores))
+        best_cfg = candidate_cfgs_after_l2_cache_optimization[best_index]
+
+        self.optimized_config = best_cfg.get_config()
+        self.performance_score_optimized_config = performance_scores[best_index]
+
 
 
     def _get_all_possible_dim_size_combinations(self, ids_list, strides_list, strides_list_2=None, pruning_rules=[], merge_rules=[]):
@@ -757,7 +765,7 @@ class Optimizer:
             prim_cfg._split_multiple_dimensions(dim_ids_to_split, splits_to_apply, new_exec_type_left=etops.exec.seq, new_exec_type_right=etops.exec.prim)
             prim_cfgs.append(prim_cfg)
         
-        return prim_cfgs
+        return prim_cfgs, performance_scores
 
 
 
@@ -847,9 +855,15 @@ class Optimizer:
         alone (times the corresponding primitive size times total K) exceeds the L2
         budget. All (M-tile, N-tile) combinations are then evaluated with a simple
         arithmetic-intensity performance model; the combination with the highest score is
-        applied in-place to config_object by splitting the relevant dimensions into an
-        outer (seq) and inner (seq) loop.
+        applied to a deep copy of config_object by splitting the relevant dimensions into
+        an outer (seq) and inner (seq) loop.
+
+        Returns:
+            (optimized_cfg, best_score) — a deep copy of config_object with the best
+            L2 splits applied, and the arithmetic-intensity score of that split.
         """
+
+        cfg = copy.deepcopy(config_object)
 
         # -----------------------------------------------------------------------
         # Prim sizes
@@ -857,39 +871,39 @@ class Optimizer:
         total_m_prim_size = 1
         total_n_prim_size = 1
 
-        for i in range(len(config_object.dim_types)):
-            if config_object.dim_types[i] == etops.dim.m and config_object.exec_types[i] == etops.exec.prim:
-                total_m_prim_size *= config_object.dim_sizes[i]
-            elif config_object.dim_types[i] == etops.dim.n and config_object.exec_types[i] == etops.exec.prim:
-                total_n_prim_size *= config_object.dim_sizes[i]
+        for i in range(len(cfg.dim_types)):
+            if cfg.dim_types[i] == etops.dim.m and cfg.exec_types[i] == etops.exec.prim:
+                total_m_prim_size *= cfg.dim_sizes[i]
+            elif cfg.dim_types[i] == etops.dim.n and cfg.exec_types[i] == etops.exec.prim:
+                total_n_prim_size *= cfg.dim_sizes[i]
 
         # Combined prim footprint (m and n prim) used in the per-dimension pruning.
         # total_k_size (full K, not just prim K) is passed separately and accounts
         # for the iteration depth over K during the L2 tile computation.
         total_mn_prim_size = total_m_prim_size * total_n_prim_size
 
-        total_k_size = config_object.K_size_total
+        total_k_size = cfg.K_size_total
         l2_limit     = self.l2_cache_size_in_elements * self.MAX_L2_CACHE_UTILIZATION
 
         # -----------------------------------------------------------------------
         # Strides selection: use the strides of the larger tensor for each type
         # -----------------------------------------------------------------------
-        left_size  = config_object.C_size_total * config_object.M_size_total * config_object.K_size_total
-        right_size = config_object.C_size_total * config_object.K_size_total * config_object.N_size_total
-        out_size   = config_object.C_size_total * config_object.M_size_total * config_object.N_size_total
+        left_size  = cfg.C_size_total * cfg.M_size_total * cfg.K_size_total
+        right_size = cfg.C_size_total * cfg.K_size_total * cfg.N_size_total
+        out_size   = cfg.C_size_total * cfg.M_size_total * cfg.N_size_total
 
-        m_strides = config_object.strides_left  if left_size  >= out_size else config_object.strides_out
-        n_strides = config_object.strides_right if right_size >= out_size else config_object.strides_out
+        m_strides = cfg.strides_left  if left_size  >= out_size else cfg.strides_out
+        n_strides = cfg.strides_right if right_size >= out_size else cfg.strides_out
 
         # -----------------------------------------------------------------------
         # Non-prim dimension IDs for M and N
         # -----------------------------------------------------------------------
         m_dim_ids = [
-            i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+            i for i, (dt, et) in enumerate(zip(cfg.dim_types, cfg.exec_types))
             if dt == etops.dim.m and et != etops.exec.prim
         ]
         n_dim_ids = [
-            i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+            i for i, (dt, et) in enumerate(zip(cfg.dim_types, cfg.exec_types))
             if dt == etops.dim.n and et != etops.exec.prim
         ]
 
@@ -897,10 +911,10 @@ class Optimizer:
         # Generate candidate splits for M and N separately
         # -----------------------------------------------------------------------
         m_splits, m_total_sizes = self._get_l2_splits_for_dim_ids(
-            m_dim_ids, config_object, m_strides, total_mn_prim_size, total_k_size, l2_limit
+            m_dim_ids, cfg, m_strides, total_mn_prim_size, total_k_size, l2_limit
         )
         n_splits, n_total_sizes = self._get_l2_splits_for_dim_ids(
-            n_dim_ids, config_object, n_strides, total_mn_prim_size, total_k_size, l2_limit
+            n_dim_ids, cfg, n_strides, total_mn_prim_size, total_k_size, l2_limit
         )
 
         # -----------------------------------------------------------------------
@@ -918,12 +932,12 @@ class Optimizer:
                     score = 0.0
                 else:
                     # Arithmetic-intensity performance model:
-                    #   (total_M * M_prim * K + total_N * N_prim * K)
+                    #   (total_M * M_prim * total_N * N_prim) 
                     #   -------------------------------------------
-                    #   (total_M * M_prim * total_N * N_prim)
-                    numerator   = (total_m * total_m_prim_size * total_k_size +
+                    #   (total_M * M_prim * K + total_N * N_prim * K)
+                    numerator   =  total_m * total_m_prim_size * total_n * total_n_prim_size
+                    denominator = (total_m * total_m_prim_size * total_k_size +
                                    total_n * total_n_prim_size * total_k_size)
-                    denominator =  total_m * total_m_prim_size * total_n * total_n_prim_size
                     score = numerator / denominator if denominator > 0 else 0.0
 
                 if score > best_score:
@@ -932,7 +946,7 @@ class Optimizer:
                     best_split_n = split_n
 
         # -----------------------------------------------------------------------
-        # Apply best split in-place: split each non-prim dim into [outer, inner]
+        # Apply best split to the copy: split each non-prim dim into [outer, inner]
         # Both outer and inner receive exec.seq.
         # -----------------------------------------------------------------------
         dim_ids_to_split = []
@@ -940,23 +954,50 @@ class Optimizer:
 
         for pos, i in enumerate(m_dim_ids):
             tile_size = best_split_m[pos]
-            full_size = config_object.dim_sizes[i]
+            full_size = cfg.dim_sizes[i]
             if 1 < tile_size < full_size:
                 dim_ids_to_split.append(i)
                 splits_to_apply.append([full_size // tile_size, tile_size])
 
         for pos, i in enumerate(n_dim_ids):
             tile_size = best_split_n[pos]
-            full_size = config_object.dim_sizes[i]
+            full_size = cfg.dim_sizes[i]
             if 1 < tile_size < full_size:
                 dim_ids_to_split.append(i)
                 splits_to_apply.append([full_size // tile_size, tile_size])
 
-        config_object._split_multiple_dimensions(
+        cfg._split_multiple_dimensions(
             dim_ids_to_split, splits_to_apply,
             new_exec_type_left=etops.exec.seq,
             new_exec_type_right=etops.exec.seq
         )
+
+        # -----------------------------------------------------------------------
+        # Convert best_score to a factor in [WORST_L2_FACTOR, 1.0] based on the best possible score.
+        # -----------------------------------------------------------------------
+        WORST_L2_FACTOR = 0.4
+        
+        # best M/N:
+        # M * K + N * K = l2_limit
+        # M = K => 2 * M * K = l2_limit
+        # => M = l2_limit / (2 * K)
+
+        best_possible_M_N = l2_limit / (2 * total_k_size)
+        best_possible_score = (best_possible_M_N ** 2) / (2 * best_possible_M_N * total_k_size)
+
+
+        if best_possible_score > 0:
+            raw    = best_score / best_possible_score
+            factor = WORST_L2_FACTOR + (1.0 - WORST_L2_FACTOR) * raw
+            factor = min(1.0, max(WORST_L2_FACTOR, factor))
+        else:
+            factor = WORST_L2_FACTOR
+
+        return cfg, factor
+
+    
+    def get_optimized_config(self):
+        return self.optimized_config
 
 
 
