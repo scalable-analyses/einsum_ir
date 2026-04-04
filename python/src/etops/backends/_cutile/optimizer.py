@@ -1062,6 +1062,51 @@ class Optimizer:
         )
 
         # -----------------------------------------------------------------------
+        # Reorder the newly created L2 inner (tile) dims into the canonical layout:
+        #   [front (non-k, non-prim, non-tile) | m_tiles | n_tiles | k_non_prim | prim]
+        #
+        # Inner dim positions are determined by the same index-shift arithmetic used
+        # inside _split_multiple_dimensions: splits are processed in ascending order of
+        # original_id, so the i-th inner dim lands at original_id + offset + 1.
+        # Non-tile dims keep their existing relative order exactly.
+        # -----------------------------------------------------------------------
+        sorted_split_pairs = sorted(zip(dim_ids_to_split, splits_to_apply), key=lambda p: p[0])
+        l2_inner_ids = [
+            original_id + offset + 1
+            for offset, (original_id, _) in enumerate(sorted_split_pairs)
+        ]
+
+        l2_inner_id_set = set(l2_inner_ids)
+
+        l2_inner_m_ids = sorted(
+            [i for i in l2_inner_ids if cfg.dim_types[i] == etops.dim.m],
+            key=lambda i: cfg.strides_left[i],
+            reverse=True
+        )
+        l2_inner_n_ids = sorted(
+            [i for i in l2_inner_ids if cfg.dim_types[i] == etops.dim.n],
+            key=lambda i: cfg.strides_right[i],
+            reverse=True
+        )
+
+        front_ids = [
+            i for i, (dt, et) in enumerate(zip(cfg.dim_types, cfg.exec_types))
+            if dt != etops.dim.k and et != etops.exec.prim and i not in l2_inner_id_set
+        ]
+        k_non_prim_ids_reorder = [
+            i for i, (dt, et) in enumerate(zip(cfg.dim_types, cfg.exec_types))
+            if dt == etops.dim.k and et != etops.exec.prim
+        ]
+        prim_ids_reorder = [
+            i for i, et in enumerate(cfg.exec_types)
+            if et == etops.exec.prim
+        ]
+
+        cfg._permute_dimensions(
+            front_ids + l2_inner_m_ids + l2_inner_n_ids + k_non_prim_ids_reorder + prim_ids_reorder
+        )
+
+        # -----------------------------------------------------------------------
         # Convert best_score to a factor in [WORST_L2_FACTOR, 1.0] based on the best possible score.
         # -----------------------------------------------------------------------
         WORST_L2_FACTOR = 0.4
