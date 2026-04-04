@@ -13,7 +13,7 @@ class ConfigHelper:
         # check dimensionality of strides
         # currently no support for multiple memory layers
         if len(config.strides) > 1:
-            raise ValueError("Currently only support for one memory layer for the cuTile backend.")
+            raise ValueError("Currently only support for one memory layer for the tileir backend.")
 
         # Non-list fields needed to reconstruct a TensorOperationConfig
         self.backend    = config.backend
