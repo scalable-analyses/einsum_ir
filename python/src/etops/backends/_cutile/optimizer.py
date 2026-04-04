@@ -858,6 +858,73 @@ class Optimizer:
 
 
 
+    def _reorder_front_dimensions(self, config_object, l2_inner_id_set, l2_inner_m_ids, l2_inner_n_ids):
+        """
+        Reorder the 'front' block (C, M, N dims that are not prim, not k, and not
+        L2 inner tile dims) into the canonical layout and emit a single combined
+        _permute_dimensions call that covers the entire cfg:
+
+            [C front (sorted) | M front (sorted) | N front (sorted)
+             | m_l2_tiles | n_l2_tiles | k_non_prim | prim]
+
+        Sorting rules within each front group (descending stride, largest leftmost):
+            C → larger of left_size_total vs right_size_total decides (left wins ties)
+            M → left tensor strides
+            N → right tensor strides
+
+        l2_inner_id_set  : set of pre-permutation indices that are L2 inner tile dims.
+        l2_inner_m_ids   : m L2 tile dim indices in their already-sorted order.
+        l2_inner_n_ids   : n L2 tile dim indices in their already-sorted order.
+
+        All three are expressed in the pre-permutation index space of config_object,
+        so they must be passed before any _permute_dimensions call has been made on
+        the current state of config_object.
+
+        Modifies config_object in place.
+        """
+
+        c_deciding_strides = (
+            config_object.strides_left
+            if config_object.left_size_total >= config_object.right_size_total
+            else config_object.strides_right
+        )
+
+        c_front_ids = sorted(
+            [i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+             if dt == etops.dim.c and et != etops.exec.prim and i not in l2_inner_id_set],
+            key=lambda i: c_deciding_strides[i],
+            reverse=True
+        )
+        m_front_ids = sorted(
+            [i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+             if dt == etops.dim.m and et != etops.exec.prim and i not in l2_inner_id_set],
+            key=lambda i: config_object.strides_left[i],
+            reverse=True
+        )
+        n_front_ids = sorted(
+            [i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+             if dt == etops.dim.n and et != etops.exec.prim and i not in l2_inner_id_set],
+            key=lambda i: config_object.strides_right[i],
+            reverse=True
+        )
+
+        k_non_prim_ids = [
+            i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+            if dt == etops.dim.k and et != etops.exec.prim
+        ]
+        prim_ids = [
+            i for i, et in enumerate(config_object.exec_types)
+            if et == etops.exec.prim
+        ]
+
+        config_object._permute_dimensions(
+            c_front_ids + m_front_ids + n_front_ids +
+            l2_inner_m_ids + l2_inner_n_ids +
+            k_non_prim_ids + prim_ids
+        )
+
+
+
     def _l2_split_wins_by_stride(self, candidate, existing, dim_ids, strides):
         """
         Tie-break between two split combinations that have the same total size and the same
@@ -1062,13 +1129,13 @@ class Optimizer:
         )
 
         # -----------------------------------------------------------------------
-        # Reorder the newly created L2 inner (tile) dims into the canonical layout:
-        #   [front (non-k, non-prim, non-tile) | m_tiles | n_tiles | k_non_prim | prim]
+        # Reorder all remaining free dims (front block: C, M, N outer) and place
+        # the L2 inner (tile) dims in the canonical position, all in one permutation.
+        # See _reorder_front_dimensions for the full ordering rules.
         #
         # Inner dim positions are determined by the same index-shift arithmetic used
         # inside _split_multiple_dimensions: splits are processed in ascending order of
         # original_id, so the i-th inner dim lands at original_id + offset + 1.
-        # Non-tile dims keep their existing relative order exactly.
         # -----------------------------------------------------------------------
         sorted_split_pairs = sorted(zip(dim_ids_to_split, splits_to_apply), key=lambda p: p[0])
         l2_inner_ids = [
@@ -1089,22 +1156,7 @@ class Optimizer:
             reverse=True
         )
 
-        front_ids = [
-            i for i, (dt, et) in enumerate(zip(cfg.dim_types, cfg.exec_types))
-            if dt != etops.dim.k and et != etops.exec.prim and i not in l2_inner_id_set
-        ]
-        k_non_prim_ids_reorder = [
-            i for i, (dt, et) in enumerate(zip(cfg.dim_types, cfg.exec_types))
-            if dt == etops.dim.k and et != etops.exec.prim
-        ]
-        prim_ids_reorder = [
-            i for i, et in enumerate(cfg.exec_types)
-            if et == etops.exec.prim
-        ]
-
-        cfg._permute_dimensions(
-            front_ids + l2_inner_m_ids + l2_inner_n_ids + k_non_prim_ids_reorder + prim_ids_reorder
-        )
+        self._reorder_front_dimensions(cfg, l2_inner_id_set, l2_inner_m_ids, l2_inner_n_ids)
 
         # -----------------------------------------------------------------------
         # Convert best_score to a factor in [WORST_L2_FACTOR, 1.0] based on the best possible score.
