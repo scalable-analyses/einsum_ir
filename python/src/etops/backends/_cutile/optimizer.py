@@ -67,6 +67,10 @@ class Optimizer:
         # Get the primitive dimension candidates
         candidate_cfgs, performance_scores = self._find_primitive_dimension()
 
+        # Reorder non-prim K dimensions immediately to the left of the prim block
+        for cfg in candidate_cfgs:
+            self._reorder_k_dimensions(cfg)
+
         candidate_cfgs_after_l2_cache_optimization = []
 
         for i, cfg in enumerate(candidate_cfgs):
@@ -812,6 +816,45 @@ class Optimizer:
             prim_cfgs.append(prim_cfg)
         
         return prim_cfgs, performance_scores
+
+
+
+    def _reorder_k_dimensions(self, config_object):
+        """
+        Reorder non-prim K dimensions so they are grouped immediately to the left
+        of the primitive block, ordered by descending stride in the deciding tensor.
+
+        The deciding tensor is the larger of the two input tensors by element count,
+        using config_object.left_size_total (C×M×K) vs config_object.right_size_total
+        (C×N×K).  Left wins ties.
+
+        Within the non-prim K block, the dimension with the largest stride is
+        placed leftmost (outermost over K).  Non-K non-prim dimensions (c, m_outer,
+        n_outer) keep their existing relative order at the front.  The prim block
+        (already ordered m → n → k by _find_primitive_dimension) is left unchanged.
+
+        Modifies config_object in place and returns it.
+        """
+
+        k_deciding_strides = config_object.strides_left if config_object.left_size_total >= config_object.right_size_total else config_object.strides_right
+
+        non_k_non_prim_ids = [
+            i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+            if dt != etops.dim.k and et != etops.exec.prim
+        ]
+        k_non_prim_ids = sorted(
+            [i for i, (dt, et) in enumerate(zip(config_object.dim_types, config_object.exec_types))
+             if dt == etops.dim.k and et != etops.exec.prim],
+            key=lambda i: k_deciding_strides[i],
+            reverse=True
+        )
+        prim_ids = [
+            i for i, et in enumerate(config_object.exec_types)
+            if et == etops.exec.prim
+        ]
+
+        config_object._permute_dimensions(non_k_non_prim_ids + k_non_prim_ids + prim_ids)
+        return config_object
 
 
 
