@@ -83,6 +83,7 @@ class Optimizer:
 
 
 
+
     def _get_all_possible_dim_size_combinations(self, ids_list, strides_list, strides_list_2=None, pruning_rules=[], merge_rules=[]):
         """
         Returns a list of all possible dimension sizes + their corresponding splits that are a combination of the divisors for the given list of dimension IDs.
@@ -763,6 +764,51 @@ class Optimizer:
                 splits_to_apply.append([full_size // tile_size, tile_size])
 
             prim_cfg._split_multiple_dimensions(dim_ids_to_split, splits_to_apply, new_exec_type_left=etops.exec.seq, new_exec_type_right=etops.exec.prim)
+
+            # -----------------------------------------------------------------------
+            # Reorder prim dimensions to the rightmost positions in the order m, n, k.
+            # Within each type the prim dim with the largest stride (in the deciding
+            # tensor) is placed leftmost.  Deciding tensors:
+            #   m → left tensor
+            #   n → right tensor
+            #   k → right tensor if m_prim_size >= n_prim_size, else left tensor
+            # Non-prim dimensions keep their existing relative order at the front.
+            # -----------------------------------------------------------------------
+            m_prim_size_reorder = 1
+            n_prim_size_reorder = 1
+            for i in range(len(prim_cfg.dim_types)):
+                if prim_cfg.dim_types[i] == etops.dim.m and prim_cfg.exec_types[i] == etops.exec.prim:
+                    m_prim_size_reorder *= prim_cfg.dim_sizes[i]
+                elif prim_cfg.dim_types[i] == etops.dim.n and prim_cfg.exec_types[i] == etops.exec.prim:
+                    n_prim_size_reorder *= prim_cfg.dim_sizes[i]
+
+            k_deciding_strides = prim_cfg.strides_right if m_prim_size_reorder >= n_prim_size_reorder else prim_cfg.strides_left
+
+            non_prim_ids = [
+                i for i, et in enumerate(prim_cfg.exec_types)
+                if et != etops.exec.prim
+            ]
+            m_prim_ids = sorted(
+                [i for i, (dt, et) in enumerate(zip(prim_cfg.dim_types, prim_cfg.exec_types))
+                 if dt == etops.dim.m and et == etops.exec.prim],
+                key=lambda i: prim_cfg.strides_left[i],
+                reverse=True
+            )
+            n_prim_ids = sorted(
+                [i for i, (dt, et) in enumerate(zip(prim_cfg.dim_types, prim_cfg.exec_types))
+                 if dt == etops.dim.n and et == etops.exec.prim],
+                key=lambda i: prim_cfg.strides_right[i],
+                reverse=True
+            )
+            k_prim_ids = sorted(
+                [i for i, (dt, et) in enumerate(zip(prim_cfg.dim_types, prim_cfg.exec_types))
+                 if dt == etops.dim.k and et == etops.exec.prim],
+                key=lambda i: k_deciding_strides[i],
+                reverse=True
+            )
+
+            prim_cfg._permute_dimensions(non_prim_ids + m_prim_ids + n_prim_ids + k_prim_ids)
+
             prim_cfgs.append(prim_cfg)
         
         return prim_cfgs, performance_scores
