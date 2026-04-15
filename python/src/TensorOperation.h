@@ -3,10 +3,15 @@
 
 #include <cstdint>
 #include <vector>
+#include <iostream>
 #include <einsum_ir/basic/unary/UnaryBackendTpp.h>
 #include <einsum_ir/basic/unary/UnaryOptimizer.h>
 #include <einsum_ir/basic/binary/ContractionBackendTpp.h>
 #include <einsum_ir/basic/binary/ContractionOptimizer.h>
+
+#ifdef ETOPS_USE_PAPI
+#include "papi.h"
+#endif 
 
 namespace einsum_ir {
   namespace py {
