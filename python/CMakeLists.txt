@@ -92,21 +92,21 @@ if(ETOPS_USE_PAPI)
   
   ExternalProject_Add(papi_external
     GIT_REPOSITORY https://github.com/icl-utk-edu/papi.git
-    GIT_TAG master
-        PREFIX ${PAPI_PREFIX_DIR}
-        SOURCE_DIR ${PAPI_SOURCE_DIR}
-        BUILD_IN_SOURCE 1
-        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>/src ./configure --prefix=<SOURCE_DIR>/src/install
-        BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>/src make
-        INSTALL_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>/src make install
-        BUILD_BYPRODUCTS "${PAPI_INSTALL_DIR}/lib/libpapi.a"
+    GIT_TAG 4c51744
+    PREFIX ${PAPI_PREFIX_DIR}
+    SOURCE_DIR ${PAPI_SOURCE_DIR}
+    BUILD_IN_SOURCE 1
+    CONFIGURE_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>/src ./configure --prefix=<SOURCE_DIR>/src/install
+    BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>/src make
+    INSTALL_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>/src make install
+    BUILD_BYPRODUCTS "${PAPI_INSTALL_DIR}/lib/libpapi.a"
   )
 
     add_library(PAPI::PAPI STATIC IMPORTED GLOBAL)
     set_target_properties(PAPI::PAPI PROPERTIES
-    IMPORTED_LOCATION "${PAPI_INSTALL_DIR}/lib/libpapi.a"
-        INTERFACE_INCLUDE_DIRECTORIES "${PAPI_INSTALL_DIR}/include"
-  )
+      IMPORTED_LOCATION "${PAPI_INSTALL_DIR}/lib/libpapi.a"
+      INTERFACE_INCLUDE_DIRECTORIES "${PAPI_INSTALL_DIR}/include"
+    )
   add_dependencies(PAPI::PAPI papi_external)
 
   target_link_libraries(TensorOperation PUBLIC PAPI::PAPI)
