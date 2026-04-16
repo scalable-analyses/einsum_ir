@@ -17,6 +17,7 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+option(ETOPS_USE_PAPI "Enable Papi profiling" OFF)
 
 # ------------------------------------------------------------
 # einsum_ir
@@ -75,6 +76,41 @@ else()
         INSTALL_RPATH "$ORIGIN"
         LINK_FLAGS "-Wl,--enable-new-dtags"
     )
+endif()
+
+if(ETOPS_USE_PAPI)
+  include(ExternalProject)
+
+  set(PAPI_PREFIX_DIR "${CMAKE_BINARY_DIR}/external/papi")
+  set(PAPI_SOURCE_DIR "${PAPI_PREFIX_DIR}/src/papi_external")
+  set(PAPI_INSTALL_DIR "${PAPI_SOURCE_DIR}/src/install")
+
+    file(MAKE_DIRECTORY
+        "${PAPI_INSTALL_DIR}/include"
+        "${PAPI_INSTALL_DIR}/lib"
+    )
+  
+  ExternalProject_Add(papi_external
+    GIT_REPOSITORY https://github.com/icl-utk-edu/papi.git
+    GIT_TAG 4c51744
+    PREFIX ${PAPI_PREFIX_DIR}
+    SOURCE_DIR ${PAPI_SOURCE_DIR}
+    BUILD_IN_SOURCE 1
+    CONFIGURE_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>/src ./configure --prefix=<SOURCE_DIR>/src/install
+    BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>/src make
+    INSTALL_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>/src make install
+    BUILD_BYPRODUCTS "${PAPI_INSTALL_DIR}/lib/libpapi.a"
+  )
+
+    add_library(PAPI::PAPI STATIC IMPORTED GLOBAL)
+    set_target_properties(PAPI::PAPI PROPERTIES
+      IMPORTED_LOCATION "${PAPI_INSTALL_DIR}/lib/libpapi.a"
+      INTERFACE_INCLUDE_DIRECTORIES "${PAPI_INSTALL_DIR}/include"
+    )
+  add_dependencies(PAPI::PAPI papi_external)
+
+  target_link_libraries(TensorOperation PUBLIC PAPI::PAPI)
+  target_compile_definitions(TensorOperation PUBLIC ETOPS_USE_PAPI)
 endif()
 
 target_compile_features(_etops_core PUBLIC)

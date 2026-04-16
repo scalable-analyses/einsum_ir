@@ -13,6 +13,7 @@ PYBIND11_MODULE(_etops_core, m) {
     .value("compilation_failed", TensorOperation::error_t::compilation_failed)
     .value("invalid_stride_shape", TensorOperation::error_t::invalid_stride_shape)
     .value("invalid_optimization_config", TensorOperation::error_t::invalid_optimization_config)
+    .value("invalid_papi_config", TensorOperation::error_t::invalid_papi_config)
     .export_values();
 
   py::enum_<TensorOperation::dtype_t>(m, "DataType" )
@@ -114,6 +115,40 @@ PYBIND11_MODULE(_etops_core, m) {
       py::arg("exec_types"),
       py::arg("dim_sizes"),
       py::arg("strides")
+    )
+    .def(
+      "configure_papi",
+      [](
+        TensorOperation                & self,
+        std::string              const & papi_profile,
+        std::vector<std::string> const & papi_events
+      ) -> TensorOperation::error_t {
+        TensorOperation::error_t l_papi_err = self.set_papi_config( papi_profile,
+                                                                    papi_events );
+        if( l_papi_err != TensorOperation::error_t::success ) {
+          return l_papi_err;
+        }
+
+#ifdef ETOPS_USE_PAPI
+        return self.papi_setup();
+#else
+        return TensorOperation::error_t::success;
+#endif
+      },
+      R"doc(
+        Configure and initialize PAPI event collection.
+
+        Supported profiles:
+          - default: PAPI_TOT_INS, PAPI_TOT_CYC
+          - cache: PAPI_L1_DCM, PAPI_L2_DCM, PAPI_L3_DCM, PAPI_TLB_DM
+          - custom: uses the supplied papi_events
+
+        :param papi_profile: PAPI profile ('default', 'cache', or 'custom').
+        :param papi_events: PAPI event names used only when papi_profile='custom'.
+        :return: Appropriate error code.
+      )doc",
+      py::arg("papi_profile") = "default",
+      py::arg("papi_events") = std::vector<std::string>{}
     )
     .def(
       "execute",

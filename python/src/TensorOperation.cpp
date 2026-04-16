@@ -27,6 +27,44 @@ int64_t einsum_ir::py::TensorOperation::get_num_threads( int64_t num_threads ) {
   return l_num_threads;
 }
 
+einsum_ir::py::TensorOperation::error_t
+einsum_ir::py::TensorOperation::set_papi_config( std::string const & i_profile,
+                                                 std::vector< std::string > const & i_events ) {
+#ifdef ETOPS_USE_PAPI
+  if( i_profile == "default" ) {
+    m_papi_event_names = { "PAPI_TOT_INS", "PAPI_TOT_CYC" };
+    m_papi_enabled = true;
+    return error_t::success;
+  }
+
+  if( i_profile == "cache" ) {
+    m_papi_event_names = { "PAPI_L1_DCM", "PAPI_L2_DCM", "PAPI_L3_DCM", "PAPI_TLB_DM" };
+    m_papi_enabled = true;
+    return error_t::success;
+  }
+
+  if( i_profile == "custom" ) {
+    if( i_events.size() == 0 ) {
+      std::cerr << "PAPI profile 'custom' requires at least one event name." << std::endl;
+      m_papi_enabled = false;
+      return error_t::invalid_papi_config;
+    }
+    m_papi_event_names = i_events;
+    m_papi_enabled = true;
+    return error_t::success;
+  }
+
+  std::cerr << "Unsupported PAPI profile: '" << i_profile
+            << "'. Supported profiles are: default, cache, custom." << std::endl;
+  m_papi_enabled = false;
+  return error_t::invalid_papi_config;
+#else
+  (void) i_profile;
+  (void) i_events;
+  return error_t::success;
+#endif
+}
+
 void einsum_ir::py::TensorOperation::calculate_sfc_sizes(
   std::vector< dim_t >   const & dim_types,
   std::vector< exec_t >  const & exec_types,
@@ -459,12 +497,26 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::setup_bi
 void einsum_ir::py::TensorOperation::execute( void const * tensor_in0,
                                               void const * tensor_in1,
                                               void       * tensor_out) {
+#ifdef ETOPS_USE_PAPI
+  if( m_papi_enabled ) {
+    // Start PAPI counters
+    papi_start();
+  }
+#endif                  
   if (m_op_type == op_type_t::unary) {
     m_backend_unary.eval(tensor_in0, tensor_out);
   }
   else if (m_op_type == op_type_t::binary) {
     m_backend_binary.contract(tensor_in0, tensor_in1, nullptr, tensor_out);
   }
+#ifdef ETOPS_USE_PAPI
+  if( m_papi_enabled ) {
+    // Stop PAPI counters and print results
+    papi_stop();
+    papi_print_results();
+  }
+#endif
+
 }
 
 einsum_ir::py::OptimizationConfig einsum_ir::py::TensorOperation::get_default_optimization_config() {
@@ -769,3 +821,79 @@ einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::optimize
   
   return error_t::success;
 }
+
+#ifdef ETOPS_USE_PAPI
+einsum_ir::py::TensorOperation::error_t einsum_ir::py::TensorOperation::papi_setup(){
+  if( !m_papi_enabled ) {
+    return error_t::success;
+  }
+
+  // Initialize PAPI library
+  int papi_error = PAPI_library_init(PAPI_VER_CURRENT);
+  if (papi_error != PAPI_VER_CURRENT) {
+    std::cerr << "Failed to initialize PAPI: " << PAPI_strerror(papi_error) << std::endl;
+    return error_t::compilation_failed;
+  }
+
+  if( m_papi_event_names.size() == 0 ) {
+    m_papi_event_names = { "PAPI_TOT_INS", "PAPI_TOT_CYC" };
+  }
+
+  // Re-initialize eventset if setup is called more than once.
+  if( papi_event_set != PAPI_NULL ) {
+    PAPI_cleanup_eventset( papi_event_set );
+    PAPI_destroy_eventset( &papi_event_set );
+    papi_event_set = PAPI_NULL;
+  }
+
+  // Create an event set
+  papi_error = PAPI_create_eventset(&papi_event_set);
+  if (papi_error != PAPI_OK) {
+    std::cerr << "Failed to create PAPI event set: " << PAPI_strerror(papi_error) << std::endl;
+    return error_t::compilation_failed;
+  }
+
+  m_papi_event_values.assign( m_papi_event_names.size(), 0 );
+
+  for( std::size_t l_event_id = 0; l_event_id < m_papi_event_names.size(); ++l_event_id ) {
+    int l_event_code = 0;
+    papi_error = PAPI_event_name_to_code( const_cast<char *>(m_papi_event_names[l_event_id].c_str()),
+                                          &l_event_code );
+    if( papi_error != PAPI_OK ) {
+      std::cerr << "Failed to resolve PAPI event '" << m_papi_event_names[l_event_id]
+                << "': " << PAPI_strerror(papi_error) << std::endl;
+      return error_t::invalid_papi_config;
+    }
+
+    papi_error = PAPI_add_event( papi_event_set, l_event_code );
+    if( papi_error != PAPI_OK ) {
+      std::cerr << "Failed to add PAPI event '" << m_papi_event_names[l_event_id]
+                << "': " << PAPI_strerror(papi_error) << std::endl;
+      return error_t::invalid_papi_config;
+    }
+  }
+
+  return error_t::success;
+}
+
+void einsum_ir::py::TensorOperation::papi_start() {
+  int papi_error = PAPI_start(papi_event_set);
+  if (papi_error != PAPI_OK) {
+    std::cerr << "Failed to start PAPI: " << PAPI_strerror(papi_error) << std::endl;
+  }
+}
+
+void einsum_ir::py::TensorOperation::papi_stop() {
+  int papi_error = PAPI_stop(papi_event_set, m_papi_event_values.data());
+  if (papi_error != PAPI_OK) {
+    std::cerr << "Failed to stop PAPI: " << PAPI_strerror(papi_error) << std::endl;
+  }
+}
+
+void einsum_ir::py::TensorOperation::papi_print_results() {
+  std::cout << "PAPI Event Results:" << std::endl;
+  for( std::size_t i = 0; i < m_papi_event_values.size(); ++i ) {
+    std::cout << "  " << m_papi_event_names[i] << ": " << m_papi_event_values[i] << std::endl;
+  }
+}
+#endif

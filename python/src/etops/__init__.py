@@ -164,12 +164,29 @@ class TensorOperationConfig:
     dim_sizes:  Sequence[int]
     strides:    Sequence[Sequence[Sequence[int]]]  # [LEVEL][TENSOR][DIMENSION]
     backend:    Optional[str] = None
+    papi_profile: Optional[str] = None
+    papi_events: Sequence[str] = ()
 
     def __post_init__(self):
         """Validate configuration at creation time."""
         # Validate backend
         if self.backend is not None and self.backend != "tpp":
             raise ValueError(f"Unsupported backend: '{self.backend}'. Currently only 'tpp' is supported.")
+
+        if self.papi_profile is not None:
+            allowed_profiles = {"default", "cache", "custom"}
+            if self.papi_profile not in allowed_profiles:
+                raise ValueError(
+                    f"Unsupported papi_profile: '{self.papi_profile}'. "
+                    "Supported values are 'default', 'cache', 'custom'."
+                )
+
+            if self.papi_profile == "custom":
+                if len(self.papi_events) == 0:
+                    raise ValueError("papi_events must not be empty when papi_profile='custom'.")
+                for i, event_name in enumerate(self.papi_events):
+                    if not isinstance(event_name, str) or len(event_name.strip()) == 0:
+                        raise ValueError(f"papi_events[{i}] must be a non-empty string.")
 
         # Determine operation type from prim_main
         is_binary = self.prim_main in [PrimType.gemm, PrimType.brgemm]
@@ -281,6 +298,11 @@ class TensorOperationConfig:
         if err != ErrorType.success:
             raise RuntimeError(f"einsum_ir TensorOperation setup failed: {err}")
 
+        if self.papi_profile is not None:
+            err = op.configure_papi(self.papi_profile, tuple(self.papi_events))
+            if err != ErrorType.success:
+                raise RuntimeError(f"einsum_ir PAPI setup failed: {err}")
+
     def to_json(self, indent: Optional[int] = None) -> str:
         """
         Serialize this configuration to a JSON string.
@@ -317,6 +339,9 @@ class TensorOperationConfig:
         # Only include backend if it's not None
         if self.backend is not None:
             data["backend"] = self.backend
+        if self.papi_profile is not None:
+            data["papi_profile"] = self.papi_profile
+            data["papi_events"] = list(self.papi_events)
         return json.dumps(data, indent=indent)
 
     @classmethod
@@ -365,7 +390,9 @@ class TensorOperationConfig:
                 tuple(tuple(tensor) for tensor in level)
                 for level in data["strides"]
             ),
-            backend=data.get("backend")
+            backend=data.get("backend"),
+            papi_profile=data.get("papi_profile"),
+            papi_events=tuple(data.get("papi_events", []))
         )
 
     def save(self, path: str, indent: Optional[int] = 2) -> None:
@@ -509,7 +536,9 @@ def optimize(
         dim_types=opt_dim_types,
         exec_types=opt_exec_types,
         dim_sizes=opt_dim_sizes,
-        strides=opt_strides
+        strides=opt_strides,
+        papi_profile=config.papi_profile,
+        papi_events=config.papi_events
     )
 
 __all__ = [

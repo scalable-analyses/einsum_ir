@@ -3,10 +3,16 @@
 
 #include <cstdint>
 #include <vector>
+#include <iostream>
+#include <string>
 #include <einsum_ir/basic/unary/UnaryBackendTpp.h>
 #include <einsum_ir/basic/unary/UnaryOptimizer.h>
 #include <einsum_ir/basic/binary/ContractionBackendTpp.h>
 #include <einsum_ir/basic/binary/ContractionOptimizer.h>
+
+#ifdef ETOPS_USE_PAPI
+#include "papi.h"
+#endif 
 
 namespace einsum_ir {
   namespace py {
@@ -78,12 +84,35 @@ class einsum_ir::py::TensorOperation {
       success                     = 0,
       compilation_failed          = 1,
       invalid_stride_shape        = 2,
-      invalid_optimization_config = 3
+      invalid_optimization_config = 3,
+      invalid_papi_config         = 4
     };
 
     op_type_t m_op_type = op_type_t::undefined;
     einsum_ir::basic::UnaryBackendTpp m_backend_unary;
     einsum_ir::basic::ContractionBackendTpp m_backend_binary;
+
+#ifdef ETOPS_USE_PAPI
+  bool m_papi_enabled = false;
+    int papi_event_set = PAPI_NULL;
+  std::vector< long_long > m_papi_event_values;
+  std::vector< std::string > m_papi_event_names;
+#endif
+
+  /**
+   * Configures PAPI profile and optional custom events.
+   *
+   * Supported profiles:
+  *  - default: PAPI_TOT_INS, PAPI_TOT_CYC
+   *  - cache: PAPI_L1_DCM, PAPI_L2_DCM, PAPI_L3_DCM, PAPI_TLB_DM
+   *  - custom: uses i_events
+   *
+   * @param i_profile selected profile name.
+   * @param i_events  user-specified events for custom profile.
+   * @return          Appropriate error code.
+   **/
+  error_t set_papi_config( std::string const & i_profile,
+                           std::vector< std::string > const & i_events );
 
     /**
      * Setup for a binary tensor contraction or a unary tensor operation.
@@ -122,7 +151,15 @@ class einsum_ir::py::TensorOperation {
     void execute( void const * tensor_in0,
                   void const * tensor_in1,
                   void       * tensor_out );
+#ifdef ETOPS_USE_PAPI
+    error_t papi_setup();
 
+    void papi_start();
+
+    void papi_stop();
+
+    void papi_print_results();
+#endif
     /**
      * Optimizes a tensor operation configuration.
      *
