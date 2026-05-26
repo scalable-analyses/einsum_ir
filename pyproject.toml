@@ -1,0 +1,134 @@
+[build-system]
+requires = [
+    "scikit-build-core>=0.11",
+    "pybind11>=2.13",
+    "setuptools_scm>=8.0",
+    "numpy>=1.26",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "etops"
+dynamic = ["version"]
+description = "Tiled Execution Intermediate Representation (TEIR) for tensor operations."
+readme = "README.rst"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.26"]
+license = "MIT AND BSD-3-Clause"
+license-files = ["LICENSE"]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0", "hypothesis>=6.100", "mypy>=1.10", "ruff>=0.6"]
+
+[project.urls]
+Homepage = "https://github.com/scalable-analyses/einsum_ir"
+Source = "https://github.com/scalable-analyses/einsum_ir"
+Issues = "https://github.com/scalable-analyses/einsum_ir/issues"
+
+[project.scripts]
+etops-textir = "etops.textir.cli:main"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build-dir = "build/{wheel_tag}"
+cmake.version = ">=3.20"
+cmake.source-dir = "teir"
+cmake.build-type = "Release"
+wheel.packages = ["etops"]
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+
+[tool.setuptools_scm]
+write_to = "etops/_version.py"
+fallback_version = "0.0.0+unknown"
+
+[tool.scikit-build.cmake.define]
+LIBXSMM_GIT_TAG = { env = "LIBXSMM_GIT_TAG", default = "c14cbc6f8bc7964f8c5190a3a16b8cace03e5889" }
+ETOPS_THREADING_BACKEND = { env = "ETOPS_THREADING_BACKEND", default = "AUTO" }
+ETOPS_ENABLE_TESTS = "OFF"
+ETOPS_ENABLE_SANITIZERS = { env = "ETOPS_ENABLE_SANITIZERS", default = "OFF" }
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra --strict-markers"
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "property: Hypothesis property-based tests",
+    "tpp: requires TPP/libxsmm backend",
+    "blas: requires BLAS backend",
+    "numpy: requires the NumPy oracle backend (registered by tests/conftest.py)",
+]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:numpy.*",
+    "ignore::hypothesis.errors.NonInteractiveExampleWarning",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+extend-exclude = [
+    "build",
+    "dist",
+    "etops/_version.py",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "RUF",  # ruff-specific
+    "SIM",  # flake8-simplify
+    "PT",   # flake8-pytest-style
+    "PIE",  # flake8-pie
+    "PL",   # pylint
+    "TID",  # flake8-tidy-imports
+]
+ignore = [
+    "E501",     # line length (handled by formatter)
+    "PLR0913",  # too many arguments
+    "PLR2004",  # magic value (frequent in numerical code)
+    "PLR0912",  # too many branches
+    "PLR0915",  # too many statements
+    "PLR0911",  # too many return statements
+    "PLC0415",  # import outside top level (intentional for optional deps)
+    "PT011",    # pytest.raises too broad (covered by message= match)
+    "SIM108",   # use ternary (less readable in many cases)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["PLR2004", "B011", "PT011"]
+"examples/**/*.py" = ["PLR2004"]
+"etops/_version.py" = ["ALL"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["etops"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.10"
+files = ["etops"]
+strict_optional = true
+no_implicit_optional = true
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+ignore_missing_imports = false
+
+[[tool.mypy.overrides]]
+module = ["etops._native", "etops._native.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["etops._version"]
+ignore_errors = true

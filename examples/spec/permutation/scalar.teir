@@ -1,0 +1,24 @@
+teir-format 1.0
+
+teir @abcd_dcba {
+  tensor %in0 : f32
+  tensor %out : f32
+
+  axis @a extent 2 strides { in0: 240, out: 4 }
+  axis @b extent 3 strides { in0: 80, out: 8 }
+  axis @c extent 4 strides { in0: 20, out: 24 }
+  axis @d extent 5 strides { in0: 4, out: 96 }
+
+  primitive @copy : Copy axes { M: [], N: [] } metadata { data_type: f32 }
+
+  schedule {
+    roots [@iter_a]
+
+    iter @iter_d axis @d policy sequential children [@n0]
+    iter @iter_c axis @c policy sequential children [@iter_d]
+    iter @iter_b axis @b policy sequential children [@iter_c]
+    iter @iter_a axis @a policy sequential children [@iter_b]
+    invoke @n0 primitive @copy
+  }
+}
+

@@ -1,0 +1,91 @@
+name: cpp
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: 0 0 * * *
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: ubuntu Release OpenMP
+            os: ubuntu-latest
+            build_type: Release
+            threading: OPENMP
+            sanitizers: OFF
+            cmake_extra: ""
+          - label: ubuntu Debug Sequential ASan+UBSan
+            os: ubuntu-latest
+            build_type: Debug
+            threading: SEQUENTIAL
+            sanitizers: ON
+            cmake_extra: ""
+          - label: ubuntu Debug OpenMP UBSan
+            os: ubuntu-latest
+            build_type: Debug
+            threading: OPENMP
+            sanitizers: OFF
+            cmake_extra: "-DETOPS_SANITIZERS=undefined"
+          - label: ubuntu-aarch64 Debug Sequential UBSan
+            os: ubuntu-24.04-arm
+            build_type: Debug
+            threading: SEQUENTIAL
+            sanitizers: OFF
+            cmake_extra: "-DETOPS_SANITIZERS=undefined"
+          - label: macos Release Dispatch
+            os: macos-latest
+            build_type: Release
+            threading: DISPATCH
+            sanitizers: OFF
+            cmake_extra: ""
+          - label: macos Release Sequential
+            os: macos-latest
+            build_type: Release
+            threading: SEQUENTIAL
+            sanitizers: OFF
+            cmake_extra: ""
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Install system deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config libopenblas-dev libomp-dev
+
+      - name: Install system deps (macOS)
+        if: runner.os == 'macOS'
+        run: brew install cmake ninja
+
+      - name: Configure
+        run: |
+          cmake -S teir -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DETOPS_ENABLE_TESTS=ON \
+            -DETOPS_ENABLE_SANITIZERS=${{ matrix.sanitizers }} \
+            -DETOPS_THREADING_BACKEND=${{ matrix.threading }} \
+            -DETOPS_BUILD_PYTHON=OFF \
+            ${{ matrix.cmake_extra }}
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: ctest
+        run: ctest --test-dir build --output-on-failure
+        env:
+          ASAN_OPTIONS: "abort_on_error=1:halt_on_error=1:detect_leaks=1"
+          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+          LSAN_OPTIONS: "exitcode=1"

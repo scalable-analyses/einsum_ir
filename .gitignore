@@ -1,0 +1,41 @@
+# Python bytecode
+__pycache__/
+*.py[codz]
+
+# Compiled C/C++ extensions
+*.so
+
+# Packaging / build
+build/
+dist/
+*.egg-info/
+_skbuild/
+
+# Test caches
+.pytest_cache/
+.hypothesis/
+
+# Type checker / linter caches
+.mypy_cache/
+.ruff_cache/
+
+# Virtualenvs
+.venv*
+.env
+.envrc
+
+# Nix
+result
+result-*
+.direnv/
+
+# Editor / OS noise
+.DS_Store
+*.swp
+*~
+
+# Claude Code per-developer state
+.claude/
+
+# Generated version file
+etops/_version.py

@@ -1,5 +1,0 @@
-clang
-cmake
-g++
-gfortran
-scons
