@@ -5,10 +5,10 @@ Parses an explicit einsum string ``"<in0_axes>,<in1_axes>->.<out_axes>"``
 default scalar schedule:
 
 - Outer chain over batch / free axes (in einsum string order).
-- For binary contractions: a sibling ``Zero`` invocation guarded by
-  ``first(<innermost-K>)`` initializing the output tile, followed by an
-  inner chain over the contracted axes ending in a scalar ``Contraction``
-  invocation.
+- For binary contractions: a sibling ``Zero`` invocation initializing
+  the output tile, placed just outside the K chain so it executes once
+  per output tile; followed by the inner chain over the contracted axes
+  ending in a scalar ``Contraction`` invocation.
 - For unary operations: a chain over every axis ending in a single ``Copy``
   invocation.
 """
