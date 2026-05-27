@@ -105,8 +105,9 @@ class TestValidate:
         teir = self._good_teir()
         validate(teir)
 
-    def test_guard_referencing_non_ancestor_axis(self) -> None:
-        """Guard scoping is enforced."""
+    def test_guard_referencing_non_ancestor_iteration_node(self) -> None:
+        """Guard scoping is enforced: the named iteration node must be a
+        strict ancestor of the guarded node."""
         b = TeirBuilder()
         b.add_tensor("in0", dtype="f32")
         b.add_tensor("out", dtype="f32")
@@ -118,14 +119,60 @@ class TestValidate:
             axes={"M": [], "N": []},
             metadata={"data_type": "f32"},
         )
-        # An invocation guarded by axis 'b', placed under an iteration over
-        # axis 'a'. Axis 'b' is not iterated by any ancestor.
-        inv = b.add_invocation("inv", primitive="copy", guard=guard(First("b")))
+        # An invocation guarded by iteration node 'it_b', placed under an
+        # iteration 'it_a'. 'it_b' is not an ancestor of the invocation.
+        inv = b.add_invocation("inv", primitive="copy", guard=guard(First("it_b")))
         it = b.add_iteration("it_a", axis="a", children=[inv])
         b.set_roots([it])
         with pytest.raises(
             etops.TeirValidationError,
-            match="not iterated by any ancestor",
+            match="references unknown node 'it_b'",
+        ):
+            b.finish(validate=True)
+
+    def test_guard_referencing_invocation_is_rejected(self) -> None:
+        """Guard targets must be iteration nodes, not invocation nodes."""
+        b = TeirBuilder()
+        b.add_tensor("in0", dtype="f32")
+        b.add_tensor("out", dtype="f32")
+        b.add_axis("a", extent=2, strides_by_tensor={"in0": 4, "out": 4})
+        b.add_primitive(
+            "copy",
+            operation="Copy",
+            axes={"M": [], "N": []},
+            metadata={"data_type": "f32"},
+        )
+        # 'sibling' is an invocation, not an iteration node.
+        sibling = b.add_invocation("sibling", primitive="copy")
+        inv = b.add_invocation("inv", primitive="copy", guard=guard(First("sibling")))
+        it = b.add_iteration("it_a", axis="a", children=[sibling, inv])
+        b.set_roots([it])
+        with pytest.raises(
+            etops.TeirValidationError,
+            match="invocation node 'sibling'",
+        ):
+            b.finish(validate=True)
+
+    def test_guard_self_reference_is_rejected(self) -> None:
+        """An iteration node may not guard against itself."""
+        b = TeirBuilder()
+        b.add_tensor("in0", dtype="f32")
+        b.add_tensor("out", dtype="f32")
+        b.add_axis("a", extent=2, strides_by_tensor={"in0": 4, "out": 4})
+        b.add_primitive(
+            "copy",
+            operation="Copy",
+            axes={"M": [], "N": []},
+            metadata={"data_type": "f32"},
+        )
+        inv = b.add_invocation("inv", primitive="copy")
+        it = b.add_iteration(
+            "it_a", axis="a", children=[inv], guard=guard(First("it_a"))
+        )
+        b.set_roots([it])
+        with pytest.raises(
+            etops.TeirValidationError,
+            match="guard references itself",
         ):
             b.finish(validate=True)
 

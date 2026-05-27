@@ -2,8 +2,8 @@
 
 Two schedules for the same computation:
 
-- ``scalar.teir``: the original schedule with a ``first(a)`` guard
-  initializing the output before each accumulation.
+- ``scalar.teir``: the original schedule with a ``first(@iter_a)``
+  guard initializing the output before each accumulation.
 - ``scalar_reordered.teir``: the equivalent reordered schedule where
   ``Zero`` is hoisted out of the contraction loop.
 

@@ -129,9 +129,10 @@ project-specific rules below are not the standard defaults.
    node id namespace. Children order is encoded by list position.
 5. **Forest, not tree.** The schedule may have multiple roots; the
    order of `roots` is semantic.
-6. **Conjunctive guards.** Guards are conjunctions of `first(axis)` /
-   `last(axis)` terms; every referenced axis must be iterated by an
-   ancestor.
+6. **Conjunctive guards.** Guards are conjunctions of `first(node)` /
+   `last(node)` terms, where each `node` is the id of an iteration-node
+   ancestor of the guarded node. The term is true on that ancestor's
+   first / last trip.
 7. **Closed catalogs.** ``etops.ir.dtypes`` and ``etops.ir.primitives``
    carry a closed set of data types and primitive operations. Adding a
    new dtype or operation is a core-source edit. Backends register

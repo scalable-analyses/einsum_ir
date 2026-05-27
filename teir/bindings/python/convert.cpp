@@ -101,7 +101,7 @@ std::optional<Guard> convert_guard(const py::object& obj) {
       throw ValidationException("guard term has unknown kind '" + kind +
                                 "'; expected 'first' or 'last'");
     }
-    guard.push_back(GuardTerm{k, py::cast<std::string>(t["axis"])});
+    guard.push_back(GuardTerm{k, py::cast<std::string>(t["node"])});
   }
   return guard;
 }

@@ -20,7 +20,7 @@ teir @scalar_bgemm {
     iter @iter_c axis @c policy sequential children [@iter_d]
     iter @iter_b axis @b policy sequential children [@iter_c]
     iter @iter_a axis @a policy sequential children [@iter_b]
-    invoke @inv_zero primitive @zero guard first(@a)
+    invoke @inv_zero primitive @zero guard first(@iter_a)
     invoke @inv_contract primitive @contraction
   }
 }

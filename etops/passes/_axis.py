@@ -58,18 +58,11 @@ def DropTrivialAxes(teir: Teir, ctx: PassContext) -> Teir:
 
 
 def DropUnusedAxes(teir: Teir, ctx: PassContext) -> Teir:
-    """Remove axes that no schedule, primitive role, or guard references."""
+    """Remove axes that no schedule iteration or primitive role references."""
 
     used: set[str] = set()
     for node in teir.schedule.iterations.values():
         used.add(node.axis)
-        if node.guard is not None:
-            for term in node.guard:
-                used.add(term.axis)
-    for inv in teir.schedule.invocations.values():
-        if inv.guard is not None:
-            for term in inv.guard:
-                used.add(term.axis)
     for prim in teir.primitives.values():
         for axes in prim.axes.values():
             used.update(axes)

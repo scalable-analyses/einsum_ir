@@ -7,8 +7,10 @@ import pytest
 
 import etops
 from etops.emit import einsum
+from etops.ir import First, Last, TeirBuilder, guard
 from etops.transforms import (
     canonicalize_ids,
+    fuse_iterations,
     set_policy,
     split_iteration,
 )
@@ -142,3 +144,136 @@ class TestSetPolicy:
             etops.TeirValidationError, match="zero stride on output tensor"
         ):
             set_policy(t, node_id, "parallel")
+
+
+def _guarded_zero_then_add(*, axis_extent: int) -> etops.Teir:
+    """Build a single-axis IR: iter @loop runs ``axis_extent`` trips over
+    axis ``a``; on the first trip the invocation ``init`` runs (a Zero),
+    then ``upd`` runs unconditionally. Both invocations share the same
+    primitive instance; the guard is the moving piece under test.
+    """
+
+    b = TeirBuilder().set_name("guarded_zero_then_add")
+    b.add_tensor("out", dtype="f32")
+    b.add_axis("a", extent=axis_extent, strides_by_tensor={"out": 4})
+    b.add_primitive(
+        "zero",
+        operation="Zero",
+        axes={"M": [], "N": []},
+        metadata={"data_type": "f32"},
+    )
+    init = b.add_invocation("init", primitive="zero", guard=guard(First("loop")))
+    upd = b.add_invocation("upd", primitive="zero")
+    b.add_iteration("loop", axis="a", children=[init, upd])
+    b.set_roots(["loop"])
+    return b.finish(validate=True)
+
+
+class TestSplitGuardRewrite:
+    """`split_iteration` rewrites descendant guards naming the split node."""
+
+    def test_first_term_expands_to_conjunction(self) -> None:
+        """``first(@loop)`` becomes ``first(@loop) and first(@loop1)``."""
+        t = _guarded_zero_then_add(axis_extent=4)
+        t2 = split_iteration(t, "loop", inner_extent=2)
+        init_guard = t2.schedule.invocations["init"].guard
+        assert init_guard is not None
+        # Outer kept its id; inner was named ``loop1``.
+        node_ids = tuple(term.node for term in init_guard)
+        assert node_ids == ("loop", "loop1")
+        assert all(isinstance(term, First) for term in init_guard)
+
+    def test_last_term_expands_to_conjunction(self) -> None:
+        """``last(@loop)`` becomes ``last(@loop) and last(@loop1)``."""
+        b = TeirBuilder().set_name("last_guarded")
+        b.add_tensor("out", dtype="f32")
+        b.add_axis("a", extent=4, strides_by_tensor={"out": 4})
+        b.add_primitive(
+            "zero",
+            operation="Zero",
+            axes={"M": [], "N": []},
+            metadata={"data_type": "f32"},
+        )
+        fini = b.add_invocation("fini", primitive="zero", guard=guard(Last("loop")))
+        upd = b.add_invocation("upd", primitive="zero")
+        b.add_iteration("loop", axis="a", children=[upd, fini])
+        b.set_roots(["loop"])
+        t = b.finish(validate=True)
+        t2 = split_iteration(t, "loop", inner_extent=2)
+        fini_guard = t2.schedule.invocations["fini"].guard
+        assert fini_guard is not None
+        assert tuple(term.node for term in fini_guard) == ("loop", "loop1")
+        assert all(isinstance(term, Last) for term in fini_guard)
+
+    def test_split_preserves_guard_semantics(self) -> None:
+        """The guarded init fires exactly once before and after a split."""
+        import numpy as np
+
+        t = _guarded_zero_then_add(axis_extent=6)
+        out = np.full((6,), 1.0, dtype=np.float32)
+        etops.compile(t, backend="numpy").execute(out)
+        baseline = out.copy()
+
+        out2 = np.full((6,), 1.0, dtype=np.float32)
+        t2 = split_iteration(t, "loop", inner_extent=2)
+        etops.compile(t2, backend="numpy").execute(out2)
+        np.testing.assert_array_equal(out2, baseline)
+
+
+class TestFuseGuardCollapse:
+    """`fuse_iterations` collapses symmetric guard pairs into one term on
+    the fused node and rejects everything else that names outer or inner."""
+
+    @staticmethod
+    def _two_loop_fixture(*, init_guard) -> etops.Teir:
+        b = TeirBuilder().set_name("two_loop")
+        b.add_tensor("out", dtype="f32")
+        # outer axis ``a`` has stride 2 elements (= 2*2 elements * 2 inner trips)
+        # = 8 bytes; inner axis ``b`` has stride 4 bytes. Together they walk
+        # a contiguous 4-element output.
+        b.add_axis("a", extent=2, strides_by_tensor={"out": 8})
+        b.add_axis("b", extent=2, strides_by_tensor={"out": 4})
+        b.add_primitive(
+            "zero",
+            operation="Zero",
+            axes={"M": [], "N": []},
+            metadata={"data_type": "f32"},
+        )
+        init = b.add_invocation("init", primitive="zero", guard=init_guard)
+        upd = b.add_invocation("upd", primitive="zero")
+        b.add_iteration("inner", axis="b", children=[init, upd])
+        b.add_iteration("outer", axis="a", children=["inner"])
+        b.set_roots(["outer"])
+        return b.finish(validate=True)
+
+    def test_symmetric_first_pair_collapses(self) -> None:
+        """``first(@outer) and first(@inner)`` becomes ``first(@outer)``."""
+        t = self._two_loop_fixture(init_guard=guard(First("outer"), First("inner")))
+        t2 = fuse_iterations(t, "outer")
+        init_guard = t2.schedule.invocations["init"].guard
+        assert init_guard is not None
+        assert tuple(term.node for term in init_guard) == ("outer",)
+        assert isinstance(init_guard[0], First)
+
+    def test_symmetric_last_pair_collapses(self) -> None:
+        """``last(@outer) and last(@inner)`` becomes ``last(@outer)``."""
+        t = self._two_loop_fixture(init_guard=guard(Last("outer"), Last("inner")))
+        t2 = fuse_iterations(t, "outer")
+        fused_guard = t2.schedule.invocations["init"].guard
+        assert fused_guard is not None
+        assert tuple(term.node for term in fused_guard) == ("outer",)
+        assert isinstance(fused_guard[0], Last)
+
+    def test_unpaired_outer_term_rejected(self) -> None:
+        """An unpaired ``first(@outer)`` has no first/last form on the fused
+        axis (would fire ``inner_extent`` consecutive fused trips)."""
+        t = self._two_loop_fixture(init_guard=guard(First("outer")))
+        with pytest.raises(etops.TeirPassError, match="cannot be expressed"):
+            fuse_iterations(t, "outer")
+
+    def test_cross_pair_rejected(self) -> None:
+        """``first(@outer) and last(@inner)`` picks a mid-sequence fused trip
+        which has no first/last representation."""
+        t = self._two_loop_fixture(init_guard=guard(First("outer"), Last("inner")))
+        with pytest.raises(etops.TeirPassError, match="cannot be expressed"):
+            fuse_iterations(t, "outer")

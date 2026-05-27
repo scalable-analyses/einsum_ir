@@ -67,11 +67,11 @@ struct Primitive {
   std::vector<std::pair<std::string, std::string>> metadata;
 };
 
-/// Guard term: `first(axis)` or `last(axis)`.
+/// Guard term: `first(node)` or `last(node)`.
 struct GuardTerm {
   enum class Kind : uint8_t { FIRST = 0, LAST = 1 };
   Kind kind;
-  AxisId axis;
+  NodeId node;
 };
 
 using Guard = std::vector<GuardTerm>;

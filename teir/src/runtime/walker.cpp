@@ -33,15 +33,16 @@ using Bases = std::array<void*, MAX_TENSORS_PER_INVOCATION>;
 /// precomputed depth.
 using AncestorStack = std::array<int64_t, MAX_ANCESTOR_DEPTH>;
 
-/// Path of (axis_idx, depth) entries from root to the node currently being
-/// resolved. Used by `resolve_tree` to fill in `InternedGuardTerm.ancestor_depth`.
+/// Path of (iter_node_idx, depth) entries from root to the node currently
+/// being resolved. Used by `resolve_tree` to fill in
+/// `InternedGuardTerm.ancestor_depth`.
 using PathStack = std::vector<std::pair<int32_t, int32_t>>;
 
 struct InternedGuardTerm {
   GuardTerm::Kind kind;
-  int32_t axis_idx;       ///< Diagnostic-only.
+  int32_t node_idx;       ///< Diagnostic-only.
   int32_t ancestor_depth; ///< Index into `AncestorStack`, resolved at prepare.
-  int64_t axis_extent;    ///< Cached extent for `LAST` comparison.
+  int64_t node_extent;    ///< Cached extent for `LAST` comparison.
 };
 
 using InternedGuard = std::vector<InternedGuardTerm>;
@@ -172,8 +173,8 @@ void Operation::Impl::prepare() {
     {
       auto it = axis_index_of.find(src.axis);
       if (it == axis_index_of.end()) {
-        throw ValidationException("iteration node '" + src.id +
-                                  "' references unknown axis '" + src.axis + "'");
+        throw ValidationException("iteration node '" + src.id + "' references unknown axis '" +
+                                  src.axis + "'");
       }
       dst.axis_idx = it->second;
     }
@@ -214,15 +215,14 @@ void Operation::Impl::prepare() {
     InternedInvocationNode& dst = inv_nodes[i];
     auto pit = primitive_by_id.find(src.primitive);
     if (pit == primitive_by_id.end()) {
-      throw ValidationException("invocation '" + src.id +
-                                "' references unknown primitive '" + src.primitive + "'");
+      throw ValidationException("invocation '" + src.id + "' references unknown primitive '" +
+                                src.primitive + "'");
     }
     const Primitive& prim = *pit->second;
     auto cit = compile_by_primitive.find(src.primitive);
     if (cit == compile_by_primitive.end()) {
       throw ValidationException("invocation '" + src.id +
-                                "' has no compiled function for primitive '" +
-                                src.primitive + "'");
+                                "' has no compiled function for primitive '" + src.primitive + "'");
     }
     CompileFn fn = cit->second;
     dst.compiled = fn(prim, ir);
@@ -265,13 +265,17 @@ InternedGuard Operation::Impl::intern_guard_raw(const Guard& guard) const {
   for (const GuardTerm& term : guard) {
     InternedGuardTerm t;
     t.kind = term.kind;
-    auto it = axis_index_of.find(term.axis);
-    if (it == axis_index_of.end()) {
-      throw ValidationException("guard references unknown axis '" + term.axis + "'");
+    auto it = node_index_of.find(term.node);
+    if (it == node_index_of.end()) {
+      throw ValidationException("guard references unknown node '" + term.node + "'");
     }
-    t.axis_idx = it->second;
+    t.node_idx = it->second;
+    if (static_cast<std::size_t>(t.node_idx) >= iter_nodes.size()) {
+      throw ValidationException("guard references invocation node '" + term.node +
+                                "'; guard targets must be iteration nodes");
+    }
     t.ancestor_depth = -1;
-    t.axis_extent = ir.axes[static_cast<std::size_t>(t.axis_idx)].extent;
+    t.node_extent = iter_nodes[static_cast<std::size_t>(t.node_idx)].extent;
     out.push_back(t);
   }
   return out;
@@ -279,15 +283,14 @@ InternedGuard Operation::Impl::intern_guard_raw(const Guard& guard) const {
 
 void Operation::Impl::resolve_guard_terms(InternedGuard& interned, const PathStack& path) const {
   for (InternedGuardTerm& term : interned) {
-    // Walk the path innermost-first; the first matching ancestor wins when
-    // multiple iteration nodes share an axis (the innermost is the binding
-    // one for guard semantics).
-    auto it = std::find_if(path.rbegin(), path.rend(), [&](const auto& entry) {
-      return entry.first == term.axis_idx;
-    });
-    if (it == path.rend()) {
-      throw ValidationException("guard references non-ancestor axis " +
-                                ir.axes[static_cast<std::size_t>(term.axis_idx)].id);
+    // Each iteration node appears at most once along any path (validated
+    // by the Python frontend), so the lookup yields at most one match.
+    auto it = std::find_if(
+        path.begin(), path.end(), [&](const auto& entry) { return entry.first == term.node_idx; });
+    if (it == path.end()) {
+      throw ValidationException("guard references iteration node '" +
+                                ir.schedule.iterations[static_cast<std::size_t>(term.node_idx)].id +
+                                "' which is not an ancestor of the guarded node");
     }
     term.ancestor_depth = it->second;
   }
@@ -296,8 +299,7 @@ void Operation::Impl::resolve_guard_terms(InternedGuard& interned, const PathSta
 int32_t Operation::Impl::resolve_tree(int32_t node_idx, PathStack& path, int32_t depth) {
   if (depth >= static_cast<int32_t>(MAX_ANCESTOR_DEPTH)) {
     throw ValidationException("schedule iteration depth " + std::to_string(depth + 1) +
-                              " exceeds walker maximum of " +
-                              std::to_string(MAX_ANCESTOR_DEPTH));
+                              " exceeds walker maximum of " + std::to_string(MAX_ANCESTOR_DEPTH));
   }
   if (static_cast<std::size_t>(node_idx) < iter_nodes.size()) {
     InternedIterationNode& it = iter_nodes[static_cast<std::size_t>(node_idx)];
@@ -305,7 +307,7 @@ int32_t Operation::Impl::resolve_tree(int32_t node_idx, PathStack& path, int32_t
       resolve_guard_terms(it.guard, path);
     }
     int32_t max_depth = depth;
-    path.emplace_back(it.axis_idx, depth);
+    path.emplace_back(node_idx, depth);
     for (int32_t cidx : it.children_idx) {
       max_depth = std::max(max_depth, resolve_tree(cidx, path, depth + 1));
     }
@@ -371,7 +373,7 @@ bool Operation::Impl::evaluate_guard(const InternedGuard& guard, const AncestorS
       if (cur_idx != 0) {
         return false;
       }
-    } else if (cur_idx != term.axis_extent - 1) {
+    } else if (cur_idx != term.node_extent - 1) {
       return false;
     }
   }

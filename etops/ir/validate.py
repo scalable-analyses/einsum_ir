@@ -8,9 +8,11 @@ strides non-negative, role arities, dtypes). This module verifies the
 - Each root appears in ``roots`` exactly once and not in any children.
 - Every iteration node is reachable from a root (cycles, if any, are
   diagnosed as unreachable nodes).
-- Guards only reference axes iterated by an ancestor.
-- No iteration node nests itself (an ancestor's axis is not re-iterated
-  by a descendant).
+- Guards reference only iteration-node ancestors of the guarded node;
+  guard targets must be iteration nodes (not invocation nodes, not
+  unknown ids) and may not name the guarded node itself.
+- No iteration node nests an axis already iterated by an ancestor
+  along the same path (the axis's byte stride would be applied twice).
 - Parallel iteration of an axis with zero stride on the output tensor
   is rejected (a race).
 - Every primitive-consumed axis byte stride is a multiple of the
@@ -266,19 +268,22 @@ def _check_schedule(teir: Teir, errors: list) -> None:
 def _walk_schedule(teir: Teir, all_node_ids: set[str], errors: list) -> None:
     """Single DFS that checks guard scope, axis nesting, parallel reduction.
 
-    Tracks the ordered ancestor-axes chain; any node unreachable from a
-    root after the walk is flagged (covering cycle detection).
+    Tracks the ordered chain of ancestor iteration-node ids (and their
+    axes) from each root; any node unreachable from a root after the
+    walk is flagged (covering cycle detection).
     """
 
     sched = teir.schedule
     out_tensor = teir.tensor_ids[-1] if teir.tensor_ids else None
     visited: set[str] = set()
 
-    stack: list[tuple[str, tuple[str, ...]]] = [
+    # Each stack frame carries the chain of (iter_node_id, axis) pairs
+    # from root to (but not including) the node we are about to visit.
+    stack: list[tuple[str, tuple[tuple[str, str], ...]]] = [
         (rid, ()) for rid in reversed(sched.roots) if rid in all_node_ids
     ]
     while stack:
-        node_id, ancestor_axes = stack.pop()
+        node_id, ancestor_chain = stack.pop()
         if node_id in visited:
             continue
         visited.add(node_id)
@@ -292,21 +297,51 @@ def _walk_schedule(teir: Teir, all_node_ids: set[str], errors: list) -> None:
 
         guard = node.guard
         if guard is not None:
+            ancestor_iter_ids = {nid for nid, _ in ancestor_chain}
             for term in guard:
-                if term.axis not in ancestor_axes:
+                target = term.node
+                if target == node_id:
                     errors.append(
                         TeirValidationError(
-                            f"node {node_id!r} guard references axis {term.axis!r}"
-                            " not iterated by any ancestor"
+                            f"node {node_id!r} guard references itself"
+                            f" ({target!r}); guard targets must be strict"
+                            " iteration-node ancestors"
+                        )
+                    )
+                    continue
+                if target in ancestor_iter_ids:
+                    continue
+                if target in sched.iterations:
+                    errors.append(
+                        TeirValidationError(
+                            f"node {node_id!r} guard references iteration node"
+                            f" {target!r} which is not an ancestor of"
+                            f" {node_id!r}"
+                        )
+                    )
+                elif target in sched.invocations:
+                    errors.append(
+                        TeirValidationError(
+                            f"node {node_id!r} guard references invocation node"
+                            f" {target!r}; guard targets must be iteration nodes"
+                        )
+                    )
+                else:
+                    errors.append(
+                        TeirValidationError(
+                            f"node {node_id!r} guard references unknown node {target!r}"
                         )
                     )
 
         if isinstance(node, IterationNode):
+            ancestor_axes = {axis for _, axis in ancestor_chain}
             if node.axis in ancestor_axes:
                 errors.append(
                     TeirValidationError(
                         f"iteration node {node_id!r} iterates axis {node.axis!r}"
-                        " already iterated by an ancestor"
+                        " already iterated by an ancestor along this path; the"
+                        " axis's byte stride would be applied twice to every"
+                        " tile address"
                     )
                 )
             if (
@@ -330,10 +365,10 @@ def _walk_schedule(teir: Teir, all_node_ids: set[str], errors: list) -> None:
                             " parallel iteration.",
                         )
                     )
-            child_ancestors = (*ancestor_axes, node.axis)
+            child_chain = (*ancestor_chain, (node_id, node.axis))
             for cid in reversed(node.children):
                 if cid not in visited:
-                    stack.append((cid, child_ancestors))
+                    stack.append((cid, child_chain))
 
     for nid in sorted(all_node_ids - visited):
         errors.append(

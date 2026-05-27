@@ -104,18 +104,28 @@ class NumpyOperation:
 
 
 def _evaluate_guard(
-    guard: Guard | None, ancestor_indices: Mapping[str, int], teir: Teir
+    guard: Guard | None,
+    ancestor_iter_indices: Mapping[str, int],
+    teir: Teir,
 ) -> bool:
-    """Return True if the guard's terms all hold for the current state."""
+    """Return True if the guard's terms all hold for the current state.
+
+    ``ancestor_iter_indices`` maps an ancestor iteration-node id to the
+    iteration-node's current trip index along the active schedule path.
+    """
 
     if guard is None:
         return True
     for term in guard:
-        if term.axis not in ancestor_indices:
-            msg = f"guard references non-ancestor axis {term.axis!r}"
+        if term.node not in ancestor_iter_indices:
+            msg = (
+                f"guard references iteration node {term.node!r} which is not"
+                " an ancestor along the current schedule path"
+            )
             raise TeirLoweringError(msg)
-        idx = ancestor_indices[term.axis]
-        extent = teir.axes[term.axis].extent
+        idx = ancestor_iter_indices[term.node]
+        iter_node = teir.schedule.iterations[term.node]
+        extent = teir.axes[iter_node.axis].extent
         if isinstance(term, First):
             if idx != 0:
                 return False
@@ -135,12 +145,18 @@ def _walk_iter(teir: Teir, builder: TileViewBuilder) -> None:
     ancestor indices" and "step to the next iteration of an axis at this
     depth" actions; we materialize each leaf invocation only when its
     ancestor chain is finalized.
+
+    Two parallel maps track the active path: ``ancestor_axis_indices`` is
+    keyed by axis id and feeds tile-address computation, while
+    ``ancestor_iter_indices`` is keyed by iteration-node id and feeds
+    guard evaluation (since the new spec binds guards to nodes, not axes).
     """
 
     sched = teir.schedule
     iterations = sched.iterations
     invocations = sched.invocations
-    ancestor_indices: dict[str, int] = {}
+    ancestor_axis_indices: dict[str, int] = {}
+    ancestor_iter_indices: dict[str, int] = {}
 
     # Frame kinds for the work stack.
     _ENTER = 0
@@ -149,7 +165,7 @@ def _walk_iter(teir: Teir, builder: TileViewBuilder) -> None:
 
     # ENTER frames carry just (action, node_id).
     # CONTINUE frames carry (action, (iter_node_id, axis_id, extent, next_idx)).
-    # EXIT frames carry (action, axis_id).
+    # EXIT frames carry (action, (iter_node_id, axis_id)).
     Frame = tuple[int, Any]
     stack: list[Frame] = [(_ENTER, root) for root in reversed(sched.roots)]
 
@@ -159,7 +175,7 @@ def _walk_iter(teir: Teir, builder: TileViewBuilder) -> None:
             node_id_str: str = payload
             if node_id_str in iterations:
                 it_node: IterationNode = iterations[node_id_str]
-                if not _evaluate_guard(it_node.guard, ancestor_indices, teir):
+                if not _evaluate_guard(it_node.guard, ancestor_iter_indices, teir):
                     continue
                 extent = teir.axes[it_node.axis].extent
                 if it_node.policy not in ("sequential", "parallel"):
@@ -173,15 +189,16 @@ def _walk_iter(teir: Teir, builder: TileViewBuilder) -> None:
                     )
                 if extent <= 0:
                     continue
-                ancestor_indices[it_node.axis] = 0
-                stack.append((_EXIT, it_node.axis))
+                ancestor_axis_indices[it_node.axis] = 0
+                ancestor_iter_indices[node_id_str] = 0
+                stack.append((_EXIT, (node_id_str, it_node.axis)))
                 stack.append((_CONTINUE, (node_id_str, it_node.axis, extent, 1)))
                 for cid in reversed(it_node.children):
                     stack.append((_ENTER, cid))
                 continue
             if node_id_str in invocations:
                 inv_node: InvocationNode = invocations[node_id_str]
-                if not _evaluate_guard(inv_node.guard, ancestor_indices, teir):
+                if not _evaluate_guard(inv_node.guard, ancestor_iter_indices, teir):
                     continue
                 primitive = teir.primitives[inv_node.primitive]
                 executor = _REGISTRY.get(primitive.operation)
@@ -190,7 +207,7 @@ def _walk_iter(teir: Teir, builder: TileViewBuilder) -> None:
                         f"numpy backend has no lowering for operation {primitive.operation!r}"
                     )
                 bases = {
-                    tid: builder.base_byte_address(tid, ancestor_indices)
+                    tid: builder.base_byte_address(tid, ancestor_axis_indices)
                     for tid in teir.tensor_ids
                 }
                 executor(teir, primitive, builder, bases)
@@ -201,7 +218,8 @@ def _walk_iter(teir: Teir, builder: TileViewBuilder) -> None:
             cont_node_id, cont_axis, cont_extent, cont_next = payload
             if cont_next >= cont_extent:
                 continue
-            ancestor_indices[cont_axis] = cont_next
+            ancestor_axis_indices[cont_axis] = cont_next
+            ancestor_iter_indices[cont_node_id] = cont_next
             stack.append(
                 (_CONTINUE, (cont_node_id, cont_axis, cont_extent, cont_next + 1))
             )
@@ -211,5 +229,6 @@ def _walk_iter(teir: Teir, builder: TileViewBuilder) -> None:
             continue
 
         # _EXIT
-        exit_axis: str = payload
-        ancestor_indices.pop(exit_axis, None)
+        exit_node_id, exit_axis = payload
+        ancestor_axis_indices.pop(exit_axis, None)
+        ancestor_iter_indices.pop(exit_node_id, None)

@@ -208,7 +208,7 @@ class TestMultiTermGuardRoundTrip:
     """Multi-term guards round-trip through the textual IR."""
 
     def test_conjunctive_guard_round_trips(self) -> None:
-        """A schedule with a ``first(a) & last(b)`` guard round-trips."""
+        """A schedule with a ``first(@iter_a) & last(@iter_b)`` guard round-trips."""
 
         from etops.ir import TeirBuilder
 
@@ -225,7 +225,7 @@ class TestMultiTermGuardRoundTrip:
         inv = b.add_invocation(
             "inv_zero",
             primitive="zero",
-            guard=guard(First("a"), Last("b")),
+            guard=guard(First("iter_a"), Last("iter_b")),
         )
         iter_b = b.add_iteration("iter_b", axis="b", children=[inv])
         iter_a = b.add_iteration("iter_a", axis="a", children=[iter_b])

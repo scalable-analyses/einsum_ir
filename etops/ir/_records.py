@@ -38,20 +38,21 @@ VALID_POLICIES: Final[frozenset[str]] = frozenset({"sequential", "parallel"})
 
 @dataclass(frozen=True)
 class First:
-    """Guard term that is true on the first iteration of ``axis``."""
+    """Guard term true on the first trip of iteration node ``node``."""
 
-    axis: str
+    node: str
 
 
 @dataclass(frozen=True)
 class Last:
-    """Guard term that is true on the last iteration of ``axis``."""
+    """Guard term true on the last trip of iteration node ``node``."""
 
-    axis: str
+    node: str
 
 
 #: A guard is a non-empty tuple of `First` / `Last` terms, AND-combined.
-#: Build one with `guard(First("a"), Last("b"))`; use ``None`` for "no guard."
+#: Build one with `guard(First("iter_a"), Last("iter_b"))`; use ``None``
+#: for "no guard."
 Guard = tuple["First | Last", ...]
 
 
@@ -83,16 +84,17 @@ def is_guard(value: object) -> bool:
 def format_guard(guard: Guard) -> str:
     """Render a `Guard` as the canonical textual-IR conjunction.
 
-    Each term renders as ``first(@axis)`` or ``last(@axis)``; the terms
-    are joined with `` and ``.
+    Each term renders as ``first(@node)`` or ``last(@node)`` where
+    ``@node`` is the id of an iteration-node ancestor of the guarded
+    node; the terms are joined with `` and ``.
     """
 
     parts: list[str] = []
     for term in guard:
         if isinstance(term, First):
-            parts.append(f"first(@{term.axis})")
+            parts.append(f"first(@{term.node})")
         else:
-            parts.append(f"last(@{term.axis})")
+            parts.append(f"last(@{term.node})")
     return " and ".join(parts)
 
 

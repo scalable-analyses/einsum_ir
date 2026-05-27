@@ -899,16 +899,21 @@ def _dispatch_axes(prim: Primitive) -> tuple[str, ...]:
 def LiftGuardedInit(teir: Teir, ctx: PassContext) -> Teir:
     """Reposition guarded init / finalize invocations to free the reduction axis.
 
-    Two rewrite shapes are recognized:
+    Two rewrite shapes are recognized — here ``X`` names the iteration
+    node referenced by the guard term:
 
-    1. ``Zero[first(X)] | Copy[first(X)] | ReLU[last(X)]`` as a direct
-       sibling of the X loop — the guard is dropped and the invocation
-       moves out of the loop (``first`` lifts above, ``last`` below).
-    2. A "scalar batched GEMM" pattern where the X
-       iteration is the outermost loop and the guarded sibling lives
-       several free-axis loops deeper. The X iteration is interchanged
-       past the intervening free-axis loops until it wraps only the
-       contraction, with the lifted invocation as its sibling.
+    1. A ``Zero | Copy | ReLU`` invocation guarded by ``first(@X)`` or
+       ``last(@X)`` is a direct child of X. The guard is dropped and the
+       invocation becomes a sibling of X at X's level (in X's parent's
+       children list, or in the roots list if X is a root): ``first`` is
+       placed immediately before X, ``last`` immediately after. The
+       invocation now runs exactly once per visit to that level,
+       reproducing the guarded-on-X semantics structurally.
+    2. A shape where X is the outermost iteration
+       in a single-child chain and the guarded sibling lives several
+       iterations deeper. X is interchanged past the intervening
+       iterations until it directly wraps the contraction, with the
+       lifted invocation as X's new sibling.
 
     Both rewrites preserve schedule semantics and eliminate the guard so
     the reduction axis can be promoted into a Contraction primitive's K
@@ -926,7 +931,8 @@ def LiftGuardedInit(teir: Teir, ctx: PassContext) -> Teir:
 
 
 def _lift_first_guarded_siblings(teir: Teir) -> Teir:
-    """Lift ``first(X)`` / ``last(X)``-guarded sibling invocations out of the X loop."""
+    """Lift ``first(@X)`` / ``last(@X)``-guarded sibling invocations to
+    X's level, where X is the parent iteration node named by the guard."""
 
     builder = teir.builder()
     sched = teir.schedule
@@ -946,7 +952,7 @@ def _lift_first_guarded_siblings(teir: Teir) -> Teir:
             if guard is None or len(guard) != 1:
                 continue
             term = guard[0]
-            if term.axis != loop_axis:
+            if term.node != nid:
                 continue
             prim = teir.primitives.get(inv.primitive)
             if prim is None:
@@ -988,9 +994,10 @@ def _lift_first_guarded_siblings(teir: Teir) -> Teir:
 
 
 def _lower_reduction_inside_init(teir: Teir) -> Teir:
-    """Pull an outermost reduction iteration inside an inner loop that hosts
-    the ``first(X)``-guarded init, so the reduction axis can be promoted
-    into the contraction primitive."""
+    """Pull an outermost reduction iteration into an inner iteration node
+    that hosts the ``first(@X)``-guarded init (X being the outermost
+    iteration node), so the reduction axis can be promoted into the
+    contraction primitive."""
 
     sched = teir.schedule
     parent_of = parent_map(teir)
@@ -1018,7 +1025,6 @@ def _lower_reduction_inside_init(teir: Teir) -> Teir:
         inner = sched.iterations.get(inner_id)
         if inner is None or len(inner.children) < 2:
             continue
-        guard_axis = x_node.axis
         guarded_id: str | None = None
         kind: str | None = None
         for child_id in inner.children:
@@ -1026,7 +1032,7 @@ def _lower_reduction_inside_init(teir: Teir) -> Teir:
             if inv is None or inv.guard is None or len(inv.guard) != 1:
                 continue
             term = inv.guard[0]
-            if term.axis != guard_axis:
+            if term.node != x_id:
                 continue
             prim = teir.primitives.get(inv.primitive)
             if prim is None or prim.operation not in _UNARY_OPERATIONS:

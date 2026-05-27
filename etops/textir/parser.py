@@ -444,7 +444,7 @@ class _Parser:
         return items
 
     def _parse_guard(self) -> Guard:
-        # 'first(@a)' or 'last(@b)', optionally chained with 'and'.
+        # 'first(@iter_a)' or 'last(@iter_b)', optionally chained with 'and'.
         terms: list[First | Last] = []
         while True:
             kind_tok = self._expect(TokenKind.IDENT)
@@ -454,10 +454,10 @@ class _Parser:
                     f" at line {kind_tok.line}, col {kind_tok.col}"
                 )
             self._expect(TokenKind.LPAREN)
-            axis_tok = self._expect(TokenKind.SIGIL_AT)
+            node_tok = self._expect(TokenKind.SIGIL_AT)
             self._expect(TokenKind.RPAREN)
             term_cls = First if kind_tok.text == "first" else Last
-            terms.append(term_cls(axis_tok.text))
+            terms.append(term_cls(node_tok.text))
             if not self._accept_kw("and"):
                 break
         return guard(*terms)

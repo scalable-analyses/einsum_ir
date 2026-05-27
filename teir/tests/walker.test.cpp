@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cstdint>
 #include <initializer_list>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -77,8 +78,8 @@ class TeirBuilder {
   teir::Teir t_;
 };
 
-teir::Guard guard_first(const std::string& axis) {
-  return teir::Guard{teir::GuardTerm{teir::GuardTerm::Kind::FIRST, axis}};
+teir::Guard guard_first(const std::string& node) {
+  return teir::Guard{teir::GuardTerm{teir::GuardTerm::Kind::FIRST, node}};
 }
 
 teir::Teir scalar_copy_teir() {
@@ -165,7 +166,7 @@ TEST_CASE("Operation::execute respects first/last guards", "[runtime]") {
                .axis("a", 3, {1})
                .axis("b", 5, {1})
                .primitive("zero", "Zero")
-               .invoke("inv", "zero", guard_first("a"))
+               .invoke("inv", "zero", guard_first("iter_a"))
                .iter("iter_b", "b", {"inv"})
                .iter("iter_a", "a", {"iter_b"})
                .roots({"iter_a"})
@@ -183,21 +184,56 @@ TEST_CASE("Operation::compile rejects missing primitive lowerings", "[runtime]")
                     teir::LoweringException);
 }
 
-TEST_CASE("Operation::execute raises ValidationException for unscoped guard axes",
+TEST_CASE("Operation::execute raises ValidationException for unscoped guard nodes",
           "[runtime][guards]") {
   teir::register_primitive("ut_guard_scope", "Zero", &ut_noop);
 
   auto t = TeirBuilder()
                .tensor("out")
                .axis("a", 2, {1})
-               .axis("z", 1, {0})
+               .axis("b", 2, {1})
                .primitive("zero", "Zero")
-               .invoke("inv", "zero", guard_first("z"))
+               .invoke("inv_a", "zero")
+               .invoke("inv_b", "zero", guard_first("iter_a"))
+               .iter("iter_a", "a", {"inv_a"})
+               .iter("iter_b", "b", {"inv_b"})
+               .roots({"iter_a", "iter_b"})
+               .build();
+
+  REQUIRE_THROWS_AS(teir::compile(std::move(t), "ut_guard_scope"), teir::ValidationException);
+}
+
+TEST_CASE("Operation::execute raises ValidationException for unknown guard nodes",
+          "[runtime][guards]") {
+  teir::register_primitive("ut_guard_unknown", "Zero", &ut_noop);
+
+  auto t = TeirBuilder()
+               .tensor("out")
+               .axis("a", 2, {1})
+               .primitive("zero", "Zero")
+               .invoke("inv", "zero", guard_first("does_not_exist"))
                .iter("iter_a", "a", {"inv"})
                .roots({"iter_a"})
                .build();
 
-  REQUIRE_THROWS_AS(teir::compile(std::move(t), "ut_guard_scope"), teir::ValidationException);
+  REQUIRE_THROWS_AS(teir::compile(std::move(t), "ut_guard_unknown"), teir::ValidationException);
+}
+
+TEST_CASE("Operation::execute raises ValidationException for guard targeting invocation",
+          "[runtime][guards]") {
+  teir::register_primitive("ut_guard_inv_target", "Zero", &ut_noop);
+
+  auto t = TeirBuilder()
+               .tensor("out")
+               .axis("a", 2, {1})
+               .primitive("zero", "Zero")
+               .invoke("inv_sibling", "zero")
+               .invoke("inv", "zero", guard_first("inv_sibling"))
+               .iter("iter_a", "a", {"inv_sibling", "inv"})
+               .roots({"iter_a"})
+               .build();
+
+  REQUIRE_THROWS_AS(teir::compile(std::move(t), "ut_guard_inv_target"), teir::ValidationException);
 }
 
 TEST_CASE("Operation::execute walks parallel iteration with a multi-root forest",

@@ -2,11 +2,26 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from etops.analyses import dim_roles
 from etops.diag import TeirPassError
-from etops.ir import Teir, TeirBuilder
+from etops.ir import Guard, Teir, TeirBuilder
 
 __all__ = ["canonicalize_ids"]
+
+
+def _rename_guard(guard: Guard | None, rename: dict[str, str]) -> Guard | None:
+    """Rewrite every guard term's node id through ``rename``.
+
+    Guards reference iteration-node ids; when those ids are renamed, the
+    guard terms must be rewritten in lock-step or they dangle.
+    """
+
+    if guard is None:
+        return None
+    return tuple(replace(term, node=rename[term.node]) for term in guard)
+
 
 # Axis roles drive iteration-node naming: an axis classified as M/N/K/C
 # names its iteration node ``m{i}`` / ``n{i}`` / ``k{i}`` / ``c{i}`` with a
@@ -74,7 +89,7 @@ def canonicalize_ids(teir: Teir) -> Teir:
         builder.add_invocation(
             rename[nid],
             primitive=inv.primitive,
-            guard=inv.guard,
+            guard=_rename_guard(inv.guard, rename),
             metadata=dict(inv.metadata),
         )
 
@@ -118,7 +133,7 @@ def canonicalize_ids(teir: Teir) -> Teir:
             axis=it.axis,
             policy=it.policy,
             children=[rename[c] for c in it.children],
-            guard=it.guard,
+            guard=_rename_guard(it.guard, rename),
             metadata=dict(it.metadata),
         )
         added.add(new_id)

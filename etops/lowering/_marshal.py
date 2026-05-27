@@ -81,7 +81,7 @@ def _guard_to_list(guard: Guard | None) -> list[dict[str, str]] | None:
     out: list[dict[str, str]] = []
     for term in guard:
         kind = "first" if isinstance(term, First) else "last"
-        out.append({"kind": kind, "axis": term.axis})
+        out.append({"kind": kind, "node": term.node})
     return out
 
 

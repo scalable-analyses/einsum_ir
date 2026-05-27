@@ -2,15 +2,118 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from etops.diag import TeirPassError
-from etops.ir import Guard, Teir
+from etops.ir import First, Guard, Last, Teir, TeirBuilder
 from etops.ir._records import VALID_POLICIES
+from etops.ir._records import guard as _make_guard
+from etops.ir.cursors import pre_order
 
 __all__ = [
     "fuse_iterations",
     "set_policy",
     "split_iteration",
 ]
+
+
+def _rewrite_split_guards(
+    builder: TeirBuilder,
+    teir: Teir,
+    split_id: str,
+    inner_id: str,
+) -> None:
+    """Expand every guard term that references ``split_id`` into a pair.
+
+    After ``split_iteration`` replaces the original ``split_id`` node with
+    an outer (id reused as ``split_id``) and a new inner (``inner_id``),
+    the old trip index ``i`` maps to the new ``(outer=i//k, inner=i%k)``.
+    Hence ``first(@split_id)`` is preserved exactly by
+    ``first(@split_id) and first(@inner_id)`` (and likewise for ``last``).
+    """
+
+    sched = teir.schedule
+    for node_id, inv in sched.invocations.items():
+        if inv.guard is None:
+            continue
+        new_guard = _expand_split_terms(inv.guard, split_id, inner_id)
+        if new_guard is not inv.guard:
+            builder.set_invocation_guard(node_id, new_guard)
+    for node_id, it in sched.iterations.items():
+        if it.guard is None:
+            continue
+        new_guard = _expand_split_terms(it.guard, split_id, inner_id)
+        if new_guard is not it.guard:
+            builder.set_iteration_guard(node_id, new_guard)
+
+
+def _expand_split_terms(guard: Guard, split_id: str, inner_id: str) -> Guard:
+    """Return ``guard`` with every term naming ``split_id`` paired with a
+    matching term on ``inner_id``. Returns the input unchanged when no
+    term references ``split_id``.
+    """
+
+    if not any(term.node == split_id for term in guard):
+        return guard
+    expanded: list[First | Last] = []
+    for term in guard:
+        expanded.append(term)
+        if term.node == split_id:
+            expanded.append(replace(term, node=inner_id))
+    return _make_guard(*expanded)
+
+
+def _collapse_fuse_guard(
+    guard: Guard,
+    outer_id: str,
+    inner_id: str,
+    *,
+    where: str,
+) -> Guard:
+    """Rewrite ``guard`` for a fuse that collapses ``outer_id`` and
+    ``inner_id`` into the fused node (reusing ``outer_id``).
+
+    A ``first(@outer)`` term paired with ``first(@inner)`` collapses into
+    a single ``first(@outer)`` on the fused node; ``last`` mirrors. Any
+    unpaired term that names outer or inner — including a cross-pair
+    such as ``first(@outer) and last(@inner)`` — has no first/last
+    expression on the fused axis and is rejected. Terms naming other
+    nodes pass through unchanged. ``where`` is a short diagnostic
+    locator describing which guard is being rewritten.
+    """
+
+    outer_first_idx: list[int] = []
+    outer_last_idx: list[int] = []
+    inner_first_idx: list[int] = []
+    inner_last_idx: list[int] = []
+    pass_through: list[First | Last] = []
+    for i, term in enumerate(guard):
+        if term.node == outer_id:
+            (outer_first_idx if isinstance(term, First) else outer_last_idx).append(i)
+        elif term.node == inner_id:
+            (inner_first_idx if isinstance(term, First) else inner_last_idx).append(i)
+        else:
+            pass_through.append(term)
+
+    fused_terms: list[First | Last] = []
+    n_first = min(len(outer_first_idx), len(inner_first_idx))
+    n_last = min(len(outer_last_idx), len(inner_last_idx))
+    fused_terms.extend(First(outer_id) for _ in range(n_first))
+    fused_terms.extend(Last(outer_id) for _ in range(n_last))
+
+    unpaired_outer = (len(outer_first_idx) - n_first) + (len(outer_last_idx) - n_last)
+    unpaired_inner = (len(inner_first_idx) - n_first) + (len(inner_last_idx) - n_last)
+    if unpaired_outer or unpaired_inner:
+        raise TeirPassError(
+            f"fuse_iterations: {where} carries a guard term referencing"
+            f" {outer_id!r} or {inner_id!r} that cannot be expressed on the"
+            " fused axis: a 'first(@outer)' term requires a paired"
+            " 'first(@inner)' (and likewise for last); cross-pairs and"
+            " unpaired references have no first/last form on the fused"
+            " node"
+        )
+
+    return _make_guard(*(pass_through + fused_terms))
 
 
 def split_iteration(teir: Teir, iteration_node_id: str, *, inner_extent: int) -> Teir:
@@ -39,9 +142,12 @@ def split_iteration(teir: Teir, iteration_node_id: str, *, inner_extent: int) ->
 
     Raises:
         TeirPassError: If the node does not exist, the iterated axis
-            appears in any primitive role list, ``inner_extent`` does
-            not divide the extent, or the node's guard references the
-            iterated axis.
+            appears in any primitive role list, or ``inner_extent`` does
+            not divide the extent. Descendant guards that name the split
+            node are rewritten in place into the equivalent
+            ``first(@outer) and first(@inner)`` conjunction (and
+            similarly for ``last``); the rewrite preserves the original
+            guard semantics exactly.
     """
 
     sched = teir.schedule
@@ -67,14 +173,6 @@ def split_iteration(teir: Teir, iteration_node_id: str, *, inner_extent: int) ->
                     f" {pid!r} role {role!r}; split_iteration only operates"
                     " on schedule-iterated axes"
                 )
-
-    if node.guard is not None and any(
-        getattr(term, "axis", None) == axis_id for term in node.guard
-    ):
-        raise TeirPassError(
-            f"split_iteration: node {iteration_node_id!r} guard references"
-            f" the axis being split ({axis_id!r})"
-        )
 
     builder = teir.builder()
     outer_extent = axis.extent // inner_extent
@@ -117,6 +215,12 @@ def split_iteration(teir: Teir, iteration_node_id: str, *, inner_extent: int) ->
     builder.set_iteration_axis(iteration_node_id, outer_id)
     builder.set_iteration_children(iteration_node_id, [inner_node_id])
 
+    # Any guard term naming the split node refers to the old combined
+    # trip index; preserve its semantics by expanding into a conjunction
+    # on the new (outer, inner) pair. Operates on the pre-split schedule
+    # because the outer-id is reused so the term node-id is unchanged.
+    _rewrite_split_guards(builder, teir, iteration_node_id, inner_node_id)
+
     return builder.finish(validate=True)
 
 
@@ -145,8 +249,12 @@ def fuse_iterations(teir: Teir, outer_iteration_node_id: str) -> Teir:
         TeirPassError: If the node does not exist, has zero or multiple
             children, the child is not an iteration node, either axis
             appears in a primitive role list, policies differ, stride
-            coherency is violated, or the inner's guard references the
-            outer's axis (which is removed from this iteration site).
+            coherency is violated, or any guard in the inner subtree
+            names the outer or inner iteration node in a shape that
+            cannot collapse into first/last on the fused axis (only
+            symmetric ``first(@outer) and first(@inner)`` and the
+            equivalent for ``last`` collapse cleanly; everything else
+            is refused).
     """
 
     sched = teir.schedule
@@ -202,26 +310,36 @@ def fuse_iterations(teir: Teir, outer_iteration_node_id: str) -> Teir:
                 f" ({inner_axis.extent * s_inner}); got {s_outer}"
             )
 
-    # The inner guard cannot reference the outer axis: that axis no
-    # longer appears in the schedule at this site after fusion, and our
-    # first/last guard language can't encode the equivalent condition
-    # against the fused axis. The outer's own guard is fine (it
-    # references ancestors of outer, which are also ancestors of the
-    # fused node).
-    if inner_node.guard is not None:
-        for term in inner_node.guard:
-            if getattr(term, "axis", None) == outer_axis_id:
-                raise TeirPassError(
-                    f"fuse_iterations: inner guard term references outer"
-                    f" axis {outer_axis_id!r}; outer is removed from this"
-                    " iteration site by the fuse"
-                )
+    # Every guard in the inner subtree (inner itself plus every descendant)
+    # may name outer or inner; collapse symmetric first/last pairs into a
+    # single term on the fused node and reject anything else that names
+    # outer or inner. Run before mutating the IR so a rejection leaves the
+    # caller's source unchanged.
+    subtree_guard_rewrites: dict[str, Guard] = {}
+    for nid in pre_order(teir):
+        if nid == outer_iteration_node_id:
+            continue
+        node_obj = sched.iterations.get(nid) or sched.invocations.get(nid)
+        if node_obj is None or node_obj.guard is None:
+            continue
+        new_guard = _collapse_fuse_guard(
+            node_obj.guard,
+            outer_iteration_node_id,
+            inner_node_id,
+            where=f"node {nid!r}",
+        )
+        if new_guard is not node_obj.guard:
+            subtree_guard_rewrites[nid] = new_guard
 
+    # Inner's own guard already collapsed above (if present). When we
+    # concatenate it with outer's, use the collapsed form so the
+    # combined guard makes sense on the fused node.
+    inner_collapsed = subtree_guard_rewrites.pop(inner_node_id, inner_node.guard)
     combined_guard: Guard | None
-    if outer_node.guard is not None and inner_node.guard is not None:
-        combined_guard = outer_node.guard + inner_node.guard
+    if outer_node.guard is not None and inner_collapsed is not None:
+        combined_guard = outer_node.guard + inner_collapsed
     else:
-        combined_guard = outer_node.guard or inner_node.guard
+        combined_guard = outer_node.guard or inner_collapsed
 
     builder = teir.builder()
     fused_id = builder.claim_unused_axis_id(f"{outer_axis_id}_{inner_axis_id}")
@@ -251,6 +369,15 @@ def fuse_iterations(teir: Teir, outer_iteration_node_id: str) -> Teir:
     builder.set_iteration_guard(outer_iteration_node_id, combined_guard)
     builder.set_iteration_metadata(outer_iteration_node_id, dict(inner_node.metadata))
     builder.remove_iteration(inner_node_id, reparent_children=True)
+
+    # Apply collapsed guards to every descendant that named outer or
+    # inner. Inner itself was popped above and folded into combined_guard.
+    for nid, new_guard in subtree_guard_rewrites.items():
+        if nid in sched.iterations:
+            builder.set_iteration_guard(nid, new_guard)
+        else:
+            builder.set_invocation_guard(nid, new_guard)
+
     return builder.finish(validate=True)
 
 
