@@ -1,0 +1,26 @@
+teir-format 1.0
+
+teir @abcd_efab_efcd_brgemm {
+  tensor %in0 : f32
+  tensor %in1 : f32
+  tensor %out : f32
+
+  axis @a extent 48 strides { in0: 8192, in1: 64 }
+  axis @b extent 16 strides { in0: 512, in1: 4 }
+  axis @c extent 4 strides { in0: 128, out: 128 }
+  axis @d extent 32 strides { in0: 4, out: 4 }
+  axis @e extent 2 strides { in1: 24576, out: 4096 }
+  axis @f extent 8 strides { in1: 3072, out: 512 }
+
+  primitive @zero_df : Zero axes { M: [@d], N: [@f] } metadata { data_type: f32 }
+  primitive @brgemm_dfab : Contraction axes { M: [@d], N: [@f], K: [@a, @b] } metadata { data_type: f32 }
+
+  schedule {
+    roots [@iter_c]
+
+    iter @iter_e axis @e policy sequential children [@inv_zero, @inv_brgemm]
+    iter @iter_c axis @c policy sequential children [@iter_e]
+    invoke @inv_zero primitive @zero_df
+    invoke @inv_brgemm primitive @brgemm_dfab
+  }
+}

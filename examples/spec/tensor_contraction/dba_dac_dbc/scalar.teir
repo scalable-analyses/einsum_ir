@@ -1,6 +1,6 @@
 teir-format 1.0
 
-teir @reordered_scalar_bgemm {
+teir @dba_dac_dbc_scalar {
   tensor %in0 : f32
   tensor %in1 : f32
   tensor %out : f32
@@ -14,13 +14,13 @@ teir @reordered_scalar_bgemm {
   primitive @contraction : Contraction axes { M: [], N: [], K: [] } metadata { data_type: f32 }
 
   schedule {
-    roots [@iter_b]
+    roots [@iter_a]
 
-    iter @iter_a axis @a policy sequential children [@inv_contract]
-    iter @iter_d axis @d policy sequential children [@inv_zero, @iter_a]
+    iter @iter_d axis @d policy sequential children [@inv_zero, @inv_contract]
     iter @iter_c axis @c policy sequential children [@iter_d]
     iter @iter_b axis @b policy sequential children [@iter_c]
-    invoke @inv_zero primitive @zero
+    iter @iter_a axis @a policy sequential children [@iter_b]
+    invoke @inv_zero primitive @zero guard first(@a)
     invoke @inv_contract primitive @contraction
   }
 }

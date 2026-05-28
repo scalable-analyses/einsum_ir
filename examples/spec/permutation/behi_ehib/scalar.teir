@@ -1,0 +1,23 @@
+teir-format 1.0
+
+teir @behi_ehib_scalar {
+  tensor %in0 : f32
+  tensor %out : f32
+
+  axis @b extent 60 strides { in0: 2048, out: 4 }
+  axis @e extent 8 strides { in0: 256, out: 15360 }
+  axis @h extent 8 strides { in0: 32, out: 1920 }
+  axis @i extent 8 strides { in0: 4, out: 240 }
+
+  primitive @copy : Copy axes { M: [], N: [] } metadata { data_type: f32 }
+
+  schedule {
+    roots [@c0]
+
+    iter @c3 axis @i policy sequential children [@i0]
+    iter @c2 axis @h policy sequential children [@c3]
+    iter @c1 axis @e policy sequential children [@c2]
+    iter @c0 axis @b policy sequential children [@c1]
+    invoke @i0 primitive @copy
+  }
+}

@@ -49,10 +49,10 @@ ETOPS_ENABLE_SANITIZERS = { env = "ETOPS_ENABLE_SANITIZERS", default = "OFF" }
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers -m 'not slow'"
 testpaths = ["tests"]
 markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "slow: marks tests as slow (run with '-m slow' or '-m \"\"' to include)",
     "property: Hypothesis property-based tests",
     "tpp: requires TPP/libxsmm backend",
     "blas: requires BLAS backend",
