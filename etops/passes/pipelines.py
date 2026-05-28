@@ -59,6 +59,4 @@ def _tpp_pipeline() -> PassPipeline:
 def _blas_pipeline() -> PassPipeline:
     """BLAS backend pipeline. cblas dispatches GEMM only (1, 1, 1); no BRGEMM."""
 
-    return _native_pipeline_with_shape(
-        CheckBackendShape(allowed_shapes=[(1, 1, 1)])
-    )
+    return _native_pipeline_with_shape(CheckBackendShape(allowed_shapes=[(1, 1, 1)]))

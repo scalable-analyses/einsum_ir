@@ -47,10 +47,7 @@ def _axis_carries_offset_on_primitive_tensors(
     if prim is None:
         return False
     operand_tensors = set(teir.tensor_ids)
-    for tid in operand_tensors:
-        if axis.offsets.get(tid, 0) != 0:
-            return True
-    return False
+    return any(axis.offsets.get(tid, 0) != 0 for tid in operand_tensors)
 
 
 # ============================================================================
