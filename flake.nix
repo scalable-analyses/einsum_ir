@@ -26,10 +26,6 @@
 
           pkgs.openblas
           pkgs.stdenv.cc.cc.lib
-          python.pkgs.pybind11
-          python.pkgs.numpy
-          python.pkgs.pytest
-          python.pkgs.hypothesis
 
           pkgs.ruff
           pkgs.clang-tools
@@ -54,7 +50,7 @@
             echo "  cmake  : $(cmake --version | head -1)"
             echo "  BLAS   : ${pkgs.openblas}"
             echo
-            echo "Bootstrap: 'uv venv .venv && source .venv/bin/activate && uv pip install -ve .'"
+            echo "Bootstrap: 'uv venv .venv && source .venv/bin/activate && uv pip install -ve \".[test]\"'"
           '';
         };
 
