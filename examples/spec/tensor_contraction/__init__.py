@@ -1,24 +1,30 @@
-"""Tensor contraction examples (``trus,pqtu -> pqrs``).
+"""Tensor contraction examples.
 
-Three schedules for the same computation:
+Files are grouped under one subdirectory per einsum family
+(``input0_input1_output``); each subdirectory's filenames
+describe the schedule shape applied to that family:
 
-- ``scalar.teir``: pure scalar nesting; ``Zero`` hoisted to the ``s``
-  loop ahead of the inner ``t`` / ``u`` contraction loops.
-- ``gemm.teir``: inner GEMM primitive (``M=s``, ``N=q``, ``K=u``)
-  inside ``(p, r, t)`` nesting; ``Zero`` hoisted to ``(p, r)``.
-- ``brgemm.teir``: BRGEMM primitive (``M=s``, ``N=q``, ``K=(t, u)``)
-  collapsing both contraction axes into one batch-reduce call; outer
-  ``(p, r)`` iteration runs in parallel.
+- ``trus_pqtu_pqrs/{scalar,gemm,brgemm}.teir``: three schedules for the
+  canonical ``trus,pqtu -> pqrs`` contraction.
+- ``abcd_efab_efcd/brgemm.teir``: a BRGEMM schedule for
+  ``abcd,efab -> efcd`` with K axes ``(a, b)`` contiguous in ``in0``.
+- ``acbd_eafb_ecfd/brgemm.teir``: a BRGEMM schedule for
+  ``acbd,eafb -> ecfd`` with K axes interleaved with M axes in ``in0``.
+- ``dba_dac_dbc/{scalar,scalar_reordered}.teir``: two scalar schedules
+  for the batched GEMM ``dba,dac -> dbc`` (``d`` is the batch axis);
+  ``scalar`` uses a ``first(a)`` guard on the Zero, ``scalar_reordered``
+  hoists the Zero out of the K loop.
+- ``_cases.py`` carries one programmatic entry
+  ``yxgcaei_yxhfca_yhgfxei/scalar``: the all-roles-populated rank-7/6/7
+  contraction.
 
-``run`` parses the named schedule (defaults to ``gemm``) and applies
-a minimal pre-lowering pipeline containing only ``EnsureKernelShape``,
-which synth-fills any empty M/N/K role lists so the backend can
-dispatch. It then compiles, executes on the requested backend (TPP by
-default; BLAS via ``backend="blas"`` or the ``--backend`` CLI flag),
-and checks the result against ``np.einsum``. The BLAS backend does
-not implement BRGEMM, so the ``brgemm`` schedule runs only on TPP.
-Pass ``show=True`` or ``--show`` to print both the parsed and the
-post-EnsureKernelShape IR trees first.
+``run`` selects an artifact by name (defaults to
+``trus_pqtu_pqrs/gemm``), applies a minimal pre-lowering pipeline
+containing only ``EnsureKernelShape``, compiles, executes, and asserts
+numerical agreement against an independent NumPy reference. The BLAS
+backend does not implement BRGEMM, so BRGEMM-shaped artifacts only run
+on TPP. Pass ``show=True`` to print both the parsed and
+post-``EnsureKernelShape`` IR trees first.
 """
 
 from __future__ import annotations
@@ -29,28 +35,62 @@ import numpy as np
 
 import etops
 from etops import textir
+from etops.ir import Teir
 from etops.passes import EnsureKernelShape, PassPipeline
+from tests._helpers import allocate_operands
 
-__all__ = ["DEFAULT_SCHEDULE", "SCHEDULES", "run"]
+__all__ = ["ARTIFACTS", "DEFAULT_NAME", "run"]
 
 _HERE = Path(__file__).parent
+DEFAULT_NAME = "trus_pqtu_pqrs/gemm"
 
-SCHEDULES: dict[str, Path] = {
-    "scalar": _HERE / "scalar.teir",
-    "gemm": _HERE / "gemm.teir",
-    "brgemm": _HERE / "brgemm.teir",
-}
-DEFAULT_SCHEDULE = "gemm"
+
+def _build_artifacts() -> dict[str, str]:
+    """``{name: kind}`` with kind in ``{"teir", "case"}``.
+
+    ``.teir`` files are discovered recursively so per-einsum-family
+    subdirectories like ``trus_pqtu_pqrs/`` show up as artifact names
+    of the form ``"<family>/<schedule>"`` (e.g.
+    ``"trus_pqtu_pqrs/gemm"``).
+    """
+
+    out: dict[str, str] = {}
+    for path in sorted(_HERE.rglob("*.teir")):
+        out[str(path.relative_to(_HERE).with_suffix(""))] = "teir"
+    cases_path = _HERE / "_cases.py"
+    if cases_path.exists():
+        from . import _cases
+
+        for key in _cases.CASES:
+            if key in out:
+                raise RuntimeError(
+                    f"artifact name collision between .teir and _cases: {key!r}"
+                )
+            out[key] = "case"
+    return out
+
+
+ARTIFACTS: dict[str, str] = _build_artifacts()
+
+
+def _load(name: str) -> Teir:
+    kind = ARTIFACTS[name]
+    if kind == "teir":
+        return textir.parse((_HERE / f"{name}.teir").read_text())
+    from ._cases import CASES
+
+    return CASES[name].build()
 
 
 def run(
     backend: str = "tpp",
-    schedule: str | None = None,
+    name: str | None = None,
     show: bool = False,
 ) -> None:
-    """Execute the named tensor contraction schedule on ``backend`` and check."""
+    """Execute artifact ``name`` on ``backend`` and verify against the oracle."""
 
-    teir = textir.parse(SCHEDULES[schedule or DEFAULT_SCHEDULE].read_text())
+    name = name or DEFAULT_NAME
+    teir = _load(name)
     prepared = PassPipeline([EnsureKernelShape]).run(
         teir, profile=etops.default_profile(backend)
     )
@@ -61,15 +101,12 @@ def run(
         print("After EnsureKernelShape (what executes):")
         print(etops.show(prepared))
 
-    # Axis extents match every shipped contraction .teir:
-    # p=3, q=2, r=3, s=4, t=2, u=2.
-    rng = np.random.default_rng(0)
-    in0 = rng.standard_normal((2, 3, 2, 4)).astype(np.float32)  # trus
-    in1 = rng.standard_normal((3, 2, 2, 2)).astype(np.float32)  # pqtu
-    out = np.zeros((3, 2, 3, 4), dtype=np.float32)  # pqrs
-
+    flats, views, out_index = allocate_operands(teir)
     op = etops.compile(prepared, backend=backend, optimize=False)
-    op.execute(in0, in1, out)
+    op.execute(*flats)
 
-    expected = np.einsum("trus,pqtu->pqrs", in0, in1, optimize=False)
-    np.testing.assert_allclose(out, expected, atol=1e-4, rtol=1e-4)
+    from ._oracles import REFERENCES
+
+    inputs = [v for i, v in enumerate(views) if i != out_index]
+    expected = REFERENCES[name](*inputs)
+    np.testing.assert_allclose(views[out_index], expected, atol=1e-4, rtol=1e-4)

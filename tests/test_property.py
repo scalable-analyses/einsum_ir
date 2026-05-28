@@ -22,7 +22,11 @@ from etops.transforms import (
     fuse_iterations,
     split_iteration,
 )
-from tests._helpers import backend_available, backend_param, tensor_axes_in_storage_order
+from tests._helpers import (
+    backend_available,
+    backend_param,
+    tensor_axes_in_storage_order,
+)
 from tests.oracles.numpy_oracle import NumpyOptimizationProfile, numpy_pipeline
 from tests.strategies import binary_einsum_teir, unary_einsum_teir, unary_relu_teir
 
@@ -251,7 +255,9 @@ class TestBackendsAgreeWithOracle:
     """
 
     @backend_param(*_PRODUCTION_BACKENDS)
-    @given(teir=binary_einsum_teir(), seed=st.integers(min_value=0, max_value=2**32 - 1))
+    @given(
+        teir=binary_einsum_teir(), seed=st.integers(min_value=0, max_value=2**32 - 1)
+    )
     def test_contraction_matches_numpy(
         self, teir: Teir, seed: int, backend: str
     ) -> None:
@@ -284,9 +290,7 @@ class TestReluAgreesWithOracle:
         teir=unary_relu_teir(dtype="f32"),
         seed=st.integers(min_value=0, max_value=2**32 - 1),
     )
-    def test_relu_f32_matches_numpy(
-        self, teir: Teir, seed: int, backend: str
-    ) -> None:
+    def test_relu_f32_matches_numpy(self, teir: Teir, seed: int, backend: str) -> None:
         inputs, reference = _allocate_relu_inputs(teir, seed=seed)
         op = etops.compile(teir, backend=backend)
         op.execute(*inputs)
@@ -297,9 +301,7 @@ class TestReluAgreesWithOracle:
         teir=unary_relu_teir(dtype="f64"),
         seed=st.integers(min_value=0, max_value=2**32 - 1),
     )
-    def test_relu_f64_matches_numpy(
-        self, teir: Teir, seed: int, backend: str
-    ) -> None:
+    def test_relu_f64_matches_numpy(self, teir: Teir, seed: int, backend: str) -> None:
         inputs, reference = _allocate_relu_inputs(teir, seed=seed)
         try:
             op = etops.compile(teir, backend=backend)

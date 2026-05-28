@@ -1,6 +1,6 @@
 teir-format 1.0
 
-teir @abcd_dcba {
+teir @abcd_dcba_scalar {
   tensor %in0 : f32
   tensor %out : f32
 

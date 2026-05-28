@@ -6,7 +6,7 @@ import logging
 from collections.abc import Sequence
 
 from etops.analyses import kernel_eligibility
-from etops.diag import TeirPassError
+from etops.diag import TeirLoweringError
 from etops.ir import Teir, validate
 from etops.passes._framework import Pass, PassContext
 
@@ -41,14 +41,27 @@ def CheckBackendShape(
             )
             if shape not in allowed:
                 allowed_str = ", ".join(repr(s) for s in sorted(allowed))
-                raise TeirPassError(
-                    f"primitive {pid!r} has (|M|, |N|, |K|) = {shape};"
+                kernel = _kernel_class(shape)
+                raise TeirLoweringError(
+                    f"primitive {pid!r} requires {kernel} dispatch"
+                    f" (|M|, |N|, |K|) = {shape};"
                     f" the {backend_name!r} backend only supports {allowed_str}"
                 )
         return teir
 
     _check.__name__ = "CheckBackendShape"
     return _check
+
+
+def _kernel_class(shape: tuple[int, int, int]) -> str:
+    """Name the Contraction kernel class implied by ``(|M|, |N|, |K|)``."""
+
+    m, n, k = shape
+    if k >= 2:
+        return "BRGEMM"
+    if m >= 1 and n >= 1 and k == 1:
+        return "GEMM"
+    return "Scalar"
 
 
 def Validate(teir: Teir, ctx: PassContext) -> Teir:

@@ -119,3 +119,31 @@ jobs:
           UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
           ETOPS_HYPOTHESIS_PROFILE: "ci"
         run: pytest tests/ -v
+
+  pytest-slow-nightly:
+    name: pytest slow (nightly)
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config libopenblas-dev
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Editable install
+        run: uv pip install --system -ve ".[test]"
+
+      - name: pytest -m slow
+        env:
+          ETOPS_HYPOTHESIS_PROFILE: ci
+        run: pytest tests/ -v -m slow

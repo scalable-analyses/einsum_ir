@@ -1,6 +1,6 @@
 teir-format 1.0
 
-teir @brgemm_contraction {
+teir @trus_pqtu_pqrs_gemm {
   tensor %in0 : f32
   tensor %in1 : f32
   tensor %out : f32
@@ -13,14 +13,15 @@ teir @brgemm_contraction {
   axis @u extent 2 strides { in0: 16, in1: 4 }
 
   primitive @zero_sq : Zero axes { M: [@s], N: [@q] } metadata { data_type: f32 }
-  primitive @brgemm_sqtu : Contraction axes { M: [@s], N: [@q], K: [@t, @u] } metadata { data_type: f32 }
+  primitive @gemm_squ : Contraction axes { M: [@s], N: [@q], K: [@u] } metadata { data_type: f32 }
 
   schedule {
     roots [@iter_p]
 
-    iter @iter_r axis @r policy parallel children [@inv_zero, @inv_brgemm]
-    iter @iter_p axis @p policy parallel children [@iter_r]
+    iter @iter_t axis @t policy sequential children [@inv_gemm]
+    iter @iter_r axis @r policy sequential children [@inv_zero, @iter_t]
+    iter @iter_p axis @p policy sequential children [@iter_r]
     invoke @inv_zero primitive @zero_sq
-    invoke @inv_brgemm primitive @brgemm_sqtu
+    invoke @inv_gemm primitive @gemm_squ
   }
 }

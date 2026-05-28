@@ -42,13 +42,21 @@ __all__ = [
 _SPEC_ROOT: Path = Path(__file__).resolve().parents[2] / "examples" / "spec"
 
 SPEC_TEIR_FILES: Mapping[str, Path] = {
-    "scalar_permutation": _SPEC_ROOT / "permutation" / "scalar.teir",
-    "tiled_permutation": _SPEC_ROOT / "permutation" / "tiled.teir",
-    "scalar_bgemm": _SPEC_ROOT / "batched_gemm" / "scalar.teir",
-    "reordered_scalar_bgemm": _SPEC_ROOT / "batched_gemm" / "scalar_reordered.teir",
-    "scalar_tensor_contraction": _SPEC_ROOT / "tensor_contraction" / "scalar.teir",
-    "gemm_tensor_contraction": _SPEC_ROOT / "tensor_contraction" / "gemm.teir",
-    "brgemm_tensor_contraction": _SPEC_ROOT / "tensor_contraction" / "brgemm.teir",
+    "scalar_permutation": _SPEC_ROOT / "permutation" / "abcd_dcba" / "scalar.teir",
+    "tiled_permutation": _SPEC_ROOT / "permutation" / "abcd_dcba" / "tiled.teir",
+    "scalar_bgemm": (_SPEC_ROOT / "tensor_contraction" / "dba_dac_dbc" / "scalar.teir"),
+    "reordered_scalar_bgemm": (
+        _SPEC_ROOT / "tensor_contraction" / "dba_dac_dbc" / "scalar_reordered.teir"
+    ),
+    "scalar_tensor_contraction": (
+        _SPEC_ROOT / "tensor_contraction" / "trus_pqtu_pqrs" / "scalar.teir"
+    ),
+    "gemm_tensor_contraction": (
+        _SPEC_ROOT / "tensor_contraction" / "trus_pqtu_pqrs" / "gemm.teir"
+    ),
+    "brgemm_tensor_contraction": (
+        _SPEC_ROOT / "tensor_contraction" / "trus_pqtu_pqrs" / "brgemm.teir"
+    ),
 }
 
 

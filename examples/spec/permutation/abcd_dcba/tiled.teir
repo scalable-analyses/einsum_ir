@@ -1,6 +1,6 @@
 teir-format 1.0
 
-teir @tiled_permutation {
+teir @abcd_dcba_tiled {
   tensor %in0 : f32
   tensor %out : f32
 
