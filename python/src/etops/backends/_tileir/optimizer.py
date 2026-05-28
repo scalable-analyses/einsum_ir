@@ -1080,10 +1080,10 @@ class Optimizer:
         # Generate candidate splits for M and N separately
         # -----------------------------------------------------------------------
         m_splits, m_total_sizes = self._get_l2_splits_for_dim_ids(
-            m_dim_ids, cfg, m_strides, total_mn_prim_size, total_k_size, l2_limit
+            m_dim_ids, cfg, m_strides, total_m_prim_size, total_k_size, l2_limit
         )
         n_splits, n_total_sizes = self._get_l2_splits_for_dim_ids(
-            n_dim_ids, cfg, n_strides, total_mn_prim_size, total_k_size, l2_limit
+            n_dim_ids, cfg, n_strides, total_n_prim_size, total_k_size, l2_limit
         )
 
         # -----------------------------------------------------------------------
@@ -1096,30 +1096,32 @@ class Optimizer:
         for split_m, total_m in zip(m_splits, m_total_sizes):
             for split_n, total_n in zip(n_splits, n_total_sizes):
                 # Combined L2 footprint check
-                combined_footprint = total_m * total_m_prim_size + total_n * total_n_prim_size
+                combined_footprint = total_m * total_m_prim_size * total_k_size + total_n * total_n_prim_size * total_k_size
                 if combined_footprint > l2_limit:
                     score = 0.0
                 else:
                     # Arithmetic-intensity performance model:
-                    #   (total_M * M_prim * total_N * N_prim) 
+                    #   (total_M * M_prim * total_N * N_prim * K) 
                     #   -------------------------------------------
                     #   (total_M * M_prim * K + total_N * N_prim * K)
-                    numerator   =  total_m * total_m_prim_size * total_n * total_n_prim_size
-                    denominator = (total_m * total_m_prim_size * total_k_size +
-                                   total_n * total_n_prim_size * total_k_size)
+                    numerator   =  total_m * total_m_prim_size * total_n * total_n_prim_size * total_k_size
+                    denominator =  combined_footprint
                     score = numerator / denominator if denominator > 0 else 0.0
 
                 if score > best_score:
                     best_score   = score
                     best_split_m = split_m
                     best_split_n = split_n
-
         # -----------------------------------------------------------------------
         # Apply best split to the copy: split each non-prim dim into [outer, inner]
         # Both outer and inner receive exec.seq.
         # -----------------------------------------------------------------------
         dim_ids_to_split = []
         splits_to_apply  = []
+        # Dims where tile_size == full_size: the whole dimension is the L2 tile.
+        # No split is needed, but the dimension must still be treated as an L2 inner dim
+        # for reordering purposes.
+        l2_full_tile_ids = []
 
         for pos, i in enumerate(m_dim_ids):
             tile_size = best_split_m[pos]
@@ -1127,6 +1129,8 @@ class Optimizer:
             if 1 < tile_size < full_size:
                 dim_ids_to_split.append(i)
                 splits_to_apply.append([full_size // tile_size, tile_size])
+            elif tile_size == full_size:
+                l2_full_tile_ids.append(i)
 
         for pos, i in enumerate(n_dim_ids):
             tile_size = best_split_n[pos]
@@ -1134,6 +1138,8 @@ class Optimizer:
             if 1 < tile_size < full_size:
                 dim_ids_to_split.append(i)
                 splits_to_apply.append([full_size // tile_size, tile_size])
+            elif tile_size == full_size:
+                l2_full_tile_ids.append(i)
 
         cfg._split_multiple_dimensions(
             dim_ids_to_split, splits_to_apply,
@@ -1149,12 +1155,22 @@ class Optimizer:
         # Inner dim positions are determined by the same index-shift arithmetic used
         # inside _split_multiple_dimensions: splits are processed in ascending order of
         # original_id, so the i-th inner dim lands at original_id + offset + 1.
+        #
+        # Full-tile dims were not split, but their indices still shift by one for every
+        # split dim with a smaller original index.
         # -----------------------------------------------------------------------
         sorted_split_pairs = sorted(zip(dim_ids_to_split, splits_to_apply), key=lambda p: p[0])
+        sorted_split_ids   = [orig_id for orig_id, _ in sorted_split_pairs]
+
         l2_inner_ids = [
             original_id + offset + 1
             for offset, (original_id, _) in enumerate(sorted_split_pairs)
         ]
+
+        # Include full-tile dims, shifted by however many splits precede them.
+        for i in l2_full_tile_ids:
+            shift = sum(1 for split_id in sorted_split_ids if split_id < i)
+            l2_inner_ids.append(i + shift)
 
         l2_inner_id_set = set(l2_inner_ids)
 
@@ -1174,16 +1190,15 @@ class Optimizer:
         # -----------------------------------------------------------------------
         # Convert best_score to a factor in [WORST_L2_FACTOR, 1.0] based on the best possible score.
         # -----------------------------------------------------------------------
-        WORST_L2_FACTOR = 0.4
+        WORST_L2_FACTOR = 0.3
         
         # best M/N:
         # M * K + N * K = l2_limit
-        # M = K => 2 * M * K = l2_limit
+        # M = N => 2 * M * K = l2_limit
         # => M = l2_limit / (2 * K)
 
         best_possible_M_N = l2_limit / (2 * total_k_size)
-        best_possible_score = (best_possible_M_N ** 2) / (2 * best_possible_M_N * total_k_size)
-
+        best_possible_score = (best_possible_M_N ** 2 * total_k_size) / (2 * best_possible_M_N * total_k_size)
 
         if best_possible_score > 0:
             raw    = best_score / best_possible_score
