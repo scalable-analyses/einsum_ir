@@ -11,53 +11,34 @@ every production backend is property-tested against it.
 It owns the IR mirror types, schedule walker, threading abstraction (Apple Dispatch / OpenMP / sequential), and the TPP (libxsmm) and BLAS (cblas) primitive lowerings.
 The pybind11 binding at `teir/bindings/python/` exposes `etops._native`.
 
-## Build
+## Build & test
+
+The `ci/` scripts are the canonical build/test commands.
+They are exactly what CI runs, and they run identically on a dev box.
+Each script documents its `ETOPS_*` knobs in its header.
 
 ```bash
-uv venv .venv && source .venv/bin/activate
-uv pip install -ve ".[test]"             # editable install + tests
+ci/install-deps.sh   # system toolchain (Fedora dnf / macOS brew / Debian apt)
+ci/teir.sh            # configure + build libteir + ctest (Python module off)
+ci/etops.sh         # editable install (builds the native ext) + pytest
+ci/lint.sh           # ruff + ruff format + mypy + clang-format + textir validate
 
-cmake -S teir -B build/teir -DETOPS_ENABLE_TESTS=ON
-cmake --build build/teir -j               # standalone C++ build
-
-cmake -S teir -B build/sanitize \
-  -DCMAKE_BUILD_TYPE=Debug \
-  -DETOPS_ENABLE_TESTS=ON \
-  -DETOPS_ENABLE_SANITIZERS=ON \
-  -DETOPS_THREADING_BACKEND=SEQUENTIAL
-cmake --build build/sanitize -j           # ASan+UBSan correctness gate
-
-nix develop                               # reproducible toolchain
+nix develop          # reproducible pinned toolchain; then run the scripts above
 ```
 
-CMake knobs: `ETOPS_THREADING_BACKEND={AUTO|DISPATCH|OPENMP|SEQUENTIAL}`, `ETOPS_USE_SYSTEM_LIBXSMM=ON|OFF`, `LIBXSMM_ROOT=<path>`, `ETOPS_ENABLE_SANITIZERS=ON|OFF` (shorthand for ASan+UBSan), `ETOPS_SANITIZERS=<comma-list>` (e.g. `address,undefined`), `ETOPS_ENABLE_TESTS=ON|OFF`, `ETOPS_BUILD_PYTHON=ON|OFF`.
+The scripts read these `ETOPS_*` env knobs and forward `CMAKE_ARGS` to the build:
+`ETOPS_BUILD_TYPE` (Debug|Release), `ETOPS_THREADING_BACKEND` (AUTO|DISPATCH|OPENMP|SEQUENTIAL), `ETOPS_SANITIZERS` (e.g. `address,undefined`), `ETOPS_ASAN_DETECT_LEAKS` (0|1), `ETOPS_CLANG_TIDY` (0|1), `ETOPS_PYTHON` (uv-provisioned version, e.g. `3.12`), `ETOPS_HYPOTHESIS_PROFILE` (dev|ci|nightly), `ETOPS_RUN_SLOW` (0|1).
+For example, the ASan+UBSan correctness gate is `ETOPS_BUILD_TYPE=Debug ETOPS_THREADING_BACKEND=SEQUENTIAL ETOPS_SANITIZERS=address,undefined ci/teir.sh`.
 
-## Test
+Underlying CMake knobs (set via `CMAKE_ARGS`, or a raw `cmake` call): `ETOPS_THREADING_BACKEND={AUTO|DISPATCH|OPENMP|SEQUENTIAL}`, `ETOPS_USE_SYSTEM_LIBXSMM=ON|OFF`, `LIBXSMM_ROOT=<path>`, `ETOPS_ENABLE_SANITIZERS=ON|OFF` (shorthand for ASan+UBSan), `ETOPS_SANITIZERS=<comma-list>`, `ETOPS_ENABLE_TESTS=ON|OFF`, `ETOPS_BUILD_PYTHON=ON|OFF`.
+
+Dev conveniences (not encoded in the scripts):
 
 ```bash
-pytest tests/                                       # Hypothesis ci (200 examples)
-pytest tests/ --hypothesis-profile=dev              # 50 examples, fast iteration
-pytest -m property                                  # property-based tests only
-pytest -m tpp                                       # libxsmm-required tests
-pytest -m blas                                      # cblas-required tests
-
-# CI selects the Hypothesis profile via env var; defaults to `ci` in conftest.
-ETOPS_HYPOTHESIS_PROFILE=ci pytest tests/
-
-ctest --test-dir build/teir --output-on-failure
-ASAN_OPTIONS=abort_on_error=1:halt_on_error=1 \
-  UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
-  ctest --test-dir build/sanitize --output-on-failure
-
-python -m etops.textir cat     examples/spec/permutation/abcd_dcba/scalar.teir
+pytest tests/ --hypothesis-profile=dev   # 50 examples, fast iteration
+pytest -m property                       # property only (-m tpp / -m blas: backend-gated)
+python -m etops.textir cat      examples/spec/permutation/abcd_dcba/scalar.teir
 python -m etops.textir validate examples/spec/permutation/abcd_dcba/scalar.teir
-
-ruff check etops/ tests/ examples/
-ruff format --check etops/ tests/ examples/
-find teir \( -name '*.h' -o -name '*.cpp' \) \
-  | grep -v '_deps/' \
-  | xargs clang-format --dry-run -Werror
-mypy etops/
 ```
 
 IMPORTANT: never lower the Hypothesis `ci` example count.

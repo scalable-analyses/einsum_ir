@@ -1,0 +1,105 @@
+name: etops
+
+# Python suite (builds the native extension). Full 3.10-3.14 matrix runs on the
+# Fedora fleet (x86 = lechuck, arm = haggis); macOS is hosted and latest-only
+# (DISPATCH/Apple coverage). Sanitizer and deep-nightly legs are decoupled.
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: pytest ${{ matrix.label }} py${{ matrix.python }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: x86, runner: [self-hosted, Linux, X64], python: "3.10" }
+          - { label: x86, runner: [self-hosted, Linux, X64], python: "3.11" }
+          - { label: x86, runner: [self-hosted, Linux, X64], python: "3.12" }
+          - { label: x86, runner: [self-hosted, Linux, X64], python: "3.13" }
+          - { label: x86, runner: [self-hosted, Linux, X64], python: "3.14" }
+          - { label: arm, runner: [self-hosted, Linux, ARM64, m4], python: "3.10" }
+          - { label: arm, runner: [self-hosted, Linux, ARM64, m4], python: "3.11" }
+          - { label: arm, runner: [self-hosted, Linux, ARM64, m4], python: "3.12" }
+          - { label: arm, runner: [self-hosted, Linux, ARM64, m4], python: "3.13" }
+          - { label: arm, runner: [self-hosted, Linux, ARM64, m4], python: "3.14" }
+          - { label: macos, runner: macos-latest, python: "3.14" }
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install system deps
+        run: bash ci/install-deps.sh
+      - name: pytest
+        env:
+          ETOPS_PYTHON: ${{ matrix.python }}
+          ETOPS_HYPOTHESIS_PROFILE: ci
+        run: bash ci/etops.sh
+
+  sanitizer:
+    name: pytest sanitizers — ${{ matrix.label }}
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: ASan+UBSan (sequential)
+            cmake_args: "-DCMAKE_BUILD_TYPE=Debug -DETOPS_SANITIZERS=address,undefined -DETOPS_THREADING_BACKEND=SEQUENTIAL"
+            preload: "1"
+          - label: UBSan (openmp)
+            cmake_args: "-DCMAKE_BUILD_TYPE=Debug -DETOPS_SANITIZERS=undefined -DETOPS_THREADING_BACKEND=OPENMP"
+            preload: "0"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install system deps
+        run: bash ci/install-deps.sh
+      - name: pytest under sanitizers
+        env:
+          ETOPS_PYTHON: "3.12"
+          ETOPS_HYPOTHESIS_PROFILE: ci
+          CMAKE_ARGS: ${{ matrix.cmake_args }}
+          # Python leaks at interpreter exit, so LSan is disabled (it would
+          # false-positive). Flip detect_leaks if you want it and ptrace allows.
+          ASAN_OPTIONS: "abort_on_error=1:halt_on_error=1:detect_leaks=0"
+          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+        run: |
+          # ASan must initialize before Python, so preload it for the ASan leg
+          # (UBSan needs no preload).
+          if [ "${{ matrix.preload }}" = "1" ]; then
+            export LD_PRELOAD="$(gcc -print-file-name=libasan.so)"
+          fi
+          bash ci/etops.sh
+
+  nightly:
+    name: pytest deep (Hypothesis 1000 + slow TCCG)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install system deps
+        run: bash ci/install-deps.sh
+      - name: pytest (deep)
+        env:
+          ETOPS_PYTHON: "3.12"
+          ETOPS_HYPOTHESIS_PROFILE: nightly
+          ETOPS_RUN_SLOW: "1"
+        run: bash ci/etops.sh

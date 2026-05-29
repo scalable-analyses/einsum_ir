@@ -1,0 +1,40 @@
+name: nix
+
+# Validates the pinned Nix dev shell (flake.nix / flake.lock).
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  nix-develop:
+    name: nix develop — build + ctest (gcc12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31.10.6
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      # ci/teir.sh hardcodes -DETOPS_BUILD_PYTHON=OFF (the bare devShell has no
+      # pybind11/numpy — those arrive via the pip bootstrap). Debug build to
+      # match the locally-verified run. CI must not mutate flake.lock.
+      - name: Build + test under the pinned toolchain
+        env:
+          ETOPS_BUILD_TYPE: Debug
+        run: nix develop --command bash ci/teir.sh

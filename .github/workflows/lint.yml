@@ -1,72 +1,34 @@
 name: lint
 
+# Fast, build-free checks (ruff, mypy, clang-format, textir validate).
 on:
   push:
   pull_request:
-  schedule:
-    - cron: 0 0 * * *
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  python:
-    name: ruff + mypy
+  lint:
+    name: ruff + mypy + clang-format + textir
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
 
       - name: Install lint tools
-        run: pip install "ruff>=0.6" "mypy>=1.10" "numpy>=1.26"
-
-      - name: ruff check
-        run: ruff check etops/ tests/ examples/
-
-      - name: ruff format check
-        run: ruff format --check etops/ tests/ examples/
-
-      - name: mypy
-        run: mypy etops/
-
-  cpp:
-    name: clang-format + clang-tidy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-
-      - name: Install system deps
         run: |
+          python -m pip install "ruff>=0.6" "mypy>=1.10" "numpy>=1.26"
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build pkg-config libopenblas-dev \
-            clang-format clang-tidy
+          sudo apt-get install -y --no-install-recommends clang-format
 
-      - name: clang-format
-        run: |
-          find teir -name '*.h' -o -name '*.cpp' \
-            | grep -v '_deps/' \
-            | xargs clang-format --dry-run -Werror
-
-      - name: Configure (export compile_commands)
-        run: |
-          cmake -S teir -B build/tidy \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DETOPS_ENABLE_TESTS=ON \
-            -DETOPS_BUILD_PYTHON=OFF \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-
-      - name: Generate ahead-of-time headers
-        run: cmake --build build/tidy --target teir -j
-
-      - name: clang-tidy
-        run: |
-          find teir -name '*.cpp' \
-            | grep -v '_deps/' \
-            | xargs clang-tidy -p build/tidy --warnings-as-errors='*'
+      - name: Lint
+        run: bash ci/lint.sh

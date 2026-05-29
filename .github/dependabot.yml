@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # Keep pinned GitHub Actions current (handles future Node-runtime
+  # deprecations automatically).
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # Python build/test dependencies declared in pyproject.toml.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

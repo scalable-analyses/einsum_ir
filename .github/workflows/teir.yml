@@ -1,0 +1,92 @@
+name: teir
+
+# libteir (C++ runtime) build + ctest matrix. Heavy work runs on the Fedora
+# self-hosted fleet (x86 = lechuck, arm = haggis/M4); macOS stays hosted — the
+# only place the Apple-only DISPATCH backend is tested.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # --- Fedora fleet, x86_64 (lechuck) ---
+          - label: x86 Release OpenMP
+            runner: [self-hosted, Linux, X64]
+            build_type: Release
+            threading: OPENMP
+            sanitizers: ""
+            clang_tidy: "0"
+          - label: x86 Debug Seq ASan+UBSan + clang-tidy
+            runner: [self-hosted, Linux, X64]
+            build_type: Debug
+            threading: SEQUENTIAL
+            sanitizers: "address,undefined"
+            clang_tidy: "1"
+          - label: x86 Debug OpenMP UBSan
+            runner: [self-hosted, Linux, X64]
+            build_type: Debug
+            threading: OPENMP
+            sanitizers: "undefined"
+            clang_tidy: "0"
+          # --- Fedora fleet, aarch64 (haggis: Apple M4) ---
+          - label: arm Release OpenMP
+            runner: [self-hosted, Linux, ARM64, m4]
+            build_type: Release
+            threading: OPENMP
+            sanitizers: ""
+            clang_tidy: "0"
+          - label: arm Debug Seq ASan+UBSan
+            runner: [self-hosted, Linux, ARM64, m4]
+            build_type: Debug
+            threading: SEQUENTIAL
+            sanitizers: "address,undefined"
+            clang_tidy: "0"
+          - label: arm Debug OpenMP UBSan
+            runner: [self-hosted, Linux, ARM64, m4]
+            build_type: Debug
+            threading: OPENMP
+            sanitizers: "undefined"
+            clang_tidy: "0"
+          # --- hosted macOS (DISPATCH is Apple-only) ---
+          - label: macos Release Dispatch
+            runner: macos-latest
+            build_type: Release
+            threading: DISPATCH
+            sanitizers: ""
+            clang_tidy: "0"
+          - label: macos Release Sequential
+            runner: macos-latest
+            build_type: Release
+            threading: SEQUENTIAL
+            sanitizers: ""
+            clang_tidy: "0"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install system deps
+        run: bash ci/install-deps.sh
+
+      - name: Build + test (+ clang-tidy on the tagged leg)
+        env:
+          ETOPS_BUILD_TYPE: ${{ matrix.build_type }}
+          ETOPS_THREADING_BACKEND: ${{ matrix.threading }}
+          ETOPS_SANITIZERS: ${{ matrix.sanitizers }}
+          ETOPS_CLANG_TIDY: ${{ matrix.clang_tidy }}
+        run: bash ci/teir.sh
