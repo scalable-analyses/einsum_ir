@@ -146,25 +146,25 @@ bool try_omatcopy_2d(char* in_base,
     if constexpr (std::is_same_v<T, float>) {
       cblas_somatcopy(CblasRowMajor,
                       CblasNoTrans,
-                      static_cast<size_t>(extent0),
-                      static_cast<size_t>(extent1),
+                      static_cast<blasint>(extent0),
+                      static_cast<blasint>(extent1),
                       1.0F,
                       reinterpret_cast<const float*>(in_base),
-                      static_cast<size_t>(in_stride0 / elem),
+                      static_cast<blasint>(in_stride0 / elem),
                       reinterpret_cast<float*>(out_base),
-                      static_cast<size_t>(out_stride0 / elem));
+                      static_cast<blasint>(out_stride0 / elem));
       return true;
     }
     if constexpr (std::is_same_v<T, double>) {
       cblas_domatcopy(CblasRowMajor,
                       CblasNoTrans,
-                      static_cast<size_t>(extent0),
-                      static_cast<size_t>(extent1),
+                      static_cast<blasint>(extent0),
+                      static_cast<blasint>(extent1),
                       1.0,
                       reinterpret_cast<const double*>(in_base),
-                      static_cast<size_t>(in_stride0 / elem),
+                      static_cast<blasint>(in_stride0 / elem),
                       reinterpret_cast<double*>(out_base),
-                      static_cast<size_t>(out_stride0 / elem));
+                      static_cast<blasint>(out_stride0 / elem));
       return true;
     }
   }
@@ -175,25 +175,25 @@ bool try_omatcopy_2d(char* in_base,
     if constexpr (std::is_same_v<T, float>) {
       cblas_somatcopy(CblasRowMajor,
                       CblasTrans,
-                      static_cast<size_t>(extent1),
-                      static_cast<size_t>(extent0),
+                      static_cast<blasint>(extent1),
+                      static_cast<blasint>(extent0),
                       1.0F,
                       reinterpret_cast<const float*>(in_base),
-                      static_cast<size_t>(in_stride1 / elem),
+                      static_cast<blasint>(in_stride1 / elem),
                       reinterpret_cast<float*>(out_base),
-                      static_cast<size_t>(out_stride0 / elem));
+                      static_cast<blasint>(out_stride0 / elem));
       return true;
     }
     if constexpr (std::is_same_v<T, double>) {
       cblas_domatcopy(CblasRowMajor,
                       CblasTrans,
-                      static_cast<size_t>(extent1),
-                      static_cast<size_t>(extent0),
+                      static_cast<blasint>(extent1),
+                      static_cast<blasint>(extent0),
                       1.0,
                       reinterpret_cast<const double*>(in_base),
-                      static_cast<size_t>(in_stride1 / elem),
+                      static_cast<blasint>(in_stride1 / elem),
                       reinterpret_cast<double*>(out_base),
-                      static_cast<size_t>(out_stride0 / elem));
+                      static_cast<blasint>(out_stride0 / elem));
       return true;
     }
   }

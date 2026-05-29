@@ -54,7 +54,7 @@ CompileFn lookup_primitive(std::string_view backend, std::string_view operation)
 
 bool has_primitive(std::string_view backend, std::string_view operation) {
   auto& r = registry();
-  return r.find({std::string(backend), std::string(operation)}) != r.end();
+  return r.contains({std::string(backend), std::string(operation)});
 }
 
 } // namespace teir

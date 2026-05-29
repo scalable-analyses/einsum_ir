@@ -607,9 +607,9 @@ CompiledInvocation finish_contraction(const ContractionPlan& plan) {
                                                 static_cast<libxsmm_blasint>(plan.br_stride_a),
                                                 static_cast<libxsmm_blasint>(plan.br_stride_b),
                                                 /*br_unroll_hint=*/0);
-    fn = libxsmm_dispatch_brgemm(shape, gemm_flags, /*prefetch=*/0, br);
+    fn = libxsmm_dispatch_brgemm(shape, gemm_flags, /*prefetch_flags=*/0, br);
   } else {
-    fn = libxsmm_dispatch_gemm(shape, gemm_flags, /*prefetch=*/0);
+    fn = libxsmm_dispatch_gemm(shape, gemm_flags, /*prefetch_flags=*/0);
   }
   if (fn == nullptr) {
     return CompiledInvocation{};

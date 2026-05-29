@@ -102,7 +102,7 @@ struct Operation::Impl {
   int32_t resolve_tree(int32_t node_idx, PathStack& path, int32_t depth);
   void build_parallel_chains();
 
-  void walk_subtree(int32_t start_node, Bases bases, AncestorStack& stack, int32_t depth) const;
+  void walk_subtree(int32_t node_idx, Bases bases, AncestorStack& stack, int32_t depth) const;
   void invoke(const InternedInvocationNode& inv, const Bases& bases) const;
   void dispatch_parallel(const InternedIterationNode& head,
                          Bases bases,
@@ -367,17 +367,13 @@ void Operation::Impl::build_parallel_chains() {
 // ============================================================================
 
 bool Operation::Impl::evaluate_guard(const InternedGuard& guard, const AncestorStack& stack) {
-  for (const InternedGuardTerm& term : guard) {
+  return std::ranges::all_of(guard, [&stack](const InternedGuardTerm& term) {
     const int64_t cur_idx = stack[static_cast<std::size_t>(term.ancestor_depth)];
     if (term.kind == GuardTerm::Kind::FIRST) {
-      if (cur_idx != 0) {
-        return false;
-      }
-    } else if (cur_idx != term.node_extent - 1) {
-      return false;
+      return cur_idx == 0;
     }
-  }
-  return true;
+    return cur_idx == term.node_extent - 1;
+  });
 }
 
 void Operation::Impl::invoke(const InternedInvocationNode& inv, const Bases& bases) const {
