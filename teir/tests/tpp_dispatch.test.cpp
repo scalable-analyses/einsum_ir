@@ -21,10 +21,6 @@
 #include <catch2/matchers/catch_matchers.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
-namespace teir::tpp {
-void register_tpp_primitives();
-}
-
 namespace {
 
 using teir::tests::dispatch_atol;
@@ -90,9 +86,12 @@ teir::Teir build_gemm_teir(const std::string& dtype, int64_t m, int64_t n, int64
   const int64_t bytes = sizeof(T);
   teir::Teir t;
   t.tensors = {
-      {"in0", teir::DataType{dtype, static_cast<int64_t>(bytes * 8)}},
-      {"in1", teir::DataType{dtype, static_cast<int64_t>(bytes * 8)}},
-      {"out", teir::DataType{dtype, static_cast<int64_t>(bytes * 8)}},
+      {.id = "in0",
+       .dtype = teir::DataType{.name = dtype, .bits = static_cast<int64_t>(bytes * 8)}},
+      {.id = "in1",
+       .dtype = teir::DataType{.name = dtype, .bits = static_cast<int64_t>(bytes * 8)}},
+      {.id = "out",
+       .dtype = teir::DataType{.name = dtype, .bits = static_cast<int64_t>(bytes * 8)}},
   };
   // in0 has shape (m, k) row-major; in1 has shape (k, n) row-major;
   // out has shape (m, n) row-major.
@@ -131,9 +130,12 @@ build_brgemm_teir(const std::string& dtype, int64_t batch, int64_t m, int64_t n,
   const int64_t bytes = sizeof(T);
   teir::Teir t;
   t.tensors = {
-      {"in0", teir::DataType{dtype, static_cast<int64_t>(bytes * 8)}},
-      {"in1", teir::DataType{dtype, static_cast<int64_t>(bytes * 8)}},
-      {"out", teir::DataType{dtype, static_cast<int64_t>(bytes * 8)}},
+      {.id = "in0",
+       .dtype = teir::DataType{.name = dtype, .bits = static_cast<int64_t>(bytes * 8)}},
+      {.id = "in1",
+       .dtype = teir::DataType{.name = dtype, .bits = static_cast<int64_t>(bytes * 8)}},
+      {.id = "out",
+       .dtype = teir::DataType{.name = dtype, .bits = static_cast<int64_t>(bytes * 8)}},
   };
   // in0 stacked: shape (batch, m, k); in1 stacked: shape (batch, k, n);
   // out shape (m, n).

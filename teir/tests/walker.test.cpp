@@ -20,7 +20,7 @@ namespace {
 class TeirBuilder {
  public:
   TeirBuilder& tensor(const std::string& id) {
-    t_.tensors.push_back({id, teir::DataType{"f32", 32}});
+    t_.tensors.push_back({id, teir::DataType{.name = "f32", .bits = 32}});
     return *this;
   }
   TeirBuilder& axis(const std::string& id, int64_t extent, std::initializer_list<int64_t> strides) {
@@ -79,7 +79,7 @@ class TeirBuilder {
 };
 
 teir::Guard guard_first(const std::string& node) {
-  return teir::Guard{teir::GuardTerm{teir::GuardTerm::Kind::FIRST, node}};
+  return teir::Guard{teir::GuardTerm{.kind = teir::GuardTerm::Kind::FIRST, .node = node}};
 }
 
 teir::Teir scalar_copy_teir() {
@@ -118,12 +118,12 @@ void ut_forest_zero_kernel(const teir::TileAddresses&, const void*) {
 
 std::atomic<int64_t> g_collapse_count{0};
 void ut_collapse_set_kernel(const teir::TileAddresses& tiles, const void*) {
-  *static_cast<float*>(tiles.addrs[0]) = 1.0f;
+  *static_cast<float*>(tiles.addrs[0]) = 1.0F;
   g_collapse_count.fetch_add(1, std::memory_order_relaxed);
 }
 
 teir::CompiledInvocation make_stateless(teir::KernelFn k) {
-  return teir::CompiledInvocation{k, {nullptr, [](void*) {}}};
+  return teir::CompiledInvocation{.kernel = k, .state = {nullptr, [](void*) {}}};
 }
 
 teir::CompiledInvocation ut_walker_copy(const teir::Primitive&, const teir::Teir&) {
@@ -148,13 +148,13 @@ TEST_CASE("Operation::execute walks the schedule and dispatches the primitive", 
   g_walker_count.store(0);
   teir::register_primitive("ut_walker", "Copy", &ut_walker_copy);
 
-  std::vector<float> in_data = {1.0f, 2.0f, 3.0f, 4.0f};
-  std::vector<float> out_data(4, 0.0f);
+  std::vector<float> in_data = {1.0F, 2.0F, 3.0F, 4.0F};
+  std::vector<float> out_data(4, 0.0F);
   auto op = teir::compile(scalar_copy_teir(), "ut_walker");
   std::vector<void*> bases = {in_data.data(), out_data.data()};
   op->execute(bases);
   REQUIRE(g_walker_count.load() == 4);
-  REQUIRE(out_data == std::vector<float>{1.0f, 2.0f, 3.0f, 4.0f});
+  REQUIRE(out_data == std::vector<float>{1.0F, 2.0F, 3.0F, 4.0F});
 }
 
 TEST_CASE("Operation::execute respects first/last guards", "[runtime]") {
@@ -172,7 +172,7 @@ TEST_CASE("Operation::execute respects first/last guards", "[runtime]") {
                .roots({"iter_a"})
                .build();
 
-  std::vector<float> out(64, 0.0f);
+  std::vector<float> out(64, 0.0F);
   auto op = teir::compile(std::move(t), "ut_guard");
   std::vector<void*> bases = {out.data()};
   op->execute(bases);
@@ -253,7 +253,7 @@ TEST_CASE("Operation::execute walks parallel iteration with a multi-root forest"
                .roots({"root_seq", "root_par"})
                .build();
 
-  std::vector<float> out(32, 0.0f);
+  std::vector<float> out(32, 0.0F);
   auto op = teir::compile(std::move(t), "ut_par_forest");
   std::vector<void*> bases = {out.data()};
   op->execute(bases);
@@ -281,12 +281,12 @@ TEST_CASE("Operation::execute collapses a chain of parallel iteration nodes",
                .roots({"iter_a"})
                .build();
 
-  std::vector<float> out(12, 0.0f);
+  std::vector<float> out(12, 0.0F);
   auto op = teir::compile(std::move(t), "ut_collapse");
   std::vector<void*> bases = {out.data()};
   op->execute(bases);
   REQUIRE(g_collapse_count.load() == 12);
   for (float v : out) {
-    REQUIRE(v == 1.0f);
+    REQUIRE(v == 1.0F);
   }
 }

@@ -9,9 +9,11 @@ Checks: >
   -readability-magic-numbers,
   -readability-function-cognitive-complexity,
   -readability-named-parameter,
-  -modernize-avoid-c-arrays
+  -modernize-avoid-c-arrays,
+  -modernize-use-auto,
+  -readability-math-missing-parentheses
 
-WarningsAsErrors: ""
+WarningsAsErrors: "*"
 HeaderFilterRegex: "teir/(include|src|bindings)/.*\\.(h|hpp)$"
 FormatStyle: file
 CheckOptions:
@@ -35,3 +37,7 @@ CheckOptions:
     value: lower_case
   - key:   readability-identifier-naming.ConstantParameterCase
     value: lower_case
+  - key:   readability-identifier-naming.ConstexprVariableCase
+    value: UPPER_CASE
+  - key:   readability-identifier-naming.GlobalConstantCase
+    value: UPPER_CASE

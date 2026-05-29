@@ -19,10 +19,6 @@
 
 #if ETOPS_BLAS_AVAILABLE
 
-namespace teir::blas {
-void register_blas_primitives();
-}
-
 namespace {
 
 using teir::tests::dispatch_atol;
@@ -33,9 +29,12 @@ teir::Teir build_gemm_teir(const std::string& dtype, int64_t m, int64_t n, int64
   const int64_t bytes = sizeof(T);
   teir::Teir t;
   t.tensors = {
-      {"in0", teir::DataType{dtype, static_cast<int64_t>(bytes * 8)}},
-      {"in1", teir::DataType{dtype, static_cast<int64_t>(bytes * 8)}},
-      {"out", teir::DataType{dtype, static_cast<int64_t>(bytes * 8)}},
+      {.id = "in0",
+       .dtype = teir::DataType{.name = dtype, .bits = static_cast<int64_t>(bytes * 8)}},
+      {.id = "in1",
+       .dtype = teir::DataType{.name = dtype, .bits = static_cast<int64_t>(bytes * 8)}},
+      {.id = "out",
+       .dtype = teir::DataType{.name = dtype, .bits = static_cast<int64_t>(bytes * 8)}},
   };
   teir::Axis m_axis;
   m_axis.id = "m";

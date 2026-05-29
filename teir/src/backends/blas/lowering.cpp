@@ -148,7 +148,7 @@ bool try_omatcopy_2d(char* in_base,
                       CblasNoTrans,
                       static_cast<size_t>(extent0),
                       static_cast<size_t>(extent1),
-                      1.0f,
+                      1.0F,
                       reinterpret_cast<const float*>(in_base),
                       static_cast<size_t>(in_stride0 / elem),
                       reinterpret_cast<float*>(out_base),
@@ -177,7 +177,7 @@ bool try_omatcopy_2d(char* in_base,
                       CblasTrans,
                       static_cast<size_t>(extent1),
                       static_cast<size_t>(extent0),
-                      1.0f,
+                      1.0F,
                       reinterpret_cast<const float*>(in_base),
                       static_cast<size_t>(in_stride1 / elem),
                       reinterpret_cast<float*>(out_base),
@@ -316,7 +316,7 @@ void scalar_copy(char* in_base,
                       out_strides.data(),
                       extents.data(),
                       rank,
-                      [](char* in_ptr, char* out_ptr) {
+                      [](const char* in_ptr, char* out_ptr) {
                         *reinterpret_cast<T*>(out_ptr) = *reinterpret_cast<const T*>(in_ptr);
                       });
 }
@@ -338,7 +338,7 @@ void scalar_relu(char* in_base,
                       out_strides.data(),
                       extents.data(),
                       rank,
-                      [](char* in_ptr, char* out_ptr) {
+                      [](const char* in_ptr, char* out_ptr) {
                         T x = *reinterpret_cast<const T*>(in_ptr);
                         *reinterpret_cast<T*>(out_ptr) = x > T(0) ? x : T(0);
                       });
@@ -380,12 +380,12 @@ void cblas_gemm_f32(CBLAS_TRANSPOSE trans_a,
               static_cast<int>(m),
               static_cast<int>(n),
               static_cast<int>(k),
-              1.0f,
+              1.0F,
               a,
               static_cast<int>(lda),
               b,
               static_cast<int>(ldb),
-              1.0f,
+              1.0F,
               c,
               static_cast<int>(ldc));
 }
@@ -545,8 +545,8 @@ CompiledInvocation blas_zero(const Primitive& prim, const Teir& teir) {
     throw LoweringException("blas: zero unsupported dtype " + dtype);
   }
   return CompiledInvocation{
-      kernel,
-      {state.release(), &state_deleter<BlasUnaryState>},
+      .kernel = kernel,
+      .state = {state.release(), &state_deleter<BlasUnaryState>},
   };
 }
 
@@ -608,8 +608,8 @@ CompiledInvocation blas_copy(const Primitive& prim, const Teir& teir) {
     throw LoweringException("blas: copy unsupported dtype " + dtype);
   }
   return CompiledInvocation{
-      kernel,
-      {state.release(), &state_deleter<BlasUnaryState>},
+      .kernel = kernel,
+      .state = {state.release(), &state_deleter<BlasUnaryState>},
   };
 }
 
@@ -630,8 +630,8 @@ CompiledInvocation blas_relu(const Primitive& prim, const Teir& teir) {
     throw LoweringException("blas: relu unsupported dtype " + dtype);
   }
   return CompiledInvocation{
-      kernel,
-      {state.release(), &state_deleter<BlasUnaryState>},
+      .kernel = kernel,
+      .state = {state.release(), &state_deleter<BlasUnaryState>},
   };
 }
 
@@ -646,21 +646,27 @@ CompiledInvocation blas_contraction(const Primitive& prim, const Teir& teir) {
   const auto& n_axes = role(prim, "N");
   const auto& k_axes = role(prim, "K");
 
-  std::vector<int64_t> m_strides_in0, m_strides_out, m_extents;
+  std::vector<int64_t> m_strides_in0;
+  std::vector<int64_t> m_strides_out;
+  std::vector<int64_t> m_extents;
   for (const auto& a : m_axes) {
     const Axis& ax = axis_by_id(teir, a);
     m_strides_in0.push_back(stride_of(ax, in0_idx));
     m_strides_out.push_back(stride_of(ax, out_idx));
     m_extents.push_back(ax.extent);
   }
-  std::vector<int64_t> n_strides_in1, n_strides_out, n_extents;
+  std::vector<int64_t> n_strides_in1;
+  std::vector<int64_t> n_strides_out;
+  std::vector<int64_t> n_extents;
   for (const auto& a : n_axes) {
     const Axis& ax = axis_by_id(teir, a);
     n_strides_in1.push_back(stride_of(ax, in1_idx));
     n_strides_out.push_back(stride_of(ax, out_idx));
     n_extents.push_back(ax.extent);
   }
-  std::vector<int64_t> k_strides_in0, k_strides_in1, k_extents;
+  std::vector<int64_t> k_strides_in0;
+  std::vector<int64_t> k_strides_in1;
+  std::vector<int64_t> k_extents;
   for (const auto& a : k_axes) {
     const Axis& ax = axis_by_id(teir, a);
     k_strides_in0.push_back(stride_of(ax, in0_idx));
@@ -714,13 +720,19 @@ CompiledInvocation blas_contraction(const Primitive& prim, const Teir& teir) {
   // View selection: pure variable assignment. Direct mapping uses
   // (A=in0, B=in1, M_cblas=M_teir); swap mapping uses
   // (A=in1, B=in0, M_cblas=N_teir).
-  int32_t a_idx, b_idx;
-  int64_t m_lib, n_lib, ldc_b;
-  OperandStrides a_strides, b_strides;
+  int32_t a_idx;
+  int32_t b_idx;
+  int64_t m_lib;
+  int64_t n_lib;
+  int64_t ldc_b;
+  OperandStrides a_strides;
+  OperandStrides b_strides;
   // Diagnostic labels: which TEIR tensor and which axis pair feed each
   // operand, used in the error path when resolve_operand fails.
-  std::string a_tensor_label, b_tensor_label;
-  std::string a_axes_label, b_axes_label;
+  std::string a_tensor_label;
+  std::string b_tensor_label;
+  std::string a_axes_label;
+  std::string b_axes_label;
 
   if (n_on_out_unit) {
     m_lib = m_extent;
@@ -728,8 +740,8 @@ CompiledInvocation blas_contraction(const Primitive& prim, const Teir& teir) {
     ldc_b = m_stride_out;
     a_idx = in0_idx;
     b_idx = in1_idx;
-    a_strides = {k_stride_in0, m_stride_in0};
-    b_strides = {n_stride_in1, k_stride_in1};
+    a_strides = {.primary = k_stride_in0, .secondary = m_stride_in0};
+    b_strides = {.primary = n_stride_in1, .secondary = k_stride_in1};
     a_tensor_label = "in0";
     b_tensor_label = "in1";
     a_axes_label = "{K, M}";
@@ -740,8 +752,8 @@ CompiledInvocation blas_contraction(const Primitive& prim, const Teir& teir) {
     ldc_b = n_stride_out;
     a_idx = in1_idx;
     b_idx = in0_idx;
-    a_strides = {k_stride_in1, n_stride_in1};
-    b_strides = {m_stride_in0, k_stride_in0};
+    a_strides = {.primary = k_stride_in1, .secondary = n_stride_in1};
+    b_strides = {.primary = m_stride_in0, .secondary = k_stride_in0};
     a_tensor_label = "in1";
     b_tensor_label = "in0";
     a_axes_label = "{K, N}";
@@ -750,8 +762,10 @@ CompiledInvocation blas_contraction(const Primitive& prim, const Teir& teir) {
 
   // Per-operand classification. Failure means neither role axis is
   // unit-stride on the operand.
-  int64_t lda_b, ldb_b;
-  bool trans_a_bit, trans_b_bit;
+  int64_t lda_b;
+  int64_t ldb_b;
+  bool trans_a_bit;
+  bool trans_b_bit;
   if (!resolve_operand(a_strides, bytes, lda_b, trans_a_bit)) {
     throw LoweringException("blas: contraction primitive '" + prim.id + "' requires one of " +
                             a_tensor_label + "'s " + a_axes_label + " role axes to be unit-stride");
@@ -788,8 +802,8 @@ CompiledInvocation blas_contraction(const Primitive& prim, const Teir& teir) {
     throw LoweringException("blas: contraction unsupported dtype " + dtype);
   }
   return CompiledInvocation{
-      kernel,
-      {state.release(), &state_deleter<BlasContractionState>},
+      .kernel = kernel,
+      .state = {state.release(), &state_deleter<BlasContractionState>},
   };
 #else
   (void)m_strides_in0;

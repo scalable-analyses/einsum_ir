@@ -131,4 +131,4 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["etops._version"]
-ignore_errors = true
+ignore_missing_imports = true

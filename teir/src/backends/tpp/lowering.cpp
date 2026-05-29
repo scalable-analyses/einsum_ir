@@ -250,10 +250,10 @@ CompiledInvocation compile_unary(libxsmm_meltw_unary_type op,
                             " kernel for primitive '" + prim_id + "' (dtype=" + dtype +
                             ", m=" + std::to_string(m) + ", n=" + std::to_string(n) + ")");
   }
-  auto* state = new UnaryState{fn, in_idx, out_idx};
+  auto* state = new UnaryState{.fn = fn, .in_tensor_idx = in_idx, .out_tensor_idx = out_idx};
   return CompiledInvocation{
-      &unary_kernel,
-      {state, &state_deleter<UnaryState>},
+      .kernel = &unary_kernel,
+      .state = {state, &state_deleter<UnaryState>},
   };
 }
 
@@ -419,11 +419,15 @@ bool plan_libxsmm_contraction(const std::string& dtype,
   // View selection: pure variable assignment. The two views differ only
   // in which TEIR tensor becomes libxsmm's A vs B and which strides are
   // paired into each operand's (primary, secondary) classifier input.
-  int32_t a_idx, b_idx;
-  OperandStrides a_strides, b_strides;
+  int32_t a_idx;
+  int32_t b_idx;
+  OperandStrides a_strides;
+  OperandStrides b_strides;
   int64_t c_other_stride;
-  int64_t m_lib, n_lib;
-  int64_t br_stride_a, br_stride_b;
+  int64_t m_lib;
+  int64_t n_lib;
+  int64_t br_stride_a;
+  int64_t br_stride_b;
 
   if (out_n_unit) {
     // Swap view: A = in1, B = in0; libxsmm M_lib = N_teir.
@@ -431,8 +435,8 @@ bool plan_libxsmm_contraction(const std::string& dtype,
     n_lib = m_extent;
     a_idx = in1_idx;
     b_idx = in0_idx;
-    a_strides = {n_stride_in1, k_stride_in1};
-    b_strides = {k_stride_in0, m_stride_in0};
+    a_strides = {.primary = n_stride_in1, .secondary = k_stride_in1};
+    b_strides = {.primary = k_stride_in0, .secondary = m_stride_in0};
     c_other_stride = m_stride_out;
     br_stride_a = br_stride_in1;
     br_stride_b = br_stride_in0;
@@ -442,16 +446,18 @@ bool plan_libxsmm_contraction(const std::string& dtype,
     n_lib = n_extent;
     a_idx = in0_idx;
     b_idx = in1_idx;
-    a_strides = {m_stride_in0, k_stride_in0};
-    b_strides = {k_stride_in1, n_stride_in1};
+    a_strides = {.primary = m_stride_in0, .secondary = k_stride_in0};
+    b_strides = {.primary = k_stride_in1, .secondary = n_stride_in1};
     c_other_stride = n_stride_out;
     br_stride_a = br_stride_in0;
     br_stride_b = br_stride_in1;
   }
 
   // Per-operand classification: identify unit-stride axis and trans flag.
-  int64_t a_ld_bytes, b_ld_bytes;
-  bool trans_a, trans_b;
+  int64_t a_ld_bytes;
+  int64_t b_ld_bytes;
+  bool trans_a;
+  bool trans_b;
   if (!resolve_operand(a_strides, bytes, a_ld_bytes, trans_a)) {
     return false;
   }
@@ -614,11 +620,14 @@ CompiledInvocation finish_contraction(const ContractionPlan& plan) {
       info.is_reference_kernel != 0) {
     return CompiledInvocation{};
   }
-  auto* state = new ContractionState{
-      fn, plan.a_tensor_idx, plan.b_tensor_idx, plan.c_tensor_idx, plan.br_count};
+  auto* state = new ContractionState{.fn = fn,
+                                     .a_tensor_idx = plan.a_tensor_idx,
+                                     .b_tensor_idx = plan.b_tensor_idx,
+                                     .c_tensor_idx = plan.c_tensor_idx,
+                                     .br_count = plan.br_count};
   return CompiledInvocation{
-      &contraction_kernel,
-      {state, &state_deleter<ContractionState>},
+      .kernel = &contraction_kernel,
+      .state = {state, &state_deleter<ContractionState>},
   };
 }
 #endif

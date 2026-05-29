@@ -108,7 +108,7 @@ struct Operation::Impl {
                          Bases bases,
                          AncestorStack& stack,
                          int32_t depth) const;
-  bool evaluate_guard(const InternedGuard& guard, const AncestorStack& stack) const;
+  static bool evaluate_guard(const InternedGuard& guard, const AncestorStack& stack);
 };
 
 // ============================================================================
@@ -285,8 +285,8 @@ void Operation::Impl::resolve_guard_terms(InternedGuard& interned, const PathSta
   for (InternedGuardTerm& term : interned) {
     // Each iteration node appears at most once along any path (validated
     // by the Python frontend), so the lookup yields at most one match.
-    auto it = std::find_if(
-        path.begin(), path.end(), [&](const auto& entry) { return entry.first == term.node_idx; });
+    auto it =
+        std::ranges::find_if(path, [&](const auto& entry) { return entry.first == term.node_idx; });
     if (it == path.end()) {
       throw ValidationException("guard references iteration node '" +
                                 ir.schedule.iterations[static_cast<std::size_t>(term.node_idx)].id +
@@ -366,7 +366,7 @@ void Operation::Impl::build_parallel_chains() {
 // Execute
 // ============================================================================
 
-bool Operation::Impl::evaluate_guard(const InternedGuard& guard, const AncestorStack& stack) const {
+bool Operation::Impl::evaluate_guard(const InternedGuard& guard, const AncestorStack& stack) {
   for (const InternedGuardTerm& term : guard) {
     const int64_t cur_idx = stack[static_cast<std::size_t>(term.ancestor_depth)];
     if (term.kind == GuardTerm::Kind::FIRST) {
