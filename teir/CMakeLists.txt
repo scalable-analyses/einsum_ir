@@ -130,6 +130,10 @@ else()
   )
   FetchContent_MakeAvailable(libxsmm_src)
   set(ETOPS_LIBXSMM_INCLUDE_DIR "${libxsmm_src_SOURCE_DIR}/include")
+  # Drop instrumentation from the libxsmm target itself
+  if(NOT "${ETOPS_SANITIZERS}" STREQUAL "" AND TARGET xsmm)
+    target_compile_options(xsmm PRIVATE -fno-sanitize=all)
+  endif()
 endif()
 
 # ----------------------------------------------------------------------------

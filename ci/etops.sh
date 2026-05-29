@@ -29,7 +29,7 @@ uv pip install -ve ".[test]"
 # Normal runs honor pyproject's `-m 'not slow'`. ETOPS_RUN_SLOW=1 runs the full
 # suite (slow TCCG + everything else) at the active Hypothesis profile.
 if [[ "${ETOPS_RUN_SLOW:-0}" == "1" ]]; then
-  pytest tests/ -m "slow or not slow"
+  LD_PRELOAD="${ETOPS_LD_PRELOAD:-}" pytest tests/ -m "slow or not slow"
 else
-  pytest tests/
+  LD_PRELOAD="${ETOPS_LD_PRELOAD:-}" pytest tests/
 fi

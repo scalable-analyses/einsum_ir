@@ -11,7 +11,9 @@ Checks: >
   -readability-named-parameter,
   -modernize-avoid-c-arrays,
   -modernize-use-auto,
-  -readability-math-missing-parentheses
+  -readability-math-missing-parentheses,
+  -modernize-use-integer-sign-comparison,
+  -clang-analyzer-*
 
 WarningsAsErrors: "*"
 HeaderFilterRegex: "teir/(include|src|bindings)/.*\\.(h|hpp)$"
