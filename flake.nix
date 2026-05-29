@@ -2,7 +2,7 @@
   description = "Tiled Execution IR (TEIR) — reproducible development shell";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -12,8 +12,8 @@
         pkgs = import nixpkgs { inherit system; };
         python = pkgs.python311;
         cppToolchain = if pkgs.stdenv.isDarwin
-          then pkgs.llvmPackages_16.clang
-          else pkgs.gcc12;
+          then pkgs.clang
+          else pkgs.gcc;
         commonInputs = [
           python
           python.pkgs.pip
