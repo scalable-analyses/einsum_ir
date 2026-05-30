@@ -26,10 +26,17 @@ fi
 
 uv pip install -ve ".[test]"
 
-# Normal runs honor pyproject's `-m 'not slow'`. ETOPS_RUN_SLOW=1 runs the full
-# suite (slow TCCG + everything else) at the active Hypothesis profile.
+# Build the pytest argument list. ETOPS_RUN_SLOW=1 also runs the slow TCCG
+# corpus; normal runs honor pyproject's `-m 'not slow'`.
+pytest_args=(tests/)
 if [[ "${ETOPS_RUN_SLOW:-0}" == "1" ]]; then
-  LD_PRELOAD="${ETOPS_LD_PRELOAD:-}" pytest tests/ -m "slow or not slow"
+  pytest_args+=(-m "slow or not slow")
+fi
+
+if [[ -n "${ETOPS_LD_PRELOAD:-}" ]]; then
+  export LD_PRELOAD="${ETOPS_LD_PRELOAD}"
+  setarch "$(uname -m)" -R python -c "import etops._native"
+  setarch "$(uname -m)" -R pytest -s "${pytest_args[@]}"
 else
-  LD_PRELOAD="${ETOPS_LD_PRELOAD:-}" pytest tests/
+  pytest "${pytest_args[@]}"
 fi
