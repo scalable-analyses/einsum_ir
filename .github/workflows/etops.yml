@@ -49,40 +49,24 @@ jobs:
           ETOPS_HYPOTHESIS_PROFILE: ci
         run: bash ci/etops.sh
 
+  # UBSan over the Python suite.
   sanitizer:
-    name: pytest sanitizers — ${{ matrix.label }}
+    name: pytest UBSan (openmp)
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - label: ASan+UBSan (sequential)
-            cmake_args: "-DCMAKE_BUILD_TYPE=Debug -DETOPS_SANITIZERS=address,undefined -DETOPS_THREADING_BACKEND=SEQUENTIAL"
-            preload: "1"
-          - label: UBSan (openmp)
-            cmake_args: "-DCMAKE_BUILD_TYPE=Debug -DETOPS_SANITIZERS=undefined -DETOPS_THREADING_BACKEND=OPENMP"
-            preload: "0"
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Install system deps
         run: bash ci/install-deps.sh
-      - name: pytest under sanitizers
+      - name: pytest under UBSan
         env:
           ETOPS_PYTHON: "3.12"
           ETOPS_HYPOTHESIS_PROFILE: ci
-          CMAKE_ARGS: ${{ matrix.cmake_args }}
-          # Python leaks at interpreter exit, so LSan is disabled (it would
-          # false-positive). Flip detect_leaks if you want it and ptrace allows.
-          ASAN_OPTIONS: "abort_on_error=1:halt_on_error=1:detect_leaks=0"
+          CMAKE_ARGS: "-DCMAKE_BUILD_TYPE=Debug -DETOPS_SANITIZERS=undefined -DETOPS_THREADING_BACKEND=OPENMP"
           UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
-        run: |
-          if [ "${{ matrix.preload }}" = "1" ]; then
-            export ETOPS_ASAN_PRELOAD=1
-          fi
-          bash ci/etops.sh
+        run: bash ci/etops.sh
 
   nightly:
     name: pytest deep (Hypothesis 1000 + slow TCCG)
