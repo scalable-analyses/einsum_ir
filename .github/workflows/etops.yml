@@ -79,12 +79,8 @@ jobs:
           ASAN_OPTIONS: "abort_on_error=1:halt_on_error=1:detect_leaks=0"
           UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
         run: |
-          # On Fedora `gcc -print-file-name=libasan.so` is a linker script, not
-          # the DSO, so resolve the real versioned libasan and let ci/etops.sh
-          # preload it for the pytest call only (UBSan needs no preload).
           if [ "${{ matrix.preload }}" = "1" ]; then
-            asan_dir=$(dirname "$(gcc -print-file-name=libasan.so)")
-            export ETOPS_LD_PRELOAD=$(ls "$asan_dir"/libasan.so.* | head -n1)
+            export ETOPS_ASAN_PRELOAD=1
           fi
           bash ci/etops.sh
 
